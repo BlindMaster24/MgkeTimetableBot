@@ -9,6 +9,7 @@ import { AbstractCallback, AbstractCommand, AbstractCommandContext } from "./abs
 import { BotChat } from "./chat";
 import { BotCron } from "./cron";
 import { BotEventController } from "./events/controller";
+import "./subscriptions/model";
 
 const cmdRootPath = path.join(__dirname, 'commands');
 const cbRootPath = path.join(__dirname, 'callbacks');

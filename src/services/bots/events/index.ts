@@ -10,6 +10,7 @@ import { MessageOptions } from "../abstract";
 import { BotServiceName } from "../abstract/command";
 import { AbstractServiceChat, BotChat, ChatMode } from "../chat";
 import { StaticKeyboard } from "../keyboard";
+import { Subscription, SubscriptionType } from "../subscriptions/model";
 
 function getDayPhrase(day: string, nextDayPhrase: string = 'день'): string {
     if (WeekIndex.fromStringDate(day).isFutureWeek()) {
@@ -95,6 +96,40 @@ export abstract class AbstractBotEventListener {
         });
     }
 
+    protected async getSubscribedChats(type: SubscriptionType, value: string, where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
+        const subscriptions = await Subscription.findAll({
+            attributes: ['chatId'],
+            where: {
+                type,
+                value
+            }
+        });
+
+        const chatIds = subscriptions.map((sub) => sub.chatId);
+        if (chatIds.length === 0) {
+            return [];
+        }
+
+        return this.getChats(Object.assign({
+            id: chatIds
+        }, where));
+    }
+
+    protected mergeChats(base: BotChat[], extra: BotChat[]): BotChat[] {
+        if (extra.length === 0) {
+            return base;
+        }
+
+        const known = new Set(base.map((chat) => chat.id));
+        for (const chat of extra) {
+            if (!known.has(chat.id)) {
+                base.push(chat);
+            }
+        }
+
+        return base;
+    }
+
     protected async getGroupsChats<T>(group: string | string[], where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
         return this.getChats(Object.assign({
             group: group,
@@ -176,7 +211,7 @@ export abstract class AbstractBotEventListener {
                 const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
                 const message: string = [
-                    `📢 Расписание на ${phrase}\n`,
+                    `📢 Группа ${group}: расписание на ${phrase}\n`,
                     formatter.formatGroupFull(group, {
                         showHeader: false,
                         days: [day]
@@ -189,7 +224,9 @@ export abstract class AbstractBotEventListener {
     }
 
     public async addGroupDay({ day, group }: GroupDayEvent) {
-        const chats: BotChat[] = await this.getGroupsChats(group, { noticeChanges: true });
+        const baseChats: BotChat[] = await this.getGroupsChats(group, { noticeChanges: true });
+        const subscriptionChats = await this.getSubscribedChats('group', group, { noticeChanges: true });
+        const chats = this.mergeChats(baseChats, subscriptionChats);
         if (chats.length === 0) return;
 
         const phrase: string = getDayPhrase(day.day, 'следующий день');
@@ -198,7 +235,7 @@ export abstract class AbstractBotEventListener {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
             const message: string = [
-                `📢 Расписание на ${phrase}\n`,
+                `📢 Группа ${group}: расписание на ${phrase}\n`,
                 formatter.formatGroupFull(group, {
                     showHeader: false,
                     days: [day]
@@ -210,7 +247,9 @@ export abstract class AbstractBotEventListener {
     }
 
     public async updateGroupDay({ day, group }: GroupDayEvent) {
-        const chats: BotChat[] = await this.getGroupsChats(group, { noticeChanges: true });
+        const baseChats: BotChat[] = await this.getGroupsChats(group, { noticeChanges: true });
+        const subscriptionChats = await this.getSubscribedChats('group', group, { noticeChanges: true });
+        const chats = this.mergeChats(baseChats, subscriptionChats);
         if (chats.length === 0) return;
 
         const phrase: string = getDayPhrase(day.day);
@@ -219,7 +258,7 @@ export abstract class AbstractBotEventListener {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
             const message: string = [
-                `🆕 Изменено расписание ${phrase}\n`,
+                `🆕 Группа ${group}: изменено расписание ${phrase}\n`,
                 formatter.formatGroupFull(group, {
                     showHeader: false,
                     days: [day]
@@ -291,7 +330,7 @@ export abstract class AbstractBotEventListener {
                 const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
                 const message: string = [
-                    `📢 Расписание на ${phrase}\n`,
+                    `📢 Преподаватель ${teacher}: расписание на ${phrase}\n`,
                     formatter.formatTeacherFull(teacher, {
                         showHeader: false,
                         days: [day]
@@ -304,7 +343,9 @@ export abstract class AbstractBotEventListener {
     }
 
     public async addTeacherDay({ day, teacher }: TeacherDayEvent) {
-        const chats: BotChat[] = await this.getTeachersChats(teacher, { noticeChanges: true });
+        const baseChats: BotChat[] = await this.getTeachersChats(teacher, { noticeChanges: true });
+        const subscriptionChats = await this.getSubscribedChats('teacher', teacher, { noticeChanges: true });
+        const chats = this.mergeChats(baseChats, subscriptionChats);
         if (chats.length === 0) return;
 
         const phrase: string = getDayPhrase(day.day, 'следующий день');
@@ -313,7 +354,7 @@ export abstract class AbstractBotEventListener {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
             const message: string = [
-                `📢 Расписание на ${phrase}\n`,
+                `📢 Преподаватель ${teacher}: расписание на ${phrase}\n`,
                 formatter.formatTeacherFull(teacher, {
                     showHeader: false,
                     days: [day]
@@ -325,7 +366,9 @@ export abstract class AbstractBotEventListener {
     }
 
     public async updateTeacherDay({ day, teacher }: TeacherDayEvent) {
-        const chats: BotChat[] = await this.getTeachersChats(teacher, { noticeChanges: true });
+        const baseChats: BotChat[] = await this.getTeachersChats(teacher, { noticeChanges: true });
+        const subscriptionChats = await this.getSubscribedChats('teacher', teacher, { noticeChanges: true });
+        const chats = this.mergeChats(baseChats, subscriptionChats);
         if (chats.length === 0) return;
 
         const phrase: string = getDayPhrase(day.day);
@@ -334,7 +377,7 @@ export abstract class AbstractBotEventListener {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
             const message: string = [
-                `🆕 Изменено расписание ${phrase}\n`,
+                `🆕 Преподаватель ${teacher}: изменено расписание ${phrase}\n`,
                 formatter.formatTeacherFull(teacher, {
                     showHeader: false,
                     days: [day]
@@ -366,9 +409,10 @@ export abstract class AbstractBotEventListener {
                     return group;
                 });
 
-                chats = await this.getGroupsChats(groups, { noticeNextWeek: true });
+                const baseChats = await this.getGroupsChats(groups, { noticeNextWeek: true });
+                const baseIds = new Set(baseChats.map((chat) => chat.id));
 
-                for (const chat of chats) {
+                for (const chat of baseChats) {
                     await this.sendMessage(chat, message, {
                         keyboard: chat.group ? StaticKeyboard.GetWeekTimetable({
                             type: 'group',
@@ -378,6 +422,26 @@ export abstract class AbstractBotEventListener {
                             weekIndex
                         }) : undefined
                     });
+                }
+
+                for (const group of groups) {
+                    const subscriptionChats = await this.getSubscribedChats('group', group, { noticeNextWeek: true });
+                    for (const chat of subscriptionChats) {
+                        if (baseIds.has(chat.id)) {
+                            continue;
+                        }
+
+                        const scopedMessage = `🆕 Группа ${group}: доступно расписание на следующую неделю`;
+                        await this.sendMessage(chat, scopedMessage, {
+                            keyboard: StaticKeyboard.GetWeekTimetable({
+                                type: 'group',
+                                value: group,
+                                showHeader: false,
+                                label: '📃 Показать',
+                                weekIndex
+                            })
+                        });
+                    }
                 }
 
                 return;
@@ -396,9 +460,10 @@ export abstract class AbstractBotEventListener {
                     return teacher;
                 });
 
-                chats = await this.getTeachersChats(teachers, { noticeNextWeek: true });
+                const baseChats = await this.getTeachersChats(teachers, { noticeNextWeek: true });
+                const baseIds = new Set(baseChats.map((chat) => chat.id));
 
-                for (const chat of chats) {
+                for (const chat of baseChats) {
                     await this.sendMessage(chat, message, {
                         keyboard: chat.teacher ? StaticKeyboard.GetWeekTimetable({
                             type: 'teacher',
@@ -408,6 +473,26 @@ export abstract class AbstractBotEventListener {
                             weekIndex
                         }) : undefined
                     });
+                }
+
+                for (const teacher of teachers) {
+                    const subscriptionChats = await this.getSubscribedChats('teacher', teacher, { noticeNextWeek: true });
+                    for (const chat of subscriptionChats) {
+                        if (baseIds.has(chat.id)) {
+                            continue;
+                        }
+
+                        const scopedMessage = `🆕 Преподаватель ${teacher}: доступно расписание на следующую неделю`;
+                        await this.sendMessage(chat, scopedMessage, {
+                            keyboard: StaticKeyboard.GetWeekTimetable({
+                                type: 'teacher',
+                                value: teacher,
+                                showHeader: false,
+                                label: '📃 Показать',
+                                weekIndex
+                            })
+                        });
+                    }
                 }
 
                 return;

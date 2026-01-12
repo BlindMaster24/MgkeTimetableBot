@@ -99,7 +99,7 @@ export class Keyboard {
     }
 
     public get SettingsMain() {
-        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsMain');
+        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsMain');  
 
         return keyboard.add({
             text: '📚 Первоначальная настройка',
@@ -111,6 +111,8 @@ export class Keyboard {
         }).row().add({
             text: '🔊 Оповещения'
         }).add({
+            text: '🔔 Подписки'
+        }).add({
             text: '🖼️ Отображение'
         }).row().add({
             text: 'Показать текущие',
@@ -119,6 +121,29 @@ export class Keyboard {
             text: 'Главное меню',
             color: KeyboardColor.SECONDARY_COLOR
         })
+    }
+
+    public get SubscriptionsMenu(): KeyboardBuilder {
+        return new KeyboardBuilder('SubscriptionsMenu')
+            .add({
+                text: '➕ Группа',
+                color: KeyboardColor.PRIMARY_COLOR
+            }).add({
+                text: '➕ Преподаватель',
+                color: KeyboardColor.PRIMARY_COLOR
+            }).row().add({
+                text: '📋 Мои подписки'
+            }).add({
+                text: '❌ Удалить подписку'
+            }).add({
+                text: '🧪 Проверить'
+            }).row().add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            }).add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsButtons() {
