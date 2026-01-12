@@ -46,16 +46,15 @@ export default class extends AbstractCommand {
         let weekIndex = WeekIndex.getRelevant();
         let weekRange = weekIndex.getWeekDayIndexRange();
 
-        let days = await this.app.getService('timetable').getGroupDaysByRange(weekRange, chat.group);
+        const weekDays = await this.app.getService('timetable').getGroupDaysByRange(weekRange, chat.group);
+        let days = weekDays;
         if (chat.hidePastDays) {
             days = removePastDays(days);
-        }
-
-        if (days.length === 0) {
-            weekIndex = weekIndex.getNextWeekIndex();
-            weekRange = weekIndex.getWeekDayIndexRange();
-
-            days = await this.app.getService('timetable').getGroupDaysByRange(weekRange, chat.group);
+            if (days.length === 0 && weekDays.length > 0) {
+                weekIndex = weekIndex.getNextWeekIndex();
+                weekRange = weekIndex.getWeekDayIndexRange();
+                days = await this.app.getService('timetable').getGroupDaysByRange(weekRange, chat.group);
+            }
         }
 
         actions.deleteLastMsg();
