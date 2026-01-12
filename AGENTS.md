@@ -63,7 +63,16 @@
   - chore: prepare 0.4.2 release
 - PRs should include a clear description, related issues, and the commands you ran (e.g., `npm run ts-check`).
 - For behavior or asset changes, include before/after notes.
+- Always check `git status` before committing.
+- Stage files explicitly (e.g., `git add path/to/file`); do not use `git add .`.
 
 ## Configuration & Security
 - Copy `config.example.ts` to `config.ts` for local setup.
 - Keep secrets out of git and avoid committing local DB files (e.g., `sqlite3.db`).
+
+## Bot Behavior Notes
+- Core flow: `src/index.ts` bootstraps; `src/app.ts` registers services and starts them after DB sync.
+- Schedule parsing relies on site HTML; keep selectors tolerant to layout changes and add fallbacks.
+- Parser cache lives under `./cache/rasp/` and emits update events; avoid clearing keys unless requested.
+- Bots: commands live in `src/services/bots/commands/`, callbacks in `src/services/bots/callbacks/`, keyboards in `src/services/bots/keyboard/`.
+- Timetable formatting lives in `src/formatter/`; domain objects live in `src/services/timetable/`.
