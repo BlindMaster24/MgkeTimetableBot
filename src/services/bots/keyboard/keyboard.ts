@@ -84,6 +84,12 @@ export class Keyboard {
             text: '⚙️ Настройки',
             color: KeyboardColor.SECONDARY_COLOR
         })
+        if (this.chat.mode === 'teacher') {
+            keyboard.add({
+                text: '📚 История',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+        }
         if (this.chat.showAbout) keyboard.add({
             text: '💡 О боте',
             color: KeyboardColor.SECONDARY_COLOR

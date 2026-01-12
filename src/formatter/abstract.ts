@@ -9,22 +9,26 @@ import { DayIndex, StringDate, formatSeconds } from "../utils/time";
 
 export type InputFormatGroupOptions = {
     showHeader?: boolean,
-    days?: GroupDay[]
+    days?: GroupDay[],
+    weekLabel?: string
 }
 
 export type InputFormatTeacherOptions = {
     showHeader?: boolean,
-    days?: TeacherDay[]
+    days?: TeacherDay[],
+    weekLabel?: string
 }
 
 export type FormatGroupOptions = {
     showHeader: boolean,
-    days: GroupDay[]
+    days: GroupDay[],
+    weekLabel?: string
 }
 
 export type FormatTeacherOptions = {
     showHeader: boolean,
-    days: TeacherDay[]
+    days: TeacherDay[],
+    weekLabel?: string
 }
 
 export type GroupLessonOptions = {
@@ -78,6 +82,9 @@ export abstract class ScheduleFormatter {
         if (options.showHeader) {
             text.push(this.GroupHeader(group))
         }
+        if (options.weekLabel) {
+            text.push(options.weekLabel);
+        }
 
         if (options.days.length > 0) {
             for (const day of options.days) {
@@ -101,6 +108,9 @@ export abstract class ScheduleFormatter {
         const text: string[] = [];
         if (options.showHeader) {
             text.push(this.TeacherHeader(teacher));
+        }
+        if (options.weekLabel) {
+            text.push(options.weekLabel);
         }
 
         if (options.days.length > 0) {
@@ -212,14 +222,16 @@ export abstract class ScheduleFormatter {
     protected getDefaultFormatGroupOptions(options: InputFormatGroupOptions | undefined, group: string): FormatGroupOptions {
         return Object.assign({}, {
             showHeader: false,
-            days: this.raspCache.groups.timetable[group].days
+            days: this.raspCache.groups.timetable[group].days,
+            weekLabel: undefined
         }, options)
     }
 
     protected getDefaultFormatTeacherOptions(options: InputFormatTeacherOptions | undefined, teacher: string): FormatTeacherOptions {
         return Object.assign({}, {
             showHeader: false,
-            days: this.raspCache.teachers.timetable[teacher].days
+            days: this.raspCache.teachers.timetable[teacher].days,
+            weekLabel: undefined
         }, options)
     }
 

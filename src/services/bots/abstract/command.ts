@@ -214,5 +214,16 @@ export abstract class AbstractCommand {
 
         return matched[0];
     }
+
+    protected buildTeacherPrompt(keyboard: Keyboard, example?: string): string {
+        const hasHistory = keyboard.TeacherHistory.buttons.length > 0;
+        const base = hasHistory
+            ? 'Введите фамилию преподавателя или выберите из списка ниже'
+            : 'Введите фамилию преподавателя';
+        if (example) {
+            return `${base} (например, ${example})`;
+        }
+        return base;
+    }
 }
 

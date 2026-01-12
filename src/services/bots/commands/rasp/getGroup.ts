@@ -1,5 +1,5 @@
 import { TelegramBotCommand } from "puregram/generated";
-import { WeekIndex, getDayRasp, randArray } from "../../../../utils";
+import { StringDate, WeekIndex, getDayRasp, randArray } from "../../../../utils";
 import { ImageFile } from "../../../image/builder";
 import { raspCache } from "../../../parser";
 import { AbstractCommand, CmdHandlerParams, MessageOptions } from "../../abstract";
@@ -102,7 +102,8 @@ export default class GetGroupCommand extends AbstractCommand {
 
         const message = formatter.formatGroupFull(String(group), {
             showHeader: true,
-            days: days
+            days: days,
+            weekLabel: this.getAcademicWeekLabel(weekIndex)
         });
 
         const options: MessageOptions = {
@@ -114,6 +115,12 @@ export default class GetGroupCommand extends AbstractCommand {
         }
 
         return context.send(message, options);
+    }
+
+    private getAcademicWeekLabel(weekIndex: WeekIndex): string {
+        const [start, end] = weekIndex.getWeekRange();
+        const weekNumber = weekIndex.getAcademicWeekNumber();
+        return `Учебная неделя №${weekNumber} (${StringDate.fromDate(start).toStringDate()}-${StringDate.fromDate(end).toStringDate()})`;
     }
 
     private async sendImage(group: string, initiator: InputInitiator, { context }: CmdHandlerParams) {

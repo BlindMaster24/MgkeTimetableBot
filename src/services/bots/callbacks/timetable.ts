@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { WeekIndex, removePastDays } from "../../../utils";
+import { StringDate, WeekIndex, removePastDays } from "../../../utils";
 import { raspCache } from "../../parser";
 import { AbstractCallback, CbHandlerParams } from "../abstract";
 
@@ -46,8 +46,10 @@ export default class extends AbstractCallback {
             days = removePastDays(days);
         }
 
-        const message = scheduleFormatter.formatGroupFull(String(value), {
-            showHeader, days
+        const message = scheduleFormatter.formatGroupFull(String(value), {      
+            showHeader,
+            days,
+            weekLabel: this.getAcademicWeekLabel(weekIndex)
         });
 
         return context.editOrSend(message, {
@@ -68,11 +70,20 @@ export default class extends AbstractCallback {
         }
 
         const message = scheduleFormatter.formatTeacherFull(value, {
-            showHeader, days
+            showHeader,
+            days,
+            weekLabel: this.getAcademicWeekLabel(weekIndex)
         });
 
         return context.editOrSend(message, {
             keyboard: await keyboard.WeekControl('teacher', value, weekIndex, hidePastDays, showHeader)
         });
+    }
+
+    private getAcademicWeekLabel(weekIndex: number): string {
+        const week = WeekIndex.fromWeekIndexNumber(weekIndex);
+        const [start, end] = week.getWeekRange();
+        const weekNumber = week.getAcademicWeekNumber();
+        return `Учебная неделя №${weekNumber} (${StringDate.fromDate(start).toStringDate()}-${StringDate.fromDate(end).toStringDate()})`;
     }
 }

@@ -1,5 +1,5 @@
 import { TelegramBotCommand } from 'puregram/generated';
-import { WeekIndex, randArray, removePastDays } from "../../../../utils";
+import { StringDate, WeekIndex, randArray, removePastDays } from "../../../../utils";
 import { raspCache } from '../../../parser';
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 import { StaticKeyboard } from '../../keyboard';
@@ -62,7 +62,8 @@ export default class extends AbstractCommand {
 
         const message = formatter.formatGroupFull(String(chat.group), {
             showHeader: false,
-            days: days
+            days: days,
+            weekLabel: this.getAcademicWeekLabel(weekIndex)
         });
 
         actions.deleteUserMsg();
@@ -102,7 +103,8 @@ export default class extends AbstractCommand {
 
         const message = formatter.formatTeacherFull(chat.teacher, {
             showHeader: false,
-            days: days
+            days: days,
+            weekLabel: this.getAcademicWeekLabel(weekIndex)
         });
 
         actions.deleteUserMsg();
@@ -110,5 +112,11 @@ export default class extends AbstractCommand {
         return context.send(message, {
             keyboard: await keyboard.WeekControl('teacher', chat.teacher, weekIndex.valueOf(), chat.hidePastDays)
         }).then(context => actions.handlerLastMsgUpdate(context));
+    }
+
+    private getAcademicWeekLabel(weekIndex: WeekIndex): string {
+        const [start, end] = weekIndex.getWeekRange();
+        const weekNumber = weekIndex.getAcademicWeekNumber();
+        return `Учебная неделя №${weekNumber} (${StringDate.fromDate(start).toStringDate()}-${StringDate.fromDate(end).toStringDate()})`;
     }
 }

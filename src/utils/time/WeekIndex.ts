@@ -57,6 +57,33 @@ export class WeekIndex {
         return new this(value);
     }
 
+    public static getAcademicYearStartDate(date: Date) {
+        const year = date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1;
+        const start = new Date(year, 8, 1);
+        const day = start.getDay();
+        if (day === 1) {
+            return start;
+        }
+        if (day === 0) {
+            start.setDate(start.getDate() + 1);
+            return start;
+        }
+        start.setDate(start.getDate() + (8 - day));
+        return start;
+    }
+
+    public static getAcademicWeekNumber(date: Date) {
+        const start = this.getAcademicYearStartDate(date);
+        const diff = date.getTime() - start.getTime();
+        return Math.floor(diff / ONE_WEEK) + 1;
+    }
+
+    public static fromAcademicWeekNumber(weekNumber: number, date: Date = new Date()) {
+        const start = this.getAcademicYearStartDate(date);
+        const target = new Date(start.getTime() + ONE_WEEK * (weekNumber - 1));
+        return this.fromDate(target);
+    }
+
     private constructor(private value: number) { }
 
     public valueOf(): number {
@@ -76,6 +103,10 @@ export class WeekIndex {
         const d2 = new Date(d1.getTime() + ONE_DAY * 6);
 
         return [d1, d2];
+    }
+
+    public getAcademicWeekNumber(): number {
+        return WeekIndex.getAcademicWeekNumber(this.getFirstDayDate());
     }
 
     public getWeekDayIndexRange(): [number, number] {
