@@ -320,6 +320,22 @@ export class ParserService implements AppService {
             const jsdom = await this.getJSDOM(url);
 
             const parser = new Parser(jsdom.window);
+            const doc = jsdom.window.document;
+            const content = doc.querySelector('#main-p .content')
+                || doc.querySelector('.common-page-left-block .content')
+                || doc.querySelector('.entry .content')
+                || doc.querySelector('.common-page-left-block');
+            const tablesCount = content ? content.querySelectorAll('table').length : 0;
+            const h2Count = content ? content.querySelectorAll('h2').length : 0;
+            const h3Count = content ? content.querySelectorAll('h3').length : 0;
+            if (tablesCount > 0 && h2Count === 0) {
+                logger.error('structure check failed', {
+                    url,
+                    tablesCount,
+                    h2Count,
+                    h3Count
+                });
+            }
             const hash = parser.getContentHash();
 
             if (!config.parser.ignoreHash && !this._forceParse && hash === cache.hash) {

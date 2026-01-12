@@ -86,13 +86,13 @@ export const config: ConfigScheme = {
         },
         lessonIndexIfEmpty: 2, //Если сегодня пар нет - после данной пары отправятся сообщения людям
         endpoints: {
-            timetableGroup: 'https://mgkct.minskedu.gov.by/персоналии/учащимся/расписание-занятий-на-неделю',
-            timetableTeacher: 'https://mgkct.minskedu.gov.by/персоналии/преподавателям/расписание-занятий-на-неделю',
+            timetableGroup: 'https://mgkct.minskedu.gov.by/personnel/for-students/weekly-timetable',
+            timetableTeacher: 'https://mgkct.minskedu.gov.by/personnel/for-teachers/weekly-timetable',
             team: [
-                'https://mgkct.minskedu.gov.by/о-колледже/администрация-колледжа',
-                'https://mgkct.minskedu.gov.by/о-колледже/педагогический-коллектив',
-                'https://mgkct.minskedu.gov.by/о-колледже/cлужащие',
-                'https://mgkct.minskedu.gov.by/о-колледже/cлужащие-ахч'
+                'https://mgkct.minskedu.gov.by/about/administration',
+                'https://mgkct.minskedu.gov.by/about/teachers',
+                'https://mgkct.minskedu.gov.by/about/employees',
+                'https://mgkct.minskedu.gov.by/about/maintenance'
             ]
         },
         proxy: null

@@ -25,7 +25,10 @@ export abstract class AbstractParser {
     }
 
     protected get content(): Element {
-        const content = this.window.document.querySelector('#main-p .content');
+        const content = this.window.document.querySelector('#main-p .content')
+            || this.window.document.querySelector('.common-page-left-block .content')
+            || this.window.document.querySelector('.entry .content')
+            || this.window.document.querySelector('.common-page-left-block');
         if (!content) {
             throw new Error('cannot get page content');
         }
