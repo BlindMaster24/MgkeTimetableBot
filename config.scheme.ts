@@ -70,6 +70,18 @@ export type ConfigScheme = {
         syncMode: boolean,
         localMode: boolean,
         ignoreHash: boolean,
+        v2?: {
+            enabled: boolean,
+            fallbackToV1: boolean,
+            weekPolicy: 'preferCurrent' | 'current' | 'closest',
+            allowTwoTables: boolean,
+            strict: boolean,
+            diffLog: boolean,
+            diffLogLimit: number,
+            headerScanRows: number,
+            minDaysInTable: number,
+            maxLessonsPerDay: number
+        },
         end_hour: number,
         activity: [number, number],
         update_interval: {

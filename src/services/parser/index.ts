@@ -14,16 +14,22 @@ import { RaspEntryCache, TeamCache, loadCache, raspCache, saveCache } from './ra
 import TeacherParser from "./teacher"
 import TeamParser from "./team"
 import { Group, GroupDay, Groups, Teacher, TeacherDay, Teachers, Team } from './types'
+import StudentParserV2 from "./v2/group"
+import TeacherParserV2 from "./v2/teacher"
+import { diffGroups, diffTeachers } from "./v2/diff"
+import { validateGroups, validateTeachers } from "./v2/validate"
 
 const MAX_LOG_LIMIT: number = 10;
 const LOG_COUNT_SEND: number = 3;
 
-function onParser<T>(Parser: typeof StudentParser | typeof TeacherParser, onStudent: T, onTeacher: T): T {
-    if (Parser === StudentParser) {
+type TimetableParser = typeof StudentParser | typeof TeacherParser | typeof StudentParserV2 | typeof TeacherParserV2;
+
+function onParser<T>(Parser: TimetableParser, onStudent: T, onTeacher: T): T {
+    if (Parser === StudentParser || Parser === StudentParserV2) {
         return onStudent;
     }
 
-    if (Parser === TeacherParser) {
+    if (Parser === TeacherParser || Parser === TeacherParserV2) {
         return onTeacher;
     }
 
@@ -270,11 +276,19 @@ export class ParserService implements AppService {
 
         const PARSER_ACTIONS = [
             this.parseTimetable.bind(
-                this, StudentParser, encodeURI(config.parser.endpoints.timetableGroup), raspCache.groups
+                this,
+                config.parser.v2?.enabled ? StudentParserV2 : StudentParser,
+                encodeURI(config.parser.endpoints.timetableGroup),
+                raspCache.groups,
+                config.parser.v2?.enabled && config.parser.v2?.fallbackToV1 ? StudentParser : undefined
             ),
 
             this.parseTimetable.bind(
-                this, TeacherParser, encodeURI(config.parser.endpoints.timetableTeacher), raspCache.teachers
+                this,
+                config.parser.v2?.enabled ? TeacherParserV2 : TeacherParser,
+                encodeURI(config.parser.endpoints.timetableTeacher),
+                raspCache.teachers,
+                config.parser.v2?.enabled && config.parser.v2?.fallbackToV1 ? TeacherParser : undefined
             )
         ];
 
@@ -307,7 +321,7 @@ export class ParserService implements AppService {
         return Promise.all(promises);
     }
 
-    private async parseTimetable(Parser: typeof TeacherParser | typeof StudentParser, url: string, cache: RaspEntryCache<Teachers | Groups>) {
+    private async parseTimetable(Parser: TimetableParser, url: string, cache: RaspEntryCache<Teachers | Groups>, fallbackParser?: TimetableParser) {
         const logger = this.logger.extend(onParser<string>(Parser, 'Student', 'Teacher'));
 
         let data: Teachers | Groups;
@@ -348,7 +362,80 @@ export class ParserService implements AppService {
             cache.hash = hash;
 
             logger.log(`Парсинг данных (newHash: ${hash})...`);
-            data = parser.run();
+            const parseWith = (ParserClass: TimetableParser) => {
+                const instance = ParserClass === Parser ? parser : new ParserClass(jsdom.window);
+                return instance.run() as Teachers | Groups;
+            };
+
+            let parsed: Teachers | Groups | null = null;
+            let parseError: Error | null = null;
+            let usedParser: TimetableParser = Parser;
+            let v1Parsed: Teachers | Groups | null = null;
+
+            try {
+                parsed = parseWith(Parser);
+            } catch (e: any) {
+                parseError = e;
+            }
+
+            const isV2Parser = Parser === StudentParserV2 || Parser === TeacherParserV2;
+            const shouldDiff = Boolean(config.parser.v2?.diffLog && isV2Parser);
+            const v1Parser: TimetableParser = (Parser === StudentParser || Parser === StudentParserV2) ? StudentParser : TeacherParser;
+
+            if ((!parsed || Object.keys(parsed).length === 0) && fallbackParser) {
+                try {
+                    parsed = parseWith(fallbackParser);
+                    usedParser = fallbackParser;
+                    parseError = null;
+                } catch (e: any) {
+                    if (!parseError) {
+                        parseError = e;
+                    }
+                }
+            }
+
+            if (!parsed) {
+                if (parseError) {
+                    throw parseError;
+                }
+                return false;
+            }
+
+            if (isV2Parser && config.parser.v2?.strict) {
+                const maxLessons = config.parser.v2?.maxLessonsPerDay ?? 10;
+                const validation = onParser(usedParser, validateGroups(parsed as Groups, maxLessons), validateTeachers(parsed as Teachers, maxLessons));
+                if (!validation.ok) {
+                    if (fallbackParser && usedParser !== fallbackParser) {
+                        const fallbackParsed = parseWith(fallbackParser);
+                        const fallbackValidation = onParser(fallbackParser, validateGroups(fallbackParsed as Groups, maxLessons), validateTeachers(fallbackParsed as Teachers, maxLessons));
+                        if (!fallbackValidation.ok) {
+                            throw new Error(`v2 validation failed: ${validation.errors.join('; ')}`);
+                        }
+                        parsed = fallbackParsed;
+                        usedParser = fallbackParser;
+                    } else {
+                        throw new Error(`v2 validation failed: ${validation.errors.join('; ')}`);
+                    }
+                }
+            }
+
+            if (shouldDiff && usedParser === Parser) {
+                try {
+                    v1Parsed = parseWith(v1Parser);
+                } catch {
+                    v1Parsed = null;
+                }
+
+                if (v1Parsed) {
+                    const limit = config.parser.v2?.diffLogLimit ?? 20;
+                    const diffLines = onParser(Parser, diffGroups(parsed as Groups, v1Parsed as Groups, limit), diffTeachers(parsed as Teachers, v1Parsed as Teachers, limit));
+                    if (diffLines.length) {
+                        logger.log(`v2 diff (${diffLines.length})`, diffLines);
+                    }
+                }
+            }
+
+            data = parsed;
             logger.log('Обработка данных...');
         }
 
@@ -364,6 +451,39 @@ export class ParserService implements AppService {
 
             return bounds;
         }, []));
+
+        const [currentStart, currentEnd] = WeekIndex.now().getWeekDayIndexRange();
+        const entries = Object.values(data) as (Group | Teacher)[];
+        const hasCurrentWeekDays = entries.some((entry) => {
+            return entry.days.some((day: GroupDay | TeacherDay) => {
+                const dayIndex = DayIndex.fromStringDate(day.day).valueOf();
+                return dayIndex >= currentStart && dayIndex <= currentEnd;
+            });
+        });
+        const preserveCurrentWeek = config.parser.v2?.weekPolicy === 'preferCurrent' && !hasCurrentWeekDays;
+        const weekPolicy = config.parser.v2?.weekPolicy ?? 'preferCurrent';
+
+        if (config.parser.v2?.enabled && weekPolicy !== 'preferCurrent') {
+            const currentWeekIndex = WeekIndex.now().valueOf();
+            for (const entry of entries) {
+                const indexes = Array.from(new Set(entry.days.map((day: GroupDay | TeacherDay) => WeekIndex.fromStringDate(day.day).valueOf())));
+                let targetIndex = currentWeekIndex;
+
+                if (!indexes.includes(currentWeekIndex)) {
+                    if (weekPolicy === 'closest') {
+                        targetIndex = indexes.sort((a: number, b: number) => Math.abs(a - currentWeekIndex) - Math.abs(b - currentWeekIndex))[0];
+                    }
+                }
+
+                const filtered = entry.days.filter((day: GroupDay | TeacherDay) => {
+                    return WeekIndex.fromStringDate(day.day).valueOf() === targetIndex;
+                });
+
+                if (filtered.length > 0) {
+                    entry.days = filtered as any;
+                }
+            }
+        }
 
         // Полная очистка
         if (this._clearKeys) {
@@ -475,7 +595,9 @@ export class ParserService implements AppService {
             //удаление старых дней (удаляются дни, которые одновременно старше указанных на сайте и старше сегодняшнего дня)
             entry.days = (entry.days as any).filter((day: GroupDay | TeacherDay): boolean => {
                 const dayIndex = DayIndex.fromStringDate(day.day);
-                const keep: boolean = (dayIndex.isNotPast() || dayIndex.valueOf() >= siteMinimalDayIndex);
+                const inCurrentWeek = dayIndex.valueOf() >= currentStart && dayIndex.valueOf() <= currentEnd;
+                const keep: boolean = (preserveCurrentWeek && inCurrentWeek) ||
+                    (dayIndex.isNotPast() || dayIndex.valueOf() >= siteMinimalDayIndex);
 
                 if (!keep) {
                     flushLessons.push(onParser<ArchiveAppendDay>(Parser, {

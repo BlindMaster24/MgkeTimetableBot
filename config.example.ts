@@ -67,6 +67,18 @@ export const config: ConfigScheme = {
         syncMode: false, // Режим парсинга. false - параллельный (все запросы выполняются одновременно, пирсит быстрее, больше нагружает систему), true - последовательный (все запросы выполняются по очереди, парсит медленнее, меньше нагружает систему)
         localMode: false, // Используется только во время разработки (парсер не делает запросы к сайту, а читает json файл)
         ignoreHash: false,
+        v2: {
+            enabled: false,
+            fallbackToV1: true,
+            weekPolicy: 'preferCurrent',
+            allowTwoTables: true,
+            strict: false,
+            diffLog: false,
+            diffLogLimit: 20,
+            headerScanRows: 5,
+            minDaysInTable: 5,
+            maxLessonsPerDay: 10
+        },
         end_hour: 17,
         activity: [9, 17],
         update_interval: {

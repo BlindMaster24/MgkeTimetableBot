@@ -34,11 +34,23 @@
 - New formatter: implement in `src/formatter/` and wire in `src/formatter/index.ts`.
 
 ## Build, Test, and Development Commands
-- `npm install` installs dependencies.
-- `npm start` runs the bot via `ts-node .` (entry: `src/index.ts`).
-- `npm run ts-check` runs `tsc --noEmit` for type checking only.
+- `npm install` or `yarn install` installs dependencies.
+- `npm start` or `yarn start` runs the bot via `ts-node .` (entry: `src/index.ts`).
+- `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
 - `ts-node tests/inputTest.ts` runs the existing test script.
 - `ts-node scripts/findGroupBySameDays.ts` runs the utility script.
+- `ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
+
+## Verification Checklist
+- `npm run ts-check` or `yarn ts-check` for type safety after parser or command changes.
+- `npm start` or `yarn start` for a smoke run of parser/bot behavior (manual check).
+- `ts-node tests/parserV2Test.ts` after parser changes.
+- If you add tests, list the exact `ts-node ...` command in the PR description.
+
+## Parser v2
+- Enable in `config.ts` via `parser.v2.enabled`.
+- Keep `parser.v2.fallbackToV1` true for safe rollout.
+- Use `parser.v2.weekPolicy = 'preferCurrent'` to avoid switching to a future week.
 
 ## Coding Style & Naming Conventions
 - TypeScript is strict; keep `strict` assumptions (null checks, no implicit any).

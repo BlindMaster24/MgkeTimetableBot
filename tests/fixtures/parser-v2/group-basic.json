@@ -1,0 +1,46 @@
+{
+    "type": "group",
+    "expected": {
+        "101": {
+            "group": "101",
+            "days": [
+                {
+                    "day": "12.01.2026",
+                    "lessons": [
+                        {
+                            "lesson": "ТестПредмет",
+                            "type": "Лек",
+                            "teacher": "Иванов И. И.",
+                            "cabinet": "101",
+                            "comment": null
+                        }
+                    ]
+                },
+                {
+                    "day": "13.01.2026",
+                    "lessons": []
+                },
+                {
+                    "day": "14.01.2026",
+                    "lessons": [
+                        {
+                            "lesson": "ТестПредмет",
+                            "type": "Лек",
+                            "teacher": "Иванов И. И.",
+                            "cabinet": "102",
+                            "comment": null
+                        }
+                    ]
+                },
+                {
+                    "day": "15.01.2026",
+                    "lessons": []
+                },
+                {
+                    "day": "16.01.2026",
+                    "lessons": []
+                }
+            ]
+        }
+    }
+}
