@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { DOMWindow } from "jsdom";
+import { config } from "../../../config";
 import { StringDate } from "../../utils";
 import { GroupLesson, Groups } from "./types/group";
 import { TeacherLesson, Teachers } from "./types/teacher";
@@ -15,7 +16,14 @@ export abstract class AbstractParser {
     public abstract run(): object;
 
     public getContentHash(): string {
-        const content = this.content.innerHTML;
+        const hashMode = config.parser.v2?.hashMode ?? 'content';
+        let content: string;
+        if (hashMode === 'tables') {
+            const tables = Array.from(this.content.querySelectorAll('table') as NodeListOf<HTMLTableElement>);
+            content = tables.map((table) => table.outerHTML).join('\n');
+        } else {
+            content = this.content.innerHTML;
+        }
         const hash = createHash('sha256').update(content).digest('base64url');
         return hash;
     }

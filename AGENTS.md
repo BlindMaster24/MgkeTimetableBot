@@ -40,17 +40,24 @@
 - `ts-node tests/inputTest.ts` runs the existing test script.
 - `ts-node scripts/findGroupBySameDays.ts` runs the utility script.
 - `ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
+ - `ts-node tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
 
 ## Verification Checklist
 - `npm run ts-check` or `yarn ts-check` for type safety after parser or command changes.
 - `npm start` or `yarn start` for a smoke run of parser/bot behavior (manual check).
 - `ts-node tests/parserV2Test.ts` after parser changes.
 - If you add tests, list the exact `ts-node ...` command in the PR description.
+ - `GET /api/parser-health` (API key required) for parser status and metrics.
 
 ## Parser v2
 - Enable in `config.ts` via `parser.v2.enabled`.
 - Keep `parser.v2.fallbackToV1` true for safe rollout.
 - Use `parser.v2.weekPolicy = 'preferCurrent'` to avoid switching to a future week.
+- Use `parser.v2.sundayHoldCurrent = true` to avoid switching to a future week on Sundays.
+- Use `parser.v2.hashMode = 'tables'` to reduce noise from layout changes.
+- Use `parser.v2.quarantine` to block suspicious updates (too few lessons).
+- Raw HTML options: `parser.v2.rawHtml.enabled`, `dir`, `maxDays`, `storeDaily`, `replayPath`, `diffMaxLines`.
+- Metrics options: `parser.v2.metrics.enabled`, `dir`.
 
 ## Coding Style & Naming Conventions
 - TypeScript is strict; keep `strict` assumptions (null checks, no implicit any).

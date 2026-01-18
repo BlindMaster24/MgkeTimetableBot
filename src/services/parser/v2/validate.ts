@@ -6,6 +6,30 @@ type ValidationResult = {
     errors: string[]
 }
 
+function shuffle<T>(items: T[]): T[] {
+    const copy = items.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = copy[i];
+        copy[i] = copy[j];
+        copy[j] = tmp;
+    }
+    return copy;
+}
+
+function pickSample<T extends Group | Teacher>(entries: T[], sampleSize: number): T[] {
+    if (sampleSize <= 0 || entries.length <= sampleSize) {
+        return entries;
+    }
+
+    const withLessons = entries.filter((entry) => {
+        return entry.days.some((day) => day.lessons.length > 0);
+    });
+
+    const source = withLessons.length > 0 ? withLessons : entries;
+    return shuffle(source).slice(0, sampleSize);
+}
+
 function validateEntry(entry: Group | Teacher, maxLessonsPerDay: number): string[] {
     const errors: string[] = [];
 
@@ -42,7 +66,7 @@ function validateEntry(entry: Group | Teacher, maxLessonsPerDay: number): string
     return errors;
 }
 
-export function validateGroups(groups: Groups, maxLessonsPerDay: number): ValidationResult {
+export function validateGroups(groups: Groups, maxLessonsPerDay: number, sampleSize: number): ValidationResult {
     const errors: string[] = [];
     const entries = Object.values(groups);
 
@@ -50,11 +74,19 @@ export function validateGroups(groups: Groups, maxLessonsPerDay: number): Valida
         return { ok: false, errors: ['empty groups'] };
     }
 
-    for (const entry of entries) {
+    let hasLessons = false;
+    for (const entry of pickSample(entries, sampleSize)) {
         const entryErrors = validateEntry(entry, maxLessonsPerDay);
         if (entryErrors.length > 0) {
             errors.push(`${entry.group}: ${entryErrors.join(', ')}`);
         }
+        if (!hasLessons) {
+            hasLessons = entry.days.some((day) => day.lessons.length > 0);
+        }
+    }
+
+    if (!hasLessons) {
+        errors.push('no lessons in sample');
     }
 
     return {
@@ -63,7 +95,7 @@ export function validateGroups(groups: Groups, maxLessonsPerDay: number): Valida
     };
 }
 
-export function validateTeachers(teachers: Teachers, maxLessonsPerDay: number): ValidationResult {
+export function validateTeachers(teachers: Teachers, maxLessonsPerDay: number, sampleSize: number): ValidationResult {
     const errors: string[] = [];
     const entries = Object.values(teachers);
 
@@ -71,11 +103,19 @@ export function validateTeachers(teachers: Teachers, maxLessonsPerDay: number): 
         return { ok: false, errors: ['empty teachers'] };
     }
 
-    for (const entry of entries) {
+    let hasLessons = false;
+    for (const entry of pickSample(entries, sampleSize)) {
         const entryErrors = validateEntry(entry, maxLessonsPerDay);
         if (entryErrors.length > 0) {
             errors.push(`${entry.teacher}: ${entryErrors.join(', ')}`);
         }
+        if (!hasLessons) {
+            hasLessons = entry.days.some((day) => day.lessons.length > 0);
+        }
+    }
+
+    if (!hasLessons) {
+        errors.push('no lessons in sample');
     }
 
     return {

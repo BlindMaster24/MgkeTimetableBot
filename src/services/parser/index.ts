@@ -1,6 +1,7 @@
-import { readFileSync } from "fs"
+import { readFileSync, promises as fs, Dirent } from "fs"
 import got from "got"
 import { JSDOM } from "jsdom"
+import path from "path"
 import { config } from "../../../config"
 import { App, AppService } from "../../app"
 import { Logger } from "../../logger"
@@ -62,6 +63,7 @@ export class ParserService implements AppService {
 
     private _forceParse: boolean = false;
     private _clearKeys: boolean = false;
+    private _lastHtmlByUrl: Map<string, string> = new Map();
 
     constructor(private app: App) {
         loadCache();
@@ -435,6 +437,7 @@ export class ParserService implements AppService {
 
             if (!parsed) {
                 if (parseError) {
+                    await this.writeSnapshot(url, 'bad');
                     throw this.attachParserContext(parseError, Object.assign({
                         stage: 'parse',
                         parserUsed: usedParser.name,
@@ -445,13 +448,15 @@ export class ParserService implements AppService {
             }
 
             if (isV2Parser && config.parser.v2?.strict) {
-                const maxLessons = config.parser.v2?.maxLessonsPerDay ?? 10;
-                const validation = onParser(usedParser, validateGroups(parsed as Groups, maxLessons), validateTeachers(parsed as Teachers, maxLessons));
+                const maxLessons = config.parser.v2?.maxLessonsPerDay ?? 6;
+                const sampleSize = config.parser.v2?.validationSample ?? 5;
+                const validation = onParser(usedParser, validateGroups(parsed as Groups, maxLessons, sampleSize), validateTeachers(parsed as Teachers, maxLessons, sampleSize));
                 if (!validation.ok) {
                     if (fallbackParser && usedParser !== fallbackParser) {
                         const fallbackParsed = parseWith(fallbackParser);
-                        const fallbackValidation = onParser(fallbackParser, validateGroups(fallbackParsed as Groups, maxLessons), validateTeachers(fallbackParsed as Teachers, maxLessons));
+                        const fallbackValidation = onParser(fallbackParser, validateGroups(fallbackParsed as Groups, maxLessons, sampleSize), validateTeachers(fallbackParsed as Teachers, maxLessons, sampleSize));
                         if (!fallbackValidation.ok) {
+                            await this.writeSnapshot(url, 'bad');
                             throw this.attachParserContext(new Error(`v2 validation failed: ${validation.errors.join('; ')}`), Object.assign({
                                 stage: 'validate',
                                 parserUsed: usedParser.name,
@@ -463,6 +468,7 @@ export class ParserService implements AppService {
                         usedParser = fallbackParser;
                         fallbackUsed = true;
                     } else {
+                        await this.writeSnapshot(url, 'bad');
                         throw this.attachParserContext(new Error(`v2 validation failed: ${validation.errors.join('; ')}`), Object.assign({
                             stage: 'validate',
                             parserUsed: usedParser.name,
@@ -490,10 +496,34 @@ export class ParserService implements AppService {
             }
 
             data = parsed;
+            await this.writeSnapshot(url, 'good');
             logger.log('Обработка данных...');
         }
 
         if (Object.keys(data).length == 0) return false;
+
+        if (config.parser.v2?.enabled && config.parser.v2?.quarantine?.enabled) {
+            const minLessons = config.parser.v2?.quarantine?.minLessons ?? 1;
+            const entries = Object.values(data) as (Group | Teacher)[];
+            const totalLessons = entries.reduce((total: number, entry) => {
+                return total + entry.days.reduce((sum: number, day) => {
+                    return sum + day.lessons.filter((lesson) => lesson !== null).length;
+                }, 0);
+            }, 0);
+
+            if (totalLessons < minLessons) {
+                const error = this.attachParserContext(new Error('quarantine: too few lessons'), {
+                    stage: 'quarantine',
+                    minLessons,
+                    totalLessons,
+                    parser: Parser.name,
+                    url
+                });
+                this.events.emit('error', error);
+                await this.writeSnapshot(url, 'bad');
+                return false;
+            }
+        }
 
         const siteMinimalDayIndex: number = Math.min(...Object.entries(data).reduce<number[]>((bounds: number[], [, entry]): number[] => {
             for (const day of entry.days) {
@@ -695,6 +725,19 @@ export class ParserService implements AppService {
             this.events.emit('updateWeek', chatMode, maxWeekIndex);
         }
 
+        const weekJumpThreshold = config.parser.v2?.weekJumpThreshold ?? 1;
+        if (cache.lastWeekIndex && maxWeekIndex - cache.lastWeekIndex > weekJumpThreshold) {
+            const error = this.attachParserContext(new Error('week jump detected'), {
+                stage: 'week-jump',
+                previousWeek: cache.lastWeekIndex,
+                nextWeek: maxWeekIndex,
+                parser: Parser.name
+            });
+            this.events.emit('error', error);
+        }
+
+        await this.writeMetrics(onParser(Parser, 'student', 'teacher'), data, cache.hash);
+
         cache.lastWeekIndex = maxWeekIndex;
         cache.update = Date.now();
         logger.log('Успех');
@@ -783,16 +826,184 @@ export class ParserService implements AppService {
             //TODO PROXY AGENT
         }
 
+        const replayPath = config.parser.v2?.rawHtml?.replayPath;
+        if (replayPath) {
+            const body = await fs.readFile(replayPath, 'utf8');
+            this._lastHtmlByUrl.set(url, body);
+            return new JSDOM(body);
+        }
+
         const response = await got({
             url: url,
             // agent: agent,
             headers: {
                 'User-Agent': 'MGKE timetable bot by Keller (https://github.com/Keller18306/MgkeTimetableBot)'
             },
-            retry: 0
+            retry: {
+                limit: config.parser.v2?.fetchRetry ?? 1,
+                methods: ['GET'],
+                statusCodes: [408, 413, 429, 500, 502, 503, 504],
+                errorCodes: ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN']
+            }
         });
 
+        this._lastHtmlByUrl.set(url, response.body);
+        await this.writeRawHtml(url, response.body);
         return new JSDOM(response.body);
+    }
+
+    private async writeRawHtml(url: string, body: string): Promise<void> {
+        const rawConfig = config.parser.v2?.rawHtml;
+        if (!rawConfig?.enabled) {
+            return;
+        }
+        if (rawConfig.storeDaily === false) {
+            return;
+        }
+
+        const { source, pathname } = this.getRawSourceInfo(url);
+
+        const day = new Date().toISOString().slice(0, 10);
+        const targetDir = rawConfig.dir || './cache/rasp/raw';
+        const dir = path.join(targetDir, source, day);
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, pathname), body, 'utf8');
+
+        const maxDays = rawConfig.maxDays ?? 0;
+        if (maxDays > 0) {
+            await this.cleanupRawHtml(path.join(targetDir, source), maxDays);
+        }
+    }
+
+    private getRawSourceInfo(url: string): { source: string, pathname: string } {
+        let pathname = 'page.html';
+        let source = 'other';
+        try {
+            const parsed = new URL(url);
+            pathname = path.basename(parsed.pathname) || pathname;
+            if (parsed.pathname.includes('for-students')) {
+                source = 'students';
+            } else if (parsed.pathname.includes('for-teachers')) {
+                source = 'teachers';
+            } else if (parsed.pathname.includes('about/')) {
+                source = 'teams';
+            }
+        } catch {
+            pathname = 'page.html';
+        }
+
+        return { source, pathname };
+    }
+
+    private async writeSnapshot(url: string, kind: 'good' | 'bad'): Promise<void> {
+        const rawConfig = config.parser.v2?.rawHtml;
+        if (!rawConfig?.enabled) {
+            return;
+        }
+
+        const body = this._lastHtmlByUrl.get(url);
+        if (!body) {
+            return;
+        }
+
+        const { source } = this.getRawSourceInfo(url);
+        const targetDir = rawConfig.dir || './cache/rasp/raw';
+        const sourceDir = path.join(targetDir, source);
+        await fs.mkdir(sourceDir, { recursive: true });
+
+        const snapshotPath = path.join(sourceDir, `last-${kind}.html`);
+        let previous = '';
+        try {
+            previous = await fs.readFile(snapshotPath, 'utf8');
+        } catch {
+            previous = '';
+        }
+
+        if (previous && previous !== body) {
+            await this.writeDiff(sourceDir, kind, previous, body);
+        }
+
+        await fs.writeFile(snapshotPath, body, 'utf8');
+    }
+
+    private async writeDiff(sourceDir: string, kind: 'good' | 'bad', previous: string, current: string): Promise<void> {
+        const prevLines = new Set(previous.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+        const nextLines = new Set(current.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+        const added = Array.from(nextLines).filter((line) => !prevLines.has(line));
+        const removed = Array.from(prevLines).filter((line) => !nextLines.has(line));
+
+        if (!added.length && !removed.length) {
+            return;
+        }
+
+        const diffDir = path.join(sourceDir, 'diff');
+        await fs.mkdir(diffDir, { recursive: true });
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const diffPath = path.join(diffDir, `diff-${kind}-${stamp}.txt`);
+        const maxLines = config.parser.v2?.rawHtml?.diffMaxLines ?? 200;
+        const payload = [
+            `added: ${added.length}`,
+            ...added.slice(0, maxLines),
+            '',
+            `removed: ${removed.length}`,
+            ...removed.slice(0, maxLines)
+        ].join('\n');
+        await fs.writeFile(diffPath, payload, 'utf8');
+    }
+
+    private async cleanupRawHtml(sourceDir: string, maxDays: number): Promise<void> {
+        let entries: Dirent[];
+        try {
+            entries = await fs.readdir(sourceDir, { withFileTypes: true });
+        } catch {
+            return;
+        }
+
+        const days = entries
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name)
+            .sort();
+
+        if (days.length <= maxDays) {
+            return;
+        }
+
+        const toRemove = days.slice(0, days.length - maxDays);
+        for (const day of toRemove) {
+            await fs.rm(path.join(sourceDir, day), { recursive: true, force: true });
+        }
+    }
+
+    private async writeMetrics(type: 'student' | 'teacher', data: Teachers | Groups, hash: string): Promise<void> {
+        const metricsConfig = config.parser.v2?.metrics;
+        if (!metricsConfig?.enabled) {
+            return;
+        }
+
+        const metricsDir = metricsConfig.dir || './cache/rasp/metrics';
+        await fs.mkdir(metricsDir, { recursive: true });
+
+        const entries = Object.values(data) as (Group | Teacher)[];
+        let daysCount = 0;
+        let lessonsCount = 0;
+
+        for (const entry of entries) {
+            daysCount += entry.days.length;
+            for (const day of entry.days) {
+                lessonsCount += day.lessons.filter((lesson) => lesson !== null).length;
+            }
+        }
+
+        const payload = {
+            type,
+            hash,
+            entries: entries.length,
+            days: daysCount,
+            lessons: lessonsCount,
+            time: new Date().toISOString()
+        };
+
+        await fs.writeFile(path.join(metricsDir, `${type}.json`), JSON.stringify(payload, null, 2), 'utf8');
     }
 }
 

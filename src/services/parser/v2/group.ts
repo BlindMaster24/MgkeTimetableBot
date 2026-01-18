@@ -1,5 +1,5 @@
 import { config } from "../../../../config";
-import { getShortSubjectName, mergeDays } from "../../../utils";
+import { WeekIndex, getShortSubjectName, mergeDays } from "../../../utils";
 import { AbstractParser } from "../abstract";
 import { GroupDay, GroupLesson, GroupLessonExplain, Groups } from "../types/group";
 import { buildTableGrid, findHeaderRowIndex, getDayRangesFromGrid } from "./grid";
@@ -132,17 +132,72 @@ export default class StudentParserV2 extends AbstractParser {
 
     protected findTables(): HTMLTableElement[] {
         const tables = Array.from(this.content.querySelectorAll('table') as NodeListOf<HTMLTableElement>);
-
-        return tables.filter((table) => {
-            const { grid } = buildTableGrid(table);
+        const candidates: { table: HTMLTableElement, weekIndex: number }[] = [];
         const minDays = config.parser.v2?.minDaysInTable ?? 5;
-        const headerRowIndex = findHeaderRowIndex(grid, config.parser.v2?.headerScanRows ?? 5, minDays);
+        const headerScanRows = config.parser.v2?.headerScanRows ?? 5;
+
+        for (const table of tables) {
+            const { grid } = buildTableGrid(table);
+            const headerRowIndex = findHeaderRowIndex(grid, headerScanRows, minDays);
             if (headerRowIndex === null) {
-                return false;
+                continue;
             }
 
-            return this.getDayRanges(grid, headerRowIndex).length > 0;
-        });
+            const ranges = this.getDayRanges(grid, headerRowIndex);
+            if (!ranges.length) {
+                continue;
+            }
+
+            const weekIndexes = new Set<number>();
+            for (const range of ranges) {
+                try {
+                    weekIndexes.add(WeekIndex.fromStringDate(range.day).valueOf());
+                } catch {
+                    continue;
+                }
+            }
+
+            if (weekIndexes.size === 0) {
+                continue;
+            }
+
+            const first = weekIndexes.values().next().value;
+            if (typeof first !== 'number') {
+                continue;
+            }
+
+            candidates.push({
+                table,
+                weekIndex: first
+            });
+        }
+
+        if (!candidates.length) {
+            return [];
+        }
+
+        const currentWeek = WeekIndex.now().valueOf();
+        const holdCurrentOnSunday = config.parser.v2?.sundayHoldCurrent ?? true;
+        const isSunday = new Date().getDay() === 0;
+        const weekPolicy = config.parser.v2?.weekPolicy ?? 'preferCurrent';
+        const weekIndexes = Array.from(new Set(candidates.map((item) => item.weekIndex)));
+        let targetWeek = weekIndexes[0];
+
+        if (weekIndexes.includes(currentWeek)) {
+            targetWeek = currentWeek;
+        } else if (weekPolicy === 'closest') {
+            targetWeek = weekIndexes.sort((a, b) => Math.abs(a - currentWeek) - Math.abs(b - currentWeek))[0];
+        } else if (weekPolicy === 'preferCurrent') {
+            const future = weekIndexes.filter((value) => value > currentWeek).sort((a, b) => a - b);
+            const past = weekIndexes.filter((value) => value < currentWeek).sort((a, b) => b - a);
+            if (holdCurrentOnSunday && isSunday && past.length) {
+                targetWeek = past[0];
+            } else {
+                targetWeek = future.length ? future[0] : weekIndexes.sort((a, b) => Math.abs(a - currentWeek) - Math.abs(b - currentWeek))[0];
+            }
+        }
+
+        return candidates.filter((item) => item.weekIndex === targetWeek).map((item) => item.table);
     }
 
     protected findHeading(table: HTMLTableElement, keyword: string): string | null {

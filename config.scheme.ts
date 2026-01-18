@@ -80,7 +80,28 @@ export type ConfigScheme = {
             diffLogLimit: number,
             headerScanRows: number,
             minDaysInTable: number,
-            maxLessonsPerDay: number
+            maxLessonsPerDay: number,
+            validationSample: number,
+            hashMode: 'content' | 'tables',
+            rawHtml: {
+                enabled: boolean,
+                dir: string,
+                maxDays: number,
+                replayPath: string | null,
+                diffMaxLines: number,
+                storeDaily: boolean
+            },
+            fetchRetry: number,
+            weekJumpThreshold: number,
+            sundayHoldCurrent: boolean,
+            quarantine: {
+                enabled: boolean,
+                minLessons: number
+            },
+            metrics: {
+                enabled: boolean,
+                dir: string
+            }
         },
         end_hour: number,
         activity: [number, number],

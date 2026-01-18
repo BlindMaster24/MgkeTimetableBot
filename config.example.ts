@@ -77,7 +77,28 @@ export const config: ConfigScheme = {
             diffLogLimit: 20,
             headerScanRows: 5,
             minDaysInTable: 5,
-            maxLessonsPerDay: 10
+            maxLessonsPerDay: 6,
+            validationSample: 5,
+            hashMode: 'content',
+            rawHtml: {
+                enabled: false,
+                dir: './cache/rasp/raw',
+                maxDays: 7,
+                replayPath: null,
+                diffMaxLines: 200,
+                storeDaily: true
+            },
+            fetchRetry: 1,
+            weekJumpThreshold: 1,
+            sundayHoldCurrent: true,
+            quarantine: {
+                enabled: true,
+                minLessons: 1
+            },
+            metrics: {
+                enabled: true,
+                dir: './cache/rasp/metrics'
+            }
         },
         end_hour: 17,
         activity: [9, 17],
