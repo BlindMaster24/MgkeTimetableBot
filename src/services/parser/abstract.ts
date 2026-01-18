@@ -25,15 +25,35 @@ export abstract class AbstractParser {
     }
 
     protected get content(): Element {
-        const content = this.window.document.querySelector('#main-p .content')
-            || this.window.document.querySelector('.common-page-left-block .content')
-            || this.window.document.querySelector('.entry .content')
-            || this.window.document.querySelector('.common-page-left-block');
-        if (!content) {
+        const doc = this.window.document;
+        const entries = Array.from(doc.querySelectorAll('.entry .content'));
+        if (entries.length === 1) {
+            return entries[0];
+        }
+        if (entries.length > 1) {
+            return entries[entries.length - 1];
+        }
+
+        const main = doc.querySelector('#main-p .content');
+        if (main) {
+            return main;
+        }
+
+        const common = doc.querySelector('.common-page-left-block .content');
+        if (common) {
+            return common;
+        }
+
+        const fallback = doc.querySelector('.common-page-left-block');
+        if (fallback) {
+            return fallback;
+        }
+
+        if (!fallback) {
             throw new Error('cannot get page content');
         }
 
-        return content;
+        return fallback;
     }
 
     protected querySelectorAll(selector: string): NodeListOf<HTMLElement> {

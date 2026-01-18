@@ -1,5 +1,6 @@
 import { APIError, Telegram } from "puregram";
 import StatusCode from "status-code-enum";
+import { config } from "../../../../config";
 import { App } from "../../../app";
 import { BotServiceName, MessageOptions } from "../abstract";
 import { BotChat } from "../chat";
@@ -17,6 +18,10 @@ export class TgEventListener extends AbstractBotEventListener {
     constructor(app: App, tg: Telegram) {
         super(app)
         this.tg = tg
+    }
+
+    protected getAdminPeerIds(): number[] {
+        return config.telegram.admin_ids;
     }
 
     public async sendMessage(chat: BotChat<TgChat>, message: string, options: MessageOptions = {}) {

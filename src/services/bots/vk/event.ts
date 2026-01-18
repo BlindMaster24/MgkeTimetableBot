@@ -1,4 +1,5 @@
 import { APIError, getRandomId, VK } from "vk-io";
+import { config } from "../../../../config";
 import { App } from "../../../app";
 import { BotServiceName, MessageOptions } from "../abstract";
 import { BotChat } from "../chat";
@@ -16,6 +17,10 @@ export class VkEventListener extends AbstractBotEventListener {
     constructor(app: App, vk: VK) {
         super(app)
         this.vk = vk
+    }
+
+    protected getAdminPeerIds(): Array<string | number> {
+        return config.vk.admin_ids;
     }
 
     public async sendMessage(chat: BotChat<VkChat>, message: string, options: MessageOptions = {}) {

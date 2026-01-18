@@ -118,7 +118,9 @@ export abstract class AbstractCommand {
     }
 
     protected async findGroup({ context }: CmdHandlerParams, group?: string, errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel): Promise<false | string> {
-        if (!group || isNaN(+group)) {
+        const normalized = group?.replace(/\*+$/g, '') ?? '';
+
+        if (!normalized || isNaN(+normalized)) {
             await context.send('Это не число', {
                 keyboard: errorKeyboard
             });
@@ -126,7 +128,7 @@ export abstract class AbstractCommand {
             return false;
         }
 
-        if (group.length > 3) {
+        if (normalized.length > 3) {
             await context.send('Номер группы введён неверно', {
                 keyboard: errorKeyboard
             });
@@ -134,7 +136,7 @@ export abstract class AbstractCommand {
             return false;
         }
 
-        if (!raspCache.groups.timetable[group]) {
+        if (!raspCache.groups.timetable[normalized]) {
             await context.send('Данной учебной группы не существует', {
                 keyboard: errorKeyboard
             })
@@ -142,7 +144,7 @@ export abstract class AbstractCommand {
             return false;
         }
 
-        return group;
+        return normalized;
     }
 
     protected async findTeacher({ context, keyboard }: CmdHandlerParams, teacher?: string, errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel): Promise<false | undefined | string> {

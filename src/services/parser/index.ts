@@ -141,6 +141,12 @@ export class ParserService implements AppService {
         }
     }
 
+    private attachParserContext(error: Error, context: Record<string, any>): Error {
+        const target: any = error as any;
+        target.parserContext = Object.assign({}, target.parserContext ?? {}, context);
+        return error;
+    }
+
     private logNoticer() {
         let hits: number = 0;
 
@@ -331,7 +337,25 @@ export class ParserService implements AppService {
 
             data = file.timetable;
         } else {
-            const jsdom = await this.getJSDOM(url);
+            const parserType = onParser<string>(Parser, 'student', 'teacher');
+            const contextBase = {
+                type: parserType,
+                url,
+                parser: Parser.name,
+                v2Enabled: Boolean(config.parser.v2?.enabled),
+                fallbackToV1: Boolean(config.parser.v2?.fallbackToV1),
+                strict: Boolean(config.parser.v2?.strict),
+                weekPolicy: config.parser.v2?.weekPolicy ?? 'preferCurrent',
+                localMode: config.parser.localMode,
+                ignoreHash: config.parser.ignoreHash
+            };
+
+            let jsdom: JSDOM;
+            try {
+                jsdom = await this.getJSDOM(url);
+            } catch (e: any) {
+                throw this.attachParserContext(e, Object.assign({ stage: 'fetch' }, contextBase));
+            }
 
             const parser = new Parser(jsdom.window);
             const doc = jsdom.window.document;
@@ -351,6 +375,12 @@ export class ParserService implements AppService {
                 });
             }
             const hash = parser.getContentHash();
+            const context = Object.assign({
+                hash,
+                tablesCount,
+                h2Count,
+                h3Count
+            }, contextBase);
 
             if (!config.parser.ignoreHash && !this._forceParse && hash === cache.hash) {
                 cache.update = Date.now();
@@ -370,12 +400,16 @@ export class ParserService implements AppService {
             let parsed: Teachers | Groups | null = null;
             let parseError: Error | null = null;
             let usedParser: TimetableParser = Parser;
+            let fallbackUsed: boolean = false;
             let v1Parsed: Teachers | Groups | null = null;
 
             try {
                 parsed = parseWith(Parser);
             } catch (e: any) {
-                parseError = e;
+                parseError = this.attachParserContext(e, Object.assign({
+                    stage: 'parse',
+                    parserUsed: Parser.name
+                }, context));
             }
 
             const isV2Parser = Parser === StudentParserV2 || Parser === TeacherParserV2;
@@ -386,17 +420,26 @@ export class ParserService implements AppService {
                 try {
                     parsed = parseWith(fallbackParser);
                     usedParser = fallbackParser;
+                    fallbackUsed = true;
                     parseError = null;
                 } catch (e: any) {
                     if (!parseError) {
-                        parseError = e;
+                        parseError = this.attachParserContext(e, Object.assign({
+                            stage: 'parse',
+                            parserUsed: fallbackParser.name,
+                            fallbackUsed
+                        }, context));
                     }
                 }
             }
 
             if (!parsed) {
                 if (parseError) {
-                    throw parseError;
+                    throw this.attachParserContext(parseError, Object.assign({
+                        stage: 'parse',
+                        parserUsed: usedParser.name,
+                        fallbackUsed
+                    }, context));
                 }
                 return false;
             }
@@ -409,12 +452,23 @@ export class ParserService implements AppService {
                         const fallbackParsed = parseWith(fallbackParser);
                         const fallbackValidation = onParser(fallbackParser, validateGroups(fallbackParsed as Groups, maxLessons), validateTeachers(fallbackParsed as Teachers, maxLessons));
                         if (!fallbackValidation.ok) {
-                            throw new Error(`v2 validation failed: ${validation.errors.join('; ')}`);
+                            throw this.attachParserContext(new Error(`v2 validation failed: ${validation.errors.join('; ')}`), Object.assign({
+                                stage: 'validate',
+                                parserUsed: usedParser.name,
+                                fallbackUsed,
+                                validationErrors: validation.errors
+                            }, context));
                         }
                         parsed = fallbackParsed;
                         usedParser = fallbackParser;
+                        fallbackUsed = true;
                     } else {
-                        throw new Error(`v2 validation failed: ${validation.errors.join('; ')}`);
+                        throw this.attachParserContext(new Error(`v2 validation failed: ${validation.errors.join('; ')}`), Object.assign({
+                            stage: 'validate',
+                            parserUsed: usedParser.name,
+                            fallbackUsed,
+                            validationErrors: validation.errors
+                        }, context));
                     }
                 }
             }
@@ -658,10 +712,25 @@ export class ParserService implements AppService {
 
             data = file.names;
         } else {
-            const jsdom = await this.getJSDOM(url);
+            const contextBase = {
+                type: 'team',
+                pageIndex,
+                url,
+                parser: 'team',
+                localMode: config.parser.localMode,
+                ignoreHash: config.parser.ignoreHash
+            };
+
+            let jsdom: JSDOM;
+            try {
+                jsdom = await this.getJSDOM(url);
+            } catch (e: any) {
+                throw this.attachParserContext(e, Object.assign({ stage: 'fetch' }, contextBase));
+            }
 
             const parser = new TeamParser(jsdom.window);
             const hash = parser.getContentHash();
+            const context = Object.assign({ hash }, contextBase);
 
             if (!config.parser.ignoreHash && !this._forceParse && hash === cache.hash[pageIndex]) {
                 cache.update = Date.now();
@@ -673,7 +742,11 @@ export class ParserService implements AppService {
             cache.hash[pageIndex] = hash;
 
             logger.log(`Парсинг данных (newHash: ${hash})...`);
-            data = parser.run();
+            try {
+                data = parser.run();
+            } catch (e: any) {
+                throw this.attachParserContext(e, Object.assign({ stage: 'parse' }, context));
+            }
             logger.log('Обработка данных...');
         }
 
@@ -724,4 +797,3 @@ export class ParserService implements AppService {
 }
 
 export { raspCache }
-

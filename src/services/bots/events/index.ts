@@ -96,6 +96,38 @@ export abstract class AbstractBotEventListener {
         });
     }
 
+    protected getAdminPeerIds(): Array<string | number> {
+        return [];
+    }
+
+    protected async getAdminChats(): Promise<BotChat[]> {
+        const adminIds = this.getAdminPeerIds();
+        if (!adminIds.length) {
+            return [];
+        }
+
+        return BotChat.findAll({
+            where: {
+                accepted: true,
+                allowSendMess: true,
+                service: this.service,
+                [`$${this._model.name}.peerId$`]: {
+                    [Op.in]: adminIds
+                }
+            } as any,
+            include: {
+                association: BotChat.associations[this._model.name],
+                required: true
+            },
+        }).then(chats => {
+            return chats.map(chat => {
+                chat.serviceChat = (chat as any)[this._model.name];
+
+                return chat;
+            });
+        });
+    }
+
     protected async getSubscribedChats(type: SubscriptionType, value: string, where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
         const subscriptions = await Subscription.findAll({
             attributes: ['chatId'],
@@ -509,12 +541,18 @@ export abstract class AbstractBotEventListener {
     }
 
     public async sendError(error: Error) {
-        const chats: BotChat[] = await this.getChats({
+        const baseChats: BotChat[] = await this.getChats({
             noticeParserErrors: true
         });
 
+        const adminChats = await this.getAdminChats();
+        const chats = this.mergeChats(baseChats, adminChats);
+        if (chats.length === 0) {
+            return;
+        }
+
         return this.sendMessages(chats, [
-            '‼️ Произошла ошибка парсера ‼️\n',
+            'Parser error\n',
             prepareError(error)
         ].join('\n'));
     }

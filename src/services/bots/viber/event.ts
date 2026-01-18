@@ -1,4 +1,5 @@
 import { Bot, Message } from 'viber-bot';
+import { config } from "../../../../config";
 import { App } from '../../../app';
 import { BotServiceName, MessageOptions } from '../abstract';
 import { BotChat } from '../chat';
@@ -16,6 +17,10 @@ export class ViberEventListener extends AbstractBotEventListener {
     constructor(app: App, bot: Bot) {
         super(app)
         this.bot = bot
+    }
+
+    protected getAdminPeerIds(): Array<string | number> {
+        return config.viber.admin_ids;
     }
 
     public async sendMessage(chat: BotChat<ViberChat>, message: string, options: MessageOptions = {}) {
