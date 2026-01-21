@@ -11,7 +11,7 @@ import { ChatMode } from "../bots/chat"
 import { clearOldImages } from "../image/clear"
 import { ArchiveAppendDay } from "../timetable"
 import StudentParser from "./group"
-import { RaspEntryCache, TeamCache, loadCache, raspCache, saveCache } from './raspCache'
+import { CallsCache, RaspEntryCache, TeamCache, loadCache, raspCache, saveCache } from './raspCache'
 import TeacherParser from "./teacher"
 import TeamParser from "./team"
 import { Group, GroupDay, Groups, Teacher, TeacherDay, Teachers, Team } from './types'
@@ -19,6 +19,8 @@ import StudentParserV2 from "./v2/group"
 import TeacherParserV2 from "./v2/teacher"
 import { diffGroups, diffTeachers } from "./v2/diff"
 import { validateGroups, validateTeachers } from "./v2/validate"
+import { CallsSchedule, parseCallsSchedule } from "./calls"
+import { CallsOverrideSource, getCallsManualReason, getCallsOverrideSource, setCallsManualReason, setCallsOverrideSource } from "./callsStore"
 
 const MAX_LOG_LIMIT: number = 10;
 const LOG_COUNT_SEND: number = 3;
@@ -39,6 +41,7 @@ function onParser<T>(Parser: TimetableParser, onStudent: T, onTeacher: T): T {
 
 export type GroupDayEvent = { day: GroupDay, group: string };
 export type TeacherDayEvent = { day: TeacherDay, teacher: string };
+export type CallsUpdateEvent = { schedule: CallsSchedule, weekdaysChanged: boolean, saturdayChanged: boolean, source: 'site' | 'manual' | 'config', updatedAt: number, updatedAtRaw?: string, reason?: string };
 
 type ParserEvents = {
     addGroupDay: [data: GroupDayEvent];
@@ -52,6 +55,8 @@ type ParserEvents = {
     flushCache: [days: ArchiveAppendDay[]]
 
     error: [error: Error];
+
+    updateCalls: [data: CallsUpdateEvent];
 }
 
 export class ParserService implements AppService {
@@ -63,6 +68,7 @@ export class ParserService implements AppService {
 
     private _forceParse: boolean = false;
     private _clearKeys: boolean = false;
+    private _forceCallsParse: boolean = false;
     private _lastHtmlByUrl: Map<string, string> = new Map();
 
     constructor(private app: App) {
@@ -89,10 +95,13 @@ export class ParserService implements AppService {
         return true;
     }
 
-    public run() {
-        if (config.parser.enabled) {
-            this.runLoop();
+    public async run() {
+        if (!config.parser.enabled) {
+            return;
         }
+
+        await this.loadCallsSettings();
+        this.runLoop();
     }
 
     public lastSuccessUpdate(): number {
@@ -126,6 +135,67 @@ export class ParserService implements AppService {
         this._forceParse = true;
         this._clearKeys = clearKeys;
         this.delayPromise?.resolve();
+    }
+
+    public forceCallsParse() {
+        this._forceCallsParse = true;
+        this.delayPromise?.resolve();
+    }
+
+    private async loadCallsSettings() {
+        const override = await getCallsOverrideSource();
+        if (override) {
+            raspCache.calls.overrideSource = override;
+        }
+
+        const { reason, updatedAt } = await getCallsManualReason();
+        if (reason) {
+            raspCache.calls.manualReason = reason;
+            if (updatedAt) {
+                raspCache.calls.manualReasonUpdatedAt = updatedAt;
+            }
+        }
+    }
+
+    public async setCallsOverride(source: CallsOverrideSource | null) {
+        await setCallsOverrideSource(source);
+        if (source) {
+            raspCache.calls.overrideSource = source;
+        } else {
+            raspCache.calls.overrideSource = undefined;
+        }
+
+        this.selectActiveCalls();
+    }
+
+    public async setManualCalls(schedule: CallsSchedule, reason?: string | null, notifyNow: boolean = false) {
+        const updatedAt = Date.now();
+        const prevSchedule = raspCache.calls.manual.schedule;
+        const weekdaysChanged = JSON.stringify(prevSchedule.weekdays) !== JSON.stringify(schedule.weekdays);
+        const saturdayChanged = JSON.stringify(prevSchedule.saturday) !== JSON.stringify(schedule.saturday);
+
+        this.updateCallsCache('manual', schedule, updatedAt, undefined, { skipNotify: true });
+
+        if (reason) {
+            raspCache.calls.manualReason = reason;
+            raspCache.calls.manualReasonUpdatedAt = updatedAt;
+            await setCallsManualReason(reason);
+        } else {
+            raspCache.calls.manualReason = undefined;
+            raspCache.calls.manualReasonUpdatedAt = undefined;
+            await setCallsManualReason(null);
+        }
+
+        if (notifyNow && (weekdaysChanged || saturdayChanged)) {
+            this.events.emit('updateCalls', {
+                schedule,
+                weekdaysChanged,
+                saturdayChanged,
+                source: 'manual',
+                updatedAt,
+                reason: reason ?? undefined
+            });
+        }
     }
 
     private log(log: string | Error) {
@@ -300,6 +370,14 @@ export class ParserService implements AppService {
             )
         ];
 
+        if (config.parser.calls?.enabled) {
+            const due = this._forceCallsParse || !raspCache.calls.update ||
+                Date.now() - raspCache.calls.update >= (config.parser.update_interval.calls * 1e3);
+            if (due) {
+                PARSER_ACTIONS.push(this.parseCallsSchedule.bind(this, encodeURI(config.parser.endpoints.bellSchedule), raspCache.calls));
+            }
+        }
+
         //парсим страницы реже
         if (
             this._forceParse || this._clearKeys || config.parser.localMode || !raspCache.team.update ||
@@ -327,6 +405,205 @@ export class ParserService implements AppService {
         }
 
         return Promise.all(promises);
+    }
+
+    private async parseCallsSchedule(url: string, cache: CallsCache, report?: { siteParsed?: boolean; error?: Error; schedule?: CallsSchedule; updatedAtRaw?: string }): Promise<boolean> {
+        const logger = this.logger.extend('Calls');
+        let schedule: CallsSchedule | null = null;
+        let updatedAt = 0;
+        let updatedAtRaw: string | undefined;
+
+        if (!config.parser.calls?.enabled) {
+            return false;
+        }
+
+        if (config.parser.localMode) {
+            schedule = cache.active.schedule;
+            updatedAt = cache.active.updatedAt;
+        } else {
+            let jsdom: JSDOM;
+            try {
+                jsdom = await this.getJSDOM(url);
+            } catch (e: any) {
+                const error = this.attachParserContext(e, { stage: 'fetch', type: 'calls', url, parser: 'CallsParser' });
+                if (report) {
+                    report.error = error;
+                }
+                throw error;
+            }
+
+            const parsed = parseCallsSchedule(jsdom.window.document);
+            if (parsed) {
+                schedule = parsed.schedule;
+                updatedAt = parsed.updatedAt ?? Date.now();
+                updatedAtRaw = parsed.updatedAtRaw;
+                if (report) {
+                    report.siteParsed = schedule.weekdays.length > 0;
+                    report.schedule = schedule;
+                    report.updatedAtRaw = updatedAtRaw;
+                }
+            }
+        }
+
+        if (schedule && schedule.weekdays.length > 0) {
+            this.updateCallsCache('site', schedule, updatedAt || Date.now(), updatedAtRaw);
+        } else {
+            this.selectActiveCalls(updatedAtRaw);
+            const preferSite = config.parser.calls?.preferSite ?? true;
+            if (preferSite && !config.parser.localMode) {
+                const now = Date.now();
+                const lastNotified = raspCache.calls.siteEmptyNotifiedAt ?? 0;
+                if (now - lastNotified > 6 * 60 * 60 * 1e3) {
+                    raspCache.calls.siteEmptyNotifiedAt = now;
+                const error = this.attachParserContext(new Error('calls schedule empty'), { stage: 'parse', type: 'calls', url, parser: 'CallsParser' });
+                if (report) {
+                    report.error = error;
+                }
+                this.events.emit('error', error);
+            }
+        }
+        }
+
+        cache.update = Date.now();
+        this._forceCallsParse = false;
+
+        logger.log('parsed');
+        return true;
+    }
+
+    public async refreshCallsNow() {
+        const url = encodeURI(config.parser.endpoints.bellSchedule);
+        const before = raspCache.calls.active.source;
+        const report: { siteParsed?: boolean; error?: Error; schedule?: CallsSchedule; updatedAtRaw?: string } = {};
+        let ok = false;
+
+        try {
+            ok = await this.parseCallsSchedule(url, raspCache.calls, report);
+        } catch (e) {
+            report.error = e as Error;
+        }
+
+        const override = raspCache.calls.overrideSource;
+        const active = raspCache.calls.active.source;
+
+        return {
+            ok,
+            error: report.error,
+            siteParsed: report.siteParsed ?? false,
+            override: override ?? null,
+            before,
+            active,
+            updatedAtRaw: report.updatedAtRaw ?? raspCache.calls.site.updatedAtRaw,
+            schedule: report.schedule,
+            reason: raspCache.calls.manualReason
+        };
+    }
+
+    private updateCallsCache(
+        source: 'site' | 'manual',
+        schedule: CallsSchedule,
+        updatedAt: number,
+        updatedAtRaw?: string,
+        options?: { skipNotify?: boolean }
+    ) {
+        const cache = raspCache.calls;
+        const hash = JSON.stringify(schedule);
+
+        if (source === 'site') {
+            cache.site = {
+                schedule,
+                updatedAt,
+                updatedAtRaw,
+                hash
+            };
+        } else {
+            cache.manual = {
+                schedule,
+                updatedAt,
+                hash
+            };
+        }
+
+        this.selectActiveCalls(updatedAtRaw, options);
+    }
+
+    private selectActiveCalls(updatedAtRaw?: string, options?: { skipNotify?: boolean }) {
+        const cache = raspCache.calls;
+        const preferSite = config.parser.calls?.preferSite ?? true;
+        const override = cache.overrideSource;
+        const configSchedule: CallsSchedule = {
+            weekdays: config.timetable.weekdays,
+            saturday: config.timetable.saturday
+        };
+
+        let activeSource: 'site' | 'manual' | 'config' = 'config';
+        let activeSchedule: CallsSchedule = configSchedule;
+        let activeUpdatedAt = Date.now();
+        let activeUpdatedAtRaw: string | undefined;
+
+        if (override === 'site') {
+            if (cache.site.updatedAt) {
+                activeSource = 'site';
+                activeSchedule = cache.site.schedule;
+                activeUpdatedAt = cache.site.updatedAt;
+                activeUpdatedAtRaw = cache.site.updatedAtRaw;
+            }
+        } else if (override === 'manual') {
+            if (cache.manual.updatedAt) {
+                activeSource = 'manual';
+                activeSchedule = cache.manual.schedule;
+                activeUpdatedAt = cache.manual.updatedAt;
+                activeUpdatedAtRaw = undefined;
+            }
+        } else if (override === 'config') {
+            activeSource = 'config';
+            activeSchedule = configSchedule;
+            activeUpdatedAt = Date.now();
+            activeUpdatedAtRaw = undefined;
+        } else {
+            if (preferSite && cache.site.updatedAt) {
+                activeSource = 'site';
+                activeSchedule = cache.site.schedule;
+                activeUpdatedAt = cache.site.updatedAt;
+                activeUpdatedAtRaw = cache.site.updatedAtRaw;
+            }
+
+            if (cache.manual.updatedAt) {
+                const manualIsNewer = cache.manual.updatedAt >= cache.site.updatedAt;
+                if (!preferSite || manualIsNewer) {
+                    activeSource = 'manual';
+                    activeSchedule = cache.manual.schedule;
+                    activeUpdatedAt = cache.manual.updatedAt;
+                    activeUpdatedAtRaw = undefined;
+                }
+            }
+        }
+
+        const activeHash = JSON.stringify(activeSchedule);
+        const sourceChanged = cache.active.source !== activeSource;
+        const updatedChanged = cache.active.updatedAt !== activeUpdatedAt;
+        if (!cache.active.hash || cache.active.hash !== activeHash || this._forceCallsParse || sourceChanged || updatedChanged) {
+            cache.changed = Date.now();
+            const weekdaysChanged = JSON.stringify(cache.active.schedule.weekdays) !== JSON.stringify(activeSchedule.weekdays);
+            const saturdayChanged = JSON.stringify(cache.active.schedule.saturday) !== JSON.stringify(activeSchedule.saturday);
+            cache.active = {
+                schedule: activeSchedule,
+                updatedAt: activeUpdatedAt,
+                source: activeSource,
+                hash: activeHash
+            };
+            if (!options?.skipNotify && config.parser.calls?.notify && (weekdaysChanged || saturdayChanged)) {
+                this.events.emit('updateCalls', {
+                    schedule: activeSchedule,
+                    weekdaysChanged,
+                    saturdayChanged,
+                    source: activeSource,
+                    updatedAt: activeUpdatedAt,
+                    updatedAtRaw: activeUpdatedAtRaw ?? updatedAtRaw,
+                    reason: activeSource === 'manual' ? cache.manualReason : undefined
+                });
+            }
+        }
     }
 
     private async parseTimetable(Parser: TimetableParser, url: string, cache: RaspEntryCache<Teachers | Groups>, fallbackParser?: TimetableParser) {

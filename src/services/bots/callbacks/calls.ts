@@ -15,9 +15,14 @@ export default class CallsCallback extends AbstractCallback {
 
         const message: string[] = [];
 
+        const activeSchedule = raspCache.calls.active.schedule.weekdays.length ? raspCache.calls.active.schedule : {
+            weekdays: config.timetable.weekdays,
+            saturday: config.timetable.saturday
+        };
+
         let maxLessons: number = Math.max(
-            config.timetable.saturday.length,
-            config.timetable.weekdays.length
+            activeSchedule.saturday.length,
+            activeSchedule.weekdays.length
         );
 
         let current: number | undefined;
@@ -41,12 +46,16 @@ export default class CallsCallback extends AbstractCallback {
         } else {
             userMaxLessons = maxLessons;
         }
-        
-        message.push('__ ЗВОНКИ (будни) __')
-        message.push(this._getMessage(config.timetable.weekdays, [1, 2, 3, 4, 5], userMaxLessons, showFull));
 
-        message.push('\n__ ЗВОНКИ (суббота) __')
-        message.push(this._getMessage(config.timetable.saturday, [6], userMaxLessons, showFull));
+        if (raspCache.calls.active.source === 'manual' && raspCache.calls.manualReason) {
+            message.push(`\u041F\u0440\u0438\u0447\u0438\u043D\u0430: ${raspCache.calls.manualReason}\n`);
+        }
+        
+        message.push('__ \u0417\u0432\u043E\u043D\u043A\u0438 (\u0431\u0443\u0434\u043D\u0438) __');
+        message.push(this._getMessage(activeSchedule.weekdays, [1, 2, 3, 4, 5], userMaxLessons, showFull));
+
+        message.push('\n__ \u0417\u0432\u043E\u043D\u043A\u0438 (\u0441\u0443\u0431\u0431\u043E\u0442\u0430) __');
+        message.push(this._getMessage(activeSchedule.saturday, [6], userMaxLessons, showFull));
 
         if (current && current >= maxLessons) {
             showFull = true;
@@ -55,7 +64,7 @@ export default class CallsCallback extends AbstractCallback {
         return context.editOrSend(message.join('\n'), {
             keyboard: showFull ? undefined : keyboard.getKeyboardBuilder('CallsFull', true).add({
                 type: ButtonType.Callback,
-                text: 'Показать полностью',
+                text: '\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u043E\u043B\u043D\u043E\u0441\u0442\u044C\u044E',
                 payload: this.payloadAction + JSON.stringify([
                     Number(true)
                 ])
@@ -68,7 +77,7 @@ export default class CallsCallback extends AbstractCallback {
             return text;
         }
 
-        return `👉 ${text} 👈`;
+        return `\uD83D\uDC49 ${text} \uD83D\uDC48`;
     }
 
     private _getMessage(calls: DayCall[], includedDays: number[], maxLessons: number, showFull: boolean) {

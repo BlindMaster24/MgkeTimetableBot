@@ -105,6 +105,8 @@ export class Keyboard {
             text: '📚 Первоначальная настройка',
             color: KeyboardColor.PRIMARY_COLOR
         }).row().add({
+            text: '🗓️ Управление расписаниями'
+        }).row().add({
             text: '⌨️ Кнопки'
         }).add({
             text: '📃 Форматировщик'
@@ -117,6 +119,21 @@ export class Keyboard {
         }).row().add({
             text: 'Показать текущие',
             color: KeyboardColor.PRIMARY_COLOR
+        }).add({
+            text: 'Главное меню',
+            color: KeyboardColor.SECONDARY_COLOR
+        })
+    }
+
+    public get SettingsSchedules() {
+        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsSchedules');
+
+        return keyboard.add({
+            text: '🕐 Звонки: управление',
+            color: KeyboardColor.PRIMARY_COLOR
+        }).row().add({
+            text: 'Меню настроек',
+            color: KeyboardColor.SECONDARY_COLOR
         }).add({
             text: 'Главное меню',
             color: KeyboardColor.SECONDARY_COLOR
@@ -185,6 +202,9 @@ export class Keyboard {
         }).row().add({
             text: noYesSmile(this.chat.noticeNextWeek, 'Оповещение о новой неделе: ', ['🔈', '🔇']) + (this.chat.noticeNextWeek ? 'Да' : 'Нет'),
             color: noYesColor(this.chat.noticeNextWeek)
+        }).row().add({
+            text: noYesSmile(this.chat.noticeCalls, 'Оповещение о звонках: ', ['🔈', '🔇']) + (this.chat.noticeCalls ? 'Да' : 'Нет'),
+            color: noYesColor(this.chat.noticeCalls)
         }).row().add({
             text: 'Меню настроек',
             color: KeyboardColor.SECONDARY_COLOR

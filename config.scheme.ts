@@ -4,6 +4,10 @@ import { GroupLessonExplain, TeacherLessonExplain } from "./src/services/timetab
 
 export type DayCall = [[string, string], [string, string]];
 export type DayCallShort = [string, string];
+export type CallsSchedule = {
+    weekdays: DayCall[],
+    saturday: DayCall[]
+};
 
 export type ConfigScheme = {
     dev: boolean,
@@ -109,7 +113,8 @@ export type ConfigScheme = {
             default: number,
             activity: number,
             error: number,
-            teams: number
+            teams: number,
+            calls: number
         },
         alertableIgnoreFilter: {
             group: Pick<GroupLessonExplain, 'lesson' | 'type'>[],
@@ -120,6 +125,12 @@ export type ConfigScheme = {
             timetableGroup: string
             timetableTeacher: string
             team: string[]
+            bellSchedule: string
+        },
+        calls: {
+            enabled: boolean,
+            preferSite: boolean,
+            notify: boolean
         },
         proxy: string | null
     },

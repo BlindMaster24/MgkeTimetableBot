@@ -146,6 +146,9 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
     /** Оповещать ли о добавлении новой недели */
     declare noticeNextWeek: CreationOptional<boolean>;
 
+    /** Оповещать ли об изменениях расписания звонков */
+    declare noticeCalls: CreationOptional<boolean>;
+
     /** Оповещать ли при ошибках парсера (если 3 последние одинаковые ошибки) */
     declare noticeParserErrors: CreationOptional<boolean>;
 
@@ -311,6 +314,10 @@ BotChat.init({
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
+    noticeCalls: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
     noticeParserErrors: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
@@ -413,4 +420,17 @@ BotChat.init({
 });
 
 export { BotChat };
+
+export async function ensureBotChatSchema() {
+    const queryInterface = sequelize.getQueryInterface();
+    const table = await queryInterface.describeTable('bot_chats');
+
+    if (!('noticeCalls' in table)) {
+        await queryInterface.addColumn('bot_chats', 'noticeCalls', {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
+        });
+    }
+}
 

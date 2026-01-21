@@ -101,4 +101,15 @@ export class StaticKeyboard {
             color: KeyboardColor.PRIMARY_COLOR
         });
     }
+
+    public static GetCalls(label: string = '📊 Показать'): KeyboardBuilder {
+        return new KeyboardBuilder('CallsShow', true).add({
+            type: ButtonType.Callback,
+            text: label,
+            payload: 'calls' + JSON.stringify([
+                Number(true)
+            ]),
+            color: KeyboardColor.PRIMARY_COLOR
+        });
+    }
 }

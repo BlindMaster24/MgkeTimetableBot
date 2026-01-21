@@ -4,6 +4,7 @@ import { Logger } from "./logger";
 import { AliceApp } from "./services/alice";
 import { Api } from "./services/api";
 import { BotService } from "./services/bots";
+import { ensureBotChatSchema } from "./services/bots/chat/Chat";
 import { TgBot } from "./services/bots/tg";
 import { ViberBot } from './services/bots/viber';
 import { VkBot } from './services/bots/vk';
@@ -81,6 +82,7 @@ export class App {
 
         this.logger.log('Подключение к БД...');
         await sequelize.sync();
+        await ensureBotChatSchema();
         this.logger.log('Подключение к БД: Успешно!');
 
         for (const [serviceId, service] of this.services) {

@@ -3,9 +3,10 @@ import { config } from "../../../../config";
 import { App } from "../../../app";
 import { createScheduleFormatter } from "../../../formatter";
 import { DayIndex, StringDate, WeekIndex, getFutureDays, prepareError } from "../../../utils";
-import { GroupDayEvent, TeacherDayEvent } from "../../parser";
+import { CallsUpdateEvent, GroupDayEvent, TeacherDayEvent } from "../../parser";
 import { raspCache, saveCache } from "../../parser/raspCache";
 import { GroupDay, TeacherDay } from "../../parser/types";
+import { DayCall } from "../../../../config.scheme";
 import { MessageOptions } from "../abstract";
 import { BotServiceName } from "../abstract/command";
 import { AbstractServiceChat, BotChat, ChatMode } from "../chat";
@@ -555,5 +556,51 @@ export abstract class AbstractBotEventListener {
             'Parser error\n',
             prepareError(error)
         ].join('\n'));
+    }
+
+    public async updateCalls(data: CallsUpdateEvent) {
+        if (!data.weekdaysChanged && !data.saturdayChanged) {
+            return;
+        }
+
+        const chats: BotChat[] = await this.getChats({
+            noticeCalls: true,
+            [Op.or]: [
+                { group: { [Op.ne]: null } },
+                { teacher: { [Op.ne]: null } }
+            ]
+        });
+        if (chats.length === 0) return;
+
+        const parts: string[] = [];
+        parts.push('\uD83D\uDD14 \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u043E \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0437\u0432\u043E\u043D\u043A\u043E\u0432');
+        if (data.reason) {
+            parts.push(`\u041F\u0440\u0438\u0447\u0438\u043D\u0430: ${data.reason}`);
+        }
+
+        if (data.weekdaysChanged) {
+            parts.push('\n__ \u0417\u0432\u043E\u043D\u043A\u0438 (\u0431\u0443\u0434\u043D\u0438) __');
+            parts.push(this.formatCalls(data.schedule.weekdays));
+        }
+
+        if (data.saturdayChanged) {
+            parts.push('\n__ \u0417\u0432\u043E\u043D\u043A\u0438 (\u0441\u0443\u0431\u0431\u043E\u0442\u0430) __');
+            parts.push(this.formatCalls(data.schedule.saturday));
+        }
+
+        parts.push('\n\u041F\u043E\u043B\u043D\u043E\u0435 \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435: \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C');
+        const message = parts.join('\n');
+        await this.sendMessages(chats, message, { keyboard: StaticKeyboard.GetCalls() });
+    }
+
+    private formatCalls(calls: DayCall[]): string {
+        const text: string[] = [];
+        for (let i = 0; i < calls.length; i++) {
+            const lesson = calls[i];
+            if (!lesson) break;
+            const lineStr: string = `${i + 1}. ${lesson[0][0]} - ${lesson[0][1]} | ${lesson[1][0]} - ${lesson[1][1]}`;
+            text.push(lineStr);
+        }
+        return text.join('\n');
     }
 }

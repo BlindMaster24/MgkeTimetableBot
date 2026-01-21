@@ -19,6 +19,7 @@ export default class extends AbstractCommand {
 
             `\nОповещение о добавлении нового дня: ${chat.noticeChanges ? 'да' : 'нет'}`,
             `Оповещение о добавлении новой недели: ${chat.noticeNextWeek ? 'да' : 'нет'}`,
+            `Оповещение об изменении звонков: ${chat.noticeCalls ? 'да' : 'нет'}`,
             `Оповещение об ошибке парсера: ${chat.noticeParserErrors ? 'да' : 'нет'}`,
 
             ...(service === 'vk' ? [

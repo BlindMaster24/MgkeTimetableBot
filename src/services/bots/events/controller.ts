@@ -28,6 +28,7 @@ export class BotEventController {
         ev.on('updateWeek', this.updateWeek.bind(this));
 
         ev.on('error', this.sendError.bind(this));
+        ev.on('updateCalls', this.updateCalls.bind(this));
     }
 
     public registerListener(service: AbstractBotEventListener) {
@@ -143,6 +144,14 @@ export class BotEventController {
     public async sendError(error: Error) {
         for (const service of this.serviceList) {
             await service.sendError(error);
+        }
+    }
+
+    public async updateCalls(data: any) {
+        for (const service of this.serviceList) {
+            if (typeof (service as any).updateCalls === 'function') {
+                await (service as any).updateCalls(data);
+            }
         }
     }
 

@@ -106,7 +106,8 @@ export const config: ConfigScheme = {
             default: 1 * 60 * 60, // 1 hour
             activity: 30, // 30 sec
             error: 60, // 1 min
-            teams: 1 * 24 * 60 * 60 // 1 day
+            teams: 1 * 24 * 60 * 60, // 1 day
+            calls: 1 * 60 * 60 // 1 hour
         },
         alertableIgnoreFilter: {
             group: [
@@ -126,7 +127,13 @@ export const config: ConfigScheme = {
                 'https://mgkct.minskedu.gov.by/about/teachers',
                 'https://mgkct.minskedu.gov.by/about/employees',
                 'https://mgkct.minskedu.gov.by/about/maintenance'
-            ]
+            ],
+            bellSchedule: 'https://mgkct.minskedu.gov.by/personnel/for-teachers/bell-schedule'
+        },
+        calls: {
+            enabled: true,
+            preferSite: true,
+            notify: true
         },
         proxy: null
     },
