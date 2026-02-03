@@ -65,6 +65,8 @@
 - Naming: `camelCase` vars/functions, `PascalCase` classes/types, `SCREAMING_SNAKE_CASE` constants.
 - Do not add code comments.
 - Keep service boundaries: cross-service access goes through service APIs, not internal files.
+- Russian text in source files must be stored as Unicode (UTF-8) characters, not escaped bytes.
+- Reason: improves readability, prevents garbled output in logs/bots, and avoids encoding issues across platforms.
 
 ## Testing Guidelines
 - No test runner is configured; tests are scripts.
