@@ -74,17 +74,39 @@
 ## Commit & Pull Request Guidelines
 - Follow existing commit style: short, imperative summaries in English, <= 72 chars.
 - Prefer a `type:` prefix (`feat`, `fix`, `docs`, `refactor`, `chore`) when it fits the change.
+- Commit messages must conform to Conventional Commits. Emojis are optional; if used, follow Gitmoji.
+- Official references (copy/paste):
+```
+https://www.conventionalcommits.org/en/v1.0.0/
+https://gitmoji.dev/specification
+```
+- Conventional Commits format: `<type>[optional scope][!]: <description>`
+- Optional body and footer start after a blank line.
+- Use `!` or `BREAKING CHANGE:` for breaking changes (see rules below).
+- Core rules:
+- `type` is required and must be lowercase (e.g., `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `build`, `ci`).
+- `scope` is optional and should be a short area (e.g., `parser`, `bots`, `api`, `formatter`).
+- `scope` is written in parentheses, e.g. `feat(parser): ...`.
+- `description` is required, imperative, no trailing period.
+- Breaking changes require both:
+- `!` after type/scope, and
+- A `BREAKING CHANGE:` footer describing the impact.
 - Examples (based on recent history, translated to English):
-  - fix: remove prefix for own notifications
-  - feat: add parser v2 and tests
-  - fix: avoid switching to next week on empty data
-  - feat: add subscriptions and start schedule
-  - docs: extend agents guidance
-  - fix: update parser for new site layout
-  - feat: harden parser v2 and add health check
-  - chore: bump ws to 8.17.1
-  - refactor: rewrite date/time utils
-  - fix: show week timetable button on alerts
+- `fix: remove prefix for own notifications`
+- `feat: add parser v2 and tests`
+- `fix: avoid switching to next week on empty data`
+- `feat: add subscriptions and start schedule`
+- `docs: extend agents guidance`
+- `fix: update parser for new site layout`
+- `feat: harden parser v2 and add health check`
+- `chore: bump ws to 8.17.1`
+- `refactor: rewrite date/time utils`
+- `fix: show week timetable button on alerts`
+- Breaking change example:
+- `feat(parser)!: drop legacy v1 cache format`
+- `BREAKING CHANGE: v1 cache files are no longer read; reparse is required.`
+- Optional Gitmoji format (if team decides to use emojis): `<emoji> <type>(scope)?: <description>`
+- Gitmoji example: `✨ feat(parser): add v2 health check`
 - PRs should include a clear description, related issues, and the commands you ran (e.g., `npm run ts-check`).
 - For behavior or asset changes, include before/after notes.
 - Always check `git status` before committing.
