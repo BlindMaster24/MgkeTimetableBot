@@ -92,6 +92,10 @@ context.send('Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð³Ñ€ÑƒÐ¿Ð¿Ñƒ Ð�
 - Rule: always type Russian text as normal Unicode characters in the source.
 - Scenario: copying from logs or terminal
 - Rule: verify the string displays correctly before committing.
+- Review checklist for Russian strings:
+- The string displays correctly in the editor (no mojibake).
+- The string renders correctly in bot output/logs when tested.
+- No accidental escape sequences or byte artifacts in source.
 
 ## Testing Guidelines
 - No test runner is configured; tests are scripts.
