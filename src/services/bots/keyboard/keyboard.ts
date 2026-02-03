@@ -94,6 +94,12 @@ export class Keyboard {
                 color: KeyboardColor.SECONDARY_COLOR
             })
         }
+        if (this.chat.service === 'tg' && config.calendar?.ics?.enabled) {
+            keyboard.add({
+                text: '📅 ICS',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+        }
         keyboard.add({
             text: '⚙️ Настройки',
             color: KeyboardColor.SECONDARY_COLOR

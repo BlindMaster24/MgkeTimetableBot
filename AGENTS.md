@@ -84,7 +84,7 @@ context.send('Выберите группу в настройках (/setup)');
 ```
 - Bad (escaped bytes / mojibake):
 ```ts
-context.send('Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð³Ñ€ÑƒÐ¿Ð¿Ñƒ Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ… (/setup)');
+context.send('Выберите группу в настройках (/setup)');
 ```
 - Scenario: you see mojibake in output
 - Fix: replace the literal with proper UTF-8 characters (retype the string).
