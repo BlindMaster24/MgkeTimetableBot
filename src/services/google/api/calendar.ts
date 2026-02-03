@@ -144,6 +144,46 @@ export class GoogleCalendarApi {
         })
     }
 
+    public async setUserRole(calendarId: string, email: string, role: 'reader' | 'writer') {
+        const api = this.api;
+        const queue = this.queue;
+
+        const acl = await queue(() => {
+            return api.acl.list({ calendarId });
+        }).then(({ data }) => data.items ?? []);
+
+        const existing = acl.find((rule) => {
+            return rule.scope?.type === 'user' && rule.scope?.value === email;
+        });
+
+        if (existing?.id) {
+            return queue(() => {
+                return api.acl.update({
+                    calendarId,
+                    ruleId: existing.id!,
+                    sendNotifications: false,
+                    requestBody: {
+                        role
+                    }
+                });
+            });
+        }
+
+        return queue(() => {
+            return api.acl.insert({
+                calendarId,
+                sendNotifications: false,
+                requestBody: {
+                    role,
+                    scope: {
+                        type: 'user',
+                        value: email
+                    }
+                }
+            });
+        });
+    }
+
     public async getList(): Promise<string[]> {
         return this.queue(async () => {
             const list = await this.api.calendarList.list();

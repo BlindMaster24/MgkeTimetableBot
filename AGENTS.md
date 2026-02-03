@@ -102,6 +102,14 @@ context.send('Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð³Ñ€ÑƒÐ¿Ð¿Ñƒ Ð�
 - Name tests `*Test.ts` under `tests/` and keep them deterministic.
 - If you add a new test, note the command in the PR description.
 
+## Documentation
+- Keep user-facing docs focused on usage; move internals to developer docs.
+- Add examples for new public APIs when helpful.
+- Update changelogs for user-visible changes.
+- Ensure links are valid and use Markdown links instead of raw paths.
+- Avoid jargon without explanation in user docs.
+- Google Calendar setup guide (Russian): [docs/google-calendar.md](docs/google-calendar.md).
+
 ## Commit & Pull Request Guidelines
 - Follow existing commit style: short, imperative summaries in English, <= 72 chars.
 - Prefer a `type:` prefix (`feat`, `fix`, `docs`, `refactor`, `chore`) when it fits the change.

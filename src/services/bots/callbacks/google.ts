@@ -11,7 +11,10 @@ enum GoogleMenu {
     MainMenu = 0,
     CalendarsList = 1,
     AddCalendar = 2,
-    DeleteCalendar = 3
+    DeleteCalendar = 3,
+    PermissionsMenu = 4,
+    PermissionsCalendar = 5,
+    PermissionsApply = 6
 }
 
 export class GoogleKeyboard {
@@ -32,6 +35,10 @@ export class GoogleKeyboard {
             type: ButtonType.Callback,
             text: 'Добавить',
             payload: payloadAction + JSON.stringify([GoogleMenu.AddCalendar])
+        }).row().add({
+            type: ButtonType.Callback,
+            text: 'Права',
+            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsMenu])
         });
     }
 
@@ -67,6 +74,40 @@ export class GoogleKeyboard {
         });
     }
 
+    public static PermissionsList(calendars: CalendarItem[]) {
+        const keyboard = new KeyboardBuilder('GooglePermissionsList', true);
+
+        for (const calendar of calendars) {
+            keyboard.add({
+                type: ButtonType.Callback,
+                text: `${calendar.type}, ${calendar.value}`,
+                payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsCalendar, calendar.calendarId])
+            }).row();
+        }
+
+        return keyboard.add({
+            type: ButtonType.Callback,
+            text: 'Назад',
+            payload: payloadAction + JSON.stringify([GoogleMenu.MainMenu])
+        });
+    }
+
+    public static PermissionsControl(calendarId: string) {
+        return new KeyboardBuilder('GooglePermissionsControl', true).add({
+            type: ButtonType.Callback,
+            text: 'Дать права редактирования',
+            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsApply, calendarId, 'writer'])
+        }).row().add({
+            type: ButtonType.Callback,
+            text: 'Снять права редактирования',
+            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsApply, calendarId, 'reader'])
+        }).row().add({
+            type: ButtonType.Callback,
+            text: 'Назад',
+            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsMenu])
+        });
+    }
+
     public static get ControlCalendar() {
         return new KeyboardBuilder('ControlCalendarGoogleCalendar', true).add({
             type: ButtonType.Callback,
@@ -89,9 +130,8 @@ export default class GoogleCalendarCallback extends AbstractCallback {
             return this._auth(params);
         }
 
-        const [menu] = z.tuple([
-            z.nativeEnum(GoogleMenu)
-        ]).parse(context.payload);
+        const payload = z.array(z.any()).parse(context.payload);
+        const menu = z.nativeEnum(GoogleMenu).parse(payload[0]);
 
         const google = this.app.getService('google_calendar');
         const user = await google.getByEmail(chat.googleEmail);
@@ -106,6 +146,12 @@ export default class GoogleCalendarCallback extends AbstractCallback {
                 return this._add(params, user);
             case GoogleMenu.CalendarsList:
                 return this._list(params, user);
+            case GoogleMenu.PermissionsMenu:
+                return this._permissionsMenu(params, user);
+            case GoogleMenu.PermissionsCalendar:
+                return this._permissionsCalendar(params, user, String(payload[1] ?? ''));
+            case GoogleMenu.PermissionsApply:
+                return this._permissionsApply(params, user, String(payload[1] ?? ''), String(payload[2] ?? ''));
         }
     }
 
@@ -176,6 +222,73 @@ export default class GoogleCalendarCallback extends AbstractCallback {
             list.join('\n')
         ].join('\n') : 'Нет добавленных календарей', {
             keyboard: GoogleKeyboard.List(list.length > 0)
+        });
+    }
+
+    private async getUserCalendars(user: GoogleUser): Promise<CalendarItem[]> {
+        const api = user.getApi().calendar;
+        const calendars = (await api.getList()).filter((calendarId) => {
+            return calendarId.split('@', 1)[0].length === 64;
+        });
+
+        if (calendars.length === 0) {
+            return [];
+        }
+
+        return CalendarItem.findAll({
+            where: {
+                calendarId: {
+                    [Op.in]: calendars
+                }
+            }
+        });
+    }
+
+    private async _permissionsMenu({ context }: CbHandlerParams, user: GoogleUser) {
+        const calendars = await this.getUserCalendars(user);
+        if (calendars.length === 0) {
+            return context.editOrSend('Нет добавленных календарей', {
+                keyboard: GoogleKeyboard.Back
+            });
+        }
+
+        return context.editOrSend('Выберите календарь для управления правами:', {
+            keyboard: GoogleKeyboard.PermissionsList(calendars)
+        });
+    }
+
+    private async _permissionsCalendar({ context }: CbHandlerParams, user: GoogleUser, calendarId: string) {
+        const calendar = await CalendarItem.findOne({
+            where: { calendarId }
+        });
+        if (!calendar) {
+            return context.editOrSend('Календарь не найден', {
+                keyboard: GoogleKeyboard.Back
+            });
+        }
+
+        return context.editOrSend(`Календарь: ${calendar.type}, ${calendar.value}\nВыберите действие:`, {
+            keyboard: GoogleKeyboard.PermissionsControl(calendarId)
+        });
+    }
+
+    private async _permissionsApply({ context, chat }: CbHandlerParams, user: GoogleUser, calendarId: string, roleRaw: string) {
+        const role = roleRaw === 'writer' ? 'writer' : 'reader';
+        const calendar = await CalendarItem.findOne({
+            where: { calendarId }
+        });
+        if (!calendar) {
+            return context.editOrSend('Календарь не найден', {
+                keyboard: GoogleKeyboard.Back
+            });
+        }
+
+        const email = chat.googleEmail ?? user.email;
+        await user.getApi().calendar.setUserRole(calendarId, email, role);
+
+        const roleText = role === 'writer' ? 'редактирования' : 'чтения';
+        return context.editOrSend(`Права ${roleText} успешно обновлены для ${email}.`, {
+            keyboard: GoogleKeyboard.PermissionsControl(calendarId)
         });
     }
 
