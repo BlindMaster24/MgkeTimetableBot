@@ -66,7 +66,32 @@
 - Do not add code comments.
 - Keep service boundaries: cross-service access goes through service APIs, not internal files.
 - Russian text in source files must be stored as Unicode (UTF-8) characters, not escaped bytes.
-- Reason: improves readability, prevents garbled output in logs/bots, and avoids encoding issues across platforms.
+- Reasons:
+- Readability: reviewers can read literals in code, not mojibake.
+- Safety: prevents garbled output in logs/bots on different OS/terminal encodings.
+- Portability: reduces cross-platform encoding surprises in CI and deployments.
+- Where it applies:
+- User-facing strings in commands, formatter, keyboards, and errors.
+- Static text in `defines.ts`, command descriptions, and help prompts.
+- Test fixtures and expected outputs.
+- Where it may not apply:
+- Binary payloads or intentionally encoded data (e.g., base64, hashes).
+- External data stored as-is (e.g., parser HTML snapshots) unless you are editing human text.
+- Examples:
+- Good (Unicode in code):
+```ts
+context.send('Выберите группу в настройках (/setup)');
+```
+- Bad (escaped bytes / mojibake):
+```ts
+context.send('Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð³Ñ€ÑƒÐ¿Ð¿Ñƒ Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ… (/setup)');
+```
+- Scenario: you see mojibake in output
+- Fix: replace the literal with proper UTF-8 characters (retype the string).
+- Scenario: adding new command text
+- Rule: always type Russian text as normal Unicode characters in the source.
+- Scenario: copying from logs or terminal
+- Rule: verify the string displays correctly before committing.
 
 ## Testing Guidelines
 - No test runner is configured; tests are scripts.
