@@ -75,7 +75,7 @@
 - Follow existing commit style: short, imperative summaries in English, <= 72 chars.
 - Prefer a `type:` prefix (`feat`, `fix`, `docs`, `refactor`, `chore`) when it fits the change.
 - Commit messages must conform to Conventional Commits. Emojis are optional; if used, follow Gitmoji.
-- Official references (copy/paste):
+- Official references (latest at time of update, copy/paste):
 ```
 https://www.conventionalcommits.org/en/v1.0.0/
 https://gitmoji.dev/specification
