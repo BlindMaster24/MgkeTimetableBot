@@ -88,6 +88,12 @@ export class Keyboard {
             text: '🕐 Звонки',
             color: KeyboardColor.SECONDARY_COLOR
         })
+        if (this.chat.service === 'tg' && this.app.isServiceRegistered('google_calendar')) {
+            keyboard.add({
+                text: '📅 Google Calendar',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+        }
         keyboard.add({
             text: '⚙️ Настройки',
             color: KeyboardColor.SECONDARY_COLOR
