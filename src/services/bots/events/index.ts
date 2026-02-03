@@ -243,8 +243,13 @@ export abstract class AbstractBotEventListener {
             for (const chat of chats) {
                 const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
+                const isOwnGroup = String(chat.group) === String(group);
+                const header = isOwnGroup
+                    ? `📢 Расписание на ${phrase}\n`
+                    : `📢 Группа ${group}: расписание на ${phrase}\n`;
+
                 const message: string = [
-                    `📢 Группа ${group}: расписание на ${phrase}\n`,
+                    header,
                     formatter.formatGroupFull(group, {
                         showHeader: false,
                         days: [day]
@@ -267,8 +272,13 @@ export abstract class AbstractBotEventListener {
         for (const chat of chats) {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
+            const isOwnGroup = String(chat.group) === String(group);
+            const header = isOwnGroup
+                ? `📢 Расписание на ${phrase}\n`
+                : `📢 Группа ${group}: расписание на ${phrase}\n`;
+
             const message: string = [
-                `📢 Группа ${group}: расписание на ${phrase}\n`,
+                header,
                 formatter.formatGroupFull(group, {
                     showHeader: false,
                     days: [day]
@@ -290,8 +300,13 @@ export abstract class AbstractBotEventListener {
         for (const chat of chats) {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
+            const isOwnGroup = String(chat.group) === String(group);
+            const header = isOwnGroup
+                ? `🆕 Изменено расписание ${phrase}\n`
+                : `🆕 Группа ${group}: изменено расписание ${phrase}\n`;
+
             const message: string = [
-                `🆕 Группа ${group}: изменено расписание ${phrase}\n`,
+                header,
                 formatter.formatGroupFull(group, {
                     showHeader: false,
                     days: [day]
@@ -362,8 +377,13 @@ export abstract class AbstractBotEventListener {
             for (const chat of chats) {
                 const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
+                const isOwnTeacher = String(chat.teacher) === String(teacher);
+                const header = isOwnTeacher
+                    ? `📢 Расписание на ${phrase}\n`
+                    : `📢 Преподаватель ${teacher}: расписание на ${phrase}\n`;
+
                 const message: string = [
-                    `📢 Преподаватель ${teacher}: расписание на ${phrase}\n`,
+                    header,
                     formatter.formatTeacherFull(teacher, {
                         showHeader: false,
                         days: [day]
@@ -386,8 +406,13 @@ export abstract class AbstractBotEventListener {
         for (const chat of chats) {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
+            const isOwnTeacher = String(chat.teacher) === String(teacher);
+            const header = isOwnTeacher
+                ? `📢 Расписание на ${phrase}\n`
+                : `📢 Преподаватель ${teacher}: расписание на ${phrase}\n`;
+
             const message: string = [
-                `📢 Преподаватель ${teacher}: расписание на ${phrase}\n`,
+                header,
                 formatter.formatTeacherFull(teacher, {
                     showHeader: false,
                     days: [day]
@@ -409,8 +434,13 @@ export abstract class AbstractBotEventListener {
         for (const chat of chats) {
             const formatter = createScheduleFormatter(this.service, this.app, raspCache, chat);
 
+            const isOwnTeacher = String(chat.teacher) === String(teacher);
+            const header = isOwnTeacher
+                ? `🆕 Изменено расписание ${phrase}\n`
+                : `🆕 Преподаватель ${teacher}: изменено расписание ${phrase}\n`;
+
             const message: string = [
-                `🆕 Преподаватель ${teacher}: изменено расписание ${phrase}\n`,
+                header,
                 formatter.formatTeacherFull(teacher, {
                     showHeader: false,
                     days: [day]
