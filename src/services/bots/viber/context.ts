@@ -83,6 +83,10 @@ export class ViberCommandContext extends AbstractCommandContext {
         return response[0].toString();
     }
 
+    public async sendFile(_data: Buffer, _filename: string, options: MessageOptions = {}): Promise<string> {
+        return this.send('Отправка файлов доступна только в Telegram.', options);
+    }
+
     //viber doesn't support message delete
     public async delete(id: string): Promise<boolean> {
         return false;

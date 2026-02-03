@@ -64,6 +64,11 @@ export type ConfigScheme = {
             interval: number
         }
     },
+    calendar: {
+        ics: {
+            enabled: boolean
+        }
+    },
     accept: {
         room: boolean,
         private: boolean,

@@ -30,6 +30,7 @@ export abstract class AbstractContext {
 
     public abstract send(text: string, options?: MessageOptions): Promise<string>;
     public abstract sendPhoto(image: ImageFile, options?: MessageOptions): Promise<string>;
+    public abstract sendFile(data: Buffer, filename: string, options?: MessageOptions): Promise<string>;
     public abstract editOrSend(text: string, options?: MessageOptions): Promise<boolean>;
     public abstract delete(id?: string): Promise<boolean>;
     public abstract isChatAdmin(): Promise<boolean>;

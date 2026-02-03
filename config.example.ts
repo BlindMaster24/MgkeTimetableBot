@@ -57,6 +57,11 @@ export const config: ConfigScheme = {
             interval: 60 * 1e3
         }
     },
+    calendar: {
+        ics: {
+            enabled: false
+        }
+    },
     accept: {
         room: false,
         private: true,

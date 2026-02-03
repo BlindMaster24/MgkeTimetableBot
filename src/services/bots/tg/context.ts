@@ -124,6 +124,25 @@ export class TgCommandContext extends AbstractCommandContext {
         return result.id.toString();
     }
 
+    public async sendFile(data: Buffer, filename: string, options: MessageOptions = {}): Promise<string> {
+        let reply_to: number | string | undefined = options.reply_to;
+        if (typeof reply_to === 'string') reply_to = Number(reply_to);
+
+        const document: MediaInput = {
+            type: MediaSourceType.Buffer,
+            value: data,
+            filename: filename
+        };
+
+        const result: MessageContext = await this.context.sendDocument(document, {
+            reply_to_message_id: reply_to,
+            disable_notification: options.disable_mentions,
+            reply_markup: convertAbstractToTg(options.keyboard)
+        });
+
+        return result.id.toString();
+    }
+
     public async delete(id?: string): Promise<boolean> {
         if (!id && !this.messageId) {
             throw new Error('the are no message to delete');
@@ -247,6 +266,25 @@ export class TgCallbackContext extends AbstractCallbackContext {
 
             await this.cache.add(image.id, fileId);
         }
+
+        return result.id.toString();
+    }
+
+    public async sendFile(data: Buffer, filename: string, options: MessageOptions = {}): Promise<string> {
+        let reply_to: number | string | undefined = options.reply_to;
+        if (typeof reply_to === 'string') reply_to = Number(reply_to);
+
+        const document: MediaInput = {
+            type: MediaSourceType.Buffer,
+            value: data,
+            filename: filename
+        };
+
+        const result: MessageContext = await this.messageContext.sendDocument(document, {
+            reply_to_message_id: reply_to,
+            disable_notification: options.disable_mentions,
+            reply_markup: convertAbstractToTg(options.keyboard)
+        });
 
         return result.id.toString();
     }

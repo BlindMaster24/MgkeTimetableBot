@@ -1,4 +1,4 @@
-import { ContextDefaultState, MessageContext, MessageEventContext, VK, getRandomId } from "vk-io";
+﻿import { ContextDefaultState, MessageContext, MessageEventContext, VK, getRandomId } from "vk-io";
 import { VkBot } from ".";
 import { config } from "../../../../config";
 import { ParsedPayload, parsePayload } from "../../../utils";
@@ -98,6 +98,10 @@ export class VkCommandContext extends AbstractCommandContext {
         return res.id.toString();
     }
 
+    public async sendFile(_data: Buffer, _filename: string, options: MessageOptions = {}): Promise<string> {
+        return this.send('Отправка файлов доступна только в Telegram.', options);
+    }
+
     public async delete(id: string): Promise<boolean> {
         return this.context.deleteMessage({
             cmids: Number(id),
@@ -188,6 +192,10 @@ export class VkCallbackContext extends AbstractCallbackContext {
         return res.toString();
     }
 
+    public async sendFile(_data: Buffer, _filename: string, options: MessageOptions = {}): Promise<string> {
+        return this.send('Отправка файлов доступна только в Telegram.', options);
+    }
+
     public async editOrSend(text: string, options: MessageOptions = {}): Promise<boolean> {
         let reply_to: number | string | undefined = options.reply_to;
         if (typeof reply_to === 'string') reply_to = Number(reply_to);
@@ -269,3 +277,4 @@ export class VkCallbackContext extends AbstractCallbackContext {
         return true;
     }
 }
+
