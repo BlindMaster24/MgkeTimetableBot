@@ -72,14 +72,19 @@
 - If you add a new test, note the command in the PR description.
 
 ## Commit & Pull Request Guidelines
-- Follow existing commit style: short, imperative summaries (often Russian), <= 72 chars.
-- Examples:
-  - feat: improve pluralization for admin actions
-  - feat: localize root channel label
-  - refactor: unify shutdown flow and state storage
-  - fix: handle replies from message bot
-  - docs: avoid code comments unless requested
-  - chore: prepare 0.4.2 release
+- Follow existing commit style: short, imperative summaries in English, <= 72 chars.
+- Prefer a `type:` prefix (`feat`, `fix`, `docs`, `refactor`, `chore`) when it fits the change.
+- Examples (based on recent history, translated to English):
+  - fix: remove prefix for own notifications
+  - feat: add parser v2 and tests
+  - fix: avoid switching to next week on empty data
+  - feat: add subscriptions and start schedule
+  - docs: extend agents guidance
+  - fix: update parser for new site layout
+  - feat: harden parser v2 and add health check
+  - chore: bump ws to 8.17.1
+  - refactor: rewrite date/time utils
+  - fix: show week timetable button on alerts
 - PRs should include a clear description, related issues, and the commands you ran (e.g., `npm run ts-check`).
 - For behavior or asset changes, include before/after notes.
 - Always check `git status` before committing.
