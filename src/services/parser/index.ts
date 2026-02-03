@@ -3,6 +3,8 @@ import got from "got"
 import { JSDOM } from "jsdom"
 import path from "path"
 import { config } from "../../../config"
+import { HttpProxyAgent } from "http-proxy-agent"
+import { HttpsProxyAgent } from "https-proxy-agent"
 import { App, AppService } from "../../app"
 import { Logger } from "../../logger"
 import { DayIndex, DelayObject, WeekIndex, getDelayTime, mergeDays } from "../../utils"
@@ -1097,10 +1099,12 @@ export class ParserService implements AppService {
     }
 
     private async getJSDOM(url: string): Promise<JSDOM> {
-        // let agent: Agents | undefined;
-
+        let agent: any;
         if (config.parser.proxy) {
-            //TODO PROXY AGENT
+            const proxy = config.parser.proxy;
+            const httpAgent = new (HttpProxyAgent as any)(proxy);
+            const httpsAgent = new (HttpsProxyAgent as any)(proxy);
+            agent = { http: httpAgent, https: httpsAgent };
         }
 
         const replayPath = config.parser.v2?.rawHtml?.replayPath;
@@ -1110,23 +1114,30 @@ export class ParserService implements AppService {
             return new JSDOM(body);
         }
 
-        const response = await got({
-            url: url,
-            // agent: agent,
-            headers: {
-                'User-Agent': 'MGKE timetable bot by Keller (https://github.com/Keller18306/MgkeTimetableBot)'
-            },
-            retry: {
-                limit: config.parser.v2?.fetchRetry ?? 1,
-                methods: ['GET'],
-                statusCodes: [408, 413, 429, 500, 502, 503, 504],
-                errorCodes: ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN']
-            }
-        });
+        try {
+            const response = await got({
+                url: url,
+                agent,
+                headers: {
+                    'User-Agent': 'MGKE timetable bot by Keller (https://github.com/Keller18306/MgkeTimetableBot)'
+                },
+                retry: {
+                    limit: config.parser.v2?.fetchRetry ?? 1,
+                    methods: ['GET'],
+                    statusCodes: [408, 413, 429, 500, 502, 503, 504],
+                    errorCodes: ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN']
+                }
+            });
 
-        this._lastHtmlByUrl.set(url, response.body);
-        await this.writeRawHtml(url, response.body);
-        return new JSDOM(response.body);
+            this._lastHtmlByUrl.set(url, response.body);
+            await this.writeRawHtml(url, response.body);
+            return new JSDOM(response.body);
+        } catch (err: any) {
+            const proxy = config.parser.proxy ? 'proxy:on' : 'proxy:off';
+            const code = err?.code ?? err?.response?.statusCode ?? 'unknown';
+            this.logger.error(`Fetch failed (${proxy}) ${url} -> ${code}`);
+            throw err;
+        }
     }
 
     private async writeRawHtml(url: string, body: string): Promise<void> {

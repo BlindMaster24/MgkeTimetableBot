@@ -21,7 +21,6 @@ export default class extends AbstractCommand {
             }
         } = {}
 
-        //todo subgroups
         for (const groupIndex in groups) {
             const group = groups[groupIndex];
 
@@ -30,9 +29,20 @@ export default class extends AbstractCommand {
 
             for (const entry of days) {
                 const day = entry.day;
-                const lessons = entry.lessons.length;
+                let lastLessonIndex = -1;
+                for (let i = 0; i < entry.lessons.length; i += 1) {
+                    const lesson = entry.lessons[i];
+                    if (!lesson) continue;
+                    if (Array.isArray(lesson)) {
+                        if (lesson.some((item) => item && item.lesson)) {
+                            lastLessonIndex = i;
+                        }
+                    } else if (lesson.lesson) {
+                        lastLessonIndex = i;
+                    }
+                }
 
-                if (lessons === 0) {
+                if (lastLessonIndex === -1) {
                     //нет пар у этой группы
                     continue;
                 }
@@ -41,6 +51,7 @@ export default class extends AbstractCommand {
                     stat[day] = {};
                 }
 
+                const lessons = lastLessonIndex + 1;
                 if (stat[day][lessons] === undefined) {
                     stat[day][lessons] = 0;
                 }

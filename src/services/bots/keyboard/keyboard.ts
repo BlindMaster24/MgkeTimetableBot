@@ -3,6 +3,7 @@ import { SCHEDULE_FORMATTERS } from '../../../formatter';
 import { WeekIndex } from '../../../utils';
 import { AbstractContext, ButtonType, KeyboardBuilder, KeyboardColor } from '../abstract';
 import { BotChat } from '../chat';
+import { config } from '../../../../config';
 import { noYesColor, noYesSmile } from './utils';
 
 export class Keyboard {
@@ -34,14 +35,20 @@ export class Keyboard {
                 color: KeyboardColor.PRIMARY_COLOR
             }).row()
         } else {
-            if (this.chat.showDaily) {
+            const isTelegram = this.chat.service === 'tg';
+            const canShowSchedule = !isTelegram || (
+                (this.chat.mode === 'student' || this.chat.mode === 'parent') ? !!this.chat.group :
+                    (this.chat.mode === 'teacher') ? !!this.chat.teacher : true
+            );
+
+            if (this.chat.showDaily && canShowSchedule) {
                 keyboard.add({
                     text: '📄 На день',
                     color: KeyboardColor.PRIMARY_COLOR
                 })
             }
 
-            if (this.chat.showWeekly) {
+            if (this.chat.showWeekly && canShowSchedule) {
                 keyboard.add({
                     text: '📑 На неделю',
                     color: KeyboardColor.PRIMARY_COLOR
@@ -61,7 +68,8 @@ export class Keyboard {
             })
         }
 
-        if (this.chat.showAbout && this.chat.showCalls) keyboard.add({
+        const canShowCalls = this.chat.showCalls && (this.chat.service !== 'tg' || config.parser.calls.enabled !== false);
+        if (this.chat.showAbout && canShowCalls) keyboard.add({
             text: '🕐 Звонки',
             color: KeyboardColor.SECONDARY_COLOR
         })
@@ -76,7 +84,7 @@ export class Keyboard {
 
         ///___ 3 LEVEL ___///
         keyboard.row()
-        if (!this.chat.showAbout && this.chat.showCalls) keyboard.add({
+        if (!this.chat.showAbout && canShowCalls) keyboard.add({
             text: '🕐 Звонки',
             color: KeyboardColor.SECONDARY_COLOR
         })

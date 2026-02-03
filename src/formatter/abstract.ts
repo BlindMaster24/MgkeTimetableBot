@@ -245,7 +245,18 @@ export abstract class ScheduleFormatter {
         if (this.app.getService('parser').isHasErrors()) {
             text.push('⚠️ В последний раз при получении расписания с сайта произошла ошибка. Есть вероятность, что расписание не актуальное. Если проблема не исчезнет - сообщите разработчику.')
         } else if (this.chat && this.chat.showHints) {
-            text.push(`💬 Подсказка: ${randArray(hints)}`)
+            let smartHint: string | null = null;
+            if (this.chat.service === 'tg') {
+                if ((this.chat.mode === 'student' || this.chat.mode === 'parent') && !this.chat.group) {
+                    smartHint = 'Выберите группу в настройках (/setup)';
+                } else if (this.chat.mode === 'teacher' && !this.chat.teacher) {
+                    smartHint = 'Выберите преподавателя в настройках (/setup)';
+                } else if (!this.chat.showDaily && !this.chat.showWeekly) {
+                    smartHint = 'Верни кнопки расписания в настройках (/buttons)';
+                }
+            }
+
+            text.push(`💬 Подсказка: ${smartHint ?? randArray(hints)}`)
         }
 
         return text.join('\n\n')
