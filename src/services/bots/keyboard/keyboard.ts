@@ -136,6 +136,8 @@ export class Keyboard {
             text: '🔔 Подписки'
         }).add({
             text: '🖼️ Отображение'
+        }).add({
+            text: '📊 Сравнение'
         }).row().add({
             text: 'Показать текущие',
             color: KeyboardColor.PRIMARY_COLOR
@@ -246,6 +248,48 @@ export class Keyboard {
         }).row().add({
             text: noYesSmile(this.chat.showHints, 'Показывать подсказки: ') + (this.chat.showHints ? 'Да' : 'Нет'),
             color: noYesColor(this.chat.showHints),
+        }).row().add({
+            text: 'Меню настроек',
+            color: KeyboardColor.SECONDARY_COLOR
+        }).add({
+            text: 'Главное меню',
+            color: KeyboardColor.SECONDARY_COLOR
+        })
+    }
+
+    public get SettingsDiff() {
+        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsDiff');
+
+        return keyboard.add({
+            text: noYesSmile(this.chat.diffEnabled, 'Включить раздел "Что изменилось"'),
+            color: noYesColor(this.chat.diffEnabled)
+        }).row().add({
+            text: `🧾 Лимит строк: ${this.chat.diffMaxLines}`
+        }).row().add({
+            text: '⚙️ Расширенные'
+        }).row().add({
+            text: 'Меню настроек',
+            color: KeyboardColor.SECONDARY_COLOR
+        }).add({
+            text: 'Главное меню',
+            color: KeyboardColor.SECONDARY_COLOR
+        })
+    }
+
+    public get SettingsDiffAdvanced() {
+        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsDiffAdvanced');
+
+        return keyboard.add({
+            text: noYesSmile(this.chat.diffAutoInWeek, 'Показывать diff после /week'),
+            color: noYesColor(this.chat.diffAutoInWeek)
+        }).row().add({
+            text: noYesSmile(this.chat.diffAutoInUpdates, 'Показывать diff в уведомлениях'),
+            color: noYesColor(this.chat.diffAutoInUpdates)
+        }).row().add({
+            text: noYesSmile(this.chat.diffShowBeforeAfter, 'Показывать "старое -> новое"'),
+            color: noYesColor(this.chat.diffShowBeforeAfter)
+        }).row().add({
+            text: '⬅️ Базовые настройки'
         }).row().add({
             text: 'Меню настроек',
             color: KeyboardColor.SECONDARY_COLOR

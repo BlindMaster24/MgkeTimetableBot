@@ -160,6 +160,16 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
 
     /** Показывать ли подсказки под расписанием */
     declare showHints: CreationOptional<boolean>;
+    /** Показывать ли раздел сравнения (diff) */
+    declare diffEnabled: CreationOptional<boolean>;
+    /** Показывать ли diff после /week и week-callback */
+    declare diffAutoInWeek: CreationOptional<boolean>;
+    /** Добавлять ли diff в уведомления об изменениях */
+    declare diffAutoInUpdates: CreationOptional<boolean>;
+    /** Показывать ли старое -> новое для изменённых пар */
+    declare diffShowBeforeAfter: CreationOptional<boolean>;
+    /** Максимум строк diff в сообщении */
+    declare diffMaxLines: CreationOptional<number>;
 
     /** Было ли показано сообщение о еуле */
     declare eula: CreationOptional<boolean>;
@@ -334,6 +344,26 @@ BotChat.init({
         type: DataTypes.BOOLEAN,
         defaultValue: true
     },
+    diffEnabled: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    diffAutoInWeek: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    diffAutoInUpdates: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    diffShowBeforeAfter: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    diffMaxLines: {
+        type: DataTypes.INTEGER,
+        defaultValue: 20
+    },
     historyGroup: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -430,6 +460,41 @@ export async function ensureBotChatSchema() {
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: true
+        });
+    }
+    if (!('diffEnabled' in table)) {
+        await queryInterface.addColumn('bot_chats', 'diffEnabled', {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
+        });
+    }
+    if (!('diffAutoInWeek' in table)) {
+        await queryInterface.addColumn('bot_chats', 'diffAutoInWeek', {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
+        });
+    }
+    if (!('diffAutoInUpdates' in table)) {
+        await queryInterface.addColumn('bot_chats', 'diffAutoInUpdates', {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
+        });
+    }
+    if (!('diffShowBeforeAfter' in table)) {
+        await queryInterface.addColumn('bot_chats', 'diffShowBeforeAfter', {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true
+        });
+    }
+    if (!('diffMaxLines' in table)) {
+        await queryInterface.addColumn('bot_chats', 'diffMaxLines', {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 20
         });
     }
 }

@@ -16,6 +16,11 @@ export default class extends AbstractCommand {
             `\nСкрывать прошедшие дни в расписании на неделю: ${chat.hidePastDays ? 'да' : 'нет'}`,
             `Отображать в сообщении время последней загрузки расписания: ${chat.showParserTime ? 'да' : 'нет'}`,
             `Подсказки под расписанием: ${chat.showHints ? 'да' : 'нет'}`,
+            `Раздел "Что изменилось": ${chat.diffEnabled ? 'да' : 'нет'}`,
+            `Diff после /week: ${chat.diffAutoInWeek ? 'да' : 'нет'}`,
+            `Diff в уведомлениях: ${chat.diffAutoInUpdates ? 'да' : 'нет'}`,
+            `Показывать старое -> новое: ${chat.diffShowBeforeAfter ? 'да' : 'нет'}`,
+            `Лимит строк diff: ${chat.diffMaxLines}`,
 
             `\nОповещение о добавлении нового дня: ${chat.noticeChanges ? 'да' : 'нет'}`,
             `Оповещение о добавлении новой недели: ${chat.noticeNextWeek ? 'да' : 'нет'}`,
