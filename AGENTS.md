@@ -37,6 +37,7 @@
 - `npm install` or `yarn install` installs dependencies.
 - `npm start` or `yarn start` runs the bot via `ts-node .` (entry: `src/index.ts`).
 - `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
+- Source of truth for npm scripts: `package.json` (currently only `start` and `ts-check`).
 - `ts-node tests/inputTest.ts` runs the existing test script.
 - `ts-node scripts/findGroupBySameDays.ts` runs the utility script.
 - `ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
@@ -47,7 +48,24 @@
 - `npm start` or `yarn start` for a smoke run of parser/bot behavior (manual check).
 - `ts-node tests/parserV2Test.ts` after parser changes.
 - If you add tests, list the exact `ts-node ...` command in the PR description.
- - `GET /api/parser-health` (API key required) for parser status and metrics.
+- `GET /api/parser-health` (API key required) for parser status and metrics.
+
+## Current Features Snapshot
+- Telegram main menu includes `Google Calendar` button when `google_calendar` service is enabled.
+- Telegram main menu includes `ICS` button when `calendar.ics.enabled` is true.
+- ICS export command supports `/ics`, `ics`, and `📅 ICS` (Telegram).
+- Formatter list includes compact formatter (`Компактный`) via `/formatter`.
+- Diff settings menu exists under settings: `📊 Сравнение` with base and advanced submenus.
+- Key user commands support button text and `/command` forms where applicable.
+
+## Settings Map
+- Display settings menu: `src/services/bots/commands/settings/view/*`.
+- Diff settings menu: `src/services/bots/commands/settings/diff/*`.
+- Settings keyboard builders: `src/services/bots/keyboard/keyboard.ts`.
+- Chat settings storage model: `src/services/bots/chat/Chat.ts`.
+- Schema patching for new chat fields: `ensureBotChatSchema` in `src/services/bots/chat/Chat.ts`.
+- Diff-related chat fields: `diffEnabled`, `diffAutoInWeek`, `diffAutoInUpdates`, `diffShowBeforeAfter`, `diffMaxLines`.
+- Existing display fields: `showHints`, `showParserTime`, `hidePastDays`.
 
 ## Parser v2
 - Enable in `config.ts` via `parser.v2.enabled`.
@@ -84,7 +102,7 @@ context.send('Выберите группу в настройках (/setup)');
 ```
 - Bad (escaped bytes / mojibake):
 ```ts
-context.send('Выберите группу в настройках (/setup)');
+context.send('\\xD0\\x92\\xD1\\x8B...');
 ```
 - Scenario: you see mojibake in output
 - Fix: replace the literal with proper UTF-8 characters (retype the string).
@@ -96,6 +114,12 @@ context.send('Выберите группу в настройках (/setup)');
 - The string displays correctly in the editor (no mojibake).
 - The string renders correctly in bot output/logs when tested.
 - No accidental escape sequences or byte artifacts in source.
+
+## Command/Input UX Rules
+- If a command is reachable from a text button, its regexp should support that button text.
+- Prefer supporting both `/command` and plain text input for user-facing commands.
+- For Telegram-only behavior, declare it explicitly in command class (`services` or `requireServices`) and in docs.
+- When adding a new main-menu button, add or verify matching command routing in the same PR.
 
 ## Testing Guidelines
 - No test runner is configured; tests are scripts.
@@ -109,6 +133,12 @@ context.send('Выберите группу в настройках (/setup)');
 - Ensure links are valid and use Markdown links instead of raw paths.
 - Avoid jargon without explanation in user docs.
 - Google Calendar setup guide (Russian): [docs/google-calendar.md](docs/google-calendar.md).
+- Keep AGENTS/README/docs synchronized for user-visible feature additions.
+
+## Docs Sync Checklist
+- If behavior is user-visible, update `AGENTS.md` and `README.md` in the same PR.
+- If feature has setup flow, add or update a focused doc under `docs/` and link it from AGENTS/README.
+- If commands or settings changed, update command/settings sections and examples.
 
 ## Commit & Pull Request Guidelines
 - Follow existing commit style: short, imperative summaries in English, <= 72 chars.
@@ -145,7 +175,7 @@ https://gitmoji.dev/specification
 - `feat(parser)!: drop legacy v1 cache format`
 - `BREAKING CHANGE: v1 cache files are no longer read; reparse is required.`
 - Optional Gitmoji format (if team decides to use emojis): `<emoji> <type>(scope)?: <description>`
-- Gitmoji example: `✨ feat(parser): add v2 health check`
+- Gitmoji example: `:sparkles: feat(parser): add v2 health check`
 - PRs should include a clear description, related issues, and the commands you ran (e.g., `npm run ts-check`).
 - For behavior or asset changes, include before/after notes.
 - Always check `git status` before committing.
@@ -161,3 +191,4 @@ https://gitmoji.dev/specification
 - Parser cache lives under `./cache/rasp/` and emits update events; avoid clearing keys unless requested.
 - Bots: commands live in `src/services/bots/commands/`, callbacks in `src/services/bots/callbacks/`, keyboards in `src/services/bots/keyboard/`.
 - Timetable formatting lives in `src/formatter/`; domain objects live in `src/services/timetable/`.
+
