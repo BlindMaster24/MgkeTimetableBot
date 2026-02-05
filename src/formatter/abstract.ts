@@ -97,7 +97,10 @@ export abstract class ScheduleFormatter {
             text.push(this.NoTimetable());
         }
 
-        text.push(this.footer(this.raspCache.groups));
+        const groupFooter = this.footer(this.raspCache.groups);
+        if (groupFooter.trim().length > 0) {
+            text.push(groupFooter);
+        }
 
         return text.join('\n\n');
     }
@@ -124,7 +127,10 @@ export abstract class ScheduleFormatter {
             text.push(this.NoTimetable());
         }
 
-        text.push(this.footer(this.raspCache.teachers));
+        const teacherFooter = this.footer(this.raspCache.teachers);
+        if (teacherFooter.trim().length > 0) {
+            text.push(teacherFooter);
+        }
 
         return text.join('\n\n');
     }

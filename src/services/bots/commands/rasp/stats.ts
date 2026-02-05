@@ -4,7 +4,7 @@ import { Timetable } from "../../../timetable";
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)stats$/i;
+    public regexp = /^((!|\/)?stats)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'stats',

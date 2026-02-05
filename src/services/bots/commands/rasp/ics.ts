@@ -5,7 +5,7 @@ import { buildIcs } from "../../../calendar/ics";
 import { AbstractCommand, BotServiceName, CmdHandlerParams } from "../../abstract";
 
 export default class IcsCommand extends AbstractCommand {
-    public regexp = /^(!|\/)ics$/i;
+    public regexp = /^((!|\/)ics|(📅\s*)?ics)$/i;
     public payloadAction = null;
     public services: BotServiceName[] = ['tg'];
     public tgCommand: TelegramBotCommand = {

@@ -2,7 +2,7 @@ import { TelegramBotCommand } from "puregram/generated";
 import { AbstractCommand, CmdHandlerParams } from "../abstract";
 
 export default class extends AbstractCommand {
-    public regexp = /^\/cancel$/i;
+    public regexp = /^((!|\/)?cancel)$/i;
     public payloadAction = 'cancel';
     public tgCommand: TelegramBotCommand = {
         command: 'cancel',

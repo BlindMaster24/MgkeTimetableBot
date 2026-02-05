@@ -4,7 +4,7 @@ import { raspCache } from "../../../parser";
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)endings$/i;
+    public regexp = /^((!|\/)?endings)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'endings',

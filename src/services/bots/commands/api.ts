@@ -9,7 +9,7 @@ import { AbstractCommand, CmdHandlerParams } from "../abstract";
 const keyTool = new ApiKey(config.encrypt_key);
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)api(_new)?$/i
+    public regexp = /^((!|\/)?api(_new)?)$/i
     public payloadAction = null;
     public requireServices: AppServiceName[] = ['api'];
 
