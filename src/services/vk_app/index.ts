@@ -5,6 +5,7 @@ import { StatusCode } from 'status-code-enum';
 import { config } from '../../../config';
 import { App, AppService } from '../../app';
 import { FromType, RequestKey } from '../../key';
+import { newTraceId, runWithLogContext } from '../../logging';
 import { Logger } from '../../logger';
 import { checkSign } from './checkSign';
 import VKAppDefaultMethod from './methods/_default';
@@ -50,7 +51,17 @@ export class VKApp implements AppService {
         this.loadMethods();
 
         server.use(`${config.vk.app.url}/:method`,
-            (request, response) => this.handler(request, response)
+            (request, response) => {
+                const requestId = request.header('x-request-id') || newTraceId();
+                return runWithLogContext({
+                traceId: requestId,
+                requestId,
+                service: 'vk_app',
+                event: 'http_request',
+                path: request.path,
+                method: request.method
+                }, () => this.handler(request, response));
+            }
         )
     }
 

@@ -6,10 +6,13 @@ import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { config } from '../../../config';
 import { App, AppService } from '../../app';
+import { newTraceId, runWithLogContext } from '../../logging';
+import { Logger } from '../../logger';
 import { ApiKeyModel } from './key';
 import ApiDefaultMethod, { HandlerParams } from './methods/_default';
 
 export class Api implements AppService {
+    private readonly logger = new Logger('API');
     private loaded: {
         [method: string]: {
             [method: string]: ApiDefaultMethod
@@ -37,7 +40,17 @@ export class Api implements AppService {
         this.loadMethods();
 
         server.use(`${config.api.url}/:method`,
-            (request, response) => this.handler(request, response)
+            (request, response) => {
+                const requestId = request.header('x-request-id') || newTraceId();
+                return runWithLogContext({
+                traceId: requestId,
+                requestId,
+                service: 'api',
+                event: 'http_request',
+                path: request.path,
+                method: request.method
+                }, () => this.handler(request, response));
+            }
         )
     }
 
@@ -112,7 +125,7 @@ export class Api implements AppService {
             this.loaded[method.httpMethod][method.method] = method
         }
 
-        console.log(`[API] Loaded ${this.getCountMethods()} methods`)
+        this.logger.info('methods_loaded', { count: this.getCountMethods() });
     }
 
     public getCountMethods() {
@@ -173,7 +186,7 @@ export class Api implements AppService {
                 }
 
                 response.status(StatusCode.ServerErrorInternal).send('server error')
-                console.error(e)
+                this.logger.error('handler_error', { error: e, method });
             }
         })();
     }

@@ -6,6 +6,7 @@ import { config } from '../../../../config';
 import { App, AppService } from '../../../app';
 import { createScheduleFormatter } from '../../../formatter';
 import { FromType, InputRequestKey } from '../../../key';
+import { newTraceId, runWithLogContext } from '../../../logging';
 import { raspCache } from '../../parser';
 import { AbstractBot, AbstractCommand, AbstractCommandContext } from '../abstract';
 import { BotChat } from '../chat';
@@ -31,9 +32,35 @@ export class TgBot extends AbstractBot implements AppService {
     }
 
     public async run() {
-        this.tg.updates.on('message', (context, next) => this.messageHandler(context, next));
-        this.tg.updates.on('my_chat_member', (context, next) => this.myChatMember(context, next));
-        this.tg.updates.on('callback_query', (context, next) => this.callbackHandler(context, next));
+        this.tg.updates.on('message', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'tg',
+            event: 'message',
+            updateId: context.id,
+            chatId: context.chatId,
+            peerId: context.chatId,
+            userId: context.from?.id,
+            messageId: context.id
+        }, () => this.messageHandler(context, next)));
+        this.tg.updates.on('my_chat_member', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'tg',
+            event: 'my_chat_member',
+            updateId: context.id,
+            chatId: context.chatId,
+            peerId: context.chatId,
+            userId: context.from?.id
+        }, () => this.myChatMember(context, next)));
+        this.tg.updates.on('callback_query', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'tg',
+            event: 'callback_query',
+            updateId: context.id,
+            chatId: context.message?.chat.id,
+            peerId: context.message?.chat.id,
+            userId: context.from?.id,
+            messageId: context.message?.id
+        }, () => this.callbackHandler(context, next)));
         //this.tg.updates.on('my_chat_member', (context, next) => this.inviteUser(context, next))
 
         if (config.telegram.noticer) {

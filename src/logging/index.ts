@@ -23,3 +23,4 @@ const defaultConfig: LoggingConfig = {
 export const loggingEngine = new LoggingEngine(defaultConfig);
 
 export * from './types';
+export * from './context';

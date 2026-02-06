@@ -6,6 +6,7 @@ import { App, AppService } from '../../../app';
 import { defines } from '../../../defines';
 import { createScheduleFormatter } from '../../../formatter';
 import { FromType, InputRequestKey } from '../../../key';
+import { newTraceId, runWithLogContext } from '../../../logging';
 import { raspCache } from '../../parser';
 import { AbstractBot } from '../abstract';
 import { BotChat } from '../chat';
@@ -32,11 +33,49 @@ export class VkBot extends AbstractBot implements AppService {
     }
 
     public async run() {
-        this.vk.updates.on('message_new', (context, next) => this.messageHandler(context, next))
-        this.vk.updates.on('message_event', (context, next) => this.eventHandler(context, next))
-        this.vk.updates.on('chat_invite_user', (context, next) => this.inviteUser(context, next))
-        this.vk.updates.on('message_allow', (context, next) => this.setAllowSendMess(context, next, true))
-        this.vk.updates.on('message_deny', (context, next) => this.setAllowSendMess(context, next, false))
+        this.vk.updates.on('message_new', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'vk',
+            event: 'message_new',
+            updateId: context.id,
+            peerId: context.peerId,
+            userId: context.senderId,
+            messageId: context.id
+        }, () => this.messageHandler(context, next)))
+        this.vk.updates.on('message_event', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'vk',
+            event: 'message_event',
+            updateId: context.id,
+            peerId: context.peerId,
+            userId: context.userId,
+            messageId: context.conversationMessageId
+        }, () => this.eventHandler(context, next)))
+        this.vk.updates.on('chat_invite_user', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'vk',
+            event: 'chat_invite_user',
+            updateId: context.id,
+            peerId: context.peerId,
+            userId: context.senderId,
+            messageId: context.id
+        }, () => this.inviteUser(context, next)))
+        this.vk.updates.on('message_allow', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'vk',
+            event: 'message_allow',
+            updateId: context.id,
+            peerId: context.userId,
+            userId: context.userId
+        }, () => this.setAllowSendMess(context, next, true)))
+        this.vk.updates.on('message_deny', (context, next) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'vk',
+            event: 'message_deny',
+            updateId: context.id,
+            peerId: context.userId,
+            userId: context.userId
+        }, () => this.setAllowSendMess(context, next, false)))
 
         await this.vk.api.groups.setLongPollSettings({
             group_id: config.vk.bot.id,

@@ -5,6 +5,7 @@ import { App } from "../../../app";
 import { sequelize } from "../../../db";
 import { defines } from "../../../defines";
 import { InputRequestKey, RequestKey } from "../../../key";
+import { setLogContext } from "../../../logging";
 import { Logger } from "../../../logger";
 import { BotChat } from "../chat";
 import { AbstractBotEventListener } from "../events";
@@ -59,6 +60,12 @@ export abstract class AbstractBot {
         }, advancedOptions);
 
         try {
+            setLogContext({
+                service: this.service,
+                peerId: context.peerId,
+                userId: context.userId,
+                messageId: context.messageId
+            });
             if (!chat.allowSendMess) {
                 chat.allowSendMess = true;
             }
@@ -97,6 +104,7 @@ export abstract class AbstractBot {
 
             const { cmd, regexp } = cmdResult;
             handlerParams.regexp = regexp;
+            setLogContext({ commandId: cmd.id, commandRegexp: regexp });
 
             if (cmd.acceptRequired && !chat.accepted) {
                 if (context.isChat && !selfMention) return;
@@ -142,6 +150,12 @@ export abstract class AbstractBot {
         const { chat, context } = handlerParams;
 
         try {
+            setLogContext({
+                service: this.service,
+                peerId: context.peerId,
+                userId: context.userId,
+                messageId: context.messageId
+            });
             if (!chat.allowSendMess) {
                 chat.allowSendMess = true;
             }
@@ -165,6 +179,7 @@ export abstract class AbstractBot {
             }
 
             chat.lastMsgTime = Date.now();
+            setLogContext({ callbackId: cb.id });
 
             try {
                 if (!cb.preHandle(handlerParams)) {

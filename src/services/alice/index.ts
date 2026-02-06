@@ -2,6 +2,7 @@ import Alice, { IApiResponseBody, IContext, Reply, Stage } from "@keller18306/ya
 import { NextFunction, Request, Response } from "express";
 import StatusCode from "status-code-enum";
 import { App, AppService } from "../../app";
+import { newTraceId, runWithLogContext } from "../../logging";
 import { SkillController } from "./controller";
 import { AliceUser } from "./user";
 
@@ -51,7 +52,15 @@ export class AliceApp implements AppService {
 
     private async handleRequest(request: Request, response: Response, next: NextFunction) {
         try {
-            const result = await this.alice.handleRequest(request.body)
+            const requestId = request.header('x-request-id') || newTraceId();
+            const result = await runWithLogContext({
+                traceId: requestId,
+                requestId,
+                service: 'alice',
+                event: 'http_request',
+                path: request.path,
+                method: request.method
+            }, () => this.alice.handleRequest(request.body))
 
             response.send(result)
         } catch (e: any) {

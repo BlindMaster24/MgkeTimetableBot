@@ -6,6 +6,7 @@ import { App, AppService } from '../../../app';
 import { defines } from '../../../defines';
 import { createScheduleFormatter } from '../../../formatter';
 import { FromType, InputRequestKey } from '../../../key/index';
+import { newTraceId, runWithLogContext } from '../../../logging';
 import { raspCache } from '../../parser';
 import { AbstractBot } from '../abstract';
 import { BotChat } from '../chat';
@@ -48,10 +49,39 @@ export class ViberBot extends AbstractBot implements AppService {
     }
 
     public async run() {
-        this.bot.on(Events.MESSAGE_RECEIVED, (message, response) => this.handleNewMessage(message, response));
-        this.bot.on(Events.CONVERSATION_STARTED, (response, subscribed, context) => this.handleConversationStarted(response, subscribed, context));
-        this.bot.on(Events.SUBSCRIBED, (response) => this.handleSubscribe(response));
-        this.bot.on(Events.UNSUBSCRIBED, (userId) => this.handleUnsubscribe(userId));
+        this.bot.on(Events.MESSAGE_RECEIVED, (message, response) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'viber',
+            event: 'message_received',
+            updateId: response.userProfile.id,
+            peerId: response.userProfile.id,
+            userId: response.userProfile.id,
+            messageId: (message as any)?.trackingData
+        }, () => this.handleNewMessage(message, response)));
+        this.bot.on(Events.CONVERSATION_STARTED, (response, subscribed, context) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'viber',
+            event: 'conversation_started',
+            updateId: response.userProfile.id,
+            peerId: response.userProfile.id,
+            userId: response.userProfile.id
+        }, () => this.handleConversationStarted(response, subscribed, context)));
+        this.bot.on(Events.SUBSCRIBED, (response) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'viber',
+            event: 'subscribed',
+            updateId: response.userProfile.id,
+            peerId: response.userProfile.id,
+            userId: response.userProfile.id
+        }, () => this.handleSubscribe(response)));
+        this.bot.on(Events.UNSUBSCRIBED, (userId) => runWithLogContext({
+            traceId: newTraceId(),
+            service: 'viber',
+            event: 'unsubscribed',
+            updateId: userId,
+            peerId: userId,
+            userId
+        }, () => this.handleUnsubscribe(userId)));
 
         const httpService = this.app.getService('http');
         httpService.ignoreJsonParserUrls.push(VIBER_URL); //fix for viber

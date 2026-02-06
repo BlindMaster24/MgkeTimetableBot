@@ -1,6 +1,7 @@
 import express, { Application, NextFunction, Request, Response } from 'express';
 import { config } from '../config';
 import { AppService } from './app';
+import { newTraceId, runWithLogContext } from './logging';
 import { Logger } from './logger';
 import { getIp, getParams, replaceWithValueLength } from './utils';
 
@@ -23,6 +24,22 @@ export class HttpService implements AppService {
 
     public run() {
         this.http.use(express.static('./public/'));
+        this.http.use((req, res, next) => {
+            const incoming = req.header('x-request-id');
+            const requestId = typeof incoming === 'string' && incoming.trim().length > 0 ? incoming : newTraceId();
+            res.setHeader('x-request-id', requestId);
+
+            runWithLogContext({
+                traceId: requestId,
+                requestId,
+                service: 'http',
+                event: 'http_request',
+                method: req.method,
+                path: req.path
+            }, () => {
+                next();
+            });
+        });
         
         if (config.dev) {
             this.logRoutes();

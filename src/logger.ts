@@ -1,4 +1,5 @@
 import { loggingEngine } from "./logging";
+import { getLogContext } from "./logging/context";
 import { LogContext } from "./logging/types";
 
 export class Logger {
@@ -35,7 +36,7 @@ export class Logger {
     private write(level: "error" | "warn" | "info" | "debug", message: any[]) {
         const [first, ...rest] = message;
         const text = typeof first === "string" ? first : "log";
-        const context: LogContext = { ...this.context };
+        const context: LogContext = { ...getLogContext(), ...this.context };
 
         if (typeof first !== "string" && first !== undefined) {
             context.data = first;

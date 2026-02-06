@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { config } from '../../../config';
 import { App, AppService } from '../../app';
+import { newTraceId, runWithLogContext } from '../../logging';
 import { unserialize } from '../../utils';
 import { AbstractBot, BotServiceName } from '../bots/abstract';
 import { GoogleKeyboard } from '../bots/callbacks/google';
@@ -38,10 +39,30 @@ export class GoogleService implements AppService {
     public run() {
         const server = this.app.getService('http').getServer();
 
-        server.get(config.google.url, expressAsyncHandler(this.oauth.bind(this)));
+        server.get(config.google.url, expressAsyncHandler((req, res) => {
+            const requestId = req.header('x-request-id') || newTraceId();
+            return runWithLogContext({
+            traceId: requestId,
+            requestId,
+            service: 'google',
+            event: 'http_request',
+            path: req.path,
+            method: req.method
+            }, () => this.oauth(req, res));
+        }));
 
         if (config.dev) {
-            server.get('/google/link', this.link.bind(this));
+            server.get('/google/link', (req, res) => {
+                const requestId = req.header('x-request-id') || newTraceId();
+                return runWithLogContext({
+                traceId: requestId,
+                requestId,
+                service: 'google',
+                event: 'http_request',
+                path: req.path,
+                method: req.method
+                }, () => this.link(req, res));
+            });
         }
 
         this.calendarController.run();
@@ -55,7 +76,7 @@ export class GoogleService implements AppService {
         return GoogleUser.getByEmail(email);
     }
 
-    private async oauth(request: Request<null, null, null, Partial<{ code: string }>>, response: Response): Promise<void> {
+    private async oauth(request: Request<any, any, any, Partial<{ code: string }>>, response: Response): Promise<void> {
         const result = z.object({
             code: z.string({
                 required_error: 'Auth code not provided'

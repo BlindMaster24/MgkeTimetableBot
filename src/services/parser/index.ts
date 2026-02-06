@@ -6,6 +6,7 @@ import { config } from "../../../config"
 import { HttpProxyAgent } from "http-proxy-agent"
 import { HttpsProxyAgent } from "https-proxy-agent"
 import { App, AppService } from "../../app"
+import { newTraceId, runWithLogContext, setLogContext } from "../../logging"
 import { Logger } from "../../logger"
 import { DayIndex, DelayObject, WeekIndex, getDelayTime, mergeDays } from "../../utils"
 import { TypedEventEmitter } from "../../utils/events"
@@ -256,7 +257,11 @@ export class ParserService implements AppService {
 
     private async runLoop() {
         while (true) {
-            const { error } = await this.parse();
+            const { error } = await runWithLogContext({
+                traceId: newTraceId(),
+                service: 'parser',
+                event: 'parse_loop_tick'
+            }, () => this.parse());
 
             this.delayPromise = getDelayTime(error);
             await this.delayPromise.promise;
@@ -264,6 +269,7 @@ export class ParserService implements AppService {
     }
 
     public async parse() {
+        setLogContext({ event: 'parse' });
         let error: boolean = false;
 
         try {
