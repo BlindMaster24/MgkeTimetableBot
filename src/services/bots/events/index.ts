@@ -12,6 +12,7 @@ import { BotServiceName } from "../abstract/command";
 import { AbstractServiceChat, BotChat, ChatMode } from "../chat";
 import { StaticKeyboard } from "../keyboard";
 import { Subscription, SubscriptionType } from "../subscriptions/model";
+import { attachServiceChat, buildBaseChatWhere } from "./query";
 
 function getDayPhrase(day: string, nextDayPhrase: string = 'день'): string {
     if (WeekIndex.fromStringDate(day).isFutureWeek()) {
@@ -76,24 +77,13 @@ export abstract class AbstractBotEventListener {
 
     protected async getChats(where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
         return BotChat.findAll({
-            where: Object.assign({
-                accepted: true,
-                allowSendMess: true,
-                service: this.service,
-                ...(config.dev ? {
-                    noticeParserErrors: true
-                } : {})
-            }, where),
+            where: buildBaseChatWhere(this.service, where),
             include: {
                 association: BotChat.associations[this._model.name],
                 required: true
             },
         }).then(chats => {
-            return chats.map(chat => {
-                chat.serviceChat = (chat as any)[this._model.name];
-
-                return chat;
-            });
+            return attachServiceChat(chats, this._model);
         });
     }
 
@@ -121,31 +111,31 @@ export abstract class AbstractBotEventListener {
                 required: true
             },
         }).then(chats => {
-            return chats.map(chat => {
-                chat.serviceChat = (chat as any)[this._model.name];
-
-                return chat;
-            });
+            return attachServiceChat(chats, this._model);
         });
     }
 
     protected async getSubscribedChats(type: SubscriptionType, value: string, where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
-        const subscriptions = await Subscription.findAll({
-            attributes: ['chatId'],
-            where: {
-                type,
-                value
-            }
+        return BotChat.findAll({
+            where: buildBaseChatWhere(this.service, where),
+            include: [
+                {
+                    association: BotChat.associations[this._model.name],
+                    required: true
+                },
+                {
+                    association: BotChat.associations.subscriptions,
+                    required: true,
+                    where: {
+                        type,
+                        value
+                    },
+                    attributes: []
+                }
+            ]
+        }).then(chats => {
+            return attachServiceChat(chats, this._model);
         });
-
-        const chatIds = subscriptions.map((sub) => sub.chatId);
-        if (chatIds.length === 0) {
-            return [];
-        }
-
-        return this.getChats(Object.assign({
-            id: chatIds
-        }, where));
     }
 
     protected mergeChats(base: BotChat[], extra: BotChat[]): BotChat[] {
