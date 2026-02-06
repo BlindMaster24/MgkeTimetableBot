@@ -136,12 +136,74 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 - Prefer pure function tests for parser/logging utilities and script-smoke tests for command routing.
 - If you add a new test, add it to `package.json` scripts when relevant and note the exact command in the PR description.
 
+## How To Read Test Results
+- Use `npm run test:all` as the main gate.
+- Expected output should include explicit `...: ok` lines from each test script:
+- `loggingContextTest: ok`
+- `loggingRedactionTest: ok`
+- `all fixtures ok` (from `parserV2Test.ts`)
+- `parserV2ValidationTest: ok`
+- `parserV2DiffTest: ok`
+- `botTelegramFlowTest: ok`
+- If any script exits with non-zero code, treat the whole run as failed, even if previous blocks were green.
+- After `npm run test:all`, always run `npm run ts-check`.
+
+## Coverage In This Project
+- There is no numeric line/branch coverage tool enabled right now.
+- Current coverage is scenario-based (script assertions + fixtures), not percentage-based.
+- Practical coverage signal comes from:
+- logging context + redaction checks
+- parser fixtures + parser validation/diff checks
+- Telegram command-regexp flow checks
+- To report current coverage in PRs, list exactly which scripts were run and which scenarios they verify.
+- PR template for this repository:
+- `Commands run:` `npm run test:all`, `npm run ts-check`
+- `Result:` pass/fail + first failing script (if any)
+- `Scenario coverage:` changed module -> validating test scripts
+
+## When To Add A Test Runner
+- Keep script tests as default while the suite is small and fast.
+- Add a runner (`vitest` preferred) only when at least one of these becomes true:
+- test count grows beyond script-maintainable level (roughly 20+ script files)
+- need watch mode, test filtering, snapshots, or built-in mocking
+- need numeric coverage reports for CI policy
+- need parallel execution and structured test reports (JUnit/coverage JSON)
+- If runner is introduced:
+- keep existing script tests working during migration
+- migrate by domain (`logging`, `parser`, `bot-flows`) in small batches
+- add CI step for runner tests and coverage threshold only after stability
+- Runner rollout plan:
+- add `vitest` with a minimal config and keep current script tests as-is
+- introduce `npm run test:unit` only after first migrated domain is stable
+- migrate one domain per PR and keep parity checks in old scripts during transition
+- enable coverage reports in CI after 2-3 stable PRs without flaky failures
+- start with conservative thresholds and increase them gradually
+
 ## Test Execution Order
 - Fast local check: `npm run test:logging`.
 - Parser-focused check: `npm run test:parser-v2`.
 - Bot routing check: `npm run test:bot-flows`.
 - Full suite: `npm run test:all`.
 - Type safety gate: `npm run ts-check`.
+
+## Detailed Testing Workflow
+- For logging changes:
+- run `npm run test:logging`
+- verify both context propagation and redaction assertions are green
+- For parser v2 changes:
+- run `npm run test:parser-v2`
+- ensure fixture, validation and diff scripts all pass
+- For Telegram command/menu/regexp changes:
+- run `npm run test:bot-flows`
+- verify both button-text and slash-command inputs are accepted where expected
+- For large refactors touching multiple domains:
+- run `npm run test:all`
+- run `npm run ts-check`
+- run `npm start` and confirm startup does not fail early
+- Failure policy:
+- if any script fails in `test:all`, stop release/merge
+- fix failing domain first, rerun targeted test script, then rerun `test:all`
+- if `ts-check` fails, do not merge even if all tests are green
 
 ## Test Coverage Targets
 - Logging: verify ALS context propagation (`traceId/requestId/updateId`) and redaction behavior.
