@@ -5,6 +5,7 @@ import { App } from "../../../app";
 import { sequelize } from "../../../db";
 import { defines } from "../../../defines";
 import { InputRequestKey, RequestKey } from "../../../key";
+import { Logger } from "../../../logger";
 import { BotChat } from "../chat";
 import { AbstractBotEventListener } from "../events";
 import { BotInput, InputCancel } from "../input";
@@ -32,6 +33,7 @@ export abstract class AbstractBot {
     public readonly input: BotInput = new BotInput();
     public readonly cache: Storage;
     public readonly app: App;
+    protected readonly logger: Logger;
 
     public service: BotServiceName;
 
@@ -39,6 +41,7 @@ export abstract class AbstractBot {
         this.app = app;
         this.service = service;
         this.cache = new Storage(this.service);
+        this.logger = new Logger(`Bot:${this.service}`);
     }
 
     protected getBotService() {
@@ -115,15 +118,22 @@ export abstract class AbstractBot {
                 await cmd.handler(handlerParams);
             } catch (err: any) {
                 if (err instanceof InputCancel) return;
-                console.error(cmd.id, context.peerId, err);
+                this.logger.error('command_handler_error', {
+                    commandId: cmd.id,
+                    peerId: context.peerId,
+                    error: err
+                });
 
                 this.handleMessageError(cmd, context, err);
             }
         } catch (err: any) {
-            console.error('sys send error', context.peerId, err);
+            this.logger.error('message_pipeline_error', {
+                peerId: context.peerId,
+                error: err
+            });
         } finally {
             await this.saveChanges(handlerParams).catch((err) => {
-                console.error('DB SAVE CHANGES ERROR:', err);
+                this.logger.error('db_save_changes_error', { error: err });
             });
         }
     }
@@ -166,7 +176,11 @@ export abstract class AbstractBot {
                 await cb.handler(handlerParams);
             } catch (err: any) {
                 if (err instanceof InputCancel) return;
-                console.error(cb.id, context.peerId, err);
+                this.logger.error('callback_handler_error', {
+                    callbackId: cb.id,
+                    peerId: context.peerId,
+                    error: err
+                });
 
                 this.handleMessageError(cb, context, err);
             }
@@ -175,10 +189,13 @@ export abstract class AbstractBot {
                 await context.answer().catch(() => { });
             }
         } catch (err: any) {
-            console.error('sys send error', context.peerId, err);
+            this.logger.error('callback_pipeline_error', {
+                peerId: context.peerId,
+                error: err
+            });
         } finally {
             await this.saveChanges(handlerParams).catch((err) => {
-                console.error('DB SAVE CHANGES ERROR:', err);
+                this.logger.error('db_save_changes_error', { error: err });
             });
         }
     }

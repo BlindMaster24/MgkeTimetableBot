@@ -249,7 +249,7 @@ export class ParserService implements AppService {
         }
 
         if (hits === LOG_COUNT_SEND) {
-            console.error('update error', error);
+            this.logger.error('update_error', { error });
             this.events.emit('error', error);
         }
     }
@@ -339,7 +339,7 @@ export class ParserService implements AppService {
                 ms = updateTime - startTime;
             } catch (e) {
                 clearTimeout(timeout);
-                console.error('Parser error', e);
+                this.logger.error('parser_error', { error: e });
                 return reject(e);
             }
 

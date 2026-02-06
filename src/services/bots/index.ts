@@ -4,6 +4,7 @@ import path from "path";
 import { TelegramBotCommand } from "puregram/generated";
 import { config } from "../../../config";
 import { App, AppService } from "../../app";
+import { Logger } from "../../logger";
 import { ParsedPayload } from "../../utils";
 import { AbstractCallback, AbstractCommand, AbstractCommandContext } from "./abstract";
 import { BotChat } from "./chat";
@@ -21,6 +22,7 @@ type LoadedInstance<T> = {
 }
 
 export class BotService implements AppService {
+    private readonly logger = new Logger('BOTS');
     public commands: {
         [id: string]: LoadedInstance<AbstractCommand>
     } = {};
@@ -188,14 +190,14 @@ export class BotService implements AppService {
     }
 
     private async load() {
-        console.log(`[BOTS] Start loading commands...`);
+        this.logger.info('start_loading_commands');
 
         await Promise.all([
             (async () => {
                 const promises = this.loadFromDirectory(AbstractCommand, cmdRootPath);
                 await Promise.all(promises);
 
-                console.log(`[BOTS] Loaded ${Object.keys(this.commands).length} commands`);
+                this.logger.info('commands_loaded', { count: Object.keys(this.commands).length });
 
                 this.initFolderWatcher(cmdRootPath, AbstractCommand)
             })(),
@@ -203,7 +205,7 @@ export class BotService implements AppService {
                 const promises = this.loadFromDirectory(AbstractCallback, cbRootPath);
                 await Promise.all(promises);
 
-                console.log(`[BOTS] Loaded ${Object.keys(this.callbacks).length} callbacks`);
+                this.logger.info('callbacks_loaded', { count: Object.keys(this.callbacks).length });
 
                 this.initFolderWatcher(cbRootPath, AbstractCallback);
             })()
@@ -335,12 +337,12 @@ export class BotService implements AppService {
 
         watch(folderPath)
             .on('ready', () => {
-                console.log(`[CMD] Watching for ${className} changes:`, folderPath);
+                this.logger.debug('watching_changes', { className, folderPath });
             })
             .on('change', async (path) => {
                 const id = this.pathToId(folderPath, path);
 
-                console.log(`[CMD] Detected ${className}#${id} change, reloading...`)
+                this.logger.info('detected_change_reloading', { className, id, path });
                 try {
                     if (classType === AbstractCommand) {
                         await this.reloadCommandById(id, path);
@@ -348,12 +350,12 @@ export class BotService implements AppService {
                         await this.reloadCallbackById(id, path);
                     } else throw new Error('unknown class type')
                 } catch (e) {
-                    console.log(`[CMD] Failed to reload ${className}#${id}:`, e)
+                    this.logger.error('reload_failed', { className, id, path, error: e });
 
                     return;
                 }
 
-                console.log(`[CMD] Successful reloaded ${className}#${id}`)
+                this.logger.info('reload_success', { className, id });
             })
             .on('unlink', (path) => {
                 const id = this.pathToId(folderPath, path);
@@ -365,7 +367,7 @@ export class BotService implements AppService {
                             return;
                         }
 
-                        console.log(`[CMD] Detected ${className}#${id} unlink, unloading...`)
+                        this.logger.info('detected_unlink_unloading', { className, id, path });
                         this.unloadCommand(cmd);
                     } else if (classType === AbstractCallback) {
                         const cb = this.callbacks[id];
@@ -373,16 +375,16 @@ export class BotService implements AppService {
                             return;
                         }
 
-                        console.log(`[CMD] Detected ${className}#${id} unlink, unloading...`)
+                        this.logger.info('detected_unlink_unloading', { className, id, path });
                         this.unloadCallback(cb);
                     } else throw new Error('unknown class type')
                 } catch (e) {
-                    console.log(`[CMD] Failed to unload ${className}#${id}:`, e)
+                    this.logger.error('unload_failed', { className, id, path, error: e });
 
                     return;
                 }
 
-                console.log(`[CMD] Successful unloaded ${className}#${id}`);
+                this.logger.info('unload_success', { className, id });
             })
     }
 }

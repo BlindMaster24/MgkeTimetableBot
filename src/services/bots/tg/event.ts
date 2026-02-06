@@ -2,6 +2,7 @@ import { APIError, Telegram } from "puregram";
 import StatusCode from "status-code-enum";
 import { config } from "../../../../config";
 import { App } from "../../../app";
+import { Logger } from "../../../logger";
 import { BotServiceName, MessageOptions } from "../abstract";
 import { BotChat } from "../chat";
 import { AbstractBotEventListener } from "../events";
@@ -14,6 +15,7 @@ export class TgEventListener extends AbstractBotEventListener {
     public readonly service: BotServiceName = 'tg';
 
     private tg: Telegram;
+    private readonly logger = new Logger('Bot:tg:event');
 
     constructor(app: App, tg: Telegram) {
         super(app)
@@ -38,7 +40,10 @@ export class TgEventListener extends AbstractBotEventListener {
                 return;
             }
 
-            console.error('TG send event error', err)
+            this.logger.error('tg_send_event_error', {
+                error: err,
+                peerId: chat.serviceChat.peerId
+            });
         })
     }
 }

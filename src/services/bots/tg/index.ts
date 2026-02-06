@@ -43,13 +43,13 @@ export class TgBot extends AbstractBot implements AppService {
         await this.getBotService().init();
 
         await this.tg.updates.startPolling().then(() => {
-            console.log('[Telegram Bot] Start polling...')
+            this.logger.info('tg_start_polling');
         }).catch(err => {
-            console.error('Tg polling error', err)
+            this.logger.error('tg_polling_error', { error: err });
         });
 
         await this.setBotCommands().catch((e) => {
-            console.error('Cannot set tg commands', e);
+            this.logger.error('tg_set_commands_error', { error: e });
         });
     }
 
@@ -82,7 +82,7 @@ export class TgBot extends AbstractBot implements AppService {
 
         const result = await Promise.all(cmd_promises);
 
-        console.log('[Telegram Bot] Commands finnaly set');
+        this.logger.info('tg_commands_set');
 
         return result;
     }
@@ -175,7 +175,7 @@ export class TgBot extends AbstractBot implements AppService {
     }
 
     private inviteUser(context: ChatMemberContext, next: NextMiddleware) {
-        console.log('tg invite user', context)
+        this.logger.debug('tg_invite_user', { context });
         //if (context) return next();
 
         /*const chat = this.getChat(context.peerId)
