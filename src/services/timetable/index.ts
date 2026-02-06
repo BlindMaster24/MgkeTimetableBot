@@ -1,29 +1,14 @@
-import { Op } from "sequelize";
 import { App, AppService } from "../../app";
 import { sequelize } from "../../db";
-import { DayIndex, StringDate, WeekIndex } from "../../utils";
+import { WeekIndex } from "../../utils";
 import { loadCache } from "../parser/raspCache";
 import { GroupDay, TeacherDay } from "../parser/types";
 import { TimetableArchive } from "./models/timetable";
-
-export type ArchiveAppendDay = {
-    type: 'group',
-    value: string,
-    day: GroupDay
-} | {
-    type: 'teacher',
-    value: string,
-    day: TeacherDay
-}
-
-function dbEntryToDayObject(entry: TimetableArchive): any {
-    return {
-        day: StringDate.fromDayIndex(entry.day).toString(),
-        lessons: JSON.parse(entry.data)
-    };
-}
+import { ArchiveAppendDay, TimetableArchiveRepository } from "./repository";
 
 export class Timetable implements AppService {
+    private readonly repository = new TimetableArchiveRepository();
+
     constructor(private app: App) { }
 
     public run() {
@@ -37,20 +22,7 @@ export class Timetable implements AppService {
     }
 
     public async getDayIndexBounds(): Promise<{ min: number, max: number }> {
-        const { fn, col } = sequelize;
-
-        const data = await TimetableArchive.findOne({
-            attributes: [
-                [fn('min', col('day')), 'min'],
-                [fn('max', col('day')), 'max'],
-            ],
-            rejectOnEmpty: true
-        });
-
-        return {
-            min: data.get('min') as number,
-            max: data.get('max') as number
-        };
+        return this.repository.getDayIndexBounds();
     }
 
     public async getWeekIndexBounds(): Promise<{ min: number, max: number }> {
@@ -63,123 +35,35 @@ export class Timetable implements AppService {
     }
 
     public async getGroups(): Promise<string[]> {
-        const data = await TimetableArchive.findAll({
-            attributes: ['group'],
-            where: {
-                group: {
-                    [Op.not]: null
-                }
-            },
-            group: 'group'
-        });
-
-        return data.map((entry) => {
-            return entry.group!;
-        });
+        return this.repository.getGroups();
     }
 
     public async getTeachers(): Promise<string[]> {
-        const data = await TimetableArchive.findAll({
-            attributes: ['teacher'],
-            where: {
-                teacher: {
-                    [Op.not]: null
-                }
-            },
-            group: 'teacher'
-        });
-
-        return data.map((entry) => {
-            return entry.teacher!;
-        });
+        return this.repository.getTeachers();
     }
 
     public async getGroupDay(dayIndex: number, group: string): Promise<GroupDay | null> {
-        const entry = await TimetableArchive.findOne({
-            attributes: ['day', 'data'],
-            where: {
-                day: dayIndex,
-                group: group
-            }
-        });
-
-        return entry ? dbEntryToDayObject(entry) : null;
+        return this.repository.getGroupDay(dayIndex, group);
     }
 
     public async getTeacherDay(dayIndex: number, teacher: string): Promise<TeacherDay | null> {
-        const entry = await TimetableArchive.findOne({
-            attributes: ['day', 'data'],
-            where: {
-                day: dayIndex,
-                teacher: teacher
-            }
-        });
-
-        return entry ? dbEntryToDayObject(entry) : null;
+        return this.repository.getTeacherDay(dayIndex, teacher);
     }
 
     public async getGroupDaysByRange(dayBounds: [number, number], group: string): Promise<GroupDay[]> {
-        const days = await TimetableArchive.findAll({
-            attributes: ['day', 'data'],
-            where: {
-                group: group,
-                day: {
-                    [Op.between]: dayBounds
-                }
-            },
-            order: [['day', 'ASC']]
-        });
-
-        return days.map(dbEntryToDayObject);
+        return this.repository.getGroupDaysByRange(dayBounds, group);
     }
 
     public async getTeacherDaysByRange(dayBounds: [number, number], teacher: string): Promise<TeacherDay[]> {
-        const days = await TimetableArchive.findAll({
-            attributes: ['day', 'data'],
-            where: {
-                teacher: teacher,
-                day: {
-                    [Op.between]: dayBounds
-                }
-            },
-            order: [['day', 'ASC']]
-        });
-
-        return days.map(dbEntryToDayObject);
+        return this.repository.getTeacherDaysByRange(dayBounds, teacher);
     }
 
     public async getGroupDays(group: string, fromDay?: number): Promise<GroupDay[]> {
-        const days = await TimetableArchive.findAll({
-            attributes: ['day', 'data'],
-            where: {
-                group: group,
-                ...(fromDay !== undefined ? {
-                    day: {
-                        [Op.gte]: fromDay
-                    }
-                } : {})
-            },
-            order: [['day', 'ASC']]
-        });
-
-        return days.map(dbEntryToDayObject);
+        return this.repository.getGroupDays(group, fromDay);
     }
 
     public async getTeacherDays(teacher: string, fromDay?: number): Promise<TeacherDay[]> {
-        const days = await TimetableArchive.findAll({
-            attributes: ['day', 'data'],
-            where: {
-                teacher: teacher,
-                ...(fromDay !== undefined ? {
-                    day: {
-                        [Op.gte]: fromDay
-                    }
-                } : {})
-            },
-            order: [['day', 'ASC']]
-        });
-
-        return days.map(dbEntryToDayObject);
+        return this.repository.getTeacherDays(teacher, fromDay);
     }
 
     public async appendDays(entries: ArchiveAppendDay[]) {
@@ -190,18 +74,7 @@ export class Timetable implements AppService {
         await sequelize.transaction(async (transaction) => {
             await TimetableArchive.bulkCreate(entries.filter((entry) => {
                 return entry.type === 'group';
-            }).map((entry) => {
-                const { day } = entry;
-
-                const dayIndex: number = DayIndex.fromStringDate(day.day).valueOf();
-                const data: string = JSON.stringify(day.lessons);
-
-                return {
-                    day: dayIndex,
-                    group: entry.value,
-                    data: data
-                }
-            }), {
+            }).map((entry) => this.repository.toArchiveRow(entry)), {
                 transaction,
                 returning: false,
                 updateOnDuplicate: ['data'],
@@ -210,18 +83,7 @@ export class Timetable implements AppService {
 
             await TimetableArchive.bulkCreate(entries.filter((entry) => {
                 return entry.type === 'teacher';
-            }).map((entry) => {
-                const { day } = entry;
-
-                const dayIndex: number = DayIndex.fromStringDate(day.day).valueOf();
-                const data: string = JSON.stringify(day.lessons);
-
-                return {
-                    day: dayIndex,
-                    teacher: entry.value,
-                    data: data
-                }
-            }), {
+            }).map((entry) => this.repository.toArchiveRow(entry)), {
                 transaction,
                 returning: false,
                 updateOnDuplicate: ['data'],
@@ -232,4 +94,5 @@ export class Timetable implements AppService {
 }
 
 export * from '../parser/types';
+export type { ArchiveAppendDay } from './repository';
 

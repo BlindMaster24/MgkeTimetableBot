@@ -42,6 +42,12 @@ TimetableArchive.init({
         {
             fields: ['day', 'teacher'],
             unique: true
+        },
+        {
+            fields: ['group', 'day']
+        },
+        {
+            fields: ['teacher', 'day']
         }
     ]
 });
