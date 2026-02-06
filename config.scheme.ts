@@ -11,6 +11,23 @@ export type CallsSchedule = {
 
 export type ConfigScheme = {
     dev: boolean,
+    logging?: {
+        level: 'error' | 'warn' | 'info' | 'debug',
+        format: 'json' | 'text',
+        output: {
+            stdout: boolean,
+            file: {
+                enabled: boolean,
+                path: string,
+                maxSizeMb: number,
+                maxFiles: number
+            }
+        },
+        redact: {
+            messageText: boolean,
+            maxPreviewLen: number
+        }
+    },
     services: AppServiceName[],
     db: Options,
     http: {

@@ -2,6 +2,23 @@ import { ConfigScheme } from "./config.scheme";
 
 export const config: ConfigScheme = {
     dev: true,
+    logging: {
+        level: 'debug',
+        format: 'json',
+        output: {
+            stdout: true,
+            file: {
+                enabled: false,
+                path: './logs/app.log',
+                maxSizeMb: 10,
+                maxFiles: 5
+            }
+        },
+        redact: {
+            messageText: true,
+            maxPreviewLen: 128
+        }
+    },
     services: ['http', 'api', 'timetable', 'parser'],
     db: {
         dialect: 'sqlite',
