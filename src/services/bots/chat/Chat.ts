@@ -426,10 +426,19 @@ BotChat.init({
             fields: ['service']
         },
         {
+            fields: ['service', 'accepted', 'allowSendMess']
+        },
+        {
             fields: ['mode', 'group']
         },
         {
+            fields: ['service', 'mode', 'group']
+        },
+        {
             fields: ['mode', 'teacher']
+        },
+        {
+            fields: ['service', 'mode', 'teacher']
         },
         {
             fields: ['accepted', 'allowSendMess'],
@@ -454,6 +463,8 @@ export { BotChat };
 export async function ensureBotChatSchema() {
     const queryInterface = sequelize.getQueryInterface();
     const table = await queryInterface.describeTable('bot_chats');
+    const indexes = await queryInterface.showIndex('bot_chats') as any[];
+    const hasIndex = (name: string) => indexes.some((index: any) => index.name === name);
 
     if (!('noticeCalls' in table)) {
         await queryInterface.addColumn('bot_chats', 'noticeCalls', {
@@ -495,6 +506,24 @@ export async function ensureBotChatSchema() {
             type: DataTypes.INTEGER,
             allowNull: false,
             defaultValue: 20
+        });
+    }
+
+    if (!hasIndex('bot_chats_service_accepted_allow_send_mess')) {
+        await queryInterface.addIndex('bot_chats', ['service', 'accepted', 'allowSendMess'], {
+            name: 'bot_chats_service_accepted_allow_send_mess'
+        });
+    }
+
+    if (!hasIndex('bot_chats_service_mode_group')) {
+        await queryInterface.addIndex('bot_chats', ['service', 'mode', 'group'], {
+            name: 'bot_chats_service_mode_group'
+        });
+    }
+
+    if (!hasIndex('bot_chats_service_mode_teacher')) {
+        await queryInterface.addIndex('bot_chats', ['service', 'mode', 'teacher'], {
+            name: 'bot_chats_service_mode_teacher'
         });
     }
 }

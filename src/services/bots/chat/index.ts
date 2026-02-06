@@ -1,5 +1,6 @@
 import { BotChat } from './Chat';
 import { LessonAlias } from './LessonAlias';
+import { Subscription } from '../subscriptions/model';
 
 BotChat.hasMany(LessonAlias, {
     sourceKey: 'id',
@@ -9,6 +10,18 @@ BotChat.hasMany(LessonAlias, {
 LessonAlias.belongsTo(BotChat, {
     foreignKey: 'chatId',
     targetKey: 'id'
+});
+
+BotChat.hasMany(Subscription, {
+    sourceKey: 'id',
+    foreignKey: 'chatId',
+    as: 'subscriptions'
+});
+
+Subscription.belongsTo(BotChat, {
+    foreignKey: 'chatId',
+    targetKey: 'id',
+    as: 'chat'
 });
 
 export * from './Abstract';
