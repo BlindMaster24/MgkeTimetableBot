@@ -37,16 +37,24 @@
 - `npm install` or `yarn install` installs dependencies.
 - `npm start` or `yarn start` runs the bot via `ts-node .` (entry: `src/index.ts`).
 - `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
-- Source of truth for npm scripts: `package.json` (currently only `start` and `ts-check`).
+- `npm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
+- `npm run test:parser-v2` runs parser v2 tests (`tests/parserV2Test.ts`, `tests/parserV2ValidationTest.ts`, `tests/parserV2DiffTest.ts`).
+- `npm run test:bot-flows` runs Telegram command-regexp flow checks (`tests/botTelegramFlowTest.ts`).
+- `npm run test:all` runs all test groups in sequence.
+- Source of truth for npm scripts: `package.json`.
 - `ts-node tests/inputTest.ts` runs the existing test script.
 - `ts-node scripts/findGroupBySameDays.ts` runs the utility script.
 - `ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
- - `ts-node tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
+- `ts-node tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
 
 ## Verification Checklist
 - `npm run ts-check` or `yarn ts-check` for type safety after parser or command changes.
+- `npm run test:logging` after logger/correlation/redaction changes.
 - `npm start` or `yarn start` for a smoke run of parser/bot behavior (manual check).
 - `ts-node tests/parserV2Test.ts` after parser changes.
+- `npm run test:parser-v2` after parser v2 parser/diff/validate changes.
+- `npm run test:bot-flows` after command regexp, menu text, or command routing changes.
+- `npm run test:all` before release or before merge of large refactors.
 - If you add tests, list the exact `ts-node ...` command in the PR description.
 - `GET /api/parser-health` (API key required) for parser status and metrics.
 
@@ -124,7 +132,21 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 ## Testing Guidelines
 - No test runner is configured; tests are scripts.
 - Name tests `*Test.ts` under `tests/` and keep them deterministic.
-- If you add a new test, note the command in the PR description.
+- Keep tests offline: do not require network/API calls.
+- Prefer pure function tests for parser/logging utilities and script-smoke tests for command routing.
+- If you add a new test, add it to `package.json` scripts when relevant and note the exact command in the PR description.
+
+## Test Execution Order
+- Fast local check: `npm run test:logging`.
+- Parser-focused check: `npm run test:parser-v2`.
+- Bot routing check: `npm run test:bot-flows`.
+- Full suite: `npm run test:all`.
+- Type safety gate: `npm run ts-check`.
+
+## Test Coverage Targets
+- Logging: verify ALS context propagation (`traceId/requestId/updateId`) and redaction behavior.
+- Parser v2: verify fixture parsing, validation edge-cases, and diff output.
+- Bot flows: verify command regex compatibility for button text and slash commands (Telegram-first).
 
 ## Documentation
 - Keep user-facing docs focused on usage; move internals to developer docs.
