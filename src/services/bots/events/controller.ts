@@ -26,6 +26,7 @@ export class BotEventController {
         ev.on('updateTeacherDay', this.updateTeacherDay.bind(this));
 
         ev.on('updateWeek', this.updateWeek.bind(this));
+        ev.on('withdrawWeek', this.withdrawWeek.bind(this));
 
         ev.on('error', this.sendError.bind(this));
         ev.on('updateCalls', this.updateCalls.bind(this));
@@ -130,6 +131,12 @@ export class BotEventController {
     public async updateWeek(chatMode: ChatMode, weekIndex: number) {
         for (const service of this.serviceList) {
             await service.updateWeek(chatMode, weekIndex);
+        }
+    }
+
+    public async withdrawWeek(chatMode: ChatMode, weekIndex: number, entries: string[]) {
+        for (const service of this.serviceList) {
+            await service.withdrawWeek(chatMode, weekIndex, entries);
         }
     }
 

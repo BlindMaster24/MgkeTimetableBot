@@ -54,6 +54,7 @@ type ParserEvents = {
     updateTeacherDay: [data: TeacherDayEvent];
 
     updateWeek: [chatMode: ChatMode, weekIndex: number];
+    withdrawWeek: [chatMode: ChatMode, weekIndex: number, entries: string[]];
 
     flushCache: [days: ArchiveAppendDay[]]
 
@@ -854,6 +855,21 @@ export class ParserService implements AppService {
             }
         }
 
+        const collectWeekEntries = (timetable: Teachers | Groups, weekIndex: number): string[] => {
+            return (Object.entries(timetable) as Array<[string, Group | Teacher]>)
+                .filter(([, entry]) => {
+                    return entry.days.some((day: GroupDay | TeacherDay) => {
+                        return WeekIndex.fromStringDate(day.day).valueOf() === weekIndex && day.lessons.length > 0;
+                    });
+                })
+                .map(([key]) => key);
+        };
+
+        const previousWeekIndex = cache.lastWeekIndex;
+        const previousWeekIsFuture = previousWeekIndex > 0 && WeekIndex.fromWeekIndexNumber(previousWeekIndex).isFutureWeek();
+        const shouldCheckWithdraw = previousWeekIsFuture && (!config.parser.v2?.enabled || weekPolicy === 'preferCurrent');
+        const previousEntries = shouldCheckWithdraw ? collectWeekEntries(cache.timetable, previousWeekIndex) : [];
+
         // Полная очистка
         if (this._clearKeys) {
             for (const index in cache.timetable) {
@@ -1008,6 +1024,17 @@ export class ParserService implements AppService {
         if (cache.lastWeekIndex && maxWeekIndex > cache.lastWeekIndex) {
             const chatMode: ChatMode = onParser<ChatMode>(Parser, 'student', 'teacher');
             this.events.emit('updateWeek', chatMode, maxWeekIndex);
+        }
+
+        if (shouldCheckWithdraw && previousEntries.length > 0) {
+            const currentEntries = collectWeekEntries(cache.timetable, previousWeekIndex);
+            const currentSet = new Set(currentEntries);
+            const withdrawnEntries = previousEntries.filter((entry) => !currentSet.has(entry));
+
+            if (withdrawnEntries.length > 0) {
+                const chatMode: ChatMode = onParser<ChatMode>(Parser, 'student', 'teacher');
+                this.events.emit('withdrawWeek', chatMode, previousWeekIndex, withdrawnEntries);
+            }
         }
 
         const weekJumpThreshold = config.parser.v2?.weekJumpThreshold ?? 1;

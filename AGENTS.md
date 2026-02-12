@@ -65,6 +65,7 @@
 - Formatter list includes compact formatter (`Компактный`) via `/formatter`.
 - Diff settings menu exists under settings: `📊 Сравнение` with base and advanced submenus.
 - Key user commands support button text and `/command` forms where applicable.
+- If next-week schedules are removed after being published, the bot notifies users that the week was withdrawn.
 
 ## Settings Map
 - Display settings menu: `src/services/bots/commands/settings/view/*`.

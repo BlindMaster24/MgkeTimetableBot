@@ -553,6 +553,65 @@ export abstract class AbstractBotEventListener {
         }
     }
 
+    public async withdrawWeek(chatMode: ChatMode, weekIndex: number, entries: string[]) {
+        if (entries.length === 0) {
+            return;
+        }
+
+        const infoLine = 'Расписание ещё не окончательно и может измениться.';
+        const baseMessage: string = `❌ Расписание на следующую неделю отозвано.\n${infoLine}`;
+
+        switch (chatMode) {
+            case 'student': {
+                const groups = entries;
+                const baseChats = await this.getGroupsChats(groups, { noticeNextWeek: true });
+                const baseIds = new Set(baseChats.map((chat) => chat.id));
+
+                for (const chat of baseChats) {
+                    await this.sendMessage(chat, baseMessage);
+                }
+
+                for (const group of groups) {
+                    const subscriptionChats = await this.getSubscribedChats('group', group, { noticeNextWeek: true });
+                    for (const chat of subscriptionChats) {
+                        if (baseIds.has(chat.id)) {
+                            continue;
+                        }
+
+                        const scopedMessage = `❌ Группа ${group}: расписание на следующую неделю отозвано.\n${infoLine}`;
+                        await this.sendMessage(chat, scopedMessage);
+                    }
+                }
+
+                return;
+            }
+
+            case 'teacher': {
+                const teachers = entries;
+                const baseChats = await this.getTeachersChats(teachers, { noticeNextWeek: true });
+                const baseIds = new Set(baseChats.map((chat) => chat.id));
+
+                for (const chat of baseChats) {
+                    await this.sendMessage(chat, baseMessage);
+                }
+
+                for (const teacher of teachers) {
+                    const subscriptionChats = await this.getSubscribedChats('teacher', teacher, { noticeNextWeek: true });
+                    for (const chat of subscriptionChats) {
+                        if (baseIds.has(chat.id)) {
+                            continue;
+                        }
+
+                        const scopedMessage = `❌ Преподаватель ${teacher}: расписание на следующую неделю отозвано.\n${infoLine}`;
+                        await this.sendMessage(chat, scopedMessage);
+                    }
+                }
+
+                return;
+            }
+        }
+    }
+
     public async sendDistribution(message: string, cb?: ProgressCallback) {
         const chats: BotChat[] = await this.getChats({
             subscribeDistribution: true
