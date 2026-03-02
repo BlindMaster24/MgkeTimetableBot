@@ -38,7 +38,7 @@
 - Preferred installer: `yarn install` (repository lockfile is `yarn.lock`).
 - If you install with npm and hit peer-resolution issues around `canvas/jsdom`, use `npm install --legacy-peer-deps`.
 - If tests fail with `Cannot find module '../build/Release/canvas.node'`, run `npm rebuild canvas`.
-- `npm start` or `yarn start` runs the bot via `ts-node .` (entry: `src/index.ts`).
+- `npm start` or `yarn start` runs the bot via `ts-node src/bootstrap.ts` (runtime entry: `src/index.ts`).
 - `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
 - `npm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
 - `npm run test:parser-v2` runs parser v2 tests (`tests/parserV2Test.ts`, `tests/parserV2ValidationTest.ts`, `tests/parserV2DiffTest.ts`).
