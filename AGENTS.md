@@ -63,6 +63,7 @@
 
 ## Current Features Snapshot
 - Telegram runtime is based on `grammY` long polling (`src/services/bots/tg/index.ts`).
+- Telegram client is configured via `config.telegram.client` (`grammy` is the supported value).
 - Telegram command registration is set via `setMyCommands` for default and admin scopes.
 - Telegram command metadata type is defined in `src/services/bots/types/telegram.ts`.
 - Telegram main menu includes `Google Calendar` button when `google_calendar` service is enabled.
