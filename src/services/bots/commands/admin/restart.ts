@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { saveCache } from "../../../parser/raspCache";
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 

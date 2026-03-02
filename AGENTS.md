@@ -1,4 +1,4 @@
-# Repository Guidelines
+﻿# Repository Guidelines
 
 ## Project Structure & Module Organization
 - Entrypoints: `src/index.ts` bootstraps the app; `src/app.ts` registers services and starts them (DB sync, then `service.run()`).
@@ -35,6 +35,9 @@
 
 ## Build, Test, and Development Commands
 - `npm install` or `yarn install` installs dependencies.
+- Preferred installer: `yarn install` (repository lockfile is `yarn.lock`).
+- If you install with npm and hit peer-resolution issues around `canvas/jsdom`, use `npm install --legacy-peer-deps`.
+- If tests fail with `Cannot find module '../build/Release/canvas.node'`, run `npm rebuild canvas`.
 - `npm start` or `yarn start` runs the bot via `ts-node .` (entry: `src/index.ts`).
 - `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
 - `npm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
@@ -60,11 +63,13 @@
 
 ## Current Features Snapshot
 - Telegram runtime is based on `grammY` long polling (`src/services/bots/tg/index.ts`).
+- Telegram command registration is set via `setMyCommands` for default and admin scopes.
+- Telegram command metadata type is defined in `src/services/bots/types/telegram.ts`.
 - Telegram main menu includes `Google Calendar` button when `google_calendar` service is enabled.
 - Telegram main menu includes `ICS` button when `calendar.ics.enabled` is true.
-- ICS export command supports `/ics`, `ics`, and `📅 ICS` (Telegram).
-- Formatter list includes compact formatter (`Компактный`) via `/formatter`.
-- Diff settings menu exists under settings: `📊 Сравнение` with base and advanced submenus.
+- ICS export command supports `/ics`, `ics`, and `ðŸ“… ICS` (Telegram).
+- Formatter list includes compact formatter (`ÐšÐ¾Ð¼Ð¿Ð°ÐºÑ‚Ð½Ñ‹Ð¹`) via `/formatter`.
+- Diff settings menu exists under settings: `ðŸ“Š Ð¡Ñ€Ð°Ð²Ð½ÐµÐ½Ð¸Ðµ` with base and advanced submenus.
 - Key user commands support button text and `/command` forms where applicable.
 - If next-week schedules are removed after being published, the bot notifies users that the week was withdrawn.
 
@@ -108,7 +113,7 @@
 - Examples:
 - Good (Unicode in code):
 ```ts
-context.send('Выберите группу в настройках (/setup)');
+context.send('Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð³Ñ€ÑƒÐ¿Ð¿Ñƒ Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ… (/setup)');
 ```
 - Bad (escaped bytes / mojibake):
 ```ts
@@ -276,5 +281,7 @@ https://gitmoji.dev/specification
 - Schedule parsing relies on site HTML; keep selectors tolerant to layout changes and add fallbacks.
 - Parser cache lives under `./cache/rasp/` and emits update events; avoid clearing keys unless requested.
 - Bots: commands live in `src/services/bots/commands/`, callbacks in `src/services/bots/callbacks/`, keyboards in `src/services/bots/keyboard/`.
+- Telegram adapter uses `grammY` contexts and `ctx.api.*` calls in `src/services/bots/tg/*`.
 - Timetable formatting lives in `src/formatter/`; domain objects live in `src/services/timetable/`.
+
 

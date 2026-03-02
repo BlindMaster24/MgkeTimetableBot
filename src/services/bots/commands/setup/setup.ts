@@ -1,4 +1,4 @@
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 import { StaticKeyboard } from "../../keyboard";
 

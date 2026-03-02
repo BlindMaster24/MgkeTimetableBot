@@ -1,4 +1,4 @@
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../types/telegram';
 import { config } from "../../../../config";
 import { AppServiceName } from "../../../app";
 import { ApiKey } from "../../../key";

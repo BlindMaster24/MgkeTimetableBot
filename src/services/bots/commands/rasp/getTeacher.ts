@@ -1,4 +1,4 @@
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { StringDate, WeekIndex, getDayRasp, randArray } from "../../../../utils";
 import { ImageFile } from "../../../image/builder";
 import { raspCache } from "../../../parser";

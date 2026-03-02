@@ -1,5 +1,5 @@
 import { InputFile } from "grammy";
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { DayIndex, getFullSubjectName, StringDate } from "../../../../utils";
 import { TeacherDay } from "../../../parser/types";
 import { AbstractCommand, BotServiceName, CmdHandlerParams } from "../../abstract";

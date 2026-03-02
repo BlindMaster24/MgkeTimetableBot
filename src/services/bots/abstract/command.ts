@@ -1,4 +1,4 @@
-﻿import type { TelegramBotCommand } from 'puregram/generated';
+﻿import type { TelegramBotCommand } from '../types/telegram';
 import { ContextDefaultState, MessageContext as VkMessageContext } from 'vk-io';
 import { App, AppServiceName } from '../../../app';
 import { ScheduleFormatter } from '../../../formatter';

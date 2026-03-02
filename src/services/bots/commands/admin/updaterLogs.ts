@@ -1,4 +1,4 @@
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { AppServiceName } from "../../../../app";
 import { StringDate, prepareError } from "../../../../utils";
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";

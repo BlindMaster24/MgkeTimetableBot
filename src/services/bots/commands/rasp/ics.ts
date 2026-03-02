@@ -1,4 +1,4 @@
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { config } from "../../../../../config";
 import { WeekIndex } from "../../../../utils";
 import { buildIcs } from "../../../calendar/ics";

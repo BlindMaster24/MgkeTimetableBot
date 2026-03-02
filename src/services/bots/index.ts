@@ -1,7 +1,7 @@
 ﻿import { watch } from "chokidar";
 import { existsSync, readdirSync, statSync } from "fs";
 import path from "path";
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from './types/telegram';
 import { config } from "../../../config";
 import { App, AppService } from "../../app";
 import { Logger } from "../../logger";

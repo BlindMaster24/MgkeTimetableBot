@@ -1,4 +1,4 @@
-import type { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from '../../types/telegram';
 import { StringDate } from "../../../../utils";
 import { raspCache } from "../../../parser";
 import { TeacherLessonExplain } from "../../../parser/types";
