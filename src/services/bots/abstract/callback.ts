@@ -1,11 +1,10 @@
-import { CallbackQueryContext as TgRealCallbackContext } from 'puregram'
 import { ContextDefaultState, MessageEventContext } from 'vk-io'
 import { App, AppServiceName } from '../../../app'
 import { ScheduleFormatter } from "../../../formatter"
 import { AbstractServiceChat, BotChat } from "../chat"
 import { Keyboard } from "../keyboard"
 import { Storage } from '../storage'
-import { TgCallbackContext } from '../tg/context'
+import { TgCallbackContext, TgCallbackRealContext } from '../tg/context'
 import { VkCallbackContext } from '../vk/context'
 import { BotServiceName } from "./command"
 import { AbstractCallbackContext } from './context'
@@ -27,7 +26,7 @@ export type CbHandlerParams = {
 } | {
     service: 'tg',
     context: TgCallbackContext,
-    realContext: TgRealCallbackContext,
+    realContext: TgCallbackRealContext,
     // chat: TgChat
 })
 

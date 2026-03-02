@@ -1,4 +1,4 @@
-import { APIError, Telegram } from "puregram";
+﻿import { Bot, GrammyError } from "grammy";
 import StatusCode from "status-code-enum";
 import { config } from "../../../../config";
 import { App } from "../../../app";
@@ -14,12 +14,12 @@ export class TgEventListener extends AbstractBotEventListener {
     protected _model = TgChat;
     public readonly service: BotServiceName = 'tg';
 
-    private tg: Telegram;
+    private bot: Bot;
     private readonly logger = new Logger('Bot:tg:event');
 
-    constructor(app: App, tg: Telegram) {
+    constructor(app: App, bot: Bot) {
         super(app)
-        this.tg = tg
+        this.bot = bot
     }
 
     protected getAdminPeerIds(): number[] {
@@ -27,15 +27,18 @@ export class TgEventListener extends AbstractBotEventListener {
     }
 
     public async sendMessage(chat: BotChat<TgChat>, message: string, options: MessageOptions = {}) {
-        return this.tg.api.sendMessage({
-            text: message,
-            chat_id: chat.serviceChat.peerId,
-            ...(!options.disableHtmlParser ? {
-                parse_mode: 'HTML',
-            } : {}),
-            reply_markup: convertAbstractToTg(options.keyboard ? options.keyboard : new Keyboard(this.app, chat).MainMenu)
-        }).catch((err: APIError) => {
-            if (err.code === StatusCode.ClientErrorForbidden) {
+        return this.bot.api.sendMessage(
+            chat.serviceChat.peerId,
+            message,
+            {
+                ...(!options.disableHtmlParser ? {
+                    parse_mode: 'HTML',
+                } : {}),
+                disable_notification: options.disable_mentions,
+                reply_markup: convertAbstractToTg(options.keyboard ? options.keyboard : new Keyboard(this.app, chat).MainMenu)
+            }
+        ).catch((err: Error) => {
+            if (err instanceof GrammyError && err.error_code === StatusCode.ClientErrorForbidden) {
                 chat.allowSendMess = false;
                 return;
             }

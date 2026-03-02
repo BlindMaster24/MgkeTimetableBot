@@ -1,7 +1,7 @@
-import { watch } from "chokidar";
+﻿import { watch } from "chokidar";
 import { existsSync, readdirSync, statSync } from "fs";
 import path from "path";
-import { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from "puregram/generated";
 import { config } from "../../../config";
 import { App, AppService } from "../../app";
 import { Logger } from "../../logger";
@@ -170,7 +170,7 @@ export class BotService implements AppService {
                     tgCommand.command = tgCommand.command.toLowerCase();
 
                     if (instance.adminOnly) {
-                        tgCommand.description = '[адм] ' + tgCommand.description;
+                        tgCommand.description = '[Ð°Ð´Ð¼] ' + tgCommand.description;
                     }
 
                     commands.push(tgCommand);
@@ -388,3 +388,4 @@ export class BotService implements AppService {
             })
     }
 }
+

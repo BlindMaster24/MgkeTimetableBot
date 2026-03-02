@@ -1,4 +1,4 @@
-import { CallbackQueryContext, MediaInput, MediaSourceType, MessageContext, PhotoAttachment } from "puregram";
+﻿import { Context, InputFile } from "grammy";
 import { TgBot } from ".";
 import { config } from "../../../../config";
 import { ParsedPayload, parsePayload } from "../../../utils";
@@ -7,54 +7,132 @@ import { AbstractCallbackContext, AbstractCommandContext, MessageOptions } from 
 import { StaticKeyboard } from "../keyboard";
 import { convertAbstractToTg } from "./keyboard";
 
+type TgUser = {
+    id: number,
+    is_bot?: boolean,
+    username?: string,
+    first_name?: string,
+    last_name?: string,
+    language_code?: string
+};
+
+type TgChat = {
+    id: number,
+    type: string,
+    username?: string
+};
+
+type TgMessage = {
+    message_id: number,
+    chat: TgChat,
+    from?: TgUser,
+    text?: string,
+    photo?: Array<{ file_id: string }>
+};
+
+type TgCallbackQueryData = {
+    id: string,
+    from: TgUser,
+    data?: string,
+    message?: TgMessage
+};
+
+export type TgMessageRealContext = Context & {
+    chat: TgChat,
+    from?: TgUser,
+    msg: TgMessage
+};
+
+export type TgCallbackRealContext = Context & {
+    from: TgUser,
+    callbackQuery: TgCallbackQueryData
+};
+
+function resolveReplyTo(replyTo?: string): number | undefined {
+    if (replyTo == null) {
+        return;
+    }
+
+    const value = Number(replyTo);
+
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    return value;
+}
+
+function appendCancelHint(text: string, options: MessageOptions): { text: string, options: MessageOptions } {
+    if (options?.keyboard?.name !== StaticKeyboard.Cancel.name) {
+        return { text, options };
+    }
+
+    const nextOptions = { ...options };
+    delete nextOptions.keyboard;
+
+    return {
+        text: `${text}\n\nНапишите /cancel для отмены`,
+        options: nextOptions
+    };
+}
+
+function buildSendOptions(options: MessageOptions = {}, replyTo?: number): any {
+    return {
+        ...(!options.disableHtmlParser ? { parse_mode: 'HTML' } : {}),
+        ...(replyTo ? {
+            reply_parameters: {
+                message_id: replyTo,
+                allow_sending_without_reply: true
+            }
+        } : {}),
+        disable_notification: options.disable_mentions,
+        reply_markup: convertAbstractToTg(options.keyboard)
+    };
+}
+
+function buildEditOptions(options: MessageOptions = {}): any {
+    return {
+        ...(!options.disableHtmlParser ? { parse_mode: 'HTML' } : {}),
+        reply_markup: convertAbstractToTg(options.keyboard)
+    };
+}
+
 export class TgCommandContext extends AbstractCommandContext {
     public text: string;
     public parsedPayload: undefined;
     public peerId: number;
     public userId: number;
-
     public messageId?: number;
 
-    private context: MessageContext;
+    private context: TgMessageRealContext;
 
-    constructor(bot: TgBot, context: MessageContext) {
+    constructor(bot: TgBot, context: TgMessageRealContext) {
         super(bot);
 
         this.context = context;
-        this.text = context.text || '';
+        this.text = context.msg?.text || '';
 
         this.peerId = context.chat.id;
         this.userId = context.from?.id || 0;
     }
 
     get isChat(): boolean {
-        return this.context.isChannel() || this.context.isSupergroup() || this.context.isGroup();
+        return this.context.chat.type !== 'private';
     }
 
     public async send(text: string, options: MessageOptions = {}): Promise<string> {
-        let reply_to: number | string | undefined = options.reply_to;
-        if (typeof reply_to === 'string') reply_to = Number(reply_to);
+        const replyTo = resolveReplyTo(options.reply_to);
+        const prepared = appendCancelHint(text, options);
 
-        if (options?.keyboard?.name === StaticKeyboard.Cancel.name) {
-            text += '\n\nНапишите /cancel для отмены';
-            delete options.keyboard;
-        }
+        const result = await this.context.api.sendMessage(
+            this.peerId,
+            prepared.text,
+            buildSendOptions(prepared.options, replyTo)
+        );
 
-        const result: MessageContext = await this.context.send(text, {
-            ...(!options.disableHtmlParser ? {
-                parse_mode: 'HTML',
-            } : {}),
-            ...(reply_to ? {
-                allow_sending_without_reply: true,
-                reply_to_message_id: reply_to,
-            } : {}),
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
+        this.messageId = result.message_id;
 
-        this.messageId = result.id;
-
-        return result.id.toString();
+        return String(result.message_id);
     }
 
     public async editOrSend(text: string, options: MessageOptions = {}): Promise<boolean> {
@@ -64,98 +142,74 @@ export class TgCommandContext extends AbstractCommandContext {
             return Boolean(result);
         }
 
-        let reply_to: number | string | undefined = options.reply_to;
-        if (typeof reply_to === 'string') reply_to = Number(reply_to);
+        const prepared = appendCancelHint(text, options);
 
-        if (options?.keyboard?.name === StaticKeyboard.Cancel.name) {
-            text += '\n\nНапишите /cancel для отмены';
-            delete options.keyboard;
+        try {
+            await this.context.api.editMessageText(
+                this.peerId,
+                this.messageId,
+                prepared.text,
+                buildEditOptions(prepared.options)
+            );
+
+            return true;
+        } catch {
+            const result = await this.send(text, options);
+
+            return Boolean(result);
         }
-
-        const result = await this.context.editMessageText(text, {
-            message_id: this.messageId,
-
-            ...(!options.disableHtmlParser ? {
-                parse_mode: 'HTML',
-            } : {}),
-            ...(reply_to ? {
-                allow_sending_without_reply: true,
-                reply_to_message_id: reply_to,
-            } : {}),
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
-
-        return Boolean(result);
     }
 
     public async sendPhoto(image: ImageFile, options: MessageOptions = {}): Promise<string> {
-        let reply_to: number | string | undefined = options.reply_to
-        if (typeof reply_to === 'string') reply_to = Number(reply_to)
+        const replyTo = resolveReplyTo(options.reply_to);
 
         let fileId = await this.cache.get(image.id);
 
-        let photo: MediaInput;
-        if (fileId) {
-            photo = {
-                type: MediaSourceType.FileId,
-                value: fileId
-            }
-        } else {
-            photo = {
-                type: MediaSourceType.Buffer,
-                value: await image.data()
-            }
-        }
+        const photo = fileId || new InputFile(await image.data(), `${image.id}.png`);
 
-        const result: MessageContext = await this.context.sendPhoto(photo, {
-            reply_to_message_id: reply_to,
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
+        const result = await this.context.api.sendPhoto(
+            this.peerId,
+            photo,
+            buildSendOptions(options, replyTo)
+        );
 
-        const attachment = result.attachment;
-        if (!fileId && attachment instanceof PhotoAttachment) {
-            fileId = attachment.bigSize.fileId;
-
+        const photoList = (result as TgMessage).photo;
+        if (!fileId && Array.isArray(photoList) && photoList.length > 0) {
+            fileId = photoList[photoList.length - 1].file_id;
             await this.cache.add(image.id, fileId);
         }
 
-        return result.id.toString();
+        return String(result.message_id);
     }
 
     public async sendFile(data: Buffer, filename: string, options: MessageOptions = {}): Promise<string> {
-        let reply_to: number | string | undefined = options.reply_to;
-        if (typeof reply_to === 'string') reply_to = Number(reply_to);
+        const replyTo = resolveReplyTo(options.reply_to);
 
-        const document: MediaInput = {
-            type: MediaSourceType.Buffer,
-            value: data,
-            filename: filename
-        };
+        const result = await this.context.api.sendDocument(
+            this.peerId,
+            new InputFile(data, filename),
+            buildSendOptions(options, replyTo)
+        );
 
-        const result: MessageContext = await this.context.sendDocument(document, {
-            reply_to_message_id: reply_to,
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
-
-        return result.id.toString();
+        return String(result.message_id);
     }
 
     public async delete(id?: string): Promise<boolean> {
         if (!id && !this.messageId) {
-            throw new Error('the are no message to delete');
+            throw new Error('there are no message to delete');
         }
 
-        return this.context.delete({
-            message_id: id ? Number(id) : this.messageId
-        })
+        const targetId = id ? Number(id) : this.messageId;
+
+        if (!targetId) {
+            return false;
+        }
+
+        return this.context.api.deleteMessage(this.peerId, targetId);
     }
 
     public async isChatAdmin(): Promise<boolean> {
         return false;
-        //TO DO
     }
 }
 
@@ -166,137 +220,113 @@ export class TgCallbackContext extends AbstractCallbackContext {
     public callbackAnswered: boolean = false;
     public parsedPayload?: ParsedPayload;
 
-    private context: CallbackQueryContext;
-    private messageContext: MessageContext;
+    private context: TgCallbackRealContext;
+    private message: TgMessage;
 
-    constructor(bot: TgBot, context: CallbackQueryContext) {
+    constructor(bot: TgBot, context: TgCallbackRealContext) {
         super(bot);
 
         this.context = context;
 
-        if (!context.message) {
-            throw new Error('there are no message context');
+        if (!context.callbackQuery.message) {
+            throw new Error('there is no message context');
         }
 
-        this.messageContext = context.message;
-        this.messageId = context.message.id;
+        this.message = context.callbackQuery.message;
+        this.messageId = this.message.message_id;
 
-        this.peerId = context.message!.chat.id;
+        this.peerId = this.message.chat.id;
         this.userId = context.from.id;
 
-        this.parsedPayload = parsePayload(context.data);
+        this.parsedPayload = context.callbackQuery.data ? parsePayload(context.callbackQuery.data) : undefined;
     }
 
     get isChat(): boolean {
-        return this.messageContext.isChannel() || this.messageContext.isSupergroup() || this.messageContext.isGroup();
+        return this.message.chat.type !== 'private';
     }
 
     public async answer(text?: string): Promise<boolean> {
         this.callbackAnswered = true;
 
-        return this.context.answerCallbackQuery({
-            text: text
-        })
-    }
-
-    public async send(text: string, options: MessageOptions = {}): Promise<string> {
-        let reply_to: number | string | undefined = options.reply_to
-        if (typeof reply_to === 'string') reply_to = Number(reply_to)
-
-        if (options?.keyboard?.name === StaticKeyboard.Cancel.name) {
-            text += '\n\nНапишите /cancel для отмены';
-            delete options.keyboard;
-        }
-
-        const result: MessageContext = await this.messageContext.send(text, {
-            ...(!options.disableHtmlParser ? {
-                parse_mode: 'HTML',
-            } : {}),
-            ...(reply_to ? {
-                allow_sending_without_reply: true,
-                reply_to_message_id: reply_to,
-            } : {}),
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
-
-        return result.id.toString();
-    }
-
-    public async editOrSend(text: string, options: MessageOptions = {}) {
-        await this.messageContext.editMessageText(text, {
-            ...(!options.disableHtmlParser ? {
-                parse_mode: 'HTML',
-            } : {}),
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        })
+        await this.context.answerCallbackQuery({ text });
 
         return true;
     }
 
+    public async send(text: string, options: MessageOptions = {}): Promise<string> {
+        const replyTo = resolveReplyTo(options.reply_to);
+        const prepared = appendCancelHint(text, options);
+
+        const result = await this.context.api.sendMessage(
+            this.peerId,
+            prepared.text,
+            buildSendOptions(prepared.options, replyTo)
+        );
+
+        return String(result.message_id);
+    }
+
+    public async editOrSend(text: string, options: MessageOptions = {}): Promise<boolean> {
+        const prepared = appendCancelHint(text, options);
+
+        try {
+            await this.context.api.editMessageText(
+                this.peerId,
+                this.messageId,
+                prepared.text,
+                buildEditOptions(prepared.options)
+            );
+
+            return true;
+        } catch {
+            const result = await this.send(text, options);
+
+            return Boolean(result);
+        }
+    }
+
     public async sendPhoto(image: ImageFile, options: MessageOptions = {}): Promise<string> {
-        let reply_to: number | string | undefined = options.reply_to
-        if (typeof reply_to === 'string') reply_to = Number(reply_to)
+        const replyTo = resolveReplyTo(options.reply_to);
 
         let fileId = await this.cache.get(image.id);
 
-        let photo: MediaInput;
-        if (!config.dev && fileId) {
-            photo = {
-                type: MediaSourceType.FileId,
-                value: fileId
-            }
-        } else {
-            photo = {
-                type: MediaSourceType.Buffer,
-                value: await image.data()
-            }
-        }
+        const photo = (!config.dev && fileId)
+            ? fileId
+            : new InputFile(await image.data(), `${image.id}.png`);
 
-        const result: MessageContext = await this.messageContext.sendPhoto(photo, {
-            reply_to_message_id: reply_to,
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
+        const result = await this.context.api.sendPhoto(
+            this.peerId,
+            photo,
+            buildSendOptions(options, replyTo)
+        );
 
-        const attachment = result.attachment;
-        if (!fileId && attachment instanceof PhotoAttachment) {
-            fileId = attachment.bigSize.fileId;
+        const photoList = (result as TgMessage).photo;
+        if (!fileId && Array.isArray(photoList) && photoList.length > 0) {
+            fileId = photoList[photoList.length - 1].file_id;
 
             await this.cache.add(image.id, fileId);
         }
 
-        return result.id.toString();
+        return String(result.message_id);
     }
 
     public async sendFile(data: Buffer, filename: string, options: MessageOptions = {}): Promise<string> {
-        let reply_to: number | string | undefined = options.reply_to;
-        if (typeof reply_to === 'string') reply_to = Number(reply_to);
+        const replyTo = resolveReplyTo(options.reply_to);
 
-        const document: MediaInput = {
-            type: MediaSourceType.Buffer,
-            value: data,
-            filename: filename
-        };
+        const result = await this.context.api.sendDocument(
+            this.peerId,
+            new InputFile(data, filename),
+            buildSendOptions(options, replyTo)
+        );
 
-        const result: MessageContext = await this.messageContext.sendDocument(document, {
-            reply_to_message_id: reply_to,
-            disable_notification: options.disable_mentions,
-            reply_markup: convertAbstractToTg(options.keyboard)
-        });
-
-        return result.id.toString();
+        return String(result.message_id);
     }
 
     public async delete(id?: string): Promise<boolean> {
-        return this.messageContext.delete({
-            message_id: id ? Number(id) : this.messageContext.id
-        })
+        return this.context.api.deleteMessage(this.peerId, id ? Number(id) : this.messageId);
     }
 
     public async isChatAdmin(): Promise<boolean> {
         return false;
-        // TODO
     }
 }

@@ -1,5 +1,4 @@
-import { NextMiddleware } from 'middleware-io';
-import { APIError, CallbackQueryContext, ChatMemberContext, MessageContext, Telegram } from 'puregram';
+﻿import { Bot, GrammyError } from 'grammy';
 import { CreationAttributes } from 'sequelize';
 import StatusCode from 'status-code-enum';
 import { config } from '../../../../config';
@@ -14,54 +13,100 @@ import { AbstractBotEventListener } from '../events';
 import { Keyboard } from '../keyboard';
 import { TgBotAction } from './action';
 import { TgChat } from './chat';
-import { TgCallbackContext, TgCommandContext } from './context';
+import { TgCallbackContext, TgCallbackRealContext, TgCommandContext, TgMessageRealContext } from './context';
 import { TgEventListener } from './event';
 
+type TgUser = {
+    id: number,
+    is_bot?: boolean
+};
+
+type TgChatInfo = {
+    id: number,
+    type: string,
+    username?: string
+};
+
+type TgMyChatMemberContext = {
+    update: {
+        update_id: number,
+        my_chat_member?: {
+            chat: TgChatInfo,
+            from?: TgUser,
+            new_chat_member: {
+                status: string
+            }
+        }
+    },
+    api: Bot['api']
+};
+
+function parseStartPayload(messageText?: string): string | undefined {
+    if (!messageText) {
+        return;
+    }
+
+    const [, payload] = messageText.match(/^\/start(?:@\w+)?(?:\s+([\s\S]+))?$/i) || [];
+
+    return payload?.trim();
+}
+
 export class TgBot extends AbstractBot implements AppService {
-    public tg: Telegram;
+    public tg: Bot;
     public event: AbstractBotEventListener;
 
     constructor(app: App) {
         super(app, 'tg');
 
-        this.tg = new Telegram({
-            token: config.telegram.token
-        });
+        this.tg = new Bot(config.telegram.token);
 
         this.event = new TgEventListener(this.app, this.tg);
     }
 
     public async run() {
-        this.tg.updates.on('message', (context, next) => runWithLogContext({
+        this.tg.catch((err) => {
+            const { ctx, error } = err;
+
+            this.logger.error('tg_update_handler_error', {
+                error,
+                updateId: ctx.update.update_id,
+                peerId: ctx.chat?.id,
+                userId: ctx.from?.id,
+                messageId: ctx.msg?.message_id
+            });
+        });
+
+        this.tg.on('message', (context) => runWithLogContext({
             traceId: newTraceId(),
             service: 'tg',
             event: 'message',
-            updateId: context.id,
-            chatId: context.chatId,
-            peerId: context.chatId,
+            updateId: context.update.update_id,
+            chatId: context.chat?.id,
+            peerId: context.chat?.id,
             userId: context.from?.id,
-            messageId: context.id
-        }, () => this.messageHandler(context, next)));
-        this.tg.updates.on('my_chat_member', (context, next) => runWithLogContext({
+            messageId: context.msg?.message_id
+        }, () => this.messageHandler(context as TgMessageRealContext)));
+
+        this.tg.on('my_chat_member', (context) => runWithLogContext({
             traceId: newTraceId(),
             service: 'tg',
             event: 'my_chat_member',
-            updateId: context.id,
-            chatId: context.chatId,
-            peerId: context.chatId,
+            updateId: context.update.update_id,
+            chatId: context.chat?.id,
+            peerId: context.chat?.id,
             userId: context.from?.id
-        }, () => this.myChatMember(context, next)));
-        this.tg.updates.on('callback_query', (context, next) => runWithLogContext({
+        }, () => this.myChatMember(context as unknown as TgMyChatMemberContext)));
+
+        this.tg.on('callback_query:data', (context) => runWithLogContext({
             traceId: newTraceId(),
             service: 'tg',
             event: 'callback_query',
-            updateId: context.id,
-            chatId: context.message?.chat.id,
-            peerId: context.message?.chat.id,
+            updateId: context.update.update_id,
+            chatId: context.callbackQuery.message?.chat.id,
+            peerId: context.callbackQuery.message?.chat.id,
             userId: context.from?.id,
-            messageId: context.message?.id
-        }, () => this.callbackHandler(context, next)));
-        //this.tg.updates.on('my_chat_member', (context, next) => this.inviteUser(context, next))
+            messageId: context.callbackQuery.message?.message_id
+        }, () => this.callbackHandler(context as TgCallbackRealContext)));
 
         if (config.telegram.noticer) {
             this.getBotService().events.registerListener(this.event);
@@ -69,14 +114,21 @@ export class TgBot extends AbstractBot implements AppService {
 
         await this.getBotService().init();
 
-        await this.tg.updates.startPolling().then(() => {
-            this.logger.info('tg_start_polling');
-        }).catch(err => {
-            this.logger.error('tg_polling_error', { error: err });
-        });
-
         await this.setBotCommands().catch((e) => {
             this.logger.error('tg_set_commands_error', { error: e });
+        });
+
+        const stopPolling = () => this.tg.stop();
+        process.once('SIGINT', stopPolling);
+        process.once('SIGTERM', stopPolling);
+
+        await this.tg.start({
+            drop_pending_updates: false,
+            onStart: () => {
+                this.logger.info('tg_start_polling');
+            }
+        }).catch(err => {
+            this.logger.error('tg_polling_error', { error: err });
         });
     }
 
@@ -85,45 +137,49 @@ export class TgBot extends AbstractBot implements AppService {
     }
 
     private async setBotCommands() {
-        const cmd_promises: Promise<boolean>[] = [];
+        const cmdPromises: Promise<boolean>[] = [];
 
-        cmd_promises.push(this.tg.api.setMyCommands({
-            commands: this.getBotService().getBotCommands(),
-            scope: {
-                type: 'default'
+        cmdPromises.push(this.tg.api.setMyCommands(
+            this.getBotService().getBotCommands(),
+            {
+                scope: {
+                    type: 'default'
+                }
             }
-        }));
+        ));
 
         const adminCommands = this.getBotService().getBotCommands(true);
-        for (const admin_id of config.telegram.admin_ids) {
-            const promise = this.tg.api.setMyCommands({
-                commands: adminCommands,
-                scope: {
-                    type: 'chat',
-                    chat_id: admin_id
+        for (const adminId of config.telegram.admin_ids) {
+            cmdPromises.push(this.tg.api.setMyCommands(
+                adminCommands,
+                {
+                    scope: {
+                        type: 'chat',
+                        chat_id: adminId
+                    }
                 }
-            });
-
-            cmd_promises.push(promise);
+            ));
         }
 
-        const result = await Promise.all(cmd_promises);
+        const result = await Promise.all(cmdPromises);
 
         this.logger.info('tg_commands_set');
 
         return result;
     }
 
-    private async messageHandler(context: MessageContext, next: NextMiddleware) {
-        if (context.from?.isBot() || context.hasViaBot()) return;
+    private async messageHandler(context: TgMessageRealContext) {
+        if (context.from?.is_bot || (context.msg as any).via_bot) {
+            return;
+        }
 
         const _context = new TgCommandContext(this, context);
 
-        const chat = await this.getChat(context.chatId, this._defaultCreationParams(_context));
-        await chat.serviceChat.updateChat(context.chat, context.from);
+        const chat = await this.getChat(context.chat.id, this._defaultCreationParams(_context));
+        await chat.serviceChat.updateChat(context.chat as any, context.from as any);
 
         if (chat.ref === null) {
-            chat.ref = context.startPayload || 'none';
+            chat.ref = parseStartPayload(context.msg.text) || 'none';
         }
 
         this.handleMessage({
@@ -140,21 +196,21 @@ export class TgBot extends AbstractBot implements AppService {
     }
 
     protected override handleMessageError(cmd: AbstractCommand, context: AbstractCommandContext, err: Error): void {
-        if (err instanceof APIError && [StatusCode.ClientErrorTooManyRequests, StatusCode.ClientErrorForbidden].includes(err.code)) {
+        if (err instanceof GrammyError && [StatusCode.ClientErrorTooManyRequests, StatusCode.ClientErrorForbidden].includes(err.error_code)) {
             return;
         }
 
         return super.handleMessageError(cmd, context, err);
     }
 
-    private async callbackHandler(context: CallbackQueryContext, next: NextMiddleware) {
-        if (context.from?.isBot()) return;
-        if (!context.data || !context.message) return;
+    private async callbackHandler(context: TgCallbackRealContext) {
+        if (context.from?.is_bot) return;
+        if (!context.callbackQuery.data || !context.callbackQuery.message) return;
 
         const _context = new TgCallbackContext(this, context);
 
-        const chat = await this.getChat(context.from.id, this._defaultCreationParams(_context));
-        await chat.serviceChat.updateChat(context.message.chat, context.message.from);
+        const chat = await this.getChat(context.callbackQuery.message.chat.id, this._defaultCreationParams(_context));
+        await chat.serviceChat.updateChat(context.callbackQuery.message.chat as any, context.callbackQuery.message.from as any);
 
         return this.handleCallback({
             service: 'tg',
@@ -170,7 +226,7 @@ export class TgBot extends AbstractBot implements AppService {
 
     protected _getAcceptKeyParams(context: TgCommandContext): InputRequestKey {
         return {
-            from: FromType.VKBot,
+            from: FromType.TelegramBot,
             peer_id: context.peerId,
             sender_id: context.userId,
             time: Date.now()
@@ -183,12 +239,18 @@ export class TgBot extends AbstractBot implements AppService {
         }
     }
 
-    private async myChatMember(context: ChatMemberContext, next: NextMiddleware) {
-        const chat = await this.getChat(context.chatId, {
+    private async myChatMember(context: TgMyChatMemberContext) {
+        const update = context.update.my_chat_member;
+
+        if (!update) {
+            return;
+        }
+
+        const chat = await this.getChat(update.chat.id, {
             accepted: config.accept.room
         });
 
-        switch (context.newChatMember.status) {
+        switch (update.new_chat_member.status) {
             case 'kicked':
                 chat.allowSendMess = false;
                 break;
@@ -199,26 +261,5 @@ export class TgBot extends AbstractBot implements AppService {
         }
 
         await chat.save();
-    }
-
-    private inviteUser(context: ChatMemberContext, next: NextMiddleware) {
-        this.logger.debug('tg_invite_user', { context });
-        //if (context) return next();
-
-        /*const chat = this.getChat(context.peerId)
-
-        const adv_context: AdvancedContext = {
-            hasMention: false,
-            mentionId: 0,
-            mentionMessage: '',
-            selfMention: false
-        }
-
-        const keyboard = new TgKeyboard(context, chat.resync(), adv_context)
-
-        context.send(defines['message.about'], {
-            keyboard: keyboard.MainMenu,
-            disable_mentions: true
-        })*/
     }
 }

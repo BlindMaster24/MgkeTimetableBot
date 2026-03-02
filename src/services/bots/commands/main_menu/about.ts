@@ -1,4 +1,4 @@
-import { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from "puregram/generated";
 import { defines } from "../../../../defines";
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 

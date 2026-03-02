@@ -59,6 +59,7 @@
 - `GET /api/parser-health` (API key required) for parser status and metrics.
 
 ## Current Features Snapshot
+- Telegram runtime is based on `grammY` long polling (`src/services/bots/tg/index.ts`).
 - Telegram main menu includes `Google Calendar` button when `google_calendar` service is enabled.
 - Telegram main menu includes `ICS` button when `calendar.ics.enabled` is true.
 - ICS export command supports `/ics`, `ics`, and `📅 ICS` (Telegram).

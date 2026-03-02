@@ -1,17 +1,16 @@
-import { MessageContext } from "puregram";
 import { TgBot } from ".";
 import { AbstractAction, AbstractCommandContext } from "../abstract";
 import { BotChat } from "../chat";
-import { TgCommandContext } from "./context";
+import { TgCommandContext, TgMessageRealContext } from "./context";
 import { Logger } from "../../../logger";
 
 export class TgBotAction extends AbstractAction {
-    protected context: MessageContext;
+    protected context: TgMessageRealContext;
     protected chat: BotChat;
     protected _context: AbstractCommandContext;
     private readonly logger: Logger;
 
-    constructor(bot: TgBot, context: MessageContext, chat: BotChat) {
+    constructor(bot: TgBot, context: TgMessageRealContext, chat: BotChat) {
         super();
         this.context = context;
         this.chat = chat;
@@ -24,14 +23,11 @@ export class TgBotAction extends AbstractAction {
         if (this.chat.lastMsgId == null) return false;
 
         try {
-            await this.context.delete({
-                chat_id: this.context.chatId,
-                message_id: this.chat.lastMsgId
-            })
+            await this.context.api.deleteMessage(this.context.chat.id, this.chat.lastMsgId);
         } catch (err: any) {
             this.logger.error('action_delete_last_message_error', {
                 error: err,
-                chatId: this.context.chatId,
+                chatId: this.context.chat.id,
                 messageId: this.chat.lastMsgId
             });
             return false;
@@ -46,10 +42,7 @@ export class TgBotAction extends AbstractAction {
         if (!this.chat.deleteUserMsg) return false;
 
         try {
-            await this.context.delete({
-                chat_id: this.context.chatId,
-                message_id: this.context.id
-            })
+            await this.context.api.deleteMessage(this.context.chat.id, this.context.msg.message_id);
         } catch (err: any) {
             /*if (err.code == 15) {
                 if (err.message.includes('(admin message)')) return false;
@@ -67,8 +60,8 @@ export class TgBotAction extends AbstractAction {
 
             this.logger.error('action_delete_user_message_error', {
                 error: err,
-                chatId: this.context.chatId,
-                messageId: this.context.id
+                chatId: this.context.chat.id,
+                messageId: this.context.msg.message_id
             });
             return false;
         }
@@ -76,10 +69,10 @@ export class TgBotAction extends AbstractAction {
         return true;
     }
 
-    async handlerLastMsgUpdate(context: MessageContext) {
+    async handlerLastMsgUpdate(messageId: string) {
         if (!this.chat.deleteLastMsg) return false;
 
-        this.chat.lastMsgId = context.id;
+        this.chat.lastMsgId = Number(messageId);
 
         return true;
     }

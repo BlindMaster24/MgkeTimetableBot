@@ -1,5 +1,5 @@
-import { MediaSource } from "puregram";
-import { TelegramBotCommand } from "puregram/generated";
+import { InputFile } from "grammy";
+import type { TelegramBotCommand } from "puregram/generated";
 import { DayIndex, getFullSubjectName, StringDate } from "../../../../utils";
 import { TeacherDay } from "../../../parser/types";
 import { AbstractCommand, BotServiceName, CmdHandlerParams } from "../../abstract";
@@ -15,7 +15,7 @@ export default class extends AbstractCommand {
     };
     public scene?: string | null = null;
 
-    async handler({ service, context, realContext, chat, formatter }: CmdHandlerParams) {
+    async handler({ service, context, realContext, chat }: CmdHandlerParams) {
         if (service !== 'tg') {
             return context.send('Не поддерживается данным сервисом');
         }
@@ -64,10 +64,9 @@ export default class extends AbstractCommand {
         }
 
         const buffer = encode(csv.join('\n'), 'win1251');
-        const source = MediaSource.buffer(buffer, {
-            filename: `Вычетка c ${day} по ${maxDay.toStringDate()} (${Date.now()}).csv`
-        });
-
-        await realContext.replyWithDocument(source);
+        await (realContext as any).api.sendDocument(
+            context.peerId,
+            new InputFile(buffer, `Вычетка c ${day} по ${maxDay.toStringDate()} (${Date.now()}).csv`)
+        );
     }
 }

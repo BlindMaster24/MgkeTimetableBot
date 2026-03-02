@@ -1,4 +1,4 @@
-import { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from "puregram/generated";
 import { GroupLessonExplain, TeacherLessonExplain } from "../../../parser/types";
 import { Timetable } from "../../../timetable";
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";

@@ -1,4 +1,4 @@
-import { InlineKeyboardBuilder as TgInlineKeyboardBuilder, KeyboardBuilder as TgKeyboardBuilder } from 'puregram';
+import { InlineKeyboard as TgInlineKeyboardBuilder, Keyboard as TgKeyboardBuilder } from 'grammy';
 import { ButtonType, KeyboardBuilder } from '../abstract';
 
 export function convertAbstractToTg(aKeyboard?: KeyboardBuilder): TgKeyboardBuilder | TgInlineKeyboardBuilder | undefined {
@@ -13,29 +13,24 @@ export function convertAbstractToTg(aKeyboard?: KeyboardBuilder): TgKeyboardBuil
         for (const row of aKeyboard.buttons) {
             for (const button of row) {
                 if (button.type === ButtonType.Url) {
-                    keyboard.urlButton({
-                        text: button.text,
-                        url: button.url,
-                        payload: button.payload
-                    });
+                    if (!button.url) {
+                        continue;
+                    }
+
+                    keyboard.url(button.text, button.url);
                 } else {
-                    keyboard.textButton({
-                        text: button.text,
-                        payload: button.payload
-                    });
+                    keyboard.text(button.text, button.payload);
                 }
             }
 
             keyboard.row()
         }
     } else {
-        keyboard = new TgKeyboardBuilder();
-
-        keyboard.resize(true);
+        keyboard = new TgKeyboardBuilder().resized();
 
         for (const row of aKeyboard.buttons) {
             for (const button of row) {
-                keyboard.textButton(button.text);
+                keyboard.text(button.text);
             }
 
             keyboard.row()

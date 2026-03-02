@@ -1,4 +1,4 @@
-import { Chat, User } from "puregram";
+import type { Chat, User } from "grammy/types";
 import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes } from "sequelize";
 import { config } from "../../../../config";
 import { sequelize } from "../../../db";
@@ -24,9 +24,9 @@ class TgChat extends AbstractServiceChat<InferAttributes<TgChat>, InferCreationA
     public async updateChat(chat: Chat, user?: User) {
         if (chat.id === user?.id) {
             this.domain = user.username || null;
-            this.firstName = user.firstName || null;
-            this.lastName = user.lastName || null;
-            this.lang = user.languageCode || null;
+            this.firstName = user.first_name || null;
+            this.lastName = user.last_name || null;
+            this.lang = user.language_code || null;
         } else {
             this.domain = chat.username || null;
         }

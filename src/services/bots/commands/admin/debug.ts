@@ -1,6 +1,6 @@
 import { arch, freemem, loadavg, uptime as osUptime, platform, release, totalmem } from 'os';
 import { uptime as botUptime, cpuUsage, memoryUsage, pid, resourceUsage, version, versions } from 'process';
-import { TelegramBotCommand } from 'puregram/generated';
+import type { TelegramBotCommand } from 'puregram/generated';
 import { Op } from 'sequelize';
 import { cpuTemperature } from 'systeminformation';
 import { formatBytes, formatSeconds } from "../../../../utils";

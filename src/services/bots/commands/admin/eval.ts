@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { TelegramBotCommand } from 'puregram/generated';
+import type { TelegramBotCommand } from 'puregram/generated';
 import { runInNewContext } from 'vm';
 import { sequelize } from '../../../../db';
 import { loadCache, raspCache, saveCache } from "../../../parser/raspCache";

@@ -1,4 +1,4 @@
-import { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from "puregram/generated";
 import { StringDate, WeekIndex } from "../../../../utils";
 import { raspCache } from "../../../parser";
 import { AbstractCommand, CmdHandlerParams, MessageOptions } from "../../abstract";

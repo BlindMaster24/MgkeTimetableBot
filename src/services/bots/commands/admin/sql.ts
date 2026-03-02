@@ -1,4 +1,4 @@
-import { TelegramBotCommand } from "puregram/generated";
+import type { TelegramBotCommand } from "puregram/generated";
 import { QueryTypes } from "sequelize";
 import { App } from "../../../../app";
 import { sequelize } from "../../../../db";

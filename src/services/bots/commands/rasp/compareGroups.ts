@@ -1,4 +1,4 @@
-﻿import { TelegramBotCommand } from "puregram/generated";
+﻿import type { TelegramBotCommand } from "puregram/generated";
 import { config } from "../../../../../config";
 import { StringDate, WeekIndex, randArray } from "../../../../utils";
 import { GroupDay, GroupLesson } from "../../../parser/types";
