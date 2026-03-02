@@ -34,6 +34,7 @@
 - New formatter: implement in `src/formatter/` and wire in `src/formatter/index.ts`.
 
 ## Build, Test, and Development Commands
+- Recommended Node.js runtime: LTS 22.x for local/dev/prod consistency.
 - `npm install` or `yarn install` installs dependencies.
 - Preferred installer: `yarn install` (repository lockfile is `yarn.lock`).
 - If you install with npm and hit peer-resolution issues around `canvas/jsdom`, use `npm install --legacy-peer-deps`.
