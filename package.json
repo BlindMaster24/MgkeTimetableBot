@@ -16,7 +16,7 @@
     "dependencies": {
         "@keller18306/table2canvas": "^0.0.3",
         "@keller18306/yandex-dialogs-sdk": "^1.0.2",
-        "canvas": "^2.11.2",
+        "canvas": "^3.2.1",
         "cbor-x": "^1.5.8",
         "chokidar": "^3.5.3",
         "cron": "^2.3.0",
