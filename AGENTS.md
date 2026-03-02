@@ -1,7 +1,7 @@
 ﻿# Repository Guidelines
 
 ## Project Structure & Module Organization
-- Entrypoints: `src/index.ts` bootstraps the app; `src/app.ts` registers services and starts them (DB sync, then `service.run()`).
+- Entrypoints: `src/bootstrap.ts` is runtime wrapper for start; `src/index.ts` bootstraps the app; `src/app.ts` registers services and starts them (DB sync, then `service.run()`).
 - Data & models: `src/db/` configures Sequelize and cleanup; domain models live in `src/services/timetable/models/`.
 - Services (`src/services/`):
   - `bots/` is the primary chat layer. Platform adapters: `tg/`, `vk/`, `viber/`. Shared abstractions: `bots/abstract/`. Commands live in `bots/commands/` (grouped by domain like `rasp/`, `settings/`, `admin/`), callbacks in `bots/callbacks/`, keyboards in `bots/keyboard/`, and event routing in `bots/events/`.
@@ -40,6 +40,7 @@
 - If you install with npm and hit peer-resolution issues around `canvas/jsdom`, use `npm install --legacy-peer-deps`.
 - If tests fail with `Cannot find module '../build/Release/canvas.node'`, run `npm rebuild canvas`.
 - `npm start` or `yarn start` runs the bot via `ts-node src/bootstrap.ts` (runtime entry: `src/index.ts`).
+- `src/bootstrap.ts` patches Node 25 `SlowBuffer` compatibility for `googleapis` transitive deps (`jws/jwa`).
 - `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
 - `npm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
 - `npm run test:parser-v2` runs parser v2 tests (`tests/parserV2Test.ts`, `tests/parserV2ValidationTest.ts`, `tests/parserV2DiffTest.ts`).
