@@ -1,5 +1,6 @@
 # Locals
 config.ts
+config2.ts
 cache
 sqlite3.db
 
