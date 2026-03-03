@@ -58,10 +58,6 @@ export class TgBot extends AbstractBot implements AppService {
     constructor(app: App) {
         super(app, 'tg');
 
-        if (config.telegram.client !== 'grammy') {
-            throw new Error(`Unsupported telegram client: ${config.telegram.client}. Use 'grammy'.`);
-        }
-
         this.tg = new Bot(config.telegram.token);
 
         this.event = new TgEventListener(this.app, this.tg);

@@ -49,7 +49,6 @@ export const config: ConfigScheme = {
         noticer: true
     },
     telegram: {
-        client: 'grammy',
         token: '',
         admin_ids: [804594266],
         noticer: true

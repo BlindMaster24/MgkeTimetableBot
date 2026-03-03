@@ -48,7 +48,6 @@ export type ConfigScheme = {
         admin_ids: number[],
     },
     telegram: {
-        client: 'grammy' | 'puregram',
         token: string,
         admin_ids: number[],
         noticer: boolean
