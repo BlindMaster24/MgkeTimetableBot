@@ -178,10 +178,7 @@ const parserSchema = z.object({
     proxy: z.string().nullable()
 });
 
-const dayCallSchema = z.tuple([
-    z.tuple([z.string(), z.string()]),
-    z.tuple([z.string(), z.string()])
-]);
+const dayCallSchema = z.tuple([z.tuple([z.string(), z.string()]), z.tuple([z.string(), z.string()])]);
 
 const dayCallShortSchema = z.tuple([z.string(), z.string()]);
 
