@@ -1,4 +1,4 @@
-﻿import { watch } from "chokidar";
+import { watch } from "chokidar";
 import { existsSync, readdirSync, statSync } from "fs";
 import path from "path";
 import type { TelegramBotCommand } from './types/telegram';
@@ -170,7 +170,7 @@ export class BotService implements AppService {
                     tgCommand.command = tgCommand.command.toLowerCase();
 
                     if (instance.adminOnly) {
-                        tgCommand.description = '[Ð°Ð´Ð¼] ' + tgCommand.description;
+                        tgCommand.description = '[адм] ' + tgCommand.description;
                     }
 
                     commands.push(tgCommand);

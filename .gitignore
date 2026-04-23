@@ -1,20 +1,28 @@
 # Locals
 config.ts
 config2.ts
-cache
+cache/
 sqlite3.db
+*.sqlite
+*.sqlite3
+*.db-journal
 
 # Logs
 logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Dependency directories
 package-lock.json
+yarn.lock
 node_modules
 
 # Optional npm cache directory
 .npm
+.pnpm-store
 
 # SFTP for deploy
 .vscode/sftp.json
