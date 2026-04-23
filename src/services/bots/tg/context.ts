@@ -1,4 +1,4 @@
-﻿import { Context, InputFile } from "grammy";
+import { Context, InputFile } from "grammy";
 import { TgBot } from ".";
 import { config } from "../../../../config";
 import { ParsedPayload, parsePayload } from "../../../utils";

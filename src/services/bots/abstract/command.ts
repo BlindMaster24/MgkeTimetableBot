@@ -1,4 +1,4 @@
-﻿import type { TelegramBotCommand } from '../types/telegram';
+import type { TelegramBotCommand } from '../types/telegram';
 import { ContextDefaultState, MessageContext as VkMessageContext } from 'vk-io';
 import { App, AppServiceName } from '../../../app';
 import { ScheduleFormatter } from '../../../formatter';
@@ -48,55 +48,55 @@ export type CmdHandlerParams<C extends AbstractCommand = any> = {
 
 export abstract class AbstractCommand {
     /**
-    * Ð£Ð½Ð¸ÐºÐ°Ð»ÑŒÐ½Ñ‹Ð¹ Ð¸Ð´ÐµÐ½Ñ‚Ð¸Ñ„Ð¸ÐºÐ°Ñ‚Ð¾Ñ€ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹, ÑƒÑÑ‚Ð°Ð½Ð°Ð²Ð»Ð¸Ð²Ð°ÐµÑ‚ÑÑ Ð²Ð¾ Ð²Ñ€ÐµÐ¼Ñ Ð·Ð°Ð³Ñ€ÑƒÐ·ÐºÐ¸ ÐºÐ¾Ð¼Ð°Ð½Ð´
+    * Уникальный идентификатор команды, устанавливается во время загрузки команд
     **/
     public id?: string;
 
     /**
-    * Ð”Ð¾Ð»Ð¶ÐµÐ½ Ð»Ð¸ Ð±Ñ‹Ñ‚ÑŒ Ñ‡Ð°Ñ‚ Ð¿Ð¾Ð´Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½Ð½Ñ‹Ð¼, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒ ÑÑ‚Ñƒ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñƒ
+    * Должен ли быть чат подверждённым, чтобы использовать эту команду
     **/
     public acceptRequired: boolean = true;
 
     /**
-    * Ð”Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð° Ð»Ð¸ ÑÑ‚Ð° ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð´Ð»Ñ Ð°Ð´Ð¼Ð¸Ð½Ð¾Ð²?
+    * Доступна ли эта команда только для админов?
     **/
     public adminOnly: boolean = false;
 
     /**
-    * Ð‘Ð°Ð·Ð¾Ð²Ð°Ñ ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ð¸ ÐµÑ‘ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ñ Ð´Ð»Ñ Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ð°Ñ†Ð¸Ð¸ ÐµÑ‘ Ð² ÑÐ¿Ð¸ÑÐºÐµ ÐºÐ¾Ð¼Ð°Ð½Ð´ Ð² Ð¿Ð¾Ð¼Ð¾Ñ‰Ð¸ (Ð¸ Ð´Ð»Ñ ÑÐ¿Ð¸ÑÐºÐ° Ñ‚ÐµÐ»ÐµÐ³Ð¸)
+    * Базовая команда и её описания для регистрации её в списке команд в помощи (и для списка телеги)
     **/
     public tgCommand: TelegramBotCommand | TelegramBotCommand[] | null = null;
 
     /**
-    * Ð¡Ð¿Ð¸ÑÐ¾Ðº ÑÐµÑ€Ð²Ð¸ÑÐ¾Ð² Ð±Ð¾Ñ‚Ð¾Ð², Ð² ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ñ… ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ð±ÑƒÐ´ÐµÑ‚ Ñ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ
-    * (ÐµÑÐ»Ð¸ undefined, Ð²Ð¾ Ð²ÑÐµÑ… ÑÐµÑ€Ð¸ÑÐ°Ñ…)
+    * Список сервисов ботов, в которых команда будет работать
+    * (если undefined, во всех серисах)
     **/
     public services?: BotServiceName[];
 
     /**
-    * Ð¡Ð¿Ð¸ÑÐ¾Ðº ÑÐµÑ€Ð²Ð¸ÑÐ¾Ð², Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ñ‹Ðµ Ð´Ð»Ñ Ñ€Ð°Ð±Ð¾Ñ‚Ñ‹ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹
-    * (ÐµÑÐ»Ð¸ undefined, ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ð¸Ñ€ÑƒÐµÑ‚ÑÑ Ð²ÑÐµÐ³Ð´Ð°, ÐµÑÐ»Ð¸ Ð¶Ðµ ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ñ‹Ð¹ ÑÐµÑ€Ð²Ð¸Ñ Ð½Ðµ Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½, Ñ‚Ð¾ Ð¸ ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ð½Ðµ Ð±ÑƒÐ´ÐµÑ‚ Ð·Ð°Ð³Ñ€ÑƒÐ¶ÐµÐ½Ð°)
+    * Список сервисов, необходимые для работы команды
+    * (если undefined, команда регистрируется всегда, если же указанный сервис не загружен, то и команда не будет загружена)
     **/
     public requireServices?: AppServiceName[];
 
     /**
-    * Ð ÐµÐ³ÑƒÐ»ÑÑ€Ð½Ð¾Ðµ Ð²Ñ‹Ñ€Ð°Ð¶ÐµÐ½Ð¸Ðµ Ð´Ð»Ñ ÐºÐ¾Ð¼Ð°Ð½Ð´Ñ‹, Ð¿Ð¾ ÐºÐ¾Ñ‚Ñ€Ð¾Ð¼Ñƒ Ð¾Ð½Ð° Ð±ÑƒÐ´ÐµÑ‚ Ð²Ñ‹Ð·Ñ‹Ð²Ð°Ñ‚ÑŒÑÑ
+    * Регулярное выражение для команды, по котрому она будет вызываться
     **/
     public abstract regexp: { [regexp: string]: RegExp } | RegExp | null;
 
     /**
-     * Ð•ÑÐ»Ð¸ ÑƒÐºÐ°Ð·Ð°Ð½, Ñ‚Ð¾ ÐºÐ¾Ð¼Ð°Ð½Ð´Ð° Ð±ÑƒÐ´ÐµÑ‚ Ð²Ñ‹Ð·Ñ‹Ð²Ð°Ñ‚ÑŒÑÑ Ð¿Ñ€Ð¸ ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ð¾Ð¼ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ð¸
-     * ÐµÑÐ»Ð¸ ÑÐ¾Ð²Ð¿Ð°Ð´Ð°ÑŽÑ‚ payload.action
+     * Если указан, то команда будет вызываться при указанном действии
+     * если совпадают payload.action
      */
     public abstract payloadAction: string | null;
 
     /**
-     * Ð¡Ñ†ÐµÐ½Ð°, Ð² ÐºÐ¾Ñ‚Ð¾Ñ€Ð¾Ð¹ Ð±ÑƒÐ´ÐµÑ‚ Ñ€Ð°Ð±Ð¾Ñ‚Ð°Ñ‚ÑŒ ÐºÐ¾Ð¼Ð°Ð½Ð´Ð°.
-     * (Ð½Ðµ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð´Ð»Ñ payload)
+     * Сцена, в которой будет работать команда.
+     * (не работает для payload)
      * 
-     * null - Ñ€Ð°Ð±Ð¾Ñ‚Ð° Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð² Ð³Ð»Ð°Ð²Ð½Ð¾Ð¹ ÑÑ†ÐµÐ½Ðµ
-     * string - Ñ€Ð°Ð±Ð¾Ñ‚Ð° Ð² ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ð¾Ð¹ ÑÑ†ÐµÐ½Ðµ
-     * undefined - Ñ€Ð°Ð±Ð¾Ñ‚Ð° Ð² Ð»ÑŽÐ±Ð¾Ð¹ ÑÑ†ÐµÐ½Ðµ
+     * null - работа только в главной сцене
+     * string - работа в указанной сцене
+     * undefined - работа в любой сцене
      */
     public scene?: string | null;
 
@@ -120,7 +120,7 @@ export abstract class AbstractCommand {
         const normalized = group?.replace(/\*+$/g, '') ?? '';
 
         if (!normalized || isNaN(+normalized)) {
-            await context.send('Ð­Ñ‚Ð¾ Ð½Ðµ Ñ‡Ð¸ÑÐ»Ð¾', {
+            await context.send('Это не число', {
                 keyboard: errorKeyboard
             });
 
@@ -128,7 +128,7 @@ export abstract class AbstractCommand {
         }
 
         if (normalized.length > 3) {
-            await context.send('ÐÐ¾Ð¼ÐµÑ€ Ð³Ñ€ÑƒÐ¿Ð¿Ñ‹ Ð²Ð²ÐµÐ´Ñ‘Ð½ Ð½ÐµÐ²ÐµÑ€Ð½Ð¾', {
+            await context.send('Номер группы введён неверно', {
                 keyboard: errorKeyboard
             });
 
@@ -136,7 +136,7 @@ export abstract class AbstractCommand {
         }
 
         if (!raspCache.groups.timetable[normalized]) {
-            await context.send('Ð”Ð°Ð½Ð½Ð¾Ð¹ ÑƒÑ‡ÐµÐ±Ð½Ð¾Ð¹ Ð³Ñ€ÑƒÐ¿Ð¿Ñ‹ Ð½Ðµ ÑÑƒÑ‰ÐµÑÑ‚Ð²ÑƒÐµÑ‚', {
+            await context.send('Данной учебной группы не существует', {
                 keyboard: errorKeyboard
             })
 
@@ -148,7 +148,7 @@ export abstract class AbstractCommand {
 
     protected async findTeacher({ context, keyboard }: CmdHandlerParams, teacher?: string, errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel): Promise<false | undefined | string> {
         if (!teacher || teacher.length < 3) {
-            await context.send('Ð¤Ð°Ð¼Ð¸Ð»Ð¸Ñ Ð²Ð²ÐµÐ´ÐµÐ½Ð° Ð½ÐµÐºÐ¾Ñ€Ñ€ÐµÐºÑ‚Ð½Ð¾', {
+            await context.send('Фамилия введена некорректно', {
                 keyboard: errorKeyboard
             });
 
@@ -187,7 +187,7 @@ export abstract class AbstractCommand {
         }
 
         if (matched.length === 0) {
-            await context.send('Ð”Ð°Ð½Ð½Ñ‹Ð¹ Ð¿Ñ€ÐµÐ¿Ð¾Ð´Ð°Ð²Ð°Ñ‚ÐµÐ»ÑŒ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½', {
+            await context.send('Данный преподаватель не найден', {
                 keyboard: errorKeyboard
             });
 
@@ -195,7 +195,7 @@ export abstract class AbstractCommand {
         }
 
         if (matched.length > matchLimit) {
-            await context.send('Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ Ð¼Ð½Ð¾Ð³Ð¾ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚Ð¾Ð² Ð´Ð»Ñ Ð²Ñ‹Ð±Ð¾Ñ€ÐºÐ¸.', {
+            await context.send('Слишком много результатов для выборки.', {
                 keyboard: errorKeyboard
             })
 
@@ -204,8 +204,8 @@ export abstract class AbstractCommand {
 
         if (matched.length > 1) {
             await context.send(
-                'ÐÐ°Ð¹Ð´ÐµÐ½Ð¾ Ð½ÐµÑÐºÐ¾Ð»ÑŒÐºÐ¾ Ð¿Ñ€ÐµÐ¿Ð¾Ð´Ð°Ð²Ð°Ñ‚ÐµÐ»ÐµÐ¹.\n' +
-                'ÐšÐ°ÐºÐ¾Ð¹ Ð¸Ð¼ÐµÐ½Ð½Ð¾ Ð½ÑƒÐ¶ÐµÐ½?\n\n' +
+                'Найдено несколько преподавателей.\n' +
+                'Какой именно нужен?\n\n' +
                 matched.join('\n'), {
                 keyboard: withCancelButton(keyboard.generateVerticalKeyboard(matched))
             })
@@ -219,10 +219,10 @@ export abstract class AbstractCommand {
     protected buildTeacherPrompt(keyboard: Keyboard, example?: string): string {
         const hasHistory = keyboard.TeacherHistory.buttons.length > 0;
         const base = hasHistory
-            ? 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ñ„Ð°Ð¼Ð¸Ð»Ð¸ÑŽ Ð¿Ñ€ÐµÐ¿Ð¾Ð´Ð°Ð²Ð°Ñ‚ÐµÐ»Ñ Ð¸Ð»Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð¸Ð· ÑÐ¿Ð¸ÑÐºÐ° Ð½Ð¸Ð¶Ðµ'
-            : 'Ð’Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ñ„Ð°Ð¼Ð¸Ð»Ð¸ÑŽ Ð¿Ñ€ÐµÐ¿Ð¾Ð´Ð°Ð²Ð°Ñ‚ÐµÐ»Ñ';
+            ? 'Введите фамилию преподавателя или выберите из списка ниже'
+            : 'Введите фамилию преподавателя';
         if (example) {
-            return `${base} (Ð½Ð°Ð¿Ñ€Ð¸Ð¼ÐµÑ€, ${example})`;
+            return `${base} (например, ${example})`;
         }
         return base;
     }

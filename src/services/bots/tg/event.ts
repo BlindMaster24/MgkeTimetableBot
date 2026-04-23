@@ -1,4 +1,4 @@
-﻿import { Bot, GrammyError } from "grammy";
+import { Bot, GrammyError } from "grammy";
 import StatusCode from "status-code-enum";
 import { config } from "../../../../config";
 import { App } from "../../../app";

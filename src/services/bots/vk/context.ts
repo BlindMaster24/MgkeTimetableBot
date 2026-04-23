@@ -1,4 +1,4 @@
-﻿import { ContextDefaultState, MessageContext, MessageEventContext, VK, getRandomId } from "vk-io";
+import { ContextDefaultState, MessageContext, MessageEventContext, VK, getRandomId } from "vk-io";
 import { VkBot } from ".";
 import { config } from "../../../../config";
 import { ParsedPayload, parsePayload } from "../../../utils";

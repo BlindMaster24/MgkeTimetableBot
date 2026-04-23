@@ -1,4 +1,4 @@
-﻿# Repository Guidelines
+# Repository Guidelines
 
 ## Project Structure & Module Organization
 - Entrypoints: `src/bootstrap.ts` is runtime wrapper for start; `src/index.ts` bootstraps the app; `src/app.ts` registers services and starts them (DB sync, then `service.run()`).
@@ -35,32 +35,33 @@
 
 ## Build, Test, and Development Commands
 - Recommended Node.js runtime: LTS 22.x for local/dev/prod consistency.
-- `npm install` or `yarn install` installs dependencies.
-- Preferred installer: `yarn install` (repository lockfile is `yarn.lock`).
-- If you install with npm and hit peer-resolution issues around `canvas/jsdom`, use `npm install --legacy-peer-deps`.
-- If tests fail with `Cannot find module '../build/Release/canvas.node'`, run `npm rebuild canvas`.
-- `npm start` or `yarn start` runs the bot via `ts-node src/bootstrap.ts` (runtime entry: `src/index.ts`).
+- Package manager: `pnpm` (pinned via the `packageManager` field in `package.json`). Enable it with Corepack: `corepack enable` (ships with Node.js 16.10+).
+- `pnpm install` installs all dependencies, including dev tools like `ts-node`. The repository lockfile is `pnpm-lock.yaml`.
+- `.npmrc` sets `shamefully-hoist=true` so transitive modules referenced directly in source (`google-auth-library`, `middleware-io`, etc.) resolve without extra setup.
+- On startup, `Timetable` self-heals `timetable_archive` from `cache/rasp/*.json`: if the max `day` in the file cache is greater than the max `day` in the archive table, the cache is flushed into the DB via the same idempotent `appendDays` path (`updateOnDuplicate: ['data']`). This prevents stale archive rows from hiding valid schedule data after DB swaps or when the parser skips a fresh run because the file cache already looks up-to-date.
+- If tests fail with `Cannot find module '../build/Release/canvas.node'`, run `pnpm rebuild canvas`.
+- `pnpm start` runs the bot via `ts-node src/bootstrap.ts` (runtime entry: `src/index.ts`).
 - `src/bootstrap.ts` patches Node 25 `SlowBuffer` compatibility for `googleapis` transitive deps (`jws/jwa`).
-- `npm run ts-check` or `yarn ts-check` runs `tsc --noEmit` for type checking only.
-- `npm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
-- `npm run test:parser-v2` runs parser v2 tests (`tests/parserV2Test.ts`, `tests/parserV2ValidationTest.ts`, `tests/parserV2DiffTest.ts`).
-- `npm run test:bot-flows` runs Telegram command-regexp flow checks (`tests/botTelegramFlowTest.ts`).
-- `npm run test:all` runs all test groups in sequence.
-- Source of truth for npm scripts: `package.json`.
-- `ts-node tests/inputTest.ts` runs the existing test script.
-- `ts-node scripts/findGroupBySameDays.ts` runs the utility script.
-- `ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
-- `ts-node tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
+- `pnpm run ts-check` runs `tsc --noEmit` for type checking only.
+- `pnpm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
+- `pnpm run test:parser-v2` runs parser v2 tests (`tests/parserV2Test.ts`, `tests/parserV2ValidationTest.ts`, `tests/parserV2DiffTest.ts`).
+- `pnpm run test:bot-flows` runs Telegram command-regexp flow checks (`tests/botTelegramFlowTest.ts`).
+- `pnpm run test:all` runs all test groups in sequence.
+- Source of truth for scripts: `package.json`.
+- `pnpm exec ts-node tests/inputTest.ts` runs the existing test script.
+- `pnpm exec ts-node scripts/findGroupBySameDays.ts` runs the utility script.
+- `pnpm exec ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
+- `pnpm exec ts-node tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
 
 ## Verification Checklist
-- `npm run ts-check` or `yarn ts-check` for type safety after parser or command changes.
-- `npm run test:logging` after logger/correlation/redaction changes.
-- `npm start` or `yarn start` for a smoke run of parser/bot behavior (manual check).
-- `ts-node tests/parserV2Test.ts` after parser changes.
-- `npm run test:parser-v2` after parser v2 parser/diff/validate changes.
-- `npm run test:bot-flows` after command regexp, menu text, or command routing changes.
-- `npm run test:all` before release or before merge of large refactors.
-- If you add tests, list the exact `ts-node ...` command in the PR description.
+- `pnpm run ts-check` for type safety after parser or command changes.
+- `pnpm run test:logging` after logger/correlation/redaction changes.
+- `pnpm start` for a smoke run of parser/bot behavior (manual check).
+- `pnpm exec ts-node tests/parserV2Test.ts` after parser changes.
+- `pnpm run test:parser-v2` after parser v2 parser/diff/validate changes.
+- `pnpm run test:bot-flows` after command regexp, menu text, or command routing changes.
+- `pnpm run test:all` before release or before merge of large refactors.
+- If you add tests, list the exact `pnpm exec ts-node ...` command in the PR description.
 - `GET /api/parser-health` (API key required) for parser status and metrics.
 
 ## Current Features Snapshot
@@ -70,9 +71,9 @@
 - Telegram command metadata type is defined in `src/services/bots/types/telegram.ts`.
 - Telegram main menu includes `Google Calendar` button when `google_calendar` service is enabled.
 - Telegram main menu includes `ICS` button when `calendar.ics.enabled` is true.
-- ICS export command supports `/ics`, `ics`, and `ðŸ“… ICS` (Telegram).
-- Formatter list includes compact formatter (`ÐšÐ¾Ð¼Ð¿Ð°ÐºÑ‚Ð½Ñ‹Ð¹`) via `/formatter`.
-- Diff settings menu exists under settings: `ðŸ“Š Ð¡Ñ€Ð°Ð²Ð½ÐµÐ½Ð¸Ðµ` with base and advanced submenus.
+- ICS export command supports `/ics`, `ics`, and `📅 ICS` (Telegram).
+- Formatter list includes compact formatter (`Компактный`) via `/formatter`.
+- Diff settings menu exists under settings: `📊 Сравнение` with base and advanced submenus.
 - Key user commands support button text and `/command` forms where applicable.
 - If next-week schedules are removed after being published, the bot notifies users that the week was withdrawn.
 
@@ -116,7 +117,7 @@
 - Examples:
 - Good (Unicode in code):
 ```ts
-context.send('Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð³Ñ€ÑƒÐ¿Ð¿Ñƒ Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ… (/setup)');
+context.send('Выберите группу в настройках (/setup)');
 ```
 - Bad (escaped bytes / mojibake):
 ```ts
@@ -147,7 +148,7 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 - If you add a new test, add it to `package.json` scripts when relevant and note the exact command in the PR description.
 
 ## How To Read Test Results
-- Use `npm run test:all` as the main gate.
+- Use `pnpm run test:all` as the main gate.
 - Expected output should include explicit `...: ok` lines from each test script:
 - `loggingContextTest: ok`
 - `loggingRedactionTest: ok`
@@ -156,7 +157,7 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 - `parserV2DiffTest: ok`
 - `botTelegramFlowTest: ok`
 - If any script exits with non-zero code, treat the whole run as failed, even if previous blocks were green.
-- After `npm run test:all`, always run `npm run ts-check`.
+- After `pnpm run test:all`, always run `pnpm run ts-check`.
 
 ## Coverage In This Project
 - There is no numeric line/branch coverage tool enabled right now.
@@ -167,7 +168,7 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 - Telegram command-regexp flow checks
 - To report current coverage in PRs, list exactly which scripts were run and which scenarios they verify.
 - PR template for this repository:
-- `Commands run:` `npm run test:all`, `npm run ts-check`
+- `Commands run:` `pnpm run test:all`, `pnpm run ts-check`
 - `Result:` pass/fail + first failing script (if any)
 - `Scenario coverage:` changed module -> validating test scripts
 
@@ -184,32 +185,32 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 - add CI step for runner tests and coverage threshold only after stability
 - Runner rollout plan:
 - add `vitest` with a minimal config and keep current script tests as-is
-- introduce `npm run test:unit` only after first migrated domain is stable
+- introduce `pnpm run test:unit` only after first migrated domain is stable
 - migrate one domain per PR and keep parity checks in old scripts during transition
 - enable coverage reports in CI after 2-3 stable PRs without flaky failures
 - start with conservative thresholds and increase them gradually
 
 ## Test Execution Order
-- Fast local check: `npm run test:logging`.
-- Parser-focused check: `npm run test:parser-v2`.
-- Bot routing check: `npm run test:bot-flows`.
-- Full suite: `npm run test:all`.
-- Type safety gate: `npm run ts-check`.
+- Fast local check: `pnpm run test:logging`.
+- Parser-focused check: `pnpm run test:parser-v2`.
+- Bot routing check: `pnpm run test:bot-flows`.
+- Full suite: `pnpm run test:all`.
+- Type safety gate: `pnpm run ts-check`.
 
 ## Detailed Testing Workflow
 - For logging changes:
-- run `npm run test:logging`
+- run `pnpm run test:logging`
 - verify both context propagation and redaction assertions are green
 - For parser v2 changes:
-- run `npm run test:parser-v2`
+- run `pnpm run test:parser-v2`
 - ensure fixture, validation and diff scripts all pass
 - For Telegram command/menu/regexp changes:
-- run `npm run test:bot-flows`
+- run `pnpm run test:bot-flows`
 - verify both button-text and slash-command inputs are accepted where expected
 - For large refactors touching multiple domains:
-- run `npm run test:all`
-- run `npm run ts-check`
-- run `npm start` and confirm startup does not fail early
+- run `pnpm run test:all`
+- run `pnpm run ts-check`
+- run `pnpm start` and confirm startup does not fail early
 - Failure policy:
 - if any script fails in `test:all`, stop release/merge
 - fix failing domain first, rerun targeted test script, then rerun `test:all`
@@ -270,7 +271,7 @@ https://gitmoji.dev/specification
 - `BREAKING CHANGE: v1 cache files are no longer read; reparse is required.`
 - Optional Gitmoji format (if team decides to use emojis): `<emoji> <type>(scope)?: <description>`
 - Gitmoji example: `:sparkles: feat(parser): add v2 health check`
-- PRs should include a clear description, related issues, and the commands you ran (e.g., `npm run ts-check`).
+- PRs should include a clear description, related issues, and the commands you ran (e.g., `pnpm run ts-check`).
 - For behavior or asset changes, include before/after notes.
 - Always check `git status` before committing.
 - Stage files explicitly (e.g., `git add path/to/file`); do not use `git add .`.
