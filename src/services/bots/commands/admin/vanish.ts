@@ -1,5 +1,5 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { vanish } from '../../../../db';
+import { vanish } from '../../../../db/clean';
 import { AbstractCommand, CmdHandlerParams } from "../../abstract";
 
 export default class extends AbstractCommand {

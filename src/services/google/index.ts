@@ -79,12 +79,12 @@ export class GoogleService implements AppService {
     private async oauth(request: Request<any, any, any, Partial<{ code: string }>>, response: Response): Promise<void> {
         const result = z.object({
             code: z.string({
-                required_error: 'Auth code not provided'
+                error: 'Auth code not provided'
             }).min(1, {
                 message: 'Auth code not provided'
             }),
             state: z.string({
-                required_error: 'State not provided'
+                error: 'State not provided'
             }).transform((data: string, ctx) => {
                 try {
                     return unserialize(data) as AuthState

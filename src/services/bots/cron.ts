@@ -54,7 +54,9 @@ export class BotCron {
             Months: 0-11 (Jan-Dec)
             Day of Week: 0-6 (Sun-Sat)
         */
-        const job = new CronJob(`0 ${min} ${hour} * * ${weekRange}`, this.execute.bind(this, data), null, true);
+        const job = new CronJob(`0 ${min} ${hour} * * ${weekRange}`, async () => {
+            await this.execute(data);
+        }, null, true);
         job.start();
 
         this.list.push(job);

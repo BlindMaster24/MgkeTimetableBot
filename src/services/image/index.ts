@@ -27,7 +27,7 @@ export class ImageService implements AppService {
         }
     }
 
-    private getImage(request: Request, response: Response) {
+    private getImage(request: Request<{ image: string }>, response: Response) {
         if (!this.checkSign(request)) {
             return response.status(StatusCode.ClientErrorForbidden).send('Invalid image signature');
         }
@@ -35,7 +35,7 @@ export class ImageService implements AppService {
         return response.status(StatusCode.SuccessOK).sendFile(path.join(ImageBuilder.CACHE_PATH, request.params.image + '.png'));
     }
 
-    private getImageSign(request: Request, response: Response) {
+    private getImageSign(request: Request<{ image: string }>, response: Response) {
         const image = request.params.image;
         if (!image) {
             return response.status(StatusCode.ClientErrorBadRequest).send('Image is not entered');
@@ -46,7 +46,7 @@ export class ImageService implements AppService {
         return response.send(key);
     }
 
-    private checkSign(request: Request): boolean {
+    private checkSign(request: Request<{ image: string }>): boolean {
         const sign = request.query.sign;
         const image = request.params.image;
 
