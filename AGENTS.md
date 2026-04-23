@@ -43,25 +43,27 @@
 - `pnpm start` runs the bot via `tsx src/bootstrap.ts` (runtime entry: `src/index.ts`).
 - `src/bootstrap.ts` patches Node 25 `SlowBuffer` compatibility for `googleapis` transitive deps (`jws/jwa`).
 - `pnpm run ts-check` runs `tsc --noEmit` for type checking only.
-- `pnpm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
-- `pnpm run test:parser-v2` runs parser v2 tests (`tests/parserV2Test.ts`, `tests/parserV2ValidationTest.ts`, `tests/parserV2DiffTest.ts`).
-- `pnpm run test:bot-flows` runs Telegram command-regexp flow checks (`tests/botTelegramFlowTest.ts`).
-- `pnpm run test:all` runs all test groups in sequence.
+- Test runner: `vitest`. Configuration lives in `vitest.config.ts`.
+- `pnpm test` / `pnpm run test:all` runs the full vitest suite once.
+- `pnpm run test:watch` runs vitest in watch mode for TDD.
+- `pnpm run test:coverage` runs the suite with V8 coverage; results go to `coverage/` (gitignored).
+- `pnpm run test:logging` runs logging tests (`tests/logging/*.test.ts`).
+- `pnpm run test:parser-v2` runs parser v2 tests (`tests/parser/*.test.ts`).
+- `pnpm run test:bot-flows` runs Telegram command-regexp flow checks (`tests/bots/*.test.ts`).
 - Source of truth for scripts: `package.json`.
-- `pnpm exec tsx tests/inputTest.ts` runs the existing test script.
+- `pnpm exec tsx tests/inputTest.ts` runs the legacy interactive input script (not part of the vitest suite).
 - `pnpm exec tsx scripts/findGroupBySameDays.ts` runs the utility script.
-- `pnpm exec tsx tests/parserV2Test.ts` runs parser v2 fixture checks.
-- `pnpm exec tsx tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
+- `pnpm exec vitest run tests/parser/v2-fixtures.test.ts` re-runs parser v2 fixture checks after table-selection changes.
 
 ## Verification Checklist
 - `pnpm run ts-check` for type safety after parser or command changes.
 - `pnpm run test:logging` after logger/correlation/redaction changes.
 - `pnpm start` for a smoke run of parser/bot behavior (manual check).
-- `pnpm exec tsx tests/parserV2Test.ts` after parser changes.
+- `pnpm exec vitest run tests/parser` after parser changes.
 - `pnpm run test:parser-v2` after parser v2 parser/diff/validate changes.
 - `pnpm run test:bot-flows` after command regexp, menu text, or command routing changes.
 - `pnpm run test:all` before release or before merge of large refactors.
-- If you add tests, list the exact `pnpm exec tsx ...` command in the PR description.
+- If you add tests, list the exact `pnpm exec vitest run <path>` command in the PR description.
 - `GET /api/parser-health` (API key required) for parser status and metrics.
 
 ## Current Features Snapshot
@@ -141,54 +143,33 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 - When adding a new main-menu button, add or verify matching command routing in the same PR.
 
 ## Testing Guidelines
-- No test runner is configured; tests are scripts.
-- Name tests `*Test.ts` under `tests/` and keep them deterministic.
-- Keep tests offline: do not require network/API calls.
-- Prefer pure function tests for parser/logging utilities and script-smoke tests for command routing.
-- If you add a new test, add it to `package.json` scripts when relevant and note the exact command in the PR description.
+- Test runner: `vitest` (see `vitest.config.ts`).
+- Name tests `*.test.ts` and group them under `tests/<domain>/` (e.g. `tests/logging/`, `tests/parser/`, `tests/bots/`). Co-located `src/**/*.test.ts` files are also picked up.
+- Keep tests deterministic and offline — do not require network/API calls.
+- Prefer pure-function tests for parser/logging utilities and regexp/flow tests for command routing.
+- If you add a new test file, list the exact `pnpm exec vitest run <path>` (or `pnpm test -- <filter>`) command in the PR description.
 
 ## How To Read Test Results
-- Use `pnpm run test:all` as the main gate.
-- Expected output should include explicit `...: ok` lines from each test script:
-- `loggingContextTest: ok`
-- `loggingRedactionTest: ok`
-- `all fixtures ok` (from `parserV2Test.ts`)
-- `parserV2ValidationTest: ok`
-- `parserV2DiffTest: ok`
-- `botTelegramFlowTest: ok`
-- If any script exits with non-zero code, treat the whole run as failed, even if previous blocks were green.
+- Use `pnpm run test:all` (alias for `vitest run`) as the main gate.
+- Expected output ends with a `Test Files  N passed (N)` / `Tests  M passed (M)` summary and exit code 0.
+- Any failing assertion fails the whole run; vitest prints the diff and the source location.
 - After `pnpm run test:all`, always run `pnpm run ts-check`.
 
 ## Coverage In This Project
-- There is no numeric line/branch coverage tool enabled right now.
-- Current coverage is scenario-based (script assertions + fixtures), not percentage-based.
-- Practical coverage signal comes from:
-- logging context + redaction checks
-- parser fixtures + parser validation/diff checks
-- Telegram command-regexp flow checks
-- To report current coverage in PRs, list exactly which scripts were run and which scenarios they verify.
+- V8 coverage via `@vitest/coverage-v8`. Run locally with `pnpm run test:coverage`.
+- CI uploads `coverage/` as an artifact (retention 14 days).
+- Thresholds are currently not enforced; they will be enabled after the suite stabilises across a few PRs.
 - PR template for this repository:
 - `Commands run:` `pnpm run test:all`, `pnpm run ts-check`
-- `Result:` pass/fail + first failing script (if any)
-- `Scenario coverage:` changed module -> validating test scripts
+- `Result:` pass/fail + first failing test file (if any)
+- `Scenario coverage:` changed module -> validating vitest test files
 
-## When To Add A Test Runner
-- Keep script tests as default while the suite is small and fast.
-- Add a runner (`vitest` preferred) only when at least one of these becomes true:
-- test count grows beyond script-maintainable level (roughly 20+ script files)
-- need watch mode, test filtering, snapshots, or built-in mocking
-- need numeric coverage reports for CI policy
-- need parallel execution and structured test reports (JUnit/coverage JSON)
-- If runner is introduced:
-- keep existing script tests working during migration
-- migrate by domain (`logging`, `parser`, `bot-flows`) in small batches
-- add CI step for runner tests and coverage threshold only after stability
-- Runner rollout plan:
-- add `vitest` with a minimal config and keep current script tests as-is
-- introduce `pnpm run test:unit` only after first migrated domain is stable
-- migrate one domain per PR and keep parity checks in old scripts during transition
-- enable coverage reports in CI after 2-3 stable PRs without flaky failures
-- start with conservative thresholds and increase them gradually
+## Test Runner Conventions
+- The runner is `vitest` — do not add a second runner.
+- Prefer `describe` / `it` with explicit `expect(...).toBe(...)` / `toEqual(...)` assertions; avoid `assert.*` in new tests.
+- Use `it.skip` / `describe.skip` with a short reason instead of commenting tests out.
+- For async-context / ALS code paths, use real async/await in tests rather than fake timers.
+- Keep test setup light-weight; avoid importing the whole `App` or starting services in unit tests.
 
 ## Test Execution Order
 - Fast local check: `pnpm run test:logging`.
