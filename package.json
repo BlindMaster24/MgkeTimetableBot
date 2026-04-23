@@ -6,10 +6,13 @@
     "scripts": {
         "start": "tsx src/bootstrap.ts",
         "ts-check": "tsc --noEmit",
-        "test:logging": "tsx tests/loggingContextTest.ts && tsx tests/loggingRedactionTest.ts",
-        "test:parser-v2": "tsx tests/parserV2Test.ts && tsx tests/parserV2ValidationTest.ts && tsx tests/parserV2DiffTest.ts",
-        "test:bot-flows": "tsx tests/botTelegramFlowTest.ts",
-        "test:all": "pnpm run test:logging && pnpm run test:parser-v2 && pnpm run test:bot-flows"
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "test:logging": "vitest run tests/logging",
+        "test:parser-v2": "vitest run tests/parser",
+        "test:bot-flows": "vitest run tests/bots",
+        "test:all": "vitest run"
     },
     "author": "Keller",
     "license": "MIT",
@@ -52,9 +55,11 @@
         "@types/express": "^5.0.6",
         "@types/jsdom": "^28.0.1",
         "@types/node": "^25.6.0",
+        "@vitest/coverage-v8": "^4.1.5",
         "tslib": "^2.8.1",
         "tsx": "^4.21.0",
-        "typescript": "^6.0.3"
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.5"
     },
     "pnpm": {
         "onlyBuiltDependencies": [
