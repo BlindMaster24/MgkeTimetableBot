@@ -12,11 +12,10 @@ export class StaticKeyboard {
     public static NeedAccept(service: BotServiceName) {
         if (service !== 'vk') return;
 
-        return new KeyboardBuilder('NeedAccept', true)
-            .add({
-                text: 'Проверить',
-                color: KeyboardColor.POSITIVE_COLOR
-            })
+        return new KeyboardBuilder('NeedAccept', true).add({
+            text: 'Проверить',
+            color: KeyboardColor.POSITIVE_COLOR
+        });
     }
 
     // public static get DisableChanges() {
@@ -53,22 +52,29 @@ export class StaticKeyboard {
     public static get SelectMode(): KeyboardBuilder {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SelectMode');
 
-        return keyboard.add({
-            text: '👀 Гость',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: '👩‍🎓 Учащийся',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).add({
-            text: '👩‍🏫 Преподаватель',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: '👨‍👩‍👦 Родитель',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).add({
-            text: '🔙 Пропустить',
-            color: KeyboardColor.SECONDARY_COLOR
-        });
+        return keyboard
+            .add({
+                text: '👀 Гость',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: '👩‍🎓 Учащийся',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .add({
+                text: '👩‍🏫 Преподаватель',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: '👨‍👩‍👦 Родитель',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .add({
+                text: '🔙 Пропустить',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public static get Cancel(): KeyboardBuilder {
@@ -81,11 +87,17 @@ export class StaticKeyboard {
         });
     }
 
-    public static GetWeekTimetable({ type, value, weekIndex, label, showHeader = true }: WeekTimetableOptions): KeyboardBuilder | undefined {
+    public static GetWeekTimetable({
+        type,
+        value,
+        weekIndex,
+        label,
+        showHeader = true
+    }: WeekTimetableOptions): KeyboardBuilder | undefined {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('GenerateImage', true);
 
         if (!isNaN(+value)) {
-            value = Number(value)
+            value = Number(value);
         }
 
         if (type === 'group' || type === 'teacher') {
@@ -95,9 +107,7 @@ export class StaticKeyboard {
         return keyboard.add({
             type: ButtonType.Callback,
             text: label ?? 'На неделю',
-            payload: 'timetable' + JSON.stringify([
-                type, value, weekIndex ?? null, 0, showHeader ? 1 : 0
-            ]),
+            payload: 'timetable' + JSON.stringify([type, value, weekIndex ?? null, 0, showHeader ? 1 : 0]),
             color: KeyboardColor.PRIMARY_COLOR
         });
     }
@@ -106,9 +116,7 @@ export class StaticKeyboard {
         return new KeyboardBuilder('CallsShow', true).add({
             type: ButtonType.Callback,
             text: label,
-            payload: 'calls' + JSON.stringify([
-                Number(true)
-            ]),
+            payload: 'calls' + JSON.stringify([Number(true)]),
             color: KeyboardColor.PRIMARY_COLOR
         });
     }

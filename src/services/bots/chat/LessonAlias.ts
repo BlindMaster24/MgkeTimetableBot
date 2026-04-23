@@ -1,7 +1,4 @@
-import {
-    CreationOptional, DataTypes, InferAttributes,
-    InferCreationAttributes, Model
-} from 'sequelize';
+import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes, Model } from 'sequelize';
 import { sequelize } from '../../../db';
 
 export type AliasRecords = Record<string, string>;
@@ -13,33 +10,36 @@ class LessonAlias extends Model<InferAttributes<LessonAlias>, InferCreationAttri
     declare alias: string;
 }
 
-LessonAlias.init({
-    id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-    },
-    chatId: {
-        type: DataTypes.INTEGER
-    },
-    lesson: {
-        type: DataTypes.STRING
-    },
-    alias: {
-        type: DataTypes.STRING
-    }
-}, {
-    sequelize: sequelize,
-    tableName: 'bot_aliases',
-    indexes: [
-        {
-            fields: ['chatId']
+LessonAlias.init(
+    {
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
         },
-        {
-            fields: ['chatId', 'lesson'],
-            unique: true
+        chatId: {
+            type: DataTypes.INTEGER
+        },
+        lesson: {
+            type: DataTypes.STRING
+        },
+        alias: {
+            type: DataTypes.STRING
         }
-    ]
-});
+    },
+    {
+        sequelize: sequelize,
+        tableName: 'bot_aliases',
+        indexes: [
+            {
+                fields: ['chatId']
+            },
+            {
+                fields: ['chatId', 'lesson'],
+                unique: true
+            }
+        ]
+    }
+);
 
 export { LessonAlias };

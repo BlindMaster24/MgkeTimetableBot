@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { StringDate } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { TeacherLessonExplain } from "../../../parser/types";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { StringDate } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { TeacherLessonExplain } from '../../../parser/types';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
     public regexp = /^((!|\/)(get)?cabinet)(\b|$|\s)/i;
@@ -18,7 +18,7 @@ export default class extends AbstractCommand {
             return context.send('Данные с сервера ещё не загружены, ожидайте...');
         }
 
-        let cabinet: string | number | false | undefined = context.text?.replace(this.regexp, '').trim();
+        const cabinet: string | number | false | undefined = context.text?.replace(this.regexp, '').trim();
         if (!cabinet) {
             return context.send('Номер кабинета не указан');
         }
@@ -26,11 +26,11 @@ export default class extends AbstractCommand {
         const info: {
             [cabinet: string]: {
                 [day: string]: {
-                    day: string,
-                    lessons: (TeacherLessonExplain & { index: number, teacher: string })[]
-                }
-            }
-        } = {}
+                    day: string;
+                    lessons: (TeacherLessonExplain & { index: number; teacher: string })[];
+                };
+            };
+        } = {};
 
         for (const teacherName in raspCache.teachers.timetable) {
             const teacher = raspCache.teachers.timetable[teacherName];
@@ -43,26 +43,28 @@ export default class extends AbstractCommand {
                     if (lesson.cabinet.match(/(\d+-)?\d+/i)?.[0] !== cabinet.match(/(\d+-)?\d+/i)?.[0]) continue;
 
                     if (!info[lesson.cabinet]) {
-                        info[lesson.cabinet] = {}
+                        info[lesson.cabinet] = {};
                     }
 
                     if (!info[lesson.cabinet][day.day]) {
                         info[lesson.cabinet][day.day] = {
                             day: day.day,
                             lessons: []
-                        }
+                        };
                     }
 
-                    info[lesson.cabinet][day.day].lessons.push(Object.assign({}, lesson, {
-                        index: Number(i),
-                        teacher: teacher.teacher
-                    }))
+                    info[lesson.cabinet][day.day].lessons.push(
+                        Object.assign({}, lesson, {
+                            index: Number(i),
+                            teacher: teacher.teacher
+                        })
+                    );
                 }
             }
         }
 
         if (!Object.keys(info).length) {
-            return context.send('Кабинет не найден.')
+            return context.send('Кабинет не найден.');
         }
 
         const message: string[] = [];
@@ -78,7 +80,9 @@ export default class extends AbstractCommand {
                 dayMessage.push(`${StringDate.fromStringDate(day).getWeekdayName()}, ${day}`);
 
                 for (const lesson of lessons) {
-                    dayMessage.push(`${lesson.index + 1}. ${lesson.lesson} (${lesson.type}), ${lesson.subgroup ? `${lesson.subgroup}. ` : ''}${lesson.group}, ${lesson.teacher}`);
+                    dayMessage.push(
+                        `${lesson.index + 1}. ${lesson.lesson} (${lesson.type}), ${lesson.subgroup ? `${lesson.subgroup}. ` : ''}${lesson.group}, ${lesson.teacher}`
+                    );
                 }
 
                 cabinetMessage.push(dayMessage.join('\n'));

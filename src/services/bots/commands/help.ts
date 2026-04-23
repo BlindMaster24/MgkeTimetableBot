@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)?help)$/i
+    public regexp = /^((!|\/)?help)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand | null = {
         command: 'help',

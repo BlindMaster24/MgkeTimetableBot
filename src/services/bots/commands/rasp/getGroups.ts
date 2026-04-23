@@ -1,10 +1,10 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { formatSeconds } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { formatSeconds } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)?(get)?groups)$/i
+    public regexp = /^((!|\/)?(get)?groups)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'groups',
@@ -14,12 +14,14 @@ export default class extends AbstractCommand {
     async handler({ context }: CmdHandlerParams) {
         const groups = await this.app.getService('timetable').getGroups();
 
-        return context.send([
-            '__ Группы в кэше __\n',
-            groups.join(', '),
+        return context.send(
+            [
+                '__ Группы в кэше __\n',
+                groups.join(', '),
 
-            `\nЗагружено: ${formatSeconds(Math.ceil((Date.now() - raspCache.groups.update) / 1e3))} назад`,
-            `Изменено: ${formatSeconds(Math.ceil((Date.now() - raspCache.groups.changed) / 1e3))} назад`
-        ].join('\n'));
+                `\nЗагружено: ${formatSeconds(Math.ceil((Date.now() - raspCache.groups.update) / 1e3))} назад`,
+                `Изменено: ${formatSeconds(Math.ceil((Date.now() - raspCache.groups.changed) / 1e3))} назад`
+            ].join('\n')
+        );
     }
 }

@@ -1,8 +1,8 @@
-import { InputFile } from "grammy";
+import { InputFile } from 'grammy';
 import type { TelegramBotCommand } from '../../types/telegram';
-import { DayIndex, getFullSubjectName, StringDate } from "../../../../utils";
-import { TeacherDay } from "../../../parser/types";
-import { AbstractCommand, BotServiceName, CmdHandlerParams } from "../../abstract";
+import { DayIndex, getFullSubjectName, StringDate } from '../../../../utils';
+import { TeacherDay } from '../../../parser/types';
+import { AbstractCommand, BotServiceName, CmdHandlerParams } from '../../abstract';
 import { encode } from 'iconv-lite';
 
 export default class extends AbstractCommand {
@@ -39,11 +39,9 @@ export default class extends AbstractCommand {
         const entries: TeacherDay[] = await archive.getTeacherDays(chat.teacher, dayIndex);
 
         const lastDay = entries.at(-1);
-        const maxDay = lastDay ? StringDate.fromStringDate(lastDay.day) : StringDate.now()
+        const maxDay = lastDay ? StringDate.fromStringDate(lastDay.day) : StringDate.now();
 
-        const csv: string[] = [
-            ['День', 'Подгруппа', 'Группа', 'Тип', 'Предмет'].join(',')
-        ];
+        const csv: string[] = [['День', 'Подгруппа', 'Группа', 'Тип', 'Предмет'].join(',')];
 
         for (const entry of entries) {
             const day = StringDate.fromStringDate(entry.day).toStringDateNoYear();
@@ -53,13 +51,15 @@ export default class extends AbstractCommand {
                     continue;
                 }
 
-                csv.push([
-                    day,
-                    lesson.subgroup ?? '',
-                    lesson.group,
-                    lesson.type?.toUpperCase() ?? '-',
-                    getFullSubjectName(lesson.lesson)
-                ].join(','));
+                csv.push(
+                    [
+                        day,
+                        lesson.subgroup ?? '',
+                        lesson.group,
+                        lesson.type?.toUpperCase() ?? '-',
+                        getFullSubjectName(lesson.lesson)
+                    ].join(',')
+                );
             }
         }
 

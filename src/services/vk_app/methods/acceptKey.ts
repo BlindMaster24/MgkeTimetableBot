@@ -1,8 +1,7 @@
-import VKAppDefaultMethod from "./_default";
+import VKAppDefaultMethod from './_default';
 
 export default class VkAppAcceptKeyMethod extends VKAppDefaultMethod {
-
-    public httpMethod: "GET" | "POST" = 'POST';
+    public httpMethod: 'GET' | 'POST' = 'POST';
     public method: string = 'acceptKey';
 
     handler() {

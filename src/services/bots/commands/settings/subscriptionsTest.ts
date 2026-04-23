@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { DayIndex, WeekIndex, getFutureDays } from "../../../../utils";
-import { GroupDay, TeacherDay } from "../../../parser/types";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { StaticKeyboard } from "../../keyboard";
-import { Subscription } from "../../subscriptions/model";
+import { DayIndex, WeekIndex, getFutureDays } from '../../../../utils';
+import { GroupDay, TeacherDay } from '../../../parser/types';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { StaticKeyboard } from '../../keyboard';
+import { Subscription } from '../../subscriptions/model';
 
 type SubscriptionEntry = {
     id: number;
@@ -26,10 +26,7 @@ export default class SubscriptionsTestCommand extends AbstractCommand {
             return context.send('Подписок нет.', { keyboard: keyboard.SubscriptionsMenu });
         }
 
-        const prompt = [
-            'Введите номер подписки для проверки:',
-            this.formatSubscriptions(list)
-        ].join('\n');
+        const prompt = ['Введите номер подписки для проверки:', this.formatSubscriptions(list)].join('\n');
 
         const selected = await context.input(prompt, { keyboard: keyboard.SubscriptionsMenu });
         const input = selected?.text?.trim();
@@ -72,18 +69,15 @@ export default class SubscriptionsTestCommand extends AbstractCommand {
                 }
             }
 
-            return context.send(
-                `🆕 Группа ${target.value}: доступно расписание на следующую неделю`,
-                {
-                    keyboard: StaticKeyboard.GetWeekTimetable({
-                        type: 'group',
-                        value: target.value,
-                        showHeader: false,
-                        label: '📃 Показать',
-                        weekIndex: weekIndex.valueOf()
-                    })
-                }
-            );
+            return context.send(`🆕 Группа ${target.value}: доступно расписание на следующую неделю`, {
+                keyboard: StaticKeyboard.GetWeekTimetable({
+                    type: 'group',
+                    value: target.value,
+                    showHeader: false,
+                    label: '📃 Показать',
+                    weekIndex: weekIndex.valueOf()
+                })
+            });
         }
 
         const days = await this.app.getService('timetable').getTeacherDaysByRange(weekRange, target.value);
@@ -100,18 +94,15 @@ export default class SubscriptionsTestCommand extends AbstractCommand {
             }
         }
 
-        return context.send(
-            `🆕 Преподаватель ${target.value}: доступно расписание на следующую неделю`,
-            {
-                keyboard: StaticKeyboard.GetWeekTimetable({
-                    type: 'teacher',
-                    value: target.value,
-                    showHeader: false,
-                    label: '📃 Показать',
-                    weekIndex: weekIndex.valueOf()
-                })
-            }
-        );
+        return context.send(`🆕 Преподаватель ${target.value}: доступно расписание на следующую неделю`, {
+            keyboard: StaticKeyboard.GetWeekTimetable({
+                type: 'teacher',
+                value: target.value,
+                showHeader: false,
+                label: '📃 Показать',
+                weekIndex: weekIndex.valueOf()
+            })
+        });
     }
 
     private async getSubscriptions(chatId: number): Promise<SubscriptionEntry[]> {
@@ -125,12 +116,14 @@ export default class SubscriptionsTestCommand extends AbstractCommand {
     }
 
     private formatSubscriptions(list: SubscriptionEntry[]): string {
-        return list.map((item, index) => {
-            if (item.type === 'group') {
-                return `${index + 1}. Группа ${item.value}`;
-            }
-            return `${index + 1}. Преподаватель ${item.value}`;
-        }).join('\n');
+        return list
+            .map((item, index) => {
+                if (item.type === 'group') {
+                    return `${index + 1}. Группа ${item.value}`;
+                }
+                return `${index + 1}. Преподаватель ${item.value}`;
+            })
+            .join('\n');
     }
 
     private pickGroupDay(days: GroupDay[]): GroupDay | undefined {

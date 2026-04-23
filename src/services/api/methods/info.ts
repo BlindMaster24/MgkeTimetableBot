@@ -1,8 +1,8 @@
-import { raspCache } from "../../parser";
-import VKAppDefaultMethod, { HandlerParams } from "./_default";
+import { raspCache } from '../../parser';
+import VKAppDefaultMethod, { HandlerParams } from './_default';
 
 export default class VkAppAuthMethod extends VKAppDefaultMethod {
-    public httpMethod: "GET" | "POST" = 'GET';
+    public httpMethod: 'GET' | 'POST' = 'GET';
     public method: string = 'info';
 
     handler({ request, response }: HandlerParams) {
@@ -25,6 +25,6 @@ export default class VkAppAuthMethod extends VKAppDefaultMethod {
                 hash: raspCache.team.hash
             },
             lastSuccess: raspCache.successUpdate
-        }
+        };
     }
 }

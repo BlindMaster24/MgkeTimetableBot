@@ -1,10 +1,10 @@
-import { ContextDefaultState, MessageContext, MessageEventContext, VK, getRandomId } from "vk-io";
-import { VkBot } from ".";
-import { config } from "../../../../config";
-import { ParsedPayload, parsePayload } from "../../../utils";
-import { ImageFile } from "../../image/builder";
-import { AbstractCallbackContext, AbstractCommandContext, MessageOptions } from "../abstract";
-import { convertAbstractToVK } from "./keyboard";
+import { ContextDefaultState, MessageContext, MessageEventContext, VK, getRandomId } from 'vk-io';
+import { VkBot } from '.';
+import { config } from '../../../../config';
+import { ParsedPayload, parsePayload } from '../../../utils';
+import { ImageFile } from '../../image/builder';
+import { AbstractCallbackContext, AbstractCommandContext, MessageOptions } from '../abstract';
+import { convertAbstractToVK } from './keyboard';
 
 export class VkCommandContext extends AbstractCommandContext {
     public text: string;
@@ -79,11 +79,13 @@ export class VkCommandContext extends AbstractCommandContext {
 
         let attachment: string | null = await this.cache.get(image.id);
         if (!attachment) {
-            attachment = (await this.vk.upload.messagePhoto({
-                source: {
-                    value: await image.data()
-                }
-            })).toString();
+            attachment = (
+                await this.vk.upload.messagePhoto({
+                    source: {
+                        value: await image.data()
+                    }
+                })
+            ).toString();
 
             await this.cache.add(image.id, attachment);
         }
@@ -178,13 +180,15 @@ export class VkCallbackContext extends AbstractCallbackContext {
             peer_id: this.peerId,
             random_id: getRandomId(),
             message: text,
-            ...(reply_to ? {
-                forward: JSON.stringify({
-                    peer_id: this.peerId,
-                    conversation_message_ids: reply_to,
-                    is_reply: true
-                })
-            } : {}),
+            ...(reply_to
+                ? {
+                      forward: JSON.stringify({
+                          peer_id: this.peerId,
+                          conversation_message_ids: reply_to,
+                          is_reply: true
+                      })
+                  }
+                : {}),
             disable_mentions: options.disable_mentions,
             keyboard: convertAbstractToVK(options.keyboard)
         });
@@ -217,11 +221,13 @@ export class VkCallbackContext extends AbstractCallbackContext {
 
         let attachment: string | null = await this.cache.get(image.id);
         if (!attachment) {
-            attachment = (await this.vk.upload.messagePhoto({
-                source: {
-                    value: await image.data()
-                }
-            })).toString();
+            attachment = (
+                await this.vk.upload.messagePhoto({
+                    source: {
+                        value: await image.data()
+                    }
+                })
+            ).toString();
 
             await this.cache.add(image.id, attachment);
         }
@@ -230,13 +236,15 @@ export class VkCallbackContext extends AbstractCallbackContext {
             peer_id: this.peerId,
             random_id: getRandomId(),
             message: '',
-            ...(reply_to ? {
-                forward: JSON.stringify({
-                    peer_id: this.peerId,
-                    conversation_message_ids: reply_to,
-                    is_reply: true
-                })
-            } : {}),
+            ...(reply_to
+                ? {
+                      forward: JSON.stringify({
+                          peer_id: this.peerId,
+                          conversation_message_ids: reply_to,
+                          is_reply: true
+                      })
+                  }
+                : {}),
             disable_mentions: options.disable_mentions,
             keyboard: convertAbstractToVK(options.keyboard),
             attachment: attachment ? [attachment] : undefined
@@ -277,4 +285,3 @@ export class VkCallbackContext extends AbstractCallbackContext {
         return true;
     }
 }
-

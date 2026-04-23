@@ -4,53 +4,53 @@ import { Groups, Teachers, Team } from '../timetable';
 import { CallsSchedule } from './calls';
 
 export type RaspEntryCache<T = Groups | Teachers> = {
-    timetable: T,
-    update: number,
-    changed: number,
-    lastWeekIndex: number,
-    hash: string,
-}
+    timetable: T;
+    update: number;
+    changed: number;
+    lastWeekIndex: number;
+    hash: string;
+};
 
 export type TeamCache = {
-    names: Team,
-    update: number,
-    changed: number,
-    hash: string[]
-}
+    names: Team;
+    update: number;
+    changed: number;
+    hash: string[];
+};
 
 export type CallsCache = {
     site: {
-        schedule: CallsSchedule,
-        updatedAt: number,
-        updatedAtRaw?: string,
-        hash: string
-    },
+        schedule: CallsSchedule;
+        updatedAt: number;
+        updatedAtRaw?: string;
+        hash: string;
+    };
     manual: {
-        schedule: CallsSchedule,
-        updatedAt: number,
-        hash: string
-    },
+        schedule: CallsSchedule;
+        updatedAt: number;
+        hash: string;
+    };
     active: {
-        schedule: CallsSchedule,
-        updatedAt: number,
-        source: 'site' | 'manual' | 'config',
-        hash: string
-    },
-    overrideSource?: 'site' | 'manual' | 'config',
-    manualReason?: string,
-    manualReasonUpdatedAt?: number,
-    siteEmptyNotifiedAt?: number,
-    update: number,
-    changed: number
-}
+        schedule: CallsSchedule;
+        updatedAt: number;
+        source: 'site' | 'manual' | 'config';
+        hash: string;
+    };
+    overrideSource?: 'site' | 'manual' | 'config';
+    manualReason?: string;
+    manualReasonUpdatedAt?: number;
+    siteEmptyNotifiedAt?: number;
+    update: number;
+    changed: number;
+};
 
 export type RaspCache = {
-    groups: RaspEntryCache<Groups>,
-    teachers: RaspEntryCache<Teachers>,
-    team: TeamCache,
-    calls: CallsCache,
-    successUpdate: boolean
-}
+    groups: RaspEntryCache<Groups>;
+    teachers: RaspEntryCache<Teachers>;
+    team: TeamCache;
+    calls: CallsCache;
+    successUpdate: boolean;
+};
 
 export const raspCache: RaspCache = {
     groups: {
@@ -94,7 +94,7 @@ export const raspCache: RaspCache = {
         changed: 0
     },
     successUpdate: true
-}
+};
 
 export async function saveCache() {
     if (!existsSync('./cache/rasp/')) {
@@ -103,8 +103,8 @@ export async function saveCache() {
 
     await writeFile('./cache/rasp/groups.json', JSON.stringify(raspCache.groups, null, 4));
     await writeFile('./cache/rasp/teachers.json', JSON.stringify(raspCache.teachers, null, 4));
-    await writeFile('./cache/rasp/team.json', JSON.stringify(raspCache.team, null, 4))
-    await writeFile('./cache/rasp/calls.json', JSON.stringify(raspCache.calls, null, 4))
+    await writeFile('./cache/rasp/team.json', JSON.stringify(raspCache.team, null, 4));
+    await writeFile('./cache/rasp/calls.json', JSON.stringify(raspCache.calls, null, 4));
 }
 
 export function loadCache() {
@@ -114,7 +114,7 @@ export function loadCache() {
         try {
             Object.assign(raspCache.groups, JSON.parse(readFileSync('./cache/rasp/groups.json', 'utf8')));
         } catch (e) {
-            unlinkSync('./cache/rasp/groups.json')
+            unlinkSync('./cache/rasp/groups.json');
         }
     }
 
@@ -122,7 +122,7 @@ export function loadCache() {
         try {
             Object.assign(raspCache.teachers, JSON.parse(readFileSync('./cache/rasp/teachers.json', 'utf8')));
         } catch (e) {
-            unlinkSync('./cache/rasp/teachers.json')
+            unlinkSync('./cache/rasp/teachers.json');
         }
     }
 
@@ -130,7 +130,7 @@ export function loadCache() {
         try {
             Object.assign(raspCache.team, JSON.parse(readFileSync('./cache/rasp/team.json', 'utf8')));
         } catch (e) {
-            unlinkSync('./cache/rasp/team.json')
+            unlinkSync('./cache/rasp/team.json');
         }
     }
 
@@ -138,7 +138,7 @@ export function loadCache() {
         try {
             Object.assign(raspCache.calls, JSON.parse(readFileSync('./cache/rasp/calls.json', 'utf8')));
         } catch (e) {
-            unlinkSync('./cache/rasp/calls.json')
+            unlinkSync('./cache/rasp/calls.json');
         }
     }
 }

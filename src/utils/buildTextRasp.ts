@@ -5,7 +5,7 @@ import { DayIndex, StringDate, nowInTime } from './time';
 export function removePastDays<T extends GroupDay | TeacherDay>(days: T[], processAutoskip: boolean = true): T[] {
     const isSaturday: boolean = StringDate.now().isSaturday();
 
-    const dayIndex: number = days.findIndex(_ => {
+    const dayIndex: number = days.findIndex((_) => {
         return DayIndex.fromStringDate(_.day).isNotPast();
     });
 
@@ -37,7 +37,11 @@ export function removePastDays<T extends GroupDay | TeacherDay>(days: T[], proce
     return nextDays;
 }
 
-export function getDayRasp<T extends GroupDay | TeacherDay>(days: T[], processAutoskip: boolean = true, maxDays: number = 1): T[] {
+export function getDayRasp<T extends GroupDay | TeacherDay>(
+    days: T[],
+    processAutoskip: boolean = true,
+    maxDays: number = 1
+): T[] {
     const nextDays: T[] = removePastDays(days, processAutoskip);
     const showDays: T[] = [];
 
@@ -60,7 +64,7 @@ export function getDayRasp<T extends GroupDay | TeacherDay>(days: T[], processAu
 }
 
 export function getFutureDays<T extends GroupDay | TeacherDay>(days: T[]): T[] {
-    const dayIndex: number = days.findIndex(_ => {
+    const dayIndex: number = days.findIndex((_) => {
         return DayIndex.fromStringDate(_.day).isFuture();
     });
 

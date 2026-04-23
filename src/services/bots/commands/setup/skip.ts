@@ -1,8 +1,8 @@
-import { defines } from "../../../../defines";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { defines } from '../../../../defines';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(🔙\s)?Пропустить$/i
+    public regexp = /^(🔙\s)?Пропустить$/i;
     public payloadAction = null;
     public scene?: string | null = 'setup';
 

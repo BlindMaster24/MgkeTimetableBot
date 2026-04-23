@@ -1,7 +1,7 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { GroupLessonExplain, TeacherLessonExplain } from "../../../parser/types";
-import { Timetable } from "../../../timetable";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { GroupLessonExplain, TeacherLessonExplain } from '../../../parser/types';
+import { Timetable } from '../../../timetable';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
     public regexp = /^((!|\/)?stats)$/i;
@@ -34,11 +34,11 @@ export default class extends AbstractCommand {
         const days = await archive.getGroupDays(group);
 
         const total: {
-            [lesson: string]: number
-        } = {}
+            [lesson: string]: number;
+        } = {};
 
         const appendStats = (explain: GroupLessonExplain) => {
-            let value: string[] = [];
+            const value: string[] = [];
 
             if (explain.subgroup) {
                 value.push(`${explain.subgroup}.`);
@@ -60,7 +60,7 @@ export default class extends AbstractCommand {
             }
 
             total[key] += 1;
-        }
+        };
 
         for (const day of days) {
             for (const lesson of day.lessons) {
@@ -77,11 +77,16 @@ export default class extends AbstractCommand {
         }
 
         message.push('Статистика пар за всё время:');
-        message.push(Object.entries(total).sort(function (a, b) {
-            return b[1] - a[1];
-        }).map(([key, value], index) => {
-            return `${key} - ${value} пар`;
-        }).join('\n'));
+        message.push(
+            Object.entries(total)
+                .sort(function (a, b) {
+                    return b[1] - a[1];
+                })
+                .map(([key, value], index) => {
+                    return `${key} - ${value} пар`;
+                })
+                .join('\n')
+        );
 
         const totalCount = Object.values(total).reduce((total, amount) => {
             total += amount;
@@ -100,11 +105,11 @@ export default class extends AbstractCommand {
         const days = await archive.getTeacherDays(teacher);
 
         const total: {
-            [lesson: string]: number
-        } = {}
+            [lesson: string]: number;
+        } = {};
 
         const appendStats = (explain: TeacherLessonExplain) => {
-            let value: string[] = [];
+            const value: string[] = [];
 
             if (explain.group) {
                 value.push(`${explain.subgroup ? `${explain.subgroup}-` : ''}${explain.group}.`);
@@ -126,7 +131,7 @@ export default class extends AbstractCommand {
             }
 
             total[key] += 1;
-        }
+        };
 
         for (const day of days) {
             for (const lesson of day.lessons) {
@@ -143,11 +148,16 @@ export default class extends AbstractCommand {
         }
 
         message.push('Статистика пар за всё время:');
-        message.push(Object.entries(total).sort(function (a, b) {
-            return b[1] - a[1];
-        }).map(([key, value], index) => {
-            return `${key} - ${value} пар`;
-        }).join('\n'));
+        message.push(
+            Object.entries(total)
+                .sort(function (a, b) {
+                    return b[1] - a[1];
+                })
+                .map(([key, value], index) => {
+                    return `${key} - ${value} пар`;
+                })
+                .join('\n')
+        );
 
         const totalCount = Object.values(total).reduce((total, amount) => {
             total += amount;

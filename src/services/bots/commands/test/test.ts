@@ -1,7 +1,7 @@
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)test$/i
+    public regexp = /^(!|\/)test$/i;
     public payloadAction = null;
 
     handler({ context }: CmdHandlerParams) {

@@ -11,7 +11,7 @@ export class Keyboard {
         private app: App,
         private chat: BotChat,
         private context?: AbstractContext
-    ) { }
+    ) {}
 
     public getKeyboardBuilder(keyboardName: string, inline?: boolean): KeyboardBuilder {
         return new KeyboardBuilder(keyboardName, inline);
@@ -22,144 +22,179 @@ export class Keyboard {
 
         ///___ 1 LEVEL ___///
         if (this.chat.mode === null) {
-            if (!this.context?.isChat) keyboard.add({
-                text: '📚 Первоначальная настройка',
-                color: KeyboardColor.PRIMARY_COLOR
-            }).row()
+            if (!this.context?.isChat)
+                keyboard
+                    .add({
+                        text: '📚 Первоначальная настройка',
+                        color: KeyboardColor.PRIMARY_COLOR
+                    })
+                    .row();
         } else if (this.chat.mode === 'guest') {
-            keyboard.add({
-                text: '👩‍🎓 Группа',
-                color: KeyboardColor.PRIMARY_COLOR
-            }).add({
-                text: '👩‍🏫 Преподаватель',
-                color: KeyboardColor.PRIMARY_COLOR
-            }).row()
+            keyboard
+                .add({
+                    text: '👩‍🎓 Группа',
+                    color: KeyboardColor.PRIMARY_COLOR
+                })
+                .add({
+                    text: '👩‍🏫 Преподаватель',
+                    color: KeyboardColor.PRIMARY_COLOR
+                })
+                .row();
         } else {
             const isTelegram = this.chat.service === 'tg';
-            const canShowSchedule = !isTelegram || (
-                (this.chat.mode === 'student' || this.chat.mode === 'parent') ? !!this.chat.group :
-                    (this.chat.mode === 'teacher') ? !!this.chat.teacher : true
-            );
+            const canShowSchedule =
+                !isTelegram ||
+                (this.chat.mode === 'student' || this.chat.mode === 'parent'
+                    ? !!this.chat.group
+                    : this.chat.mode === 'teacher'
+                      ? !!this.chat.teacher
+                      : true);
 
             if (this.chat.showDaily && canShowSchedule) {
                 keyboard.add({
                     text: '📄 На день',
                     color: KeyboardColor.PRIMARY_COLOR
-                })
+                });
             }
 
             if (this.chat.showWeekly && canShowSchedule) {
                 keyboard.add({
                     text: '📑 На неделю',
                     color: KeyboardColor.PRIMARY_COLOR
-                })
+                });
             }
 
-            if (this.chat.showDaily || this.chat.showWeekly) keyboard.row()
+            if (this.chat.showDaily || this.chat.showWeekly) keyboard.row();
         }
 
-        const showFastAnother: boolean = this.chat.mode ? ['student', 'parent', 'teacher'].includes(this.chat.mode) : false;
+        const showFastAnother: boolean = this.chat.mode
+            ? ['student', 'parent', 'teacher'].includes(this.chat.mode)
+            : false;
 
         ///___ 2 LEVEL ___///
         if (showFastAnother && this.chat.showFastGroup) {
             keyboard.add({
                 text: '👩‍🎓 Группа',
                 color: KeyboardColor.PRIMARY_COLOR
-            })
+            });
         }
 
-        const canShowCalls = this.chat.showCalls && (this.chat.service !== 'tg' || config.parser.calls.enabled !== false);
-        if (this.chat.showAbout && canShowCalls) keyboard.add({
-            text: '🕐 Звонки',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        const canShowCalls =
+            this.chat.showCalls && (this.chat.service !== 'tg' || config.parser.calls.enabled !== false);
+        if (this.chat.showAbout && canShowCalls)
+            keyboard.add({
+                text: '🕐 Звонки',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
 
         if (showFastAnother && this.chat.showFastTeacher) {
             keyboard.add({
-                text: ((this.chat.showAbout && this.chat.showCalls) && (showFastAnother && this.chat.showFastGroup)) ? '👩‍🏫 Препод.' : '👩‍🏫 Преподаватель',
+                text:
+                    this.chat.showAbout && this.chat.showCalls && showFastAnother && this.chat.showFastGroup
+                        ? '👩‍🏫 Препод.'
+                        : '👩‍🏫 Преподаватель',
                 color: KeyboardColor.PRIMARY_COLOR
-            })
+            });
         }
 
-
         ///___ 3 LEVEL ___///
-        keyboard.row()
-        if (!this.chat.showAbout && canShowCalls) keyboard.add({
-            text: '🕐 Звонки',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        keyboard.row();
+        if (!this.chat.showAbout && canShowCalls)
+            keyboard.add({
+                text: '🕐 Звонки',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
         if (this.chat.service === 'tg' && this.app.isServiceRegistered('google_calendar')) {
             keyboard.add({
                 text: '📅 Google Calendar',
                 color: KeyboardColor.SECONDARY_COLOR
-            })
+            });
         }
         if (this.chat.service === 'tg' && config.calendar?.ics?.enabled) {
             keyboard.add({
                 text: '📅 ICS',
                 color: KeyboardColor.SECONDARY_COLOR
-            })
+            });
         }
         keyboard.add({
             text: '⚙️ Настройки',
             color: KeyboardColor.SECONDARY_COLOR
-        })
+        });
         if (this.chat.mode === 'teacher') {
             keyboard.add({
                 text: '📚 История',
                 color: KeyboardColor.SECONDARY_COLOR
-            })
+            });
         }
-        if (this.chat.showAbout) keyboard.add({
-            text: '💡 О боте',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        if (this.chat.showAbout)
+            keyboard.add({
+                text: '💡 О боте',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
 
-        return keyboard
+        return keyboard;
     }
 
     public get SettingsMain() {
-        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsMain');  
+        const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsMain');
 
-        return keyboard.add({
-            text: '📚 Первоначальная настройка',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: '🗓️ Управление расписаниями'
-        }).row().add({
-            text: '⌨️ Кнопки'
-        }).add({
-            text: '📃 Форматировщик'
-        }).row().add({
-            text: '🔊 Оповещения'
-        }).add({
-            text: '🔔 Подписки'
-        }).add({
-            text: '🖼️ Отображение'
-        }).add({
-            text: '📊 Сравнение'
-        }).row().add({
-            text: 'Показать текущие',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text: '📚 Первоначальная настройка',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: '🗓️ Управление расписаниями'
+            })
+            .row()
+            .add({
+                text: '⌨️ Кнопки'
+            })
+            .add({
+                text: '📃 Форматировщик'
+            })
+            .row()
+            .add({
+                text: '🔊 Оповещения'
+            })
+            .add({
+                text: '🔔 Подписки'
+            })
+            .add({
+                text: '🖼️ Отображение'
+            })
+            .add({
+                text: '📊 Сравнение'
+            })
+            .row()
+            .add({
+                text: 'Показать текущие',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsSchedules() {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsSchedules');
 
-        return keyboard.add({
-            text: '🕐 Звонки: управление',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text: '🕐 Звонки: управление',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SubscriptionsMenu(): KeyboardBuilder {
@@ -167,19 +202,27 @@ export class Keyboard {
             .add({
                 text: '➕ Группа',
                 color: KeyboardColor.PRIMARY_COLOR
-            }).add({
+            })
+            .add({
                 text: '➕ Преподаватель',
                 color: KeyboardColor.PRIMARY_COLOR
-            }).row().add({
+            })
+            .row()
+            .add({
                 text: '📋 Мои подписки'
-            }).add({
+            })
+            .add({
                 text: '❌ Удалить подписку'
-            }).add({
+            })
+            .add({
                 text: '🧪 Проверить'
-            }).row().add({
+            })
+            .row()
+            .add({
                 text: 'Меню настроек',
                 color: KeyboardColor.SECONDARY_COLOR
-            }).add({
+            })
+            .add({
                 text: 'Главное меню',
                 color: KeyboardColor.SECONDARY_COLOR
             });
@@ -188,115 +231,166 @@ export class Keyboard {
     public get SettingsButtons() {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsButtons');
 
-        return keyboard.add({
-            text: noYesSmile(this.chat.showDaily, 'Кнопка "📄 На день"'),
-            color: noYesColor(this.chat.showDaily)
-        }).add({
-            text: noYesSmile(this.chat.showWeekly, 'Кнопка "📑 На неделю"'),
-            color: noYesColor(this.chat.showWeekly)
-        }).row().add({
-            text: noYesSmile(this.chat.showCalls, 'Кнопка "🕐 Звонки"'),
-            color: noYesColor(this.chat.showCalls)
-        }).add({
-            text: noYesSmile(this.chat.showAbout, 'Кнопка "💡 О боте"'),
-            color: noYesColor(this.chat.showAbout)
-        }).row().add({
-            text: noYesSmile(this.chat.showFastGroup, 'Кнопка "👩‍🎓 Группа"'),
-            color: noYesColor(this.chat.showFastGroup)
-        }).add({
-            text: noYesSmile(this.chat.showFastTeacher, 'Кнопка "👩‍🏫 Преподаватель"'),
-            color: noYesColor(this.chat.showFastTeacher)
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text: noYesSmile(this.chat.showDaily, 'Кнопка "📄 На день"'),
+                color: noYesColor(this.chat.showDaily)
+            })
+            .add({
+                text: noYesSmile(this.chat.showWeekly, 'Кнопка "📑 На неделю"'),
+                color: noYesColor(this.chat.showWeekly)
+            })
+            .row()
+            .add({
+                text: noYesSmile(this.chat.showCalls, 'Кнопка "🕐 Звонки"'),
+                color: noYesColor(this.chat.showCalls)
+            })
+            .add({
+                text: noYesSmile(this.chat.showAbout, 'Кнопка "💡 О боте"'),
+                color: noYesColor(this.chat.showAbout)
+            })
+            .row()
+            .add({
+                text: noYesSmile(this.chat.showFastGroup, 'Кнопка "👩‍🎓 Группа"'),
+                color: noYesColor(this.chat.showFastGroup)
+            })
+            .add({
+                text: noYesSmile(this.chat.showFastTeacher, 'Кнопка "👩‍🏫 Преподаватель"'),
+                color: noYesColor(this.chat.showFastTeacher)
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsNotice() {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsNotice');
 
-        return keyboard.add({
-            text: noYesSmile(this.chat.noticeChanges, 'Оповещение о новых днях: ', ['🔈', '🔇']) + (this.chat.noticeChanges ? 'Да' : 'Нет'),
-            color: noYesColor(this.chat.noticeChanges)
-        }).row().add({
-            text: noYesSmile(this.chat.noticeNextWeek, 'Оповещение о новой неделе: ', ['🔈', '🔇']) + (this.chat.noticeNextWeek ? 'Да' : 'Нет'),
-            color: noYesColor(this.chat.noticeNextWeek)
-        }).row().add({
-            text: noYesSmile(this.chat.noticeCalls, 'Оповещение о звонках: ', ['🔈', '🔇']) + (this.chat.noticeCalls ? 'Да' : 'Нет'),
-            color: noYesColor(this.chat.noticeCalls)
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text:
+                    noYesSmile(this.chat.noticeChanges, 'Оповещение о новых днях: ', ['🔈', '🔇']) +
+                    (this.chat.noticeChanges ? 'Да' : 'Нет'),
+                color: noYesColor(this.chat.noticeChanges)
+            })
+            .row()
+            .add({
+                text:
+                    noYesSmile(this.chat.noticeNextWeek, 'Оповещение о новой неделе: ', ['🔈', '🔇']) +
+                    (this.chat.noticeNextWeek ? 'Да' : 'Нет'),
+                color: noYesColor(this.chat.noticeNextWeek)
+            })
+            .row()
+            .add({
+                text:
+                    noYesSmile(this.chat.noticeCalls, 'Оповещение о звонках: ', ['🔈', '🔇']) +
+                    (this.chat.noticeCalls ? 'Да' : 'Нет'),
+                color: noYesColor(this.chat.noticeCalls)
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsView() {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsView');
 
-        return keyboard.add({
-            text: noYesSmile(this.chat.hidePastDays, 'Скрывать прошедшие дни'),
-            color: noYesColor(this.chat.hidePastDays)
-        }).row().add({
-            text: noYesSmile(this.chat.showParserTime, 'Время последней загрузки расписания'),
-            color: noYesColor(this.chat.showParserTime)
-        }).row().add({
-            text: noYesSmile(this.chat.showHints, 'Показывать подсказки: ') + (this.chat.showHints ? 'Да' : 'Нет'),
-            color: noYesColor(this.chat.showHints),
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text: noYesSmile(this.chat.hidePastDays, 'Скрывать прошедшие дни'),
+                color: noYesColor(this.chat.hidePastDays)
+            })
+            .row()
+            .add({
+                text: noYesSmile(this.chat.showParserTime, 'Время последней загрузки расписания'),
+                color: noYesColor(this.chat.showParserTime)
+            })
+            .row()
+            .add({
+                text: noYesSmile(this.chat.showHints, 'Показывать подсказки: ') + (this.chat.showHints ? 'Да' : 'Нет'),
+                color: noYesColor(this.chat.showHints)
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsDiff() {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsDiff');
 
-        return keyboard.add({
-            text: noYesSmile(this.chat.diffEnabled, 'Включить раздел "Что изменилось"'),
-            color: noYesColor(this.chat.diffEnabled)
-        }).row().add({
-            text: `🧾 Лимит строк: ${this.chat.diffMaxLines}`
-        }).row().add({
-            text: '⚙️ Расширенные'
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text: noYesSmile(this.chat.diffEnabled, 'Включить раздел "Что изменилось"'),
+                color: noYesColor(this.chat.diffEnabled)
+            })
+            .row()
+            .add({
+                text: `🧾 Лимит строк: ${this.chat.diffMaxLines}`
+            })
+            .row()
+            .add({
+                text: '⚙️ Расширенные'
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsDiffAdvanced() {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsDiffAdvanced');
 
-        return keyboard.add({
-            text: noYesSmile(this.chat.diffAutoInWeek, 'Показывать diff после /week'),
-            color: noYesColor(this.chat.diffAutoInWeek)
-        }).row().add({
-            text: noYesSmile(this.chat.diffAutoInUpdates, 'Показывать diff в уведомлениях'),
-            color: noYesColor(this.chat.diffAutoInUpdates)
-        }).row().add({
-            text: noYesSmile(this.chat.diffShowBeforeAfter, 'Показывать "старое -> новое"'),
-            color: noYesColor(this.chat.diffShowBeforeAfter)
-        }).row().add({
-            text: '⬅️ Базовые настройки'
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .add({
+                text: noYesSmile(this.chat.diffAutoInWeek, 'Показывать diff после /week'),
+                color: noYesColor(this.chat.diffAutoInWeek)
+            })
+            .row()
+            .add({
+                text: noYesSmile(this.chat.diffAutoInUpdates, 'Показывать diff в уведомлениях'),
+                color: noYesColor(this.chat.diffAutoInUpdates)
+            })
+            .row()
+            .add({
+                text: noYesSmile(this.chat.diffShowBeforeAfter, 'Показывать "старое -> новое"'),
+                color: noYesColor(this.chat.diffShowBeforeAfter)
+            })
+            .row()
+            .add({
+                text: '⬅️ Базовые настройки'
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsFormatters() {
@@ -312,40 +406,52 @@ export class Keyboard {
                 color: selected ? KeyboardColor.POSITIVE_COLOR : KeyboardColor.PRIMARY_COLOR
             });
 
-            if (+i + 1 % 2 === 0) keyboard.row();
+            if (+i + (1 % 2) === 0) keyboard.row();
         }
 
-        return keyboard.row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        })
+        return keyboard
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get SettingsAliases(): KeyboardBuilder {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('SettingsAliases');
 
-        return keyboard.add({
-            text: 'Список',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).add({
-            text: 'Добавить',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: 'Удалить',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: 'Отчистить все',
-            color: KeyboardColor.PRIMARY_COLOR
-        }).row().add({
-            text: 'Меню настроек',
-            color: KeyboardColor.SECONDARY_COLOR
-        }).add({
-            text: 'Главное меню',
-            color: KeyboardColor.SECONDARY_COLOR
-        });
+        return keyboard
+            .add({
+                text: 'Список',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .add({
+                text: 'Добавить',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: 'Удалить',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: 'Отчистить все',
+                color: KeyboardColor.PRIMARY_COLOR
+            })
+            .row()
+            .add({
+                text: 'Меню настроек',
+                color: KeyboardColor.SECONDARY_COLOR
+            })
+            .add({
+                text: 'Главное меню',
+                color: KeyboardColor.SECONDARY_COLOR
+            });
     }
 
     public get GroupHistory() {
@@ -355,9 +461,11 @@ export class Keyboard {
             keyboard.add({
                 type: ButtonType.Callback,
                 text: group,
-                payload: 'answer' + JSON.stringify({
-                    answer: group
-                })
+                payload:
+                    'answer' +
+                    JSON.stringify({
+                        answer: group
+                    })
             });
         }
 
@@ -371,10 +479,12 @@ export class Keyboard {
             keyboard.add({
                 type: ButtonType.Callback,
                 text: teacher,
-                payload: 'answer' + JSON.stringify({
-                    answer: teacher
-                })
-            })
+                payload:
+                    'answer' +
+                    JSON.stringify({
+                        answer: teacher
+                    })
+            });
         }
 
         return keyboard;
@@ -384,23 +494,33 @@ export class Keyboard {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('WithVerticalValues', true);
 
         for (const value of values) {
-            keyboard.add({
-                type: ButtonType.Callback,
-                text: value,
-                payload: 'answer' + JSON.stringify({
-                    answer: value
+            keyboard
+                .add({
+                    type: ButtonType.Callback,
+                    text: value,
+                    payload:
+                        'answer' +
+                        JSON.stringify({
+                            answer: value
+                        })
                 })
-            }).row()
+                .row();
         }
 
         return keyboard;
     }
 
-    public async WeekControl(type: string, value: string | number, weekIndex: number, hidePastDays: boolean = true, showHeader: boolean = false): Promise<KeyboardBuilder | undefined> {
+    public async WeekControl(
+        type: string,
+        value: string | number,
+        weekIndex: number,
+        hidePastDays: boolean = true,
+        showHeader: boolean = false
+    ): Promise<KeyboardBuilder | undefined> {
         const keyboard: KeyboardBuilder = new KeyboardBuilder('WeekControl', true);
 
         if (!isNaN(+value)) {
-            value = Number(value)
+            value = Number(value);
         }
 
         if (type === 'group' || type === 'teacher') {
@@ -415,9 +535,9 @@ export class Keyboard {
             keyboard.add({
                 type: ButtonType.Callback,
                 text: '⬅️',
-                payload: 'timetable' + JSON.stringify([
-                    type, value, (weekIndex - 1), Number(hidePastDays), Number(showHeader)
-                ]),
+                payload:
+                    'timetable' +
+                    JSON.stringify([type, value, weekIndex - 1, Number(hidePastDays), Number(showHeader)]),
                 color: KeyboardColor.PRIMARY_COLOR
             });
 
@@ -429,9 +549,7 @@ export class Keyboard {
             keyboard.add({
                 type: ButtonType.Callback,
                 text: '🔼',
-                payload: 'timetable' + JSON.stringify([
-                    type, value, weekIndex, 0, Number(showHeader)
-                ]),
+                payload: 'timetable' + JSON.stringify([type, value, weekIndex, 0, Number(showHeader)]),
                 color: KeyboardColor.PRIMARY_COLOR
             });
 
@@ -442,9 +560,9 @@ export class Keyboard {
             keyboard.add({
                 type: ButtonType.Callback,
                 text: '➡️',
-                payload: 'timetable' + JSON.stringify([
-                    type, value, (weekIndex + 1), Number(hidePastDays), Number(showHeader)
-                ]),
+                payload:
+                    'timetable' +
+                    JSON.stringify([type, value, weekIndex + 1, Number(hidePastDays), Number(showHeader)]),
                 color: KeyboardColor.PRIMARY_COLOR
             });
 
@@ -458,9 +576,7 @@ export class Keyboard {
         keyboard.add({
             type: ButtonType.Callback,
             text: '📷 Сгенерировать изображение',
-            payload: 'image' + JSON.stringify([
-                type, value, weekIndex
-            ]),
+            payload: 'image' + JSON.stringify([type, value, weekIndex]),
             color: KeyboardColor.PRIMARY_COLOR
         });
 

@@ -1,9 +1,9 @@
-import { AppServiceName } from "../../../../app";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import GoogleCalendarCallback from "../../callbacks/google";
+import { AppServiceName } from '../../../../app';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import GoogleCalendarCallback from '../../callbacks/google';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)?(g(oogle)?)?calendar|(📅\s*)?google calendar)$/i
+    public regexp = /^((!|\/)?(g(oogle)?)?calendar|(📅\s*)?google calendar)$/i;
     public payloadAction = null;
     public requireServices: AppServiceName[] = ['google_calendar'];
 

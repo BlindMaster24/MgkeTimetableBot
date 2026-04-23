@@ -1,4 +1,4 @@
-import { DayIndex } from "./DayIndex";
+import { DayIndex } from './DayIndex';
 
 export class StringDate {
     public static now() {
@@ -8,9 +8,13 @@ export class StringDate {
     public static fromStringDate(strDate: string, utc: boolean = false) {
         const date = new Date();
 
-        const parts = strDate.split('.').map((value: string): number => {
-            return Number(value);
-        }).slice(0, 3).reverse() as [number, number, number];
+        const parts = strDate
+            .split('.')
+            .map((value: string): number => {
+                return Number(value);
+            })
+            .slice(0, 3)
+            .reverse() as [number, number, number];
 
         parts[1] -= 1; //js format
 
@@ -28,9 +32,13 @@ export class StringDate {
     public static fromStringDateTime(strDate: string, strTime: string, utc: boolean = false) {
         const date = new Date();
 
-        const dateParts = strDate.split('.').map((value: string): number => {
-            return Number(value);
-        }).slice(0, 3).reverse() as [number, number, number];
+        const dateParts = strDate
+            .split('.')
+            .map((value: string): number => {
+                return Number(value);
+            })
+            .slice(0, 3)
+            .reverse() as [number, number, number];
 
         dateParts[1] -= 1; //js format
 
@@ -65,7 +73,7 @@ export class StringDate {
         return new this(date);
     }
 
-    constructor(private date: Date) { }
+    constructor(private date: Date) {}
 
     public valueOf(): number {
         return this.date.getTime();
@@ -80,15 +88,7 @@ export class StringDate {
     }
 
     public getWeekdayName(): string {
-        const days: string[] = [
-            'Воскресенье',
-            'Понедельник',
-            'Вторник',
-            'Среда',
-            'Четверг',
-            'Пятница',
-            'Суббота'
-        ];
+        const days: string[] = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
         return days[this.date.getDay()];
     }
@@ -104,26 +104,30 @@ export class StringDate {
     public toStringDate(): string {
         const date = this.date;
 
-        return `${date.getDate().toString().padStart(2, '0')}.` +
+        return (
+            `${date.getDate().toString().padStart(2, '0')}.` +
             `${(date.getMonth() + 1).toString().padStart(2, '0')}.` +
-            `${date.getFullYear()}`;
+            `${date.getFullYear()}`
+        );
     }
-
 
     public toStringDateNoYear(): string {
         const date = this.date;
 
-        return `${date.getDate().toString().padStart(2, '0')}.` +
-            `${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        return (
+            `${date.getDate().toString().padStart(2, '0')}.` + `${(date.getMonth() + 1).toString().padStart(2, '0')}`
+        );
     }
 
     public toStringTime(microtime: boolean = false): string {
         const date = this.date;
 
-        return `${date.getHours().toString().padStart(2, '0')}:` +
+        return (
+            `${date.getHours().toString().padStart(2, '0')}:` +
             `${date.getMinutes().toString().padStart(2, '0')}:` +
             `${date.getSeconds().toString().padStart(2, '0')}` +
-            (microtime ? `,${date.getMilliseconds().toString().padStart(3, '0')}` : '');
+            (microtime ? `,${date.getMilliseconds().toString().padStart(3, '0')}` : '')
+        );
     }
 
     public toStringDateTime(microtime: boolean = false): string {

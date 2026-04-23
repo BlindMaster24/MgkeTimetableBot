@@ -3,9 +3,7 @@ import { GroupLesson, GroupLessonExplain } from '../src/services/parser/types';
 import { TimetableArchive } from '../src/services/timetable/models/timetable';
 import { DayIndex } from '../src/utils';
 
-const days: string[] = [
-    '01.09.2023', '04.09.2023', '19.09.2023'
-];
+const days: string[] = ['01.09.2023', '04.09.2023', '19.09.2023'];
 
 const myGroup = 63;
 const mySubgroup = 2;
@@ -73,27 +71,29 @@ const main = async () => {
                     [Op.not]: null
                 }
             }
-        }).then(groups => {
-            return groups.map((entry: any) => {
-                entry.data = JSON.parse(entry.data);
+        }).then((groups) => {
+            return groups
+                .map((entry: any) => {
+                    entry.data = JSON.parse(entry.data);
 
-                return entry;
-            }).filter((entry) => {
-                const lessons = entry.data;
-                if (!lessons.length) {
-                    return false;
-                }
+                    return entry;
+                })
+                .filter((entry) => {
+                    const lessons = entry.data;
+                    if (!lessons.length) {
+                        return false;
+                    }
 
-                let lastLesson = lessons.at(-1);
-                lastLesson = Array.isArray(lastLesson) ? lastLesson[0] : lastLesson;
+                    let lastLesson = lessons.at(-1);
+                    lastLesson = Array.isArray(lastLesson) ? lastLesson[0] : lastLesson;
 
-                const cabinet = lastLesson.cabinet;
-                if (cabinet && cabinet.startsWith('Кн')) {
-                    return false;
-                }
+                    const cabinet = lastLesson.cabinet;
+                    if (cabinet && cabinet.startsWith('Кн')) {
+                        return false;
+                    }
 
-                return true;
-            });
+                    return true;
+                });
         });
 
         const myGroupEntry = groups.find((_) => {
@@ -101,7 +101,7 @@ const main = async () => {
         });
 
         const myCount = getLessonsCount(myGroupEntry)[mySubgroup];
-        console.log('У меня сегодня пар (с моей подгруппой)', myCount)
+        console.log('У меня сегодня пар (с моей подгруппой)', myCount);
 
         const findedGroups: number[] = [];
 
@@ -115,14 +115,14 @@ const main = async () => {
                 //без подгрупп на этот день
 
                 if (counts.common === myCount) {
-                    findedGroups.push(num)
+                    findedGroups.push(num);
 
-                    console.log('Для группы', num, 'совпадает завершения', '(у группы нет сегодня подгрупп)')
+                    console.log('Для группы', num, 'совпадает завершения', '(у группы нет сегодня подгрупп)');
                 }
             } else {
                 delete counts.common;
 
-                const subgroupsWithMyCount: number[] = []
+                const subgroupsWithMyCount: number[] = [];
                 for (const subgroup in counts) {
                     const count = counts[subgroup];
 
@@ -132,9 +132,15 @@ const main = async () => {
                 }
 
                 if (subgroupsWithMyCount.length) {
-                    findedGroups.push(num)
+                    findedGroups.push(num);
 
-                    console.log('Для группы', num, 'совпадает завершения', 'со следующими подгруппами', subgroupsWithMyCount)
+                    console.log(
+                        'Для группы',
+                        num,
+                        'совпадает завершения',
+                        'со следующими подгруппами',
+                        subgroupsWithMyCount
+                    );
                 }
             }
         }
@@ -144,13 +150,13 @@ const main = async () => {
         if (totalGroups.length === 0) {
             totalGroups = findedGroups;
         } else {
-            totalGroups = totalGroups.filter(group => {
+            totalGroups = totalGroups.filter((group) => {
                 return findedGroups.includes(group);
-            })
+            });
 
-            console.log('Значит остаются: ', totalGroups)
+            console.log('Значит остаются: ', totalGroups);
         }
     }
-}
+};
 
 main();

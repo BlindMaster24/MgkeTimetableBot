@@ -47,7 +47,7 @@ export function convertAbstractToVK(aKeyboard?: KeyboardBuilder): VKKeyboardBuil
                     label: button.text,
                     url: button.url,
                     payload: button.payload
-                })
+                });
             }
         }
 

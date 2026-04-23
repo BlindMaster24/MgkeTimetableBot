@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)ping$/i
+    public regexp = /^(!|\/)ping$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'ping',
@@ -10,6 +10,6 @@ export default class extends AbstractCommand {
     };
 
     handler({ context }: CmdHandlerParams) {
-        return context.send('pong')
+        return context.send('pong');
     }
 }

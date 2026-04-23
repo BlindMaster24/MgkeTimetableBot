@@ -1,18 +1,38 @@
 import {
-    Attributes, CreationAttributes, CreationOptional, DataTypes, InferAttributes,
-    InferCreationAttributes, Model, ModelDefined, ModelStatic, NonAttribute, NonNullFindOptions
+    Attributes,
+    CreationAttributes,
+    CreationOptional,
+    DataTypes,
+    InferAttributes,
+    InferCreationAttributes,
+    Model,
+    ModelDefined,
+    ModelStatic,
+    NonAttribute,
+    NonNullFindOptions
 } from 'sequelize';
 import { sequelize } from '../../../db';
 import { arrayUnique } from '../../../utils';
 import { BotServiceName } from '../abstract';
-import { AbstractServiceChat, IAbstractServiceChatAttributes, IAbstractServiceChatCreationAttributes } from './Abstract';
+import {
+    AbstractServiceChat,
+    IAbstractServiceChatAttributes,
+    IAbstractServiceChatCreationAttributes
+} from './Abstract';
 import { AliasRecords, LessonAlias } from './LessonAlias';
 
 export type ChatMode = 'student' | 'teacher' | 'parent' | 'guest';
 const SEARCH_HISTORY_LENGTH: number = 3;
 
-class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes<BotChat<T>>, InferCreationAttributes<BotChat<T>>> {
-    public static async findByServicePeerId<T extends AbstractServiceChat = any>(model: ModelStatic<T>, peerId: string | number, creationDefaults?: Partial<CreationAttributes<BotChat>>): Promise<BotChat<T>> {
+class BotChat<T extends AbstractServiceChat = any> extends Model<
+    InferAttributes<BotChat<T>>,
+    InferCreationAttributes<BotChat<T>>
+> {
+    public static async findByServicePeerId<T extends AbstractServiceChat = any>(
+        model: ModelStatic<T>,
+        peerId: string | number,
+        creationDefaults?: Partial<CreationAttributes<BotChat>>
+    ): Promise<BotChat<T>> {
         const findOptions: NonNullFindOptions<Attributes<BotChat<T>>> = {
             where: {
                 [`$${model.name}.peerId$`]: peerId
@@ -22,7 +42,7 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
                 required: true
             },
             rejectOnEmpty: false
-        }
+        };
 
         const chat = await this.findOne<BotChat<T>>(findOptions);
         if (!chat && creationDefaults) {
@@ -30,7 +50,7 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
 
             return createdChat;
         } else if (!chat) {
-            throw new Error('Chat not found')
+            throw new Error('Chat not found');
         }
 
         chat.serviceChat = (chat as any)[model.name];
@@ -38,21 +58,31 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
         return chat;
     }
 
-    private static _createChat<T extends AbstractServiceChat = any>(model: ModelDefined<IAbstractServiceChatAttributes, IAbstractServiceChatCreationAttributes>, peerId: string | number, creationDefaults: Partial<CreationAttributes<BotChat>>): Promise<BotChat<T>> {
+    private static _createChat<T extends AbstractServiceChat = any>(
+        model: ModelDefined<IAbstractServiceChatAttributes, IAbstractServiceChatCreationAttributes>,
+        peerId: string | number,
+        creationDefaults: Partial<CreationAttributes<BotChat>>
+    ): Promise<BotChat<T>> {
         return sequelize.transaction(async (transaction) => {
-            const chat = await this.create({
-                ...creationDefaults,
-                service: (model as any).service
-            }, {
-                transaction
-            });
+            const chat = await this.create(
+                {
+                    ...creationDefaults,
+                    service: (model as any).service
+                },
+                {
+                    transaction
+                }
+            );
 
-            const serviceChat = await model.create({
-                chatId: chat.id,
-                peerId: peerId
-            }, {
-                transaction
-            });
+            const serviceChat = await model.create(
+                {
+                    chatId: chat.id,
+                    peerId: peerId
+                },
+                {
+                    transaction
+                }
+            );
 
             chat.serviceChat = serviceChat as any;
 
@@ -186,7 +216,7 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
     /**
      * Отключить проверку по текущему режиму для оповещений о добавлении дней.
      * Если указана группа/преподаватель, то будут всё равно приходить оповещения, даже если не выбран режим
-    */
+     */
     declare deactivateSecondaryCheck: CreationOptional<boolean>;
 
     declare serviceChat: NonAttribute<T>;
@@ -235,235 +265,236 @@ class BotChat<T extends AbstractServiceChat = any> extends Model<InferAttributes
     // }
 }
 
-BotChat.init({
-    id: {
-        type: DataTypes.INTEGER, //todo
-        primaryKey: true,
-        autoIncrement: true
-    },
-    // primaryId: {
-    //     type: DataTypes.INTEGER,
-    //     primaryKey: true,
-    //     autoIncrement: true
-    // },
-    service: {
-        type: DataTypes.ENUM<BotServiceName>('vk', 'viber', 'tg'),
-        allowNull: false
-    },
-    // id: {
-    //     type: DataTypes.INTEGER, //todo
-    //     allowNull: false
-    // },
-    accepted: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    ref: DataTypes.STRING,
-    scene: DataTypes.STRING,
-    mode: DataTypes.ENUM('student', 'teacher', 'parent', 'guest'),
-    group: DataTypes.STRING,
-    teacher: DataTypes.STRING,
-    googleEmail: DataTypes.STRING,
-    showAbout: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    showDaily: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    showWeekly: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    showCalls: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    showFastGroup: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    showFastTeacher: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    hidePastDays: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    deleteLastMsg: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    lastMsgId: {
-        type: DataTypes.INTEGER,
-        allowNull: true
-    },
-    lastMsgTime: {
-        type: DataTypes.BIGINT,
-        defaultValue: 0
-    },
-    deleteUserMsg: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    allowSendMess: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    subscribeDistribution: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    noticeChanges: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    noticeNextWeek: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    noticeCalls: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    noticeParserErrors: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    needUpdateButtons: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    showParserTime: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    showHints: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    diffEnabled: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    diffAutoInWeek: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    diffAutoInUpdates: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    diffShowBeforeAfter: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: true
-    },
-    diffMaxLines: {
-        type: DataTypes.INTEGER,
-        defaultValue: 20
-    },
-    historyGroup: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: '[]',
+BotChat.init(
+    {
+        id: {
+            type: DataTypes.INTEGER, //todo
+            primaryKey: true,
+            autoIncrement: true
+        },
+        // primaryId: {
+        //     type: DataTypes.INTEGER,
+        //     primaryKey: true,
+        //     autoIncrement: true
+        // },
+        service: {
+            type: DataTypes.ENUM<BotServiceName>('vk', 'viber', 'tg'),
+            allowNull: false
+        },
+        // id: {
+        //     type: DataTypes.INTEGER, //todo
+        //     allowNull: false
+        // },
+        accepted: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        ref: DataTypes.STRING,
+        scene: DataTypes.STRING,
+        mode: DataTypes.ENUM('student', 'teacher', 'parent', 'guest'),
+        group: DataTypes.STRING,
+        teacher: DataTypes.STRING,
+        googleEmail: DataTypes.STRING,
+        showAbout: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        showDaily: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        showWeekly: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        showCalls: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        showFastGroup: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        showFastTeacher: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        hidePastDays: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        deleteLastMsg: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        lastMsgId: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
+        lastMsgTime: {
+            type: DataTypes.BIGINT,
+            defaultValue: 0
+        },
+        deleteUserMsg: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        allowSendMess: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        subscribeDistribution: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        noticeChanges: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        noticeNextWeek: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        noticeCalls: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        noticeParserErrors: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        needUpdateButtons: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        showParserTime: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        showHints: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        diffEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        diffAutoInWeek: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        diffAutoInUpdates: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        diffShowBeforeAfter: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: true
+        },
+        diffMaxLines: {
+            type: DataTypes.INTEGER,
+            defaultValue: 20
+        },
+        historyGroup: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: '[]',
 
-        get() {
-            try {
-                return JSON.parse(this.getDataValue('historyGroup') as any)
-                    .slice(0, SEARCH_HISTORY_LENGTH);
-            } catch (e) {
-                return [];
+            get() {
+                try {
+                    return JSON.parse(this.getDataValue('historyGroup') as any).slice(0, SEARCH_HISTORY_LENGTH);
+                } catch (e) {
+                    return [];
+                }
+            },
+
+            set(value: string[]) {
+                const str = JSON.stringify(arrayUnique(value).slice(0, SEARCH_HISTORY_LENGTH));
+                this.setDataValue('historyGroup', str as any);
             }
         },
+        historyTeacher: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: '[]',
 
-        set(value: string[]) {
-            const str = JSON.stringify(arrayUnique(value).slice(0, SEARCH_HISTORY_LENGTH));
-            this.setDataValue('historyGroup', str as any);
-        },
-    },
-    historyTeacher: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: '[]',
+            get() {
+                try {
+                    return JSON.parse(this.getDataValue('historyTeacher') as any).slice(0, SEARCH_HISTORY_LENGTH);
+                } catch (e) {
+                    return [];
+                }
+            },
 
-        get() {
-            try {
-                return JSON.parse(this.getDataValue('historyTeacher') as any)
-                    .slice(0, SEARCH_HISTORY_LENGTH);
-            } catch (e) {
-                return [];
+            set(value: string[]) {
+                const str = JSON.stringify(arrayUnique(value).slice(0, SEARCH_HISTORY_LENGTH));
+                this.setDataValue('historyTeacher', str as any);
             }
         },
-
-        set(value: string[]) {
-            const str = JSON.stringify(arrayUnique(value).slice(0, SEARCH_HISTORY_LENGTH));
-            this.setDataValue('historyTeacher', str as any);
+        scheduleFormatter: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0
         },
-    },
-    scheduleFormatter: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0
-    },
-    eula: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    deactivateSecondaryCheck: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    }
-}, {
-    sequelize: sequelize,
-    tableName: 'bot_chats',
-    indexes: [
-        {
-            fields: ['service', 'id'],
-            unique: true
+        eula: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
         },
-        {
-            fields: ['service']
-        },
-        {
-            fields: ['service', 'accepted', 'allowSendMess']
-        },
-        {
-            fields: ['mode', 'group']
-        },
-        {
-            fields: ['service', 'mode', 'group']
-        },
-        {
-            fields: ['mode', 'teacher']
-        },
-        {
-            fields: ['service', 'mode', 'teacher']
-        },
-        {
-            fields: ['accepted', 'allowSendMess'],
-        },
-        {
-            fields: ['subscribeDistribution']
-        },
-        {
-            fields: ['noticeChanges']
-        },
-        {
-            fields: ['noticeNextWeek']
-        },
-        {
-            fields: ['deactivateSecondaryCheck']
+        deactivateSecondaryCheck: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
         }
-    ]
-});
+    },
+    {
+        sequelize: sequelize,
+        tableName: 'bot_chats',
+        indexes: [
+            {
+                fields: ['service', 'id'],
+                unique: true
+            },
+            {
+                fields: ['service']
+            },
+            {
+                fields: ['service', 'accepted', 'allowSendMess']
+            },
+            {
+                fields: ['mode', 'group']
+            },
+            {
+                fields: ['service', 'mode', 'group']
+            },
+            {
+                fields: ['mode', 'teacher']
+            },
+            {
+                fields: ['service', 'mode', 'teacher']
+            },
+            {
+                fields: ['accepted', 'allowSendMess']
+            },
+            {
+                fields: ['subscribeDistribution']
+            },
+            {
+                fields: ['noticeChanges']
+            },
+            {
+                fields: ['noticeNextWeek']
+            },
+            {
+                fields: ['deactivateSecondaryCheck']
+            }
+        ]
+    }
+);
 
 export { BotChat };
 
 export async function ensureBotChatSchema() {
     const queryInterface = sequelize.getQueryInterface();
     const table = await queryInterface.describeTable('bot_chats');
-    const indexes = await queryInterface.showIndex('bot_chats') as any[];
+    const indexes = (await queryInterface.showIndex('bot_chats')) as any[];
     const hasIndex = (name: string) => indexes.some((index: any) => index.name === name);
 
     if (!('noticeCalls' in table)) {
@@ -527,4 +558,3 @@ export async function ensureBotChatSchema() {
         });
     }
 }
-

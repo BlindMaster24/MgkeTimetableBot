@@ -6,16 +6,19 @@ export enum KeyboardColor {
 }
 
 export type KeyboardButton = {
-    type?: ButtonType,
-    text: string,
-    payload?: any,
-    color?: KeyboardColor
-} & ({
-    type?: ButtonType.Text | ButtonType.Callback,
-} | {
-    type: ButtonType.Url,
-    url: string
-})
+    type?: ButtonType;
+    text: string;
+    payload?: any;
+    color?: KeyboardColor;
+} & (
+    | {
+          type?: ButtonType.Text | ButtonType.Callback;
+      }
+    | {
+          type: ButtonType.Url;
+          url: string;
+      }
+);
 
 export enum ButtonType {
     Text,
@@ -38,24 +41,24 @@ export class KeyboardBuilder {
 
     public add(button: KeyboardButton) {
         if (!button.type) {
-            button.type = ButtonType.Text
+            button.type = ButtonType.Text;
         }
 
         let index = this.buttons.length - 1;
 
         if (index == -1) {
-            index++
+            index++;
             this.buttons[index] = [];
         }
 
         this.buttons[index].push(button);
 
-        return this
+        return this;
     }
 
     public row() {
         this.buttons.push([]);
-        return this
+        return this;
     }
 
     public inline(value: boolean) {

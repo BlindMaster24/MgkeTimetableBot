@@ -1,7 +1,7 @@
 import { Credentials } from 'google-auth-library';
 import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes, Model } from 'sequelize';
-import { sequelize } from "../../../db";
-import { GoogleUserApi } from "../api";
+import { sequelize } from '../../../db';
+import { GoogleUserApi } from '../api';
 import { BotChat } from '../../bots/chat';
 
 class GoogleUser extends Model<InferAttributes<GoogleUser>, InferCreationAttributes<GoogleUser>> {
@@ -18,7 +18,7 @@ class GoogleUser extends Model<InferAttributes<GoogleUser>, InferCreationAttribu
             refreshToken: credentials.refresh_token ?? undefined,
             accessToken: credentials.access_token ?? undefined,
             accessTokenExpires: credentials.expiry_date ?? undefined
-        }).then(res => res[0]);
+        }).then((res) => res[0]);
         // return this.findOrCreate({
         //     defaults: ,
         //     where: { email },
@@ -36,11 +36,14 @@ class GoogleUser extends Model<InferAttributes<GoogleUser>, InferCreationAttribu
 
     public getApi() {
         if (!this._api) {
-            this._api = new GoogleUserApi({
-                refresh_token: this.refreshToken,
-                access_token: this.accessToken,
-                expiry_date: this.accessTokenExpires
-            }, this.updateCredentials.bind(this));
+            this._api = new GoogleUserApi(
+                {
+                    refresh_token: this.refreshToken,
+                    access_token: this.accessToken,
+                    expiry_date: this.accessTokenExpires
+                },
+                this.updateCredentials.bind(this)
+            );
         }
 
         return this._api;
@@ -55,36 +58,39 @@ class GoogleUser extends Model<InferAttributes<GoogleUser>, InferCreationAttribu
     }
 }
 
-GoogleUser.init({
-    id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-    },
-    email: {
-        type: DataTypes.STRING,
-        unique: true,
-        validate: {
-            isEmail: true
+GoogleUser.init(
+    {
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
         },
-        allowNull: false
+        email: {
+            type: DataTypes.STRING,
+            unique: true,
+            validate: {
+                isEmail: true
+            },
+            allowNull: false
+        },
+        refreshToken: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        accessToken: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        accessTokenExpires: {
+            type: DataTypes.STRING,
+            allowNull: true
+        }
     },
-    refreshToken: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    accessToken: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    accessTokenExpires: {
-        type: DataTypes.STRING,
-        allowNull: true
+    {
+        sequelize: sequelize,
+        tableName: 'google_accounts'
     }
-}, {
-    sequelize: sequelize,
-    tableName: 'google_accounts'
-});
+);
 
 // GoogleUser.belongsTo(BotChat, {
 //     foreignKey: 'email',

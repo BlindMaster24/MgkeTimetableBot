@@ -1,3 +1,3 @@
 export interface Team {
-    [short: string]: string
+    [short: string]: string;
 }

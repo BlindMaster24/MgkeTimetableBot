@@ -1,17 +1,16 @@
-import { existsSync, readFileSync } from "fs";
-import path from "path";
+import { existsSync, readFileSync } from 'fs';
+import path from 'path';
 
 const filePath: string = path.join(__dirname, './../../subjects.csv');
 
-
 type Subjects = {
     subjectsByShort: {
-        [key: string]: string
-    },
+        [key: string]: string;
+    };
     subjectsByFull: {
-        [key: string]: string
-    }
-}
+        [key: string]: string;
+    };
+};
 function getSubjectsList(): Subjects {
     if (!existsSync(filePath)) {
         return {
@@ -22,26 +21,30 @@ function getSubjectsList(): Subjects {
 
     const file = readFileSync(filePath, 'utf8');
 
-    const byShort = Object.fromEntries(file.split('\n').map((line) => {
-        line = line.trim();
+    const byShort = Object.fromEntries(
+        file.split('\n').map((line) => {
+            line = line.trim();
 
-        const parts = line.split(';', 2);
+            const parts = line.split(';', 2);
 
-        return parts.reverse();
-    }));
+            return parts.reverse();
+        })
+    );
 
-    const byFull = Object.fromEntries(file.split('\n').map((line) => {
-        line = line.trim();
+    const byFull = Object.fromEntries(
+        file.split('\n').map((line) => {
+            line = line.trim();
 
-        const parts = line.split(';', 2);
+            const parts = line.split(';', 2);
 
-        return parts;
-    }));
+            return parts;
+        })
+    );
 
     return {
         subjectsByShort: byShort,
         subjectsByFull: byFull
-    }
+    };
 }
 
 const { subjectsByFull, subjectsByShort } = getSubjectsList();

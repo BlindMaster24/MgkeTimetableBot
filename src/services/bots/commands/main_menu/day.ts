@@ -1,11 +1,11 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { getDayRasp, randArray } from "../../../../utils";
+import { getDayRasp, randArray } from '../../../../utils';
 import { raspCache } from '../../../parser';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 import { StaticKeyboard } from '../../keyboard';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)(get)?(rasp)?day|(📄\s)?(расписание\s)?на день)$/i
+    public regexp = /^((!|\/)(get)?(rasp)?day|(📄\s)?(расписание\s)?на день)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'day',
@@ -15,7 +15,10 @@ export default class extends AbstractCommand {
     async handler(params: CmdHandlerParams) {
         const { context, chat } = params;
 
-        if (Object.keys(raspCache.groups.timetable).length == 0 && Object.keys(raspCache.teachers.timetable).length == 0) {
+        if (
+            Object.keys(raspCache.groups.timetable).length == 0 &&
+            Object.keys(raspCache.teachers.timetable).length == 0
+        ) {
             return context.send('Данные с сервера ещё не загружены, ожидайте...');
         }
 
@@ -29,55 +32,56 @@ export default class extends AbstractCommand {
 
     private async groupRasp({ chat, context, actions, formatter }: CmdHandlerParams) {
         if (chat.group == null) {
-            const randGroup = randArray(Object.keys(raspCache.groups.timetable))
+            const randGroup = randArray(Object.keys(raspCache.groups.timetable));
 
             return context.send(
                 'Ваша учебная группа не выбрана\n\n' +
-                'Выбрать группу можно командой /setGroup <group>\n' +
-                'Пример:\n' +
-                `/setGroup ${randGroup}`
-            )
+                    'Выбрать группу можно командой /setGroup <group>\n' +
+                    'Пример:\n' +
+                    `/setGroup ${randGroup}`
+            );
         }
 
-        const rasp = raspCache.groups.timetable[chat.group]
+        const rasp = raspCache.groups.timetable[chat.group];
         if (rasp === undefined) return context.send('Данной учебной группы не существует');
 
-        actions.deleteLastMsg()
+        actions.deleteLastMsg();
 
         const message = formatter.formatGroupFull(String(chat.group), {
             days: getDayRasp(rasp.days)
-        })
+        });
 
-        actions.deleteUserMsg()
+        actions.deleteUserMsg();
 
-        return context.send(message).then(context => actions.handlerLastMsgUpdate(context))
+        return context.send(message).then((context) => actions.handlerLastMsgUpdate(context));
     }
 
     private async teacherRasp({ chat, context, actions, formatter }: CmdHandlerParams) {
         if (chat.teacher == null) {
-            const randTeacher = randArray(Object.keys(raspCache.teachers.timetable))
+            const randTeacher = randArray(Object.keys(raspCache.teachers.timetable));
 
             return context.send(
                 'Имя преподавателя не выбрано\n\n' +
-                'Выбрать преподвателя можно командой /setTeacher <teacher>\n' +
-                'Пример:\n' +
-                `/setTeacher ${randTeacher}`
-            )
+                    'Выбрать преподвателя можно командой /setTeacher <teacher>\n' +
+                    'Пример:\n' +
+                    `/setTeacher ${randTeacher}`
+            );
         }
 
-        if (Object.keys(raspCache.teachers.timetable).length == 0) return context.send('Данные с сервера ещё не загружены, ожидайте...')
+        if (Object.keys(raspCache.teachers.timetable).length == 0)
+            return context.send('Данные с сервера ещё не загружены, ожидайте...');
 
-        const rasp = raspCache.teachers.timetable[chat.teacher]
+        const rasp = raspCache.teachers.timetable[chat.teacher];
         if (rasp === undefined) return context.send('Ничего не найдено');
 
-        actions.deleteLastMsg()
+        actions.deleteLastMsg();
 
         const message = formatter.formatTeacherFull(chat.teacher, {
             days: getDayRasp(rasp.days)
-        })
+        });
 
-        actions.deleteUserMsg()
+        actions.deleteUserMsg();
 
-        return context.send(message).then(context => actions.handlerLastMsgUpdate(context))
+        return context.send(message).then((context) => actions.handlerLastMsgUpdate(context));
     }
 }

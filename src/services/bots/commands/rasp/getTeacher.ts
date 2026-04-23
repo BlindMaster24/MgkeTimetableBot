@@ -1,10 +1,10 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { StringDate, WeekIndex, getDayRasp, randArray } from "../../../../utils";
-import { ImageFile } from "../../../image/builder";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams, MessageOptions } from "../../abstract";
-import { InputInitiator } from "../../input";
-import { StaticKeyboard, withCancelButton } from "../../keyboard";
+import { StringDate, WeekIndex, getDayRasp, randArray } from '../../../../utils';
+import { ImageFile } from '../../../image/builder';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams, MessageOptions } from '../../abstract';
+import { InputInitiator } from '../../input';
+import { StaticKeyboard, withCancelButton } from '../../keyboard';
 
 export default class GetTeacherCommand extends AbstractCommand {
     public regexp = {
@@ -41,13 +41,15 @@ export default class GetTeacherCommand extends AbstractCommand {
         if (teacher == '' || teacher == undefined || teacher.length < 3) {
             const randTeacher = randArray(Object.keys(raspCache.teachers.timetable));
 
-            teacher = await context.input(this.buildTeacherPrompt(keyboard, randTeacher), {
-                keyboard: withCancelButton(keyboard.TeacherHistory)
-            }).then<string | undefined>(value => {
-                initiator = value?.initiator;
+            teacher = await context
+                .input(this.buildTeacherPrompt(keyboard, randTeacher), {
+                    keyboard: withCancelButton(keyboard.TeacherHistory)
+                })
+                .then<string | undefined>((value) => {
+                    initiator = value?.initiator;
 
-                return value?.text;
-            });
+                    return value?.text;
+                });
         }
 
         while (true) {
@@ -55,7 +57,7 @@ export default class GetTeacherCommand extends AbstractCommand {
 
             if (!teacher) {
                 if (teacher === undefined) {
-                    teacher = await context.waitInput().then<string | undefined>(value => {
+                    teacher = await context.waitInput().then<string | undefined>((value) => {
                         initiator = value?.initiator;
 
                         return value?.text;
@@ -95,7 +97,7 @@ export default class GetTeacherCommand extends AbstractCommand {
 
         const options: MessageOptions = {
             keyboard: StaticKeyboard.GetWeekTimetable({ type: 'teacher', value: teacher })
-        }
+        };
 
         if (initiator === 'callback') {
             return context.editOrSend(message, options);
@@ -104,13 +106,19 @@ export default class GetTeacherCommand extends AbstractCommand {
         return context.send(message, options);
     }
 
-    private async sendWeek(teacher: string, initiator: InputInitiator, { context, keyboard, formatter }: CmdHandlerParams) {
-        const requested = await context.input('Введите номер учебной недели или дату (дд.мм или дд.мм.гггг)', {
-            keyboard: withCancelButton(keyboard.TeacherHistory)
-        }).then<string | undefined>(value => {
-            initiator = value?.initiator;
-            return value?.text;
-        });
+    private async sendWeek(
+        teacher: string,
+        initiator: InputInitiator,
+        { context, keyboard, formatter }: CmdHandlerParams
+    ) {
+        const requested = await context
+            .input('Введите номер учебной недели или дату (дд.мм или дд.мм.гггг)', {
+                keyboard: withCancelButton(keyboard.TeacherHistory)
+            })
+            .then<string | undefined>((value) => {
+                initiator = value?.initiator;
+                return value?.text;
+            });
 
         const weekIndex = this.parseWeekIndex(requested);
         if (!weekIndex) {
@@ -134,7 +142,7 @@ export default class GetTeacherCommand extends AbstractCommand {
 
         const options: MessageOptions = {
             keyboard: await keyboard.WeekControl('teacher', teacher, weekIndex.valueOf(), false)
-        }
+        };
 
         if (initiator === 'callback') {
             return context.editOrSend(message, options);

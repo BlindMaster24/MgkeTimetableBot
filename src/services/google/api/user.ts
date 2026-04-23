@@ -9,16 +9,14 @@ export class GoogleUserApi {
 
     public static createAuth(): OAuth2Client {
         return new google.auth.OAuth2(
-            config.google.oauth.clientId, config.google.oauth.clientSecret,
+            config.google.oauth.clientId,
+            config.google.oauth.clientSecret,
             'https://' + config.google.redirectDomain + config.google.url
         );
     }
 
     public static _requiredScopes() {
-        return [
-            'https://www.googleapis.com/auth/calendar',
-            'https://www.googleapis.com/auth/userinfo.email'
-        ];
+        return ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/userinfo.email'];
     }
 
     public static getAuthUrl(state?: any): string {

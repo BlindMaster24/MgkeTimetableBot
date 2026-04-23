@@ -1,8 +1,8 @@
-import { ContextDefaultState, MessageContext } from "vk-io";
-import { VkBot } from ".";
-import { AbstractAction, AbstractCommandContext } from "../abstract";
-import { BotChat } from "../chat";
-import { VkCommandContext } from "./context";
+import { ContextDefaultState, MessageContext } from 'vk-io';
+import { VkBot } from '.';
+import { AbstractAction, AbstractCommandContext } from '../abstract';
+import { BotChat } from '../chat';
+import { VkCommandContext } from './context';
 
 export class VkBotAction extends AbstractAction {
     protected context: MessageContext<ContextDefaultState>;
@@ -26,9 +26,9 @@ export class VkBotAction extends AbstractAction {
                 conversation_message_ids: this.chat.lastMsgId as number,
                 peer_id: this.context.peerId,
                 delete_for_all: 1
-            })
+            });
         } catch (err: any) {
-            console.error('actionDeleteLastMsg', err, this.context)
+            console.error('actionDeleteLastMsg', err, this.context);
             return false;
         }
 
@@ -45,23 +45,25 @@ export class VkBotAction extends AbstractAction {
                 conversation_message_ids: this.context.conversationMessageId,
                 delete_for_all: 1,
                 peer_id: this.context.peerId
-            })
+            });
         } catch (err: any) {
             if (err.code == 15) {
                 if (err.message.includes('(admin message)')) return false;
 
-                if (!await this._context.isChatAdmin()) {
+                if (!(await this._context.isChatAdmin())) {
                     this.chat.deleteUserMsg = false;
-                    await this.context.send('Удаление сообщений при нажатии кнопки выключено.\nПричина: нет прав администратора')
-                    return false
+                    await this.context.send(
+                        'Удаление сообщений при нажатии кнопки выключено.\nПричина: нет прав администратора'
+                    );
+                    return false;
                 }
 
-                console.error('actionDeleteUserMsg_1', err, this.context)
+                console.error('actionDeleteUserMsg_1', err, this.context);
 
                 return false;
             }
 
-            console.error('actionDeleteUserMsg_2', err, this.context)
+            console.error('actionDeleteUserMsg_2', err, this.context);
             return false;
         }
 

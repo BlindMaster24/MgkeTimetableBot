@@ -1,6 +1,6 @@
-import { IContext, Reply } from "@keller18306/yandex-dialogs-sdk";
-import { AliceSkill } from "../skill";
-import { AliceUser } from "../user";
+import { IContext, Reply } from '@keller18306/yandex-dialogs-sdk';
+import { AliceSkill } from '../skill';
+import { AliceUser } from '../user';
 
 export default class extends AliceSkill {
     public id: string = 'about';
@@ -20,8 +20,8 @@ export default class extends AliceSkill {
             'Алексей, вам слово.'
         ].join('\n');
 
-        return Reply.text(text.replace(/\+/ig, ''), {
+        return Reply.text(text.replace(/\+/gi, ''), {
             tts: text
-        })
+        });
     }
 }

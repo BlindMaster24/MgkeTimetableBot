@@ -1,23 +1,23 @@
 import { IContext } from '@keller18306/yandex-dialogs-sdk';
 import { readdirSync } from 'fs';
 import path from 'path';
-import { AliceSkill } from "./skill";
+import { AliceSkill } from './skill';
 import { App } from '../../app';
 
 export class SkillController {
     private skills: {
-        [id: string]: AliceSkill
+        [id: string]: AliceSkill;
     } = {};
 
     constructor(private app: App) {}
 
     public loadSkills() {
-        const cmdsPath = path.join(__dirname, 'skills')
+        const cmdsPath = path.join(__dirname, 'skills');
 
-        const dir = readdirSync(cmdsPath)
+        const dir = readdirSync(cmdsPath);
 
         for (const file of dir) {
-            const { default: skillClass } = require(path.join(cmdsPath, file))
+            const { default: skillClass } = require(path.join(cmdsPath, file));
             if (skillClass == undefined) {
                 continue;
             }
@@ -34,12 +34,12 @@ export class SkillController {
             this.skills[skill.id] = skill;
         }
 
-        console.log(`[Alice] Loaded ${Object.keys(this.skills).length} skills`)
+        console.log(`[Alice] Loaded ${Object.keys(this.skills).length} skills`);
 
-        return this.skills
+        return this.skills;
     }
 
-    public matchSkill(ctx: IContext): { skill: AliceSkill, match: any } | false {
+    public matchSkill(ctx: IContext): { skill: AliceSkill; match: any } | false {
         for (const id in this.skills) {
             const skill: AliceSkill = this.skills[id];
 

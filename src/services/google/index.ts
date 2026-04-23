@@ -15,12 +15,14 @@ import { GoogleCalendarController } from './controller';
 import { CalendarItem } from './models/calendar';
 import { GoogleUser } from './models/user';
 
-type AuthState = {
-    service: 'test'
-} | {
-    service: BotServiceName,
-    peerId: string | number
-}
+type AuthState =
+    | {
+          service: 'test';
+      }
+    | {
+          service: BotServiceName;
+          peerId: string | number;
+      };
 
 export class GoogleService implements AppService {
     public readonly api: GoogleServiceApi;
@@ -39,29 +41,38 @@ export class GoogleService implements AppService {
     public run() {
         const server = this.app.getService('http').getServer();
 
-        server.get(config.google.url, expressAsyncHandler((req, res) => {
-            const requestId = req.header('x-request-id') || newTraceId();
-            return runWithLogContext({
-            traceId: requestId,
-            requestId,
-            service: 'google',
-            event: 'http_request',
-            path: req.path,
-            method: req.method
-            }, () => this.oauth(req, res));
-        }));
+        server.get(
+            config.google.url,
+            expressAsyncHandler((req, res) => {
+                const requestId = req.header('x-request-id') || newTraceId();
+                return runWithLogContext(
+                    {
+                        traceId: requestId,
+                        requestId,
+                        service: 'google',
+                        event: 'http_request',
+                        path: req.path,
+                        method: req.method
+                    },
+                    () => this.oauth(req, res)
+                );
+            })
+        );
 
         if (config.dev) {
             server.get('/google/link', (req, res) => {
                 const requestId = req.header('x-request-id') || newTraceId();
-                return runWithLogContext({
-                traceId: requestId,
-                requestId,
-                service: 'google',
-                event: 'http_request',
-                path: req.path,
-                method: req.method
-                }, () => this.link(req, res));
+                return runWithLogContext(
+                    {
+                        traceId: requestId,
+                        requestId,
+                        service: 'google',
+                        event: 'http_request',
+                        path: req.path,
+                        method: req.method
+                    },
+                    () => this.link(req, res)
+                );
             });
         }
 
@@ -77,27 +88,33 @@ export class GoogleService implements AppService {
     }
 
     private async oauth(request: Request<any, any, any, Partial<{ code: string }>>, response: Response): Promise<void> {
-        const result = z.object({
-            code: z.string({
-                error: 'Auth code not provided'
-            }).min(1, {
-                message: 'Auth code not provided'
-            }),
-            state: z.string({
-                error: 'State not provided'
-            }).transform((data: string, ctx) => {
-                try {
-                    return unserialize(data) as AuthState
-                } catch (e: any) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: e.toString()
+        const result = z
+            .object({
+                code: z
+                    .string({
+                        error: 'Auth code not provided'
                     })
+                    .min(1, {
+                        message: 'Auth code not provided'
+                    }),
+                state: z
+                    .string({
+                        error: 'State not provided'
+                    })
+                    .transform((data: string, ctx) => {
+                        try {
+                            return unserialize(data) as AuthState;
+                        } catch (e: any) {
+                            ctx.addIssue({
+                                code: z.ZodIssueCode.custom,
+                                message: e.toString()
+                            });
 
-                    return z.NEVER;
-                }
+                            return z.NEVER;
+                        }
+                    })
             })
-        }).safeParse(request.query);
+            .safeParse(request.query);
 
         if (!result.success) {
             response.status(StatusCode.ClientErrorBadRequest).send(fromZodError(result.error).toString());

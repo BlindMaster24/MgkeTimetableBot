@@ -1,12 +1,12 @@
 import Table2canvas, { IColumn } from '@keller18306/table2canvas';
-import { Canvas, CanvasRenderingContext2D, Image, loadImage } from "canvas";
-import { createHash } from "crypto";
-import { existsSync, mkdirSync } from "fs";
-import { readFile, writeFile } from "fs/promises";
-import path from "path";
-import { config } from "../../../config";
-import { StringDate } from "../../utils";
-import { GroupDay, GroupLessonExplain, TeacherDay } from "../parser/types";
+import { Canvas, CanvasRenderingContext2D, Image, loadImage } from 'canvas';
+import { createHash } from 'crypto';
+import { existsSync, mkdirSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
+import path from 'path';
+import { config } from '../../../config';
+import { StringDate } from '../../utils';
+import { GroupDay, GroupLessonExplain, TeacherDay } from '../parser/types';
 
 const groupColumns: IColumn[] = [
     {
@@ -67,15 +67,15 @@ export const cachePath: string = path.join(__dirname, './../../../cache/images/'
 const logo: Promise<Image> = loadImage(path.join(__dirname, './../../../public/mgke.png'));
 
 export type ImageFile = {
-    id: string,
-    data: () => Buffer | Promise<Buffer>
-}
+    id: string;
+    data: () => Buffer | Promise<Buffer>;
+};
 
 export class ImageBuilder {
     public static readonly CACHE_PATH: string = cachePath;
 
     private promises: {
-        [id: string]: Promise<ImageFile>
+        [id: string]: Promise<ImageFile>;
     } = {};
 
     public async getGroupImage(group: string | number, days: GroupDay[]): Promise<ImageFile> {
@@ -91,7 +91,7 @@ export class ImageBuilder {
                 return {
                     id: id,
                     data: () => {
-                        return readFile(filePath)
+                        return readFile(filePath);
                     }
                 };
             }
@@ -127,7 +127,7 @@ export class ImageBuilder {
                 return {
                     id: id,
                     data: () => {
-                        return readFile(filePath)
+                        return readFile(filePath);
                     }
                 };
             }
@@ -185,45 +185,55 @@ export class ImageBuilder {
     }
 
     private _generateCanvasListForGroup(days: GroupDay[]): Canvas[] {
-        const maxLessons: number = Math.max(3, ...days.map(_ => _.lessons.length));
+        const maxLessons: number = Math.max(3, ...days.map((_) => _.lessons.length));
         const canvasList: Canvas[] = [];
 
         for (const day of days) {
             const table = this._createTable2canvas(groupColumns, day);
 
             for (const i in day.lessons) {
-                const lesson = day.lessons[i]
+                const lesson = day.lessons[i];
                 if (!lesson) {
-                    table.appendData([{
-                        i: String(+i + 1)
-                    }]);
+                    table.appendData([
+                        {
+                            i: String(+i + 1)
+                        }
+                    ]);
 
                     continue;
                 }
 
-                const _lesson: GroupLessonExplain = Array.isArray(lesson) ? {
-                    lesson: lesson.map((_: GroupLessonExplain): string => {
-                        return `${_.subgroup}. ${_.lesson}`;
-                    }).join('\n'),
-                    type: lesson.map((_: GroupLessonExplain): string | null => _.type).join('\n'),
-                    cabinet: lesson.map((_: GroupLessonExplain): string => _.cabinet || '-').join('\n'),
-                    teacher: lesson.map((_: GroupLessonExplain): string | null => _.teacher).join('\n'),
-                    comment: null
-                } : lesson;
+                const _lesson: GroupLessonExplain = Array.isArray(lesson)
+                    ? {
+                          lesson: lesson
+                              .map((_: GroupLessonExplain): string => {
+                                  return `${_.subgroup}. ${_.lesson}`;
+                              })
+                              .join('\n'),
+                          type: lesson.map((_: GroupLessonExplain): string | null => _.type).join('\n'),
+                          cabinet: lesson.map((_: GroupLessonExplain): string => _.cabinet || '-').join('\n'),
+                          teacher: lesson.map((_: GroupLessonExplain): string | null => _.teacher).join('\n'),
+                          comment: null
+                      }
+                    : lesson;
 
-                table.appendData([{
-                    i: String(+i + 1),
-                    lesson: _lesson.lesson,
-                    type: _lesson.type,
-                    cabinet: _lesson.cabinet || '-',
-                    teacher: _lesson.teacher
-                }]);
+                table.appendData([
+                    {
+                        i: String(+i + 1),
+                        lesson: _lesson.lesson,
+                        type: _lesson.type,
+                        cabinet: _lesson.cabinet || '-',
+                        teacher: _lesson.teacher
+                    }
+                ]);
             }
 
             for (let i = day.lessons.length; i < maxLessons; i++) {
-                table.appendData([{
-                    i: String(i + 1)
-                }]);
+                table.appendData([
+                    {
+                        i: String(i + 1)
+                    }
+                ]);
             }
 
             canvasList.push(table.canvas);
@@ -233,34 +243,40 @@ export class ImageBuilder {
     }
 
     private _generateCanvasListForTeacher(days: TeacherDay[]): Canvas[] {
-        const maxLessons: number = Math.max(...days.map(_ => _.lessons.length));
+        const maxLessons: number = Math.max(...days.map((_) => _.lessons.length));
         const canvasList: Canvas[] = [];
 
         for (const day of days) {
             const table = this._createTable2canvas(teacherColumns, day);
 
             for (const i in day.lessons) {
-                const lesson = day.lessons[i]
+                const lesson = day.lessons[i];
                 if (!lesson) {
-                    table.appendData([{
-                        i: String(+i + 1)
-                    }]);
+                    table.appendData([
+                        {
+                            i: String(+i + 1)
+                        }
+                    ]);
                     continue;
                 }
 
-                table.appendData([{
-                    i: String(+i + 1),
-                    lesson: lesson.lesson,
-                    type: lesson.type,
-                    cabinet: lesson.cabinet || '-',
-                    group: (lesson.subgroup ? `${lesson.subgroup}. ` : '') + lesson.group
-                }]);
+                table.appendData([
+                    {
+                        i: String(+i + 1),
+                        lesson: lesson.lesson,
+                        type: lesson.type,
+                        cabinet: lesson.cabinet || '-',
+                        group: (lesson.subgroup ? `${lesson.subgroup}. ` : '') + lesson.group
+                    }
+                ]);
             }
 
             for (let i = day.lessons.length; i < maxLessons; i++) {
-                table.appendData([{
-                    i: String(i + 1)
-                }]);
+                table.appendData([
+                    {
+                        i: String(i + 1)
+                    }
+                ]);
             }
 
             canvasList.push(table.canvas);
@@ -276,8 +292,8 @@ export class ImageBuilder {
         const cells: number = 2;
         const rows: number = Math.ceil(canvasList.length / 2);
 
-        const width = maxWidth * cells
-        const height = (90 * this.devicePixelRatio) + maxHeight * rows
+        const width = maxWidth * cells;
+        const height = 90 * this.devicePixelRatio + maxHeight * rows;
 
         const canvas = new Canvas(width * this.devicePixelRatio, height * this.devicePixelRatio, 'image');
         const ctx: CanvasRenderingContext2D = canvas.getContext('2d', {
@@ -297,7 +313,7 @@ export class ImageBuilder {
         }
 
         ctx.fillStyle = 'gray';
-        const fontSize = 8 * this.devicePixelRatio
+        const fontSize = 8 * this.devicePixelRatio;
         ctx.font = `${fontSize}px sans-serif`;
         const paddingY = 9 * this.devicePixelRatio;
         const paddingX = 5 * this.devicePixelRatio;
@@ -308,9 +324,23 @@ export class ImageBuilder {
         ctx.fillText('VK: https://vk.com/mgke_slave', paddingX, height - fontSize - paddingY * 0);
 
         ctx.textAlign = 'right';
-        ctx.fillText(`Сгенерированно в: ${StringDate.now().toStringDateTime(true)}`, width - paddingX, height - fontSize - paddingY * 1)
-        ctx.fillText('Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы', width - paddingX, height - fontSize - paddingY * 0);
-        ctx.drawImage(await logo, 10 * this.devicePixelRatio, 10 * this.devicePixelRatio, 70 * this.devicePixelRatio, 70 * this.devicePixelRatio);
+        ctx.fillText(
+            `Сгенерированно в: ${StringDate.now().toStringDateTime(true)}`,
+            width - paddingX,
+            height - fontSize - paddingY * 1
+        );
+        ctx.fillText(
+            'Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы',
+            width - paddingX,
+            height - fontSize - paddingY * 0
+        );
+        ctx.drawImage(
+            await logo,
+            10 * this.devicePixelRatio,
+            10 * this.devicePixelRatio,
+            70 * this.devicePixelRatio,
+            70 * this.devicePixelRatio
+        );
 
         return { canvas, ctx, width, height };
     }

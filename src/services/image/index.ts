@@ -32,7 +32,9 @@ export class ImageService implements AppService {
             return response.status(StatusCode.ClientErrorForbidden).send('Invalid image signature');
         }
 
-        return response.status(StatusCode.SuccessOK).sendFile(path.join(ImageBuilder.CACHE_PATH, request.params.image + '.png'));
+        return response
+            .status(StatusCode.SuccessOK)
+            .sendFile(path.join(ImageBuilder.CACHE_PATH, request.params.image + '.png'));
     }
 
     private getImageSign(request: Request<{ image: string }>, response: Response) {

@@ -9,7 +9,7 @@ export class ApiKey extends AbstractKey {
         if (typeof id === 'number') id = BigInt(id);
         if (typeof iv === 'string') iv = Buffer.from(iv, 'base64url');
 
-        let buffer_writer = new WriteBuffer();
+        const buffer_writer = new WriteBuffer();
         this.createKeyHeader(buffer_writer);
 
         buffer_writer.writeBigUInt64BE(id);
@@ -17,14 +17,14 @@ export class ApiKey extends AbstractKey {
         return this.finallyEncrypt(buffer_writer, iv);
     }
 
-    public parseKey(encoded: string): { id: bigint, iv: Buffer } {
+    public parseKey(encoded: string): { id: bigint; iv: Buffer } {
         const buffer = this.finallyDecrypt(encoded);
         this.keyHeader(buffer);
 
         return {
             id: buffer.readBigUInt64BE(),
             iv: this._iv!
-        }
+        };
     }
 
     public createIV(): Buffer {

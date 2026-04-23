@@ -1,5 +1,5 @@
-import { GroupLessonExplain, TeacherLessonExplain } from "../services/parser/types";
-import { GroupLessonOptions, ScheduleFormatter } from "./abstract";
+import { GroupLessonExplain, TeacherLessonExplain } from '../services/parser/types';
+import { GroupLessonOptions, ScheduleFormatter } from './abstract';
 
 export class VisualScheduleFormatter extends ScheduleFormatter {
     public static readonly label: string = '🌈 Визуальный';
@@ -12,7 +12,10 @@ export class VisualScheduleFormatter extends ScheduleFormatter {
         }
 
         if (options.showLesson) {
-            line.push(this.Lesson(this.getLessonAlias(lesson.lesson)) + ((options.showType && lesson.type) ? this.Type(lesson.type) : ''));
+            line.push(
+                this.Lesson(this.getLessonAlias(lesson.lesson)) +
+                    (options.showType && lesson.type ? this.Type(lesson.type) : '')
+            );
         }
 
         if (options.showTeacher && lesson.teacher) {
@@ -53,14 +56,12 @@ export class VisualScheduleFormatter extends ScheduleFormatter {
     }
 
     protected formatLessonHeader(header: string, mainLessons: string, withSubgroups: boolean): string {
-        const line: string[] = [
-            header
-        ];
+        const line: string[] = [header];
 
         if (mainLessons) {
             line.push(mainLessons);
             if (withSubgroups) {
-                line.push('')
+                line.push('');
             }
         }
 
@@ -94,7 +95,7 @@ export class VisualScheduleFormatter extends ScheduleFormatter {
     }
 
     protected Subgroup(subgroup: string): string {
-        return `    🎒 Подгруппа ${subgroup}:`
+        return `    🎒 Подгруппа ${subgroup}:`;
     }
 
     protected Lesson(lesson: string): string {
@@ -126,9 +127,7 @@ export class VisualScheduleFormatter extends ScheduleFormatter {
     }
 
     private getSmileNumber(index: number): string {
-        return [
-            '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'
-        ][index];
+        return ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index];
     }
 
     protected NoTimetable(): string {

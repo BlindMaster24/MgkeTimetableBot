@@ -1,6 +1,6 @@
-import { IContext, Reply } from "@keller18306/yandex-dialogs-sdk";
-import { AliceSkill } from "../skill";
-import { AliceUser } from "../user";
+import { IContext, Reply } from '@keller18306/yandex-dialogs-sdk';
+import { AliceSkill } from '../skill';
+import { AliceUser } from '../user';
 
 export default class extends AliceSkill {
     public id: string = 'ping';
@@ -9,7 +9,7 @@ export default class extends AliceSkill {
         return /ping|пинг/i.test(ctx.message);
     }
 
-    public controller(ctx: IContext, user: AliceUser) { 
-        return Reply.text('pong')
+    public controller(ctx: IContext, user: AliceUser) {
+        return Reply.text('pong');
     }
 }

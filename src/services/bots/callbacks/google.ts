@@ -1,9 +1,9 @@
-import { Op } from "sequelize";
-import { z } from "zod";
-import { AppServiceName } from "../../../app";
-import { CalendarItem } from "../../google/models/calendar";
-import { GoogleUser } from "../../google/models/user";
-import { AbstractCallback, ButtonType, CbHandlerParams, CmdHandlerParams, KeyboardBuilder } from "../abstract";
+import { Op } from 'sequelize';
+import { z } from 'zod';
+import { AppServiceName } from '../../../app';
+import { CalendarItem } from '../../google/models/calendar';
+import { GoogleUser } from '../../google/models/user';
+import { AbstractCallback, ButtonType, CbHandlerParams, CmdHandlerParams, KeyboardBuilder } from '../abstract';
 
 const payloadAction = 'gcal';
 
@@ -27,36 +27,44 @@ export class GoogleKeyboard {
     }
 
     public static get Menu() {
-        return new KeyboardBuilder('GoogleMenu', true).add({
-            type: ButtonType.Callback,
-            text: 'Список',
-            payload: payloadAction + JSON.stringify([GoogleMenu.CalendarsList])
-        }).add({
-            type: ButtonType.Callback,
-            text: 'Добавить',
-            payload: payloadAction + JSON.stringify([GoogleMenu.AddCalendar])
-        }).row().add({
-            type: ButtonType.Callback,
-            text: 'Права',
-            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsMenu])
-        });
+        return new KeyboardBuilder('GoogleMenu', true)
+            .add({
+                type: ButtonType.Callback,
+                text: 'Список',
+                payload: payloadAction + JSON.stringify([GoogleMenu.CalendarsList])
+            })
+            .add({
+                type: ButtonType.Callback,
+                text: 'Добавить',
+                payload: payloadAction + JSON.stringify([GoogleMenu.AddCalendar])
+            })
+            .row()
+            .add({
+                type: ButtonType.Callback,
+                text: 'Права',
+                payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsMenu])
+            });
     }
 
     public static List(showDelete: boolean) {
         const keyboard = new KeyboardBuilder('GoogleCalendarsList', true);
 
-        keyboard.add({
-            type: ButtonType.Callback,
-            text: 'Обновить',
-            payload: payloadAction + JSON.stringify([GoogleMenu.CalendarsList])
-        }).row();
+        keyboard
+            .add({
+                type: ButtonType.Callback,
+                text: 'Обновить',
+                payload: payloadAction + JSON.stringify([GoogleMenu.CalendarsList])
+            })
+            .row();
 
         if (showDelete) {
-            keyboard.add({
-                type: ButtonType.Callback,
-                text: 'Удалить',
-                payload: payloadAction + JSON.stringify([GoogleMenu.DeleteCalendar])
-            }).row();
+            keyboard
+                .add({
+                    type: ButtonType.Callback,
+                    text: 'Удалить',
+                    payload: payloadAction + JSON.stringify([GoogleMenu.DeleteCalendar])
+                })
+                .row();
         }
 
         return keyboard.add({
@@ -78,11 +86,13 @@ export class GoogleKeyboard {
         const keyboard = new KeyboardBuilder('GooglePermissionsList', true);
 
         for (const calendar of calendars) {
-            keyboard.add({
-                type: ButtonType.Callback,
-                text: `${calendar.type}, ${calendar.value}`,
-                payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsCalendar, calendar.calendarId])
-            }).row();
+            keyboard
+                .add({
+                    type: ButtonType.Callback,
+                    text: `${calendar.type}, ${calendar.value}`,
+                    payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsCalendar, calendar.calendarId])
+                })
+                .row();
         }
 
         return keyboard.add({
@@ -93,19 +103,24 @@ export class GoogleKeyboard {
     }
 
     public static PermissionsControl(calendarId: string) {
-        return new KeyboardBuilder('GooglePermissionsControl', true).add({
-            type: ButtonType.Callback,
-            text: 'Дать права редактирования',
-            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsApply, calendarId, 'writer'])
-        }).row().add({
-            type: ButtonType.Callback,
-            text: 'Снять права редактирования',
-            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsApply, calendarId, 'reader'])
-        }).row().add({
-            type: ButtonType.Callback,
-            text: 'Назад',
-            payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsMenu])
-        });
+        return new KeyboardBuilder('GooglePermissionsControl', true)
+            .add({
+                type: ButtonType.Callback,
+                text: 'Дать права редактирования',
+                payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsApply, calendarId, 'writer'])
+            })
+            .row()
+            .add({
+                type: ButtonType.Callback,
+                text: 'Снять права редактирования',
+                payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsApply, calendarId, 'reader'])
+            })
+            .row()
+            .add({
+                type: ButtonType.Callback,
+                text: 'Назад',
+                payload: payloadAction + JSON.stringify([GoogleMenu.PermissionsMenu])
+            });
     }
 
     public static get ControlCalendar() {
@@ -175,12 +190,12 @@ export default class GoogleCalendarCallback extends AbstractCallback {
             return this._auth(params);
         }
 
-        return context.editOrSend([
-            `Привязанный гугл аккаунт: ${chat.googleEmail}.`,
-            'Действие с календарями:'
-        ].join('\n'), {
-            keyboard: GoogleKeyboard.Menu
-        });
+        return context.editOrSend(
+            [`Привязанный гугл аккаунт: ${chat.googleEmail}.`, 'Действие с календарями:'].join('\n'),
+            {
+                keyboard: GoogleKeyboard.Menu
+            }
+        );
     }
 
     private async _list({ context }: CbHandlerParams, user: GoogleUser) {
@@ -205,24 +220,26 @@ export default class GoogleCalendarCallback extends AbstractCallback {
 
             if (calendar.lastManualSyncedDay) {
                 const current = Math.max(0, calendar.lastManualSyncedDay! - dayIndex.min);
-                const max = (dayIndex.max - dayIndex.min);
+                const max = dayIndex.max - dayIndex.min;
 
-                progress = current * 100 / max;
+                progress = (current * 100) / max;
             } else {
                 progress = 100;
             }
-            
+
             const syncText = `(Синхронизация: ${progress.toFixed(2)}%)`;
 
             return `${i + 1}. ${calendar.type}, ${calendar.value} ${syncText}`;
         });
 
-        return context.editOrSend(list.length > 0 ? [
-            'Список календарей с расписанием:',
-            list.join('\n')
-        ].join('\n') : 'Нет добавленных календарей', {
-            keyboard: GoogleKeyboard.List(list.length > 0)
-        });
+        return context.editOrSend(
+            list.length > 0
+                ? ['Список календарей с расписанием:', list.join('\n')].join('\n')
+                : 'Нет добавленных календарей',
+            {
+                keyboard: GoogleKeyboard.List(list.length > 0)
+            }
+        );
     }
 
     private async getUserCalendars(user: GoogleUser): Promise<CalendarItem[]> {
@@ -272,7 +289,12 @@ export default class GoogleCalendarCallback extends AbstractCallback {
         });
     }
 
-    private async _permissionsApply({ context, chat }: CbHandlerParams, user: GoogleUser, calendarId: string, roleRaw: string) {
+    private async _permissionsApply(
+        { context, chat }: CbHandlerParams,
+        user: GoogleUser,
+        calendarId: string,
+        roleRaw: string
+    ) {
         const role = roleRaw === 'writer' ? 'writer' : 'reader';
         const calendar = await CalendarItem.findOne({
             where: { calendarId }
@@ -300,7 +322,7 @@ export default class GoogleCalendarCallback extends AbstractCallback {
         const creating = async () => {
             await context.answer();
             await context.editOrSend('Ожидайте... Идёт создание календаря...');
-        }
+        };
 
         switch (chat.mode) {
             case 'parent':
@@ -333,15 +355,20 @@ export default class GoogleCalendarCallback extends AbstractCallback {
         if (created) {
             google.calendarController.resync(calendar, { firstlyRelevant: true }).catch((err) => {
                 console.error('bot creation sync error', calendar.calendarId, err);
-                context.send('Ошибка синхронизации календаря. Сообщите разработчику!').catch(() => { });
+                context.send('Ошибка синхронизации календаря. Сообщите разработчику!').catch(() => {});
             });
         }
 
         await user.getApi().calendar.addById(calendar.calendarId);
 
-        return context.editOrSend('Календарь успешно добавлен в ваш гугл аккаунт!' +
-            (created ? '\n\nВажно! Так как календарь был создан только что, необходимо время для его полной синхронизации.' : ''), {
-            keyboard: GoogleKeyboard.Back
-        });
+        return context.editOrSend(
+            'Календарь успешно добавлен в ваш гугл аккаунт!' +
+                (created
+                    ? '\n\nВажно! Так как календарь был создан только что, необходимо время для его полной синхронизации.'
+                    : ''),
+            {
+                keyboard: GoogleKeyboard.Back
+            }
+        );
     }
 }

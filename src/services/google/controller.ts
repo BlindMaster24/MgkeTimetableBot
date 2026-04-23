@@ -1,16 +1,16 @@
-import { Op } from "sequelize";
-import { config } from "../../../config";
-import { App } from "../../app";
-import { Logger } from "../../logger";
-import { DayIndex, KeyedQueue, StringDate, WeekIndex } from "../../utils";
-import { GroupDayEvent, TeacherDayEvent } from "../parser";
-import { GroupDay, GroupLessonExplain, TeacherDay, TeacherLessonExplain } from "../parser/types";
-import { ArchiveAppendDay } from "../timetable";
-import { CalendarItem, CalendarLessonInfo, CalendarType } from "./models/calendar";
+import { Op } from 'sequelize';
+import { config } from '../../../config';
+import { App } from '../../app';
+import { Logger } from '../../logger';
+import { DayIndex, KeyedQueue, StringDate, WeekIndex } from '../../utils';
+import { GroupDayEvent, TeacherDayEvent } from '../parser';
+import { GroupDay, GroupLessonExplain, TeacherDay, TeacherLessonExplain } from '../parser/types';
+import { ArchiveAppendDay } from '../timetable';
+import { CalendarItem, CalendarLessonInfo, CalendarType } from './models/calendar';
 
 interface SyncOptions {
-    forceFullResync: boolean,
-    firstlyRelevant: boolean
+    forceFullResync: boolean;
+    firstlyRelevant: boolean;
 }
 
 export class GoogleCalendarController {
@@ -29,7 +29,7 @@ export class GoogleCalendarController {
         events.on('flushCache', this.onFlushCache.bind(this));
 
         this.resumeSync().catch((err) => {
-            this.logger.error('Sync error', err)
+            this.logger.error('Sync error', err);
         });
     }
 
@@ -77,7 +77,7 @@ export class GoogleCalendarController {
             const bounds = this.getLessonTimeBounds(+i, day);
 
             for (const bound of bounds) {
-                const response = calendar.createEvent(lessonInfo, day, bound).then(response => {
+                const response = calendar.createEvent(lessonInfo, day, bound).then((response) => {
                     logger.debug(`EventCreated`, +i + 1, lessonInfo.title, response.id);
 
                     return response;
@@ -109,7 +109,7 @@ export class GoogleCalendarController {
             const bounds = this.getLessonTimeBounds(+i, day);
 
             for (const bound of bounds) {
-                const response = calendar.createEvent(lessonInfo, day, bound).then(response => {
+                const response = calendar.createEvent(lessonInfo, day, bound).then((response) => {
                     logger.debug(`EventCreated`, +i + 1, lessonInfo.title, response.id);
 
                     return response;
@@ -123,58 +123,66 @@ export class GoogleCalendarController {
     }
 
     private async onFlushCache(days: ArchiveAppendDay[]) {
-        const records = days.slice().sort((_a, _b) => {
-            const a = DayIndex.fromStringDate(_a.day.day).valueOf();
-            const b = DayIndex.fromStringDate(_b.day.day).valueOf();
+        const records = days
+            .slice()
+            .sort((_a, _b) => {
+                const a = DayIndex.fromStringDate(_a.day.day).valueOf();
+                const b = DayIndex.fromStringDate(_b.day.day).valueOf();
 
-            return a - b;
-        }).reduce<Record<CalendarType, { [key: string]: ArchiveAppendDay[] }>>((acc, appendDay) => {
-            const type: CalendarType = appendDay.type;
-            const value: string = appendDay.value;
+                return a - b;
+            })
+            .reduce<Record<CalendarType, { [key: string]: ArchiveAppendDay[] }>>(
+                (acc, appendDay) => {
+                    const type: CalendarType = appendDay.type;
+                    const value: string = appendDay.value;
 
-            if (!acc[type][value]) {
-                acc[type][value] = [];
-            }
-
-            acc[type][value].push(appendDay);
-
-            return acc;
-        }, {
-            group: {},
-            teacher: {}
-        });
-
-        const calendars = await this.queue.execute('onFlushCache:getCalendars', () => {
-            return Promise.all([
-                CalendarItem.findAll({
-                    where: {
-                        type: 'group',
-                        value: {
-                            [Op.in]: Object.keys(records.group)
-                        }
+                    if (!acc[type][value]) {
+                        acc[type][value] = [];
                     }
-                }),
-                CalendarItem.findAll({
-                    where: {
-                        type: 'teacher',
-                        value: {
-                            [Op.in]: Object.keys(records.teacher)
+
+                    acc[type][value].push(appendDay);
+
+                    return acc;
+                },
+                {
+                    group: {},
+                    teacher: {}
+                }
+            );
+
+        const calendars = await this.queue
+            .execute('onFlushCache:getCalendars', () => {
+                return Promise.all([
+                    CalendarItem.findAll({
+                        where: {
+                            type: 'group',
+                            value: {
+                                [Op.in]: Object.keys(records.group)
+                            }
                         }
-                    }
-                })
-            ]);
-        }).then(([groups, teachers]) => {
-            const reducer = (entries: any, calendar: CalendarItem) => {
-                entries[calendar.value] = calendar;
+                    }),
+                    CalendarItem.findAll({
+                        where: {
+                            type: 'teacher',
+                            value: {
+                                [Op.in]: Object.keys(records.teacher)
+                            }
+                        }
+                    })
+                ]);
+            })
+            .then(([groups, teachers]) => {
+                const reducer = (entries: any, calendar: CalendarItem) => {
+                    entries[calendar.value] = calendar;
 
-                return entries;
-            }
+                    return entries;
+                };
 
-            return {
-                group: groups.reduce<Record<string, CalendarItem>>(reducer, {}),
-                teacher: teachers.reduce<Record<string, CalendarItem>>(reducer, {}),
-            }
-        });
+                return {
+                    group: groups.reduce<Record<string, CalendarItem>>(reducer, {}),
+                    teacher: teachers.reduce<Record<string, CalendarItem>>(reducer, {})
+                };
+            });
 
         const promises: Promise<void>[] = [];
 
@@ -309,16 +317,16 @@ export class GoogleCalendarController {
         ]);
 
         const entries: {
-            type: CalendarType,
-            value: string
+            type: CalendarType;
+            value: string;
         }[] = [
-                ...groups.map((value): { type: 'group', value: string } => {
-                    return { type: 'group', value }
-                }),
-                ...teachers.map((value): { type: 'teacher', value: string } => {
-                    return { type: 'teacher', value }
-                })
-            ];
+            ...groups.map((value): { type: 'group'; value: string } => {
+                return { type: 'group', value };
+            }),
+            ...teachers.map((value): { type: 'teacher'; value: string } => {
+                return { type: 'teacher', value };
+            })
+        ];
 
         for (const { type, value } of entries) {
             let calendar: CalendarItem | null;
@@ -352,65 +360,81 @@ export class GoogleCalendarController {
     }
 
     private getGroupLessonInfo(lessons: GroupLessonExplain[]): CalendarLessonInfo {
-        const everyTitleEqual = lessons.every(
-            lesson => lesson.lesson === lessons[0].lesson
-        );
+        const everyTitleEqual = lessons.every((lesson) => lesson.lesson === lessons[0].lesson);
 
         let title: string;
         if (everyTitleEqual && lessons.length > 1) {
-            title = lessons.map((lesson) => {
-                return lesson.subgroup;
-            }).join(',') + ' - ' + lessons[0].lesson;
+            title =
+                lessons
+                    .map((lesson) => {
+                        return lesson.subgroup;
+                    })
+                    .join(',') +
+                ' - ' +
+                lessons[0].lesson;
         } else {
-            title = lessons.map((lesson) => {
+            title = lessons
+                .map((lesson) => {
+                    const line: string[] = [];
+
+                    if (lesson.subgroup) {
+                        line.push(`${lesson.subgroup}.`);
+                    }
+
+                    line.push(lesson.lesson);
+
+                    return line.join(' ');
+                })
+                .join(' | ');
+        }
+
+        const description = lessons
+            .map((lesson) => {
                 const line: string[] = [];
 
                 if (lesson.subgroup) {
-                    line.push(`${lesson.subgroup}.`);
+                    line.push(`<i>${lesson.subgroup}-я подгруппа:</i>`);
                 }
 
-                line.push(lesson.lesson);
+                line.push(`<b>Предмет:</b> ${lesson.lesson}`);
 
-                return line.join(' ');
-            }).join(' | ');
-        }
+                if (lesson.type) {
+                    line.push(`<b>Вид:</b> ${lesson.type}`);
+                }
 
-        const description = lessons.map((lesson) => {
-            const line: string[] = [];
+                if (lesson.teacher) {
+                    line.push(`<b>Преподаватель:</b> ${lesson.teacher}`);
+                }
 
-            if (lesson.subgroup) {
-                line.push(`<i>${lesson.subgroup}-я подгруппа:</i>`);
-            }
+                line.push(`<b>Кабинет:</b> ${lesson.cabinet || '-'}`);
 
-            line.push(`<b>Предмет:</b> ${lesson.lesson}`);
+                if (lesson.comment) {
+                    line.push(`<b>Примечание:</b> ${lesson.comment}`);
+                }
 
-            if (lesson.type) {
-                line.push(`<b>Вид:</b> ${lesson.type}`);
-            }
-
-            if (lesson.teacher) {
-                line.push(`<b>Преподаватель:</b> ${lesson.teacher}`);
-            }
-
-            line.push(`<b>Кабинет:</b> ${lesson.cabinet || '-'}`);
-
-            if (lesson.comment) {
-                line.push(`<b>Примечание:</b> ${lesson.comment}`);
-            }
-
-            return line.join('\n');
-        }).join('\n\n');
+                return line.join('\n');
+            })
+            .join('\n\n');
 
         let location: string | undefined;
-        if (lessons.length > 0 && !lessons.every((_) => { return _.cabinet === null })) {
-            location = lessons.map((lesson) => {
-                return lesson.cabinet || '-';
-            }).join(' | ');
+        if (
+            lessons.length > 0 &&
+            !lessons.every((_) => {
+                return _.cabinet === null;
+            })
+        ) {
+            location = lessons
+                .map((lesson) => {
+                    return lesson.cabinet || '-';
+                })
+                .join(' | ');
         }
 
         return {
-            title, description, location
-        }
+            title,
+            description,
+            location
+        };
     }
 
     private getTeacherLessonInfo(lesson: TeacherLessonExplain): CalendarLessonInfo {
@@ -434,6 +458,6 @@ export class GoogleCalendarController {
             title: `${lesson.subgroup ? `${lesson.subgroup}. ` : ''}${lesson.group}-${lesson.lesson}`,
             description: line.join('\n'),
             location: lesson.cabinet || undefined
-        }
+        };
     }
 }

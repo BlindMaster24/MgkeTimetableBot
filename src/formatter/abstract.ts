@@ -1,45 +1,54 @@
-import { App, AppServiceName } from "../app";
-import { hints } from "../defines";
-import { BotChat } from "../services/bots/chat";
-import { AliasRecords } from "../services/bots/chat/LessonAlias";
-import { RaspCache, RaspEntryCache } from "../services/parser/raspCache";
-import { GroupDay, GroupLesson, GroupLessonExplain, Groups, TeacherDay, TeacherLesson, TeacherLessonExplain, Teachers } from "../services/parser/types";
-import { randArray } from "../utils/rand";
-import { DayIndex, StringDate, formatSeconds } from "../utils/time";
+import { App, AppServiceName } from '../app';
+import { hints } from '../defines';
+import { BotChat } from '../services/bots/chat';
+import { AliasRecords } from '../services/bots/chat/LessonAlias';
+import { RaspCache, RaspEntryCache } from '../services/parser/raspCache';
+import {
+    GroupDay,
+    GroupLesson,
+    GroupLessonExplain,
+    Groups,
+    TeacherDay,
+    TeacherLesson,
+    TeacherLessonExplain,
+    Teachers
+} from '../services/parser/types';
+import { randArray } from '../utils/rand';
+import { DayIndex, StringDate, formatSeconds } from '../utils/time';
 
 export type InputFormatGroupOptions = {
-    showHeader?: boolean,
-    days?: GroupDay[],
-    weekLabel?: string
-}
+    showHeader?: boolean;
+    days?: GroupDay[];
+    weekLabel?: string;
+};
 
 export type InputFormatTeacherOptions = {
-    showHeader?: boolean,
-    days?: TeacherDay[],
-    weekLabel?: string
-}
+    showHeader?: boolean;
+    days?: TeacherDay[];
+    weekLabel?: string;
+};
 
 export type FormatGroupOptions = {
-    showHeader: boolean,
-    days: GroupDay[],
-    weekLabel?: string
-}
+    showHeader: boolean;
+    days: GroupDay[];
+    weekLabel?: string;
+};
 
 export type FormatTeacherOptions = {
-    showHeader: boolean,
-    days: TeacherDay[],
-    weekLabel?: string
-}
+    showHeader: boolean;
+    days: TeacherDay[];
+    weekLabel?: string;
+};
 
 export type GroupLessonOptions = {
-    isMain: boolean,
-    showSubgroup: boolean,
-    showLesson: boolean,
-    showType: boolean,
-    showTeacher: boolean,
-    showCabinet: boolean,
-    showComment: boolean
-}
+    isMain: boolean;
+    showSubgroup: boolean;
+    showLesson: boolean;
+    showType: boolean;
+    showTeacher: boolean;
+    showCabinet: boolean;
+    showComment: boolean;
+};
 
 export abstract class ScheduleFormatter {
     private _aliasCache: AliasRecords = {};
@@ -51,7 +60,7 @@ export abstract class ScheduleFormatter {
         private app: App,
         protected raspCache: RaspCache,
         protected chat?: BotChat
-    ) { }
+    ) {}
 
     protected abstract formatGroupLesson(lesson: GroupLessonExplain, options: GroupLessonOptions): string;
     protected abstract formatLessonHeader(header: string, mainLessons: string, withSubgroups: boolean): string;
@@ -78,9 +87,9 @@ export abstract class ScheduleFormatter {
     public formatGroupFull(group: string, _options?: InputFormatGroupOptions): string {
         const options = this.getDefaultFormatGroupOptions(_options, group);
 
-        const text: string[] = []
+        const text: string[] = [];
         if (options.showHeader) {
-            text.push(this.GroupHeader(group))
+            text.push(this.GroupHeader(group));
         }
         if (options.weekLabel) {
             text.push(options.weekLabel);
@@ -88,10 +97,7 @@ export abstract class ScheduleFormatter {
 
         if (options.days.length > 0) {
             for (const day of options.days) {
-                text.push([
-                    this.formatDayHeader(day.day),
-                    this.formatGroupLessons(day.lessons)
-                ].join('\n'));
+                text.push([this.formatDayHeader(day.day), this.formatGroupLessons(day.lessons)].join('\n'));
             }
         } else {
             text.push(this.NoTimetable());
@@ -118,10 +124,7 @@ export abstract class ScheduleFormatter {
 
         if (options.days.length > 0) {
             for (const day of options.days) {
-                text.push([
-                    this.formatDayHeader(day.day),
-                    this.formatTeacherLessons(day.lessons)
-                ].join('\n'));
+                text.push([this.formatDayHeader(day.day), this.formatTeacherLessons(day.lessons)].join('\n'));
             }
         } else {
             text.push(this.NoTimetable());
@@ -147,7 +150,7 @@ export abstract class ScheduleFormatter {
         const text: string[] = [];
 
         for (const i in lessons) {
-            const lesson = lessons[i]
+            const lesson = lessons[i];
             if (lesson == null) continue;
 
             const lessonHeader = this.LessonHeader(+i);
@@ -158,13 +161,14 @@ export abstract class ScheduleFormatter {
             }
 
             const subs = Array.isArray(lesson) ? lesson : [lesson];
-            const withSubgroups = Array.isArray(lesson)
+            const withSubgroups = Array.isArray(lesson);
 
-            const lessonsEqual: boolean = subs.every(_ => _.lesson === subs[0].lesson);
-            const typeEqual: boolean = lessonsEqual && subs.every(_ => _.type === subs[0].type);
-            const teacherEqual: boolean = subs.length > 1 && typeEqual && subs.every(_ => _.teacher === subs[0].teacher);
-            const cabinetEqual: boolean = teacherEqual && subs.every(_ => _.cabinet === subs[0].cabinet);
-            const commentEqual: boolean = subs.every(_ => _.comment === subs[0].comment);
+            const lessonsEqual: boolean = subs.every((_) => _.lesson === subs[0].lesson);
+            const typeEqual: boolean = lessonsEqual && subs.every((_) => _.type === subs[0].type);
+            const teacherEqual: boolean =
+                subs.length > 1 && typeEqual && subs.every((_) => _.teacher === subs[0].teacher);
+            const cabinetEqual: boolean = teacherEqual && subs.every((_) => _.cabinet === subs[0].cabinet);
+            const commentEqual: boolean = subs.every((_) => _.comment === subs[0].comment);
 
             const options: GroupLessonOptions = {
                 isMain: true,
@@ -173,19 +177,21 @@ export abstract class ScheduleFormatter {
                 showType: !withSubgroups || typeEqual,
                 showTeacher: !withSubgroups || teacherEqual,
                 showCabinet: !withSubgroups || cabinetEqual,
-                showComment: !withSubgroups || commentEqual,
-            }
+                showComment: !withSubgroups || commentEqual
+            };
 
-            const reversedOptions = Object.fromEntries(Object.entries(options).map(([key, value]) => {
-                return [key, !value]
-            })) as GroupLessonOptions;
+            const reversedOptions = Object.fromEntries(
+                Object.entries(options).map(([key, value]) => {
+                    return [key, !value];
+                })
+            ) as GroupLessonOptions;
 
-            const mainLessons = this.formatGroupLesson(subs[0], options)
-            text.push(this.formatLessonHeader(lessonHeader, mainLessons, withSubgroups))
+            const mainLessons = this.formatGroupLesson(subs[0], options);
+            text.push(this.formatLessonHeader(lessonHeader, mainLessons, withSubgroups));
 
             if (withSubgroups) {
                 const lines: string[] = subs.map((lesson: GroupLessonExplain, i: number): string => {
-                    const value: string = this.formatGroupLesson(lesson, reversedOptions)
+                    const value: string = this.formatGroupLesson(lesson, reversedOptions);
 
                     return this.formatSubgroupLesson(value, i, subs.length - 1);
                 });
@@ -206,10 +212,10 @@ export abstract class ScheduleFormatter {
             return this.NoLessons();
         }
 
-        const text: string[] = []
+        const text: string[] = [];
 
         for (const i in lessons) {
-            const lesson = lessons[i]
+            const lesson = lessons[i];
             if (lesson == null) continue;
 
             const header = this.LessonHeader(+i);
@@ -225,31 +231,47 @@ export abstract class ScheduleFormatter {
         return text.join('\n').trim();
     }
 
-    protected getDefaultFormatGroupOptions(options: InputFormatGroupOptions | undefined, group: string): FormatGroupOptions {
-        return Object.assign({}, {
-            showHeader: false,
-            days: this.raspCache.groups.timetable[group].days,
-            weekLabel: undefined
-        }, options)
+    protected getDefaultFormatGroupOptions(
+        options: InputFormatGroupOptions | undefined,
+        group: string
+    ): FormatGroupOptions {
+        return Object.assign(
+            {},
+            {
+                showHeader: false,
+                days: this.raspCache.groups.timetable[group].days,
+                weekLabel: undefined
+            },
+            options
+        );
     }
 
-    protected getDefaultFormatTeacherOptions(options: InputFormatTeacherOptions | undefined, teacher: string): FormatTeacherOptions {
-        return Object.assign({}, {
-            showHeader: false,
-            days: this.raspCache.teachers.timetable[teacher].days,
-            weekLabel: undefined
-        }, options)
+    protected getDefaultFormatTeacherOptions(
+        options: InputFormatTeacherOptions | undefined,
+        teacher: string
+    ): FormatTeacherOptions {
+        return Object.assign(
+            {},
+            {
+                showHeader: false,
+                days: this.raspCache.teachers.timetable[teacher].days,
+                weekLabel: undefined
+            },
+            options
+        );
     }
 
     protected footer(rasp: RaspEntryCache<Groups | Teachers>) {
-        const text: string[] = []
+        const text: string[] = [];
 
         if (this.chat && this.chat.showParserTime) {
-            text.push(`Информация была загружена ${formatSeconds(Math.ceil((Date.now() - rasp.update) / 1e3))} назад`)
+            text.push(`Информация была загружена ${formatSeconds(Math.ceil((Date.now() - rasp.update) / 1e3))} назад`);
         }
 
         if (this.app.getService('parser').isHasErrors()) {
-            text.push('⚠️ В последний раз при получении расписания с сайта произошла ошибка. Есть вероятность, что расписание не актуальное. Если проблема не исчезнет - сообщите разработчику.')
+            text.push(
+                '⚠️ В последний раз при получении расписания с сайта произошла ошибка. Есть вероятность, что расписание не актуальное. Если проблема не исчезнет - сообщите разработчику.'
+            );
         } else if (this.chat && this.chat.showHints) {
             let smartHint: string | null = null;
             if (this.chat.service === 'tg') {
@@ -262,10 +284,10 @@ export abstract class ScheduleFormatter {
                 }
             }
 
-            text.push(`💬 Подсказка: ${smartHint ?? randArray(hints)}`)
+            text.push(`💬 Подсказка: ${smartHint ?? randArray(hints)}`);
         }
 
-        return text.join('\n\n')
+        return text.join('\n\n');
     }
 
     protected getLessonAlias(lesson: string): string {

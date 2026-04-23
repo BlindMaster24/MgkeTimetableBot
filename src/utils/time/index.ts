@@ -1,15 +1,15 @@
 import { config } from '../../../config';
 
 export function seconds2times(seconds: number, values: number = 3) {
-    let times = [];
+    const times = [];
     let count_zero = false;
-    let periods = [60, 60 * 60, 60 * 60 * 24, 60 * 60 * 24 * 365];
+    const periods = [60, 60 * 60, 60 * 60 * 24, 60 * 60 * 24 * 365];
     let period = 0;
 
     for (let i = values; i >= 0; i--) {
         period = Math.floor(seconds / periods[i]);
 
-        if ((period > 0) || (period === 0 && count_zero)) {
+        if (period > 0 || (period === 0 && count_zero)) {
             times[i + 1] = period;
             seconds -= period * periods[i];
             count_zero = true;
@@ -22,9 +22,9 @@ export function seconds2times(seconds: number, values: number = 3) {
 }
 
 export function formatSeconds(sec: number, limit: number | null = null) {
-    let end = [];
-    let times_values = ['сек.', 'мин.', 'ч.', 'д.', 'г.'];
-    let times = seconds2times(sec);
+    const end = [];
+    const times_values = ['сек.', 'мин.', 'ч.', 'д.', 'г.'];
+    const times = seconds2times(sec);
     let ti = 0;
 
     for (let i = times.length - 1; i >= 0; i--) {
@@ -39,21 +39,18 @@ export function formatSeconds(sec: number, limit: number | null = null) {
 export function nowInTime(includedDays: number[], timeFrom: string, timeTo: string): boolean {
     const partsFrom = timeFrom.split(':');
     const hoursFrom = Number(partsFrom[0]);
-    const minutesFrom = Number(partsFrom[1]) + (hoursFrom * 60);
+    const minutesFrom = Number(partsFrom[1]) + hoursFrom * 60;
 
     const partsTo = timeTo.split(':');
     const hoursTo = Number(partsTo[0]);
-    const minutesTo = Number(partsTo[1]) + (hoursTo * 60);
+    const minutesTo = Number(partsTo[1]) + hoursTo * 60;
 
     const date = new Date();
 
     const hoursNow = date.getHours();
-    const minutesNow = date.getMinutes() + (hoursNow * 60);
+    const minutesNow = date.getMinutes() + hoursNow * 60;
 
-    if (
-        (includedDays.includes(date.getDay())) &&
-        (minutesNow >= minutesFrom && minutesNow <= minutesTo)
-    ) {
+    if (includedDays.includes(date.getDay()) && minutesNow >= minutesFrom && minutesNow <= minutesTo) {
         return true;
     } else {
         return false;
@@ -61,8 +58,8 @@ export function nowInTime(includedDays: number[], timeFrom: string, timeTo: stri
 }
 
 export interface DelayObject {
-    promise: Promise<void>,
-    resolve: () => void
+    promise: Promise<void>;
+    resolve: () => void;
 }
 
 function createDelayPromise(ms: number): DelayObject {
@@ -73,54 +70,52 @@ function createDelayPromise(ms: number): DelayObject {
 
         resolveFunc = () => {
             clearTimeout(timeout);
-            resolve()
-        }
+            resolve();
+        };
     });
 
     if (!resolveFunc) {
-        throw new Error('something went wrong')
-    };
+        throw new Error('something went wrong');
+    }
 
     return {
         promise,
         resolve: resolveFunc
-    }
+    };
 }
 
 export function getDelayTime(error: boolean = false): DelayObject {
-    if (error) return createDelayPromise(config.parser.update_interval.error * 1e3)
+    if (error) return createDelayPromise(config.parser.update_interval.error * 1e3);
 
     // во время локального тестирования - 3 секунды
     if (config.parser.localMode) {
         return createDelayPromise(3e3);
     }
 
-    const date = new Date()
-    const hour = date.getHours()
+    const date = new Date();
+    const hour = date.getHours();
 
     //в воскресенье не нужно часто
     if (date.getDay() !== 0 && config.parser.activity[0] <= hour && hour <= config.parser.activity[1]) {
-        return createDelayPromise(config.parser.update_interval.activity * 1e3)
+        return createDelayPromise(config.parser.update_interval.activity * 1e3);
     }
 
     //фикс для убирания задержки во время активности
-    const startHour = (config.parser.activity[0] - Math.ceil(config.parser.update_interval.default / (1 * 60 * 60)))
+    const startHour = config.parser.activity[0] - Math.ceil(config.parser.update_interval.default / (1 * 60 * 60));
     if (hour >= startHour && hour <= config.parser.activity[0]) {
-        const endTime = new Date(date.getTime() + config.parser.update_interval.default * 1e3)
+        const endTime = new Date(date.getTime() + config.parser.update_interval.default * 1e3);
 
         if (endTime.getHours() >= config.parser.activity[0]) {
-            endTime.setHours(config.parser.activity[0])
-            endTime.setMinutes(0)
-            endTime.setSeconds(0)
-            endTime.setMilliseconds(0)
+            endTime.setHours(config.parser.activity[0]);
+            endTime.setMinutes(0);
+            endTime.setSeconds(0);
+            endTime.setMilliseconds(0);
 
-            return createDelayPromise(
-                Math.max(0, endTime.getTime() - date.getTime())
-            )
+            return createDelayPromise(Math.max(0, endTime.getTime() - date.getTime()));
         }
     }
 
-    return createDelayPromise(config.parser.update_interval.default * 1e3)
+    return createDelayPromise(config.parser.update_interval.default * 1e3);
 }
 
 export * from './DayIndex';

@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)settings)|((⚙️\s)?Настройки|Меню настроек)$/i
+    public regexp = /^((!|\/)settings)|((⚙️\s)?Настройки|Меню настроек)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'settings',
@@ -14,6 +14,6 @@ export default class extends AbstractCommand {
 
         return context.send('Вы перешли в меню настроек.', {
             keyboard: keyboard.SettingsMain
-        })
+        });
     }
 }

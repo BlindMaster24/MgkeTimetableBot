@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { StringDate, WeekIndex } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams, MessageOptions } from "../../abstract";
-import { InputInitiator } from "../../input";
-import { StaticKeyboard, withCancelButton } from "../../keyboard";
+import { StringDate, WeekIndex } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams, MessageOptions } from '../../abstract';
+import { InputInitiator } from '../../input';
+import { withCancelButton } from '../../keyboard';
 
 export default class HistoryTeacherCommand extends AbstractCommand {
     public regexp = /^((!|\/)history|(📚\s)?История)(\b|$|\s)/i;
@@ -22,18 +22,20 @@ export default class HistoryTeacherCommand extends AbstractCommand {
         }
 
         let initiator: InputInitiator;
-        let teacher: string | false | undefined = await context.input(this.buildTeacherPrompt(keyboard), {
-            keyboard: withCancelButton(keyboard.TeacherHistory)
-        }).then<string | undefined>(value => {
-            initiator = value?.initiator;
-            return value?.text;
-        });
+        let teacher: string | false | undefined = await context
+            .input(this.buildTeacherPrompt(keyboard), {
+                keyboard: withCancelButton(keyboard.TeacherHistory)
+            })
+            .then<string | undefined>((value) => {
+                initiator = value?.initiator;
+                return value?.text;
+            });
 
         while (true) {
             teacher = await this.findTeacher(params, teacher, keyboard.MainMenu);
             if (!teacher) {
                 if (teacher === undefined) {
-                    teacher = await context.waitInput().then<string | undefined>(value => {
+                    teacher = await context.waitInput().then<string | undefined>((value) => {
                         initiator = value?.initiator;
                         return value?.text;
                     });
@@ -44,12 +46,14 @@ export default class HistoryTeacherCommand extends AbstractCommand {
             break;
         }
 
-        const requested = await context.input('Введите номер учебной недели или дату (дд.мм или дд.мм.гггг)', {
-            keyboard: withCancelButton(keyboard.TeacherHistory)
-        }).then<string | undefined>(value => {
-            initiator = value?.initiator;
-            return value?.text;
-        });
+        const requested = await context
+            .input('Введите номер учебной недели или дату (дд.мм или дд.мм.гггг)', {
+                keyboard: withCancelButton(keyboard.TeacherHistory)
+            })
+            .then<string | undefined>((value) => {
+                initiator = value?.initiator;
+                return value?.text;
+            });
 
         const weekIndex = this.parseWeekIndex(requested);
         if (!weekIndex) {

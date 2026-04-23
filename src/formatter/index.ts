@@ -9,10 +9,18 @@ import { LitolaxScheduleFormatter } from './litolax';
 import { VisualScheduleFormatter } from './visual';
 
 export const SCHEDULE_FORMATTERS = [
-    DefaultScheduleFormatter, VisualScheduleFormatter, LitolaxScheduleFormatter, CompactScheduleFormatter
+    DefaultScheduleFormatter,
+    VisualScheduleFormatter,
+    LitolaxScheduleFormatter,
+    CompactScheduleFormatter
 ];
 
-export function createScheduleFormatter(service: BotServiceName, app: App, raspCache: RaspCache, chat: BotChat): ScheduleFormatter {
+export function createScheduleFormatter(
+    service: BotServiceName,
+    app: App,
+    raspCache: RaspCache,
+    chat: BotChat
+): ScheduleFormatter {
     if (!chat) {
         return new DefaultScheduleFormatter(service, app, raspCache, chat);
     }

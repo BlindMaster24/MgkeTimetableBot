@@ -1,10 +1,10 @@
-import { AppServiceName } from "../../../../app";
-import { AbstractCommand, BotServiceName as BotService, CmdHandlerParams } from "../../abstract";
+import { AppServiceName } from '../../../../app';
+import { AbstractCommand, BotServiceName as BotService, CmdHandlerParams } from '../../abstract';
 
 //const activateTool = new ActivateKey(config.encrypt_key)
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)activate/i
+    public regexp = /^(!|\/)activate/i;
     public payloadAction = null;
 
     public services: BotService[] = ['vk'];

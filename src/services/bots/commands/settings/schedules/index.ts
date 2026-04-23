@@ -1,7 +1,7 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(🗓️\s)?Управление расписаниями$/i
+    public regexp = /^(🗓️\s)?Управление расписаниями$/i;
     public payloadAction = null;
     public scene?: string | null = 'settings';
 
@@ -10,6 +10,6 @@ export default class extends AbstractCommand {
 
         return context.send('Управление расписаниями.', {
             keyboard: keyboard.SettingsSchedules
-        })
+        });
     }
 }

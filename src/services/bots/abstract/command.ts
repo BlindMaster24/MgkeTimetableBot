@@ -19,69 +19,73 @@ import { KeyboardBuilder } from './keyboardBuilder';
 export type BotServiceName = 'tg' | 'vk' | 'viber';
 
 export type CmdHandlerParams<C extends AbstractCommand = any> = {
-    context: AbstractCommandContext,
-    realContext: VkMessageContext<ContextDefaultState> | ViberContext | TgMessageRealContext,
-    serviceChat: AbstractServiceChat,
-    chat: BotChat,
-    regexp?: C['regexp'] extends RegExp ? 'index' : keyof C['regexp'],
-    actions: AbstractAction,
-    keyboard: Keyboard,
-    service: BotServiceName,
-    formatter: ScheduleFormatter,
-    cache: Storage
-} & ({
-    service: 'vk',
-    context: VkCommandContext,
-    realContext: VkMessageContext<ContextDefaultState>,
-    serviceChat: VkChat
-} | {
-    service: 'viber',
-    context: ViberCommandContext,
-    realContext: ViberContext,
-    serviceChat: ViberChat
-} | {
-    service: 'tg',
-    context: TgCommandContext,
-    realContext: TgMessageRealContext,
-    serviceChat: TgChat
-})
+    context: AbstractCommandContext;
+    realContext: VkMessageContext<ContextDefaultState> | ViberContext | TgMessageRealContext;
+    serviceChat: AbstractServiceChat;
+    chat: BotChat;
+    regexp?: C['regexp'] extends RegExp ? 'index' : keyof C['regexp'];
+    actions: AbstractAction;
+    keyboard: Keyboard;
+    service: BotServiceName;
+    formatter: ScheduleFormatter;
+    cache: Storage;
+} & (
+    | {
+          service: 'vk';
+          context: VkCommandContext;
+          realContext: VkMessageContext<ContextDefaultState>;
+          serviceChat: VkChat;
+      }
+    | {
+          service: 'viber';
+          context: ViberCommandContext;
+          realContext: ViberContext;
+          serviceChat: ViberChat;
+      }
+    | {
+          service: 'tg';
+          context: TgCommandContext;
+          realContext: TgMessageRealContext;
+          serviceChat: TgChat;
+      }
+);
 
 export abstract class AbstractCommand {
     /**
-    * Уникальный идентификатор команды, устанавливается во время загрузки команд
-    **/
+     * Уникальный идентификатор команды, устанавливается во время загрузки команд
+     **/
     public id?: string;
 
     /**
-    * Должен ли быть чат подверждённым, чтобы использовать эту команду
-    **/
+     * Должен ли быть чат подверждённым, чтобы использовать эту команду
+     **/
     public acceptRequired: boolean = true;
 
     /**
-    * Доступна ли эта команда только для админов?
-    **/
+     * Доступна ли эта команда только для админов?
+     **/
     public adminOnly: boolean = false;
 
     /**
-    * Базовая команда и её описания для регистрации её в списке команд в помощи (и для списка телеги)
-    **/
+     * Базовая команда и её описания для регистрации её в списке команд в помощи (и для списка телеги)
+     **/
     public tgCommand: TelegramBotCommand | TelegramBotCommand[] | null = null;
 
     /**
-    * Список сервисов ботов, в которых команда будет работать
-    * (если undefined, во всех серисах)
-    **/
+     * Список сервисов ботов, в которых команда будет работать
+     * (если undefined, во всех серисах)
+     **/
     public services?: BotServiceName[];
 
     /**
-    * Список сервисов, необходимые для работы команды
-    * (если undefined, команда регистрируется всегда, если же указанный сервис не загружен, то и команда не будет загружена)
-    **/
+     * Список сервисов, необходимые для работы команды
+     * (если undefined, команда регистрируется всегда, если же указанный сервис не загружен, то и команда не будет загружена)
+     **/
     public requireServices?: AppServiceName[];
 
     /**
-    * Регулярное выражение для команды, по котрому она будет вызываться
-    **/
+     * Регулярное выражение для команды, по котрому она будет вызываться
+     **/
     public abstract regexp: { [regexp: string]: RegExp } | RegExp | null;
 
     /**
@@ -93,16 +97,16 @@ export abstract class AbstractCommand {
     /**
      * Сцена, в которой будет работать команда.
      * (не работает для payload)
-     * 
+     *
      * null - работа только в главной сцене
      * string - работа в указанной сцене
      * undefined - работа в любой сцене
      */
     public scene?: string | null;
 
-    public abstract handler(params: CmdHandlerParams): any | Promise<any>
+    public abstract handler(params: CmdHandlerParams): any | Promise<any>;
 
-    constructor(protected app: App) { }
+    constructor(protected app: App) {}
 
     public preHandle({ service, serviceChat: chat }: CmdHandlerParams) {
         if (this.services && !this.services.includes(service)) {
@@ -116,7 +120,11 @@ export abstract class AbstractCommand {
         return true;
     }
 
-    protected async findGroup({ context }: CmdHandlerParams, group?: string, errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel): Promise<false | string> {
+    protected async findGroup(
+        { context }: CmdHandlerParams,
+        group?: string,
+        errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel
+    ): Promise<false | string> {
         const normalized = group?.replace(/\*+$/g, '') ?? '';
 
         if (!normalized || isNaN(+normalized)) {
@@ -138,7 +146,7 @@ export abstract class AbstractCommand {
         if (!raspCache.groups.timetable[normalized]) {
             await context.send('Данной учебной группы не существует', {
                 keyboard: errorKeyboard
-            })
+            });
 
             return false;
         }
@@ -146,7 +154,11 @@ export abstract class AbstractCommand {
         return normalized;
     }
 
-    protected async findTeacher({ context, keyboard }: CmdHandlerParams, teacher?: string, errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel): Promise<false | undefined | string> {
+    protected async findTeacher(
+        { context, keyboard }: CmdHandlerParams,
+        teacher?: string,
+        errorKeyboard: KeyboardBuilder = StaticKeyboard.Cancel
+    ): Promise<false | undefined | string> {
         if (!teacher || teacher.length < 3) {
             await context.send('Фамилия введена некорректно', {
                 keyboard: errorKeyboard
@@ -197,18 +209,15 @@ export abstract class AbstractCommand {
         if (matched.length > matchLimit) {
             await context.send('Слишком много результатов для выборки.', {
                 keyboard: errorKeyboard
-            })
+            });
 
             return false;
         }
 
         if (matched.length > 1) {
-            await context.send(
-                'Найдено несколько преподавателей.\n' +
-                'Какой именно нужен?\n\n' +
-                matched.join('\n'), {
+            await context.send('Найдено несколько преподавателей.\n' + 'Какой именно нужен?\n\n' + matched.join('\n'), {
                 keyboard: withCancelButton(keyboard.generateVerticalKeyboard(matched))
-            })
+            });
 
             return undefined;
         }
@@ -227,5 +236,3 @@ export abstract class AbstractCommand {
         return base;
     }
 }
-
-

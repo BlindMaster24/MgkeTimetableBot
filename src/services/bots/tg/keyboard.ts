@@ -1,7 +1,9 @@
 import { InlineKeyboard as TgInlineKeyboardBuilder, Keyboard as TgKeyboardBuilder } from 'grammy';
 import { ButtonType, KeyboardBuilder } from '../abstract';
 
-export function convertAbstractToTg(aKeyboard?: KeyboardBuilder): TgKeyboardBuilder | TgInlineKeyboardBuilder | undefined {
+export function convertAbstractToTg(
+    aKeyboard?: KeyboardBuilder
+): TgKeyboardBuilder | TgInlineKeyboardBuilder | undefined {
     if (!aKeyboard) {
         return;
     }
@@ -23,7 +25,7 @@ export function convertAbstractToTg(aKeyboard?: KeyboardBuilder): TgKeyboardBuil
                 }
             }
 
-            keyboard.row()
+            keyboard.row();
         }
     } else {
         keyboard = new TgKeyboardBuilder().resized();
@@ -33,9 +35,9 @@ export function convertAbstractToTg(aKeyboard?: KeyboardBuilder): TgKeyboardBuil
                 keyboard.text(button.text);
             }
 
-            keyboard.row()
+            keyboard.row();
         }
     }
 
-    return keyboard
+    return keyboard;
 }

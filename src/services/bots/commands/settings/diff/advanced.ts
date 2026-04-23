@@ -1,7 +1,7 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(⚙️\s)?Расширенные$/i
+    public regexp = /^(⚙️\s)?Расширенные$/i;
     public payloadAction = null;
     public scene?: string | null = 'settings';
 

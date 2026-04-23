@@ -1,17 +1,17 @@
-import { sequelize } from "./db";
-import { HttpService } from "./http";
-import { Logger } from "./logger";
-import { AliceApp } from "./services/alice";
-import { Api } from "./services/api";
-import { BotService } from "./services/bots";
-import { ensureBotChatSchema } from "./services/bots/chat/Chat";
-import { TgBot } from "./services/bots/tg";
+import { sequelize } from './db';
+import { HttpService } from './http';
+import { Logger } from './logger';
+import { AliceApp } from './services/alice';
+import { Api } from './services/api';
+import { BotService } from './services/bots';
+import { ensureBotChatSchema } from './services/bots/chat/Chat';
+import { TgBot } from './services/bots/tg';
 import { ViberBot } from './services/bots/viber';
 import { VkBot } from './services/bots/vk';
-import { GoogleService } from "./services/google";
-import { ImageService } from "./services/image";
+import { GoogleService } from './services/google';
+import { ImageService } from './services/image';
 import { ParserService } from './services/parser';
-import { Timetable } from "./services/timetable";
+import { Timetable } from './services/timetable';
 import { VKApp } from './services/vk_app';
 
 export interface AppService {
@@ -59,7 +59,9 @@ export class App {
         }
     }
 
-    public getService<TServiceName extends AppServiceName & string, TService = InstanceType<Services[TServiceName]>>(service: TServiceName): TService {
+    public getService<TServiceName extends AppServiceName & string, TService = InstanceType<Services[TServiceName]>>(
+        service: TServiceName
+    ): TService {
         const serviceInstance = this.services.get(service);
 
         if (!serviceInstance) {
@@ -74,7 +76,7 @@ export class App {
     }
 
     public async runServices(): Promise<void> {
-        this.logger.log('Запуск...')
+        this.logger.log('Запуск...');
 
         const promises: Promise<any>[] = [];
 

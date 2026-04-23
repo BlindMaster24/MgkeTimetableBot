@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { StaticKeyboard } from "../../keyboard";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { StaticKeyboard } from '../../keyboard';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)setup|(📚\s)?Первоначальная настройка$/i
+    public regexp = /^(!|\/)setup|(📚\s)?Первоначальная настройка$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'setup',

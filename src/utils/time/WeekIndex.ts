@@ -1,5 +1,5 @@
-import { DayIndex, StringDate } from ".";
-import { raspCache } from "../../services/parser";
+import { DayIndex, StringDate } from '.';
+import { raspCache } from '../../services/parser';
 
 const startingWeekIndexDate = new Date(1970, 0, 5);
 const ONE_DAY: number = 24 * 60 * 60 * 1000;
@@ -31,7 +31,6 @@ export class WeekIndex {
         return this.fromDate(strDate.toDate());
     }
 
-
     public static fromDayIndex(dayIndex: number | DayIndex) {
         if (typeof dayIndex === 'number') {
             dayIndex = DayIndex.fromNumber(dayIndex);
@@ -43,7 +42,8 @@ export class WeekIndex {
     public static fromDate(date: Date) {
         // Корректировка для воскресенья
         const dayOfWeek = date.getDay();
-        if (dayOfWeek === 0) { // Воскресенье
+        if (dayOfWeek === 0) {
+            // Воскресенье
             date = new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1);
         }
 
@@ -84,7 +84,7 @@ export class WeekIndex {
         return this.fromDate(target);
     }
 
-    private constructor(private value: number) { }
+    private constructor(private value: number) {}
 
     public valueOf(): number {
         return this.value;
@@ -95,11 +95,11 @@ export class WeekIndex {
     }
 
     public getFirstDayDate() {
-        return new Date((this.value * ONE_WEEK) + startingWeekIndexDate.getTime());
+        return new Date(this.value * ONE_WEEK + startingWeekIndexDate.getTime());
     }
 
     public getWeekRange(): [Date, Date] {
-        const d1 = new Date((this.value * ONE_WEEK) + startingWeekIndexDate.getTime());
+        const d1 = new Date(this.value * ONE_WEEK + startingWeekIndexDate.getTime());
         const d2 = new Date(d1.getTime() + ONE_DAY * 6);
 
         return [d1, d2];
@@ -112,10 +112,7 @@ export class WeekIndex {
     public getWeekDayIndexRange(): [number, number] {
         const [d1, d2] = this.getWeekRange();
 
-        return [
-            DayIndex.fromDate(d1).valueOf(),
-            DayIndex.fromDate(d2).valueOf()
-        ];
+        return [DayIndex.fromDate(d1).valueOf(), DayIndex.fromDate(d2).valueOf()];
     }
 
     public isFutureWeek(): boolean {

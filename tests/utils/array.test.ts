@@ -14,11 +14,19 @@ describe('arrayUnique', () => {
 
 describe('chunkArray', () => {
     it('splits an array into fixed-size chunks', () => {
-        expect(chunkArray([1, 2, 3, 4, 5, 6], 2)).toEqual([[1, 2], [3, 4], [5, 6]]);
+        expect(chunkArray([1, 2, 3, 4, 5, 6], 2)).toEqual([
+            [1, 2],
+            [3, 4],
+            [5, 6]
+        ]);
     });
 
     it('pads the last chunk with undefined when not divisible', () => {
-        expect(chunkArray([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5, undefined]]);
+        expect(chunkArray([1, 2, 3, 4, 5], 2)).toEqual([
+            [1, 2],
+            [3, 4],
+            [5, undefined]
+        ]);
     });
 
     it('returns a single chunk when size exceeds length', () => {

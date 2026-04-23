@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)reloadCmd/i
+    public regexp = /^(!|\/)reloadCmd/i;
     public payloadAction = null;
     public adminOnly: boolean = true;
     public tgCommand: TelegramBotCommand = {
@@ -21,6 +21,6 @@ export default class extends AbstractCommand {
             return context.send('Во время перезагрузки команды произошла ошибка');
         }
 
-        return context.send('Команда перезагружена')
+        return context.send('Команда перезагружена');
     }
 }

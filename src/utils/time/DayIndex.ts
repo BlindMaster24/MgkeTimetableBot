@@ -1,4 +1,4 @@
-import { StringDate } from ".";
+import { StringDate } from '.';
 
 export class DayIndex {
     public static now() {
@@ -17,7 +17,7 @@ export class DayIndex {
         date = new Date(date);
         date.setHours(0, 0, 0, 0);
 
-        const dayIndex = (date.getTime() + (Math.abs(date.getTimezoneOffset()) * 60 * 1e3)) / 1e3 / 24 / 60 / 60;
+        const dayIndex = (date.getTime() + Math.abs(date.getTimezoneOffset()) * 60 * 1e3) / 1e3 / 24 / 60 / 60;
 
         return new this(dayIndex);
     }
@@ -26,7 +26,7 @@ export class DayIndex {
         return new this(value);
     }
 
-    private constructor(private value: number) { }
+    private constructor(private value: number) {}
 
     public valueOf(): number {
         return this.value;

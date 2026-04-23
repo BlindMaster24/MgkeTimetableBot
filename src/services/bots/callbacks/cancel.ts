@@ -1,4 +1,4 @@
-import { AbstractCallback, CbHandlerParams } from "../abstract";
+import { AbstractCallback, CbHandlerParams } from '../abstract';
 
 export default class extends AbstractCallback {
     public payloadAction: string = 'cancel';
@@ -7,7 +7,7 @@ export default class extends AbstractCallback {
         context.cancelInput();
         chat.scene = null;
 
-        await context.answer('Ввод был отменён').catch(() => { });
-        await context.delete().catch(() => { });
+        await context.answer('Ввод был отменён').catch(() => {});
+        await context.delete().catch(() => {});
     }
 }

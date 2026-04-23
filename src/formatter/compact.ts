@@ -1,8 +1,8 @@
-import { GroupLessonExplain, TeacherLessonExplain } from "../services/parser/types";
-import { GroupLessonOptions, ScheduleFormatter } from "./abstract";
+import { GroupLessonExplain, TeacherLessonExplain } from '../services/parser/types';
+import { GroupLessonOptions, ScheduleFormatter } from './abstract';
 
 export class CompactScheduleFormatter extends ScheduleFormatter {
-    public static readonly label: string = "Компактный";
+    public static readonly label: string = 'Компактный';
 
     protected formatGroupLesson(lesson: GroupLessonExplain, options: GroupLessonOptions): string {
         const line: string[] = [];
@@ -19,7 +19,7 @@ export class CompactScheduleFormatter extends ScheduleFormatter {
             line.push(this.Cabinet(lesson.cabinet));
         }
 
-        return line.join(" ");
+        return line.join(' ');
     }
 
     protected formatTeacherLesson(lesson: TeacherLessonExplain): string {
@@ -35,7 +35,7 @@ export class CompactScheduleFormatter extends ScheduleFormatter {
             line.push(this.Cabinet(lesson.cabinet));
         }
 
-        return line.join(" ");
+        return line.join(' ');
     }
 
     protected formatLessonHeader(header: string, mainLessons: string, withSubgroups: boolean): string {
@@ -45,7 +45,7 @@ export class CompactScheduleFormatter extends ScheduleFormatter {
         }
         void withSubgroups;
 
-        return line.join("");
+        return line.join('');
     }
 
     protected formatSubgroupLesson(value: string, currentIndex: number, lastIndex: number): string {
@@ -64,7 +64,7 @@ export class CompactScheduleFormatter extends ScheduleFormatter {
 
     protected DayHeader(day: string, weekday: string): string {
         const hint: string | undefined = this.dayHint(day);
-        return `__ ${this.b(weekday + (hint ? ` ${this.i(hint)}` : ""))}, ${day} __`;
+        return `__ ${this.b(weekday + (hint ? ` ${this.i(hint)}` : ''))}, ${day} __`;
     }
 
     protected LessonHeader(i: number): string {
@@ -100,14 +100,14 @@ export class CompactScheduleFormatter extends ScheduleFormatter {
     }
 
     protected NoLessons(): string {
-        return this.i("Пар нет");
+        return this.i('Пар нет');
     }
 
     protected NoTimetable(): string {
-        return "Нет расписания для отображения";
+        return 'Нет расписания для отображения';
     }
 
     protected footer(): string {
-        return "";
+        return '';
     }
 }

@@ -1,16 +1,16 @@
-import { config } from "../../../../config";
-import { WeekIndex, getShortSubjectName, mergeDays } from "../../../utils";
-import { AbstractParser } from "../abstract";
-import { GroupDay, GroupLesson, GroupLessonExplain, Groups } from "../types/group";
-import { buildTableGrid, findHeaderRowIndex, getDayRangesFromGrid } from "./grid";
-import { DayRange, GridCell } from "./types";
-import { cleanText, extractLines, isTeacherLine, parseLessonNumber } from "./text";
+import { config } from '../../../../config';
+import { WeekIndex, getShortSubjectName, mergeDays } from '../../../utils';
+import { AbstractParser } from '../abstract';
+import { GroupDay, GroupLesson, GroupLessonExplain, Groups } from '../types/group';
+import { buildTableGrid, findHeaderRowIndex, getDayRangesFromGrid } from './grid';
+import { DayRange, GridCell } from './types';
+import { cleanText, extractLines, isTeacherLine, parseLessonNumber } from './text';
 
 type ParsedTable = {
-    group: string,
-    groupNumber: string,
-    days: GroupDay[]
-}
+    group: string;
+    groupNumber: string;
+    days: GroupDay[];
+};
 
 export default class StudentParserV2 extends AbstractParser {
     protected groups: Groups = {};
@@ -132,7 +132,7 @@ export default class StudentParserV2 extends AbstractParser {
 
     protected findTables(): HTMLTableElement[] {
         const tables = Array.from(this.content.querySelectorAll('table') as NodeListOf<HTMLTableElement>);
-        const candidates: { table: HTMLTableElement, weekIndex: number }[] = [];
+        const candidates: { table: HTMLTableElement; weekIndex: number }[] = [];
         const minDays = config.parser.v2?.minDaysInTable ?? 5;
         const headerScanRows = config.parser.v2?.headerScanRows ?? 5;
 
@@ -193,7 +193,9 @@ export default class StudentParserV2 extends AbstractParser {
             if (holdCurrentOnSunday && isSunday && past.length) {
                 targetWeek = past[0];
             } else {
-                targetWeek = future.length ? future[0] : weekIndexes.sort((a, b) => Math.abs(a - currentWeek) - Math.abs(b - currentWeek))[0];
+                targetWeek = future.length
+                    ? future[0]
+                    : weekIndexes.sort((a, b) => Math.abs(a - currentWeek) - Math.abs(b - currentWeek))[0];
             }
         }
 
@@ -244,7 +246,10 @@ export default class StudentParserV2 extends AbstractParser {
         }
     }
 
-    protected parseLesson(lessonCell?: HTMLTableCellElement | null, cabinetCell?: HTMLTableCellElement | null): GroupLesson {
+    protected parseLesson(
+        lessonCell?: HTMLTableCellElement | null,
+        cabinetCell?: HTMLTableCellElement | null
+    ): GroupLesson {
         const lines = extractLines(lessonCell);
         if (!lines.length) {
             return null;
@@ -378,7 +383,7 @@ export default class StudentParserV2 extends AbstractParser {
         return match ? match[1].trim() : null;
     }
 
-    protected parseLessonLine(line: string): { lesson: string, subgroup?: number } | null {
+    protected parseLessonLine(line: string): { lesson: string; subgroup?: number } | null {
         const match = line.match(/^(?:(\d+)\s*[.)]\s*)?(.+)$/);
         if (!match) {
             return null;
@@ -472,7 +477,7 @@ export default class StudentParserV2 extends AbstractParser {
                 }
 
                 if (simmilarIndex !== null) {
-                    lesson.forEach((_) => _.comment = '2 часа');
+                    lesson.forEach((_) => (_.comment = '2 часа'));
                     day.lessons[simmilarIndex] = null;
                 }
             }

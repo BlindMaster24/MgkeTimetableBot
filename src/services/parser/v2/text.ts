@@ -1,14 +1,6 @@
-import { StringDate } from "../../../utils";
+import { StringDate } from '../../../utils';
 
-const DAY_NAMES = [
-    'понедельник',
-    'вторник',
-    'среда',
-    'четверг',
-    'пятница',
-    'суббота',
-    'воскресенье'
-];
+const DAY_NAMES = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье'];
 
 const DATE_RE = /(\d{1,2}\.\d{1,2}\.\d{2,4})/;
 
@@ -22,7 +14,10 @@ export function cleanText(text?: string | null): string | null {
 }
 
 export function normalizeDate(value: string): string | null {
-    const parts = value.split('.').map((part) => part.trim()).filter(Boolean);
+    const parts = value
+        .split('.')
+        .map((part) => part.trim())
+        .filter(Boolean);
     if (parts.length < 3) {
         return null;
     }
@@ -48,7 +43,7 @@ export function normalizeDate(value: string): string | null {
     }
 }
 
-export function parseDayLabel(value?: string | null): { day: string, weekday?: string } | null {
+export function parseDayLabel(value?: string | null): { day: string; weekday?: string } | null {
     const text = cleanText(value);
     if (!text) {
         return null;

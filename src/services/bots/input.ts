@@ -8,7 +8,7 @@ export class InputCancel extends Error {
 }
 
 export type InputInitiator = 'message' | 'command' | 'callback' | undefined;
-export type InputResolvedValue = { text: string | undefined, initiator: InputInitiator } | undefined;
+export type InputResolvedValue = { text: string | undefined; initiator: InputInitiator } | undefined;
 type ResolveFunction = (value: InputResolvedValue | PromiseLike<InputResolvedValue>) => void;
 type CancelFunction = () => void;
 
@@ -20,12 +20,12 @@ interface InputPromiseElement {
 
 export class BotInput {
     private promises: {
-        [peerId: string]: InputPromiseElement
+        [peerId: string]: InputPromiseElement;
     } = {};
 
     constructor(
         private readonly msTimeout: number = 10 * 60 * 1e3 // 10min
-    ) { }
+    ) {}
 
     public async create(peerId: string): Promise<InputResolvedValue> {
         if (this.has(peerId)) {
@@ -41,14 +41,14 @@ export class BotInput {
 
                 clearTimeout(element.timeout);
                 resolve(value);
-            }
+            };
 
             element.cancel = () => {
                 this.delete(peerId);
 
                 clearTimeout(element.timeout);
                 reject(new InputCancel());
-            }
+            };
 
             element.timeout = setTimeout(() => {
                 if (!element.cancel) {
@@ -56,7 +56,7 @@ export class BotInput {
                 }
 
                 element.cancel();
-            }, this.msTimeout)
+            }, this.msTimeout);
 
             this.add(peerId, element as InputPromiseElement);
         });
@@ -82,7 +82,7 @@ export class BotInput {
 
     private add(peerId: string, element: InputPromiseElement) {
         if (this.has(peerId)) {
-            throw new Error('Uncompleted promise already exists')
+            throw new Error('Uncompleted promise already exists');
         }
 
         this.promises[peerId] = element;

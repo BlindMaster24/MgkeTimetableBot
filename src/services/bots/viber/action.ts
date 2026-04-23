@@ -1,6 +1,6 @@
-import { AbstractAction } from "../abstract";
-import { BotChat as chat } from "../chat";
-import { ViberCommandContext } from "./context";
+import { AbstractAction } from '../abstract';
+import { BotChat as chat } from '../chat';
+import { ViberCommandContext } from './context';
 
 export class ViberAction extends AbstractAction {
     protected context: ViberCommandContext;

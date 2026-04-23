@@ -1,11 +1,11 @@
 import type { TelegramBotCommand } from '../types/telegram';
-import { getDayRasp, randArray } from "../../../utils";
-import { raspCache } from "../../parser";
-import { AbstractCommand, CmdHandlerParams } from "../abstract";
-import { StaticKeyboard } from "../keyboard";
+import { getDayRasp, randArray } from '../../../utils';
+import { raspCache } from '../../parser';
+import { AbstractCommand, CmdHandlerParams } from '../abstract';
+import { StaticKeyboard } from '../keyboard';
 
 export default class extends AbstractCommand {
-    public regexp = /(^(!|\/)start)|^(Начать|Start|(Главное\s)?Меню)$/i
+    public regexp = /(^(!|\/)start)|^(Начать|Start|(Главное\s)?Меню)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'start',
@@ -16,8 +16,10 @@ export default class extends AbstractCommand {
         if (chat.mode !== null) {
             context.cancelInput();
             chat.scene = null;
-            if (Object.keys(raspCache.groups.timetable).length == 0 &&
-                Object.keys(raspCache.teachers.timetable).length == 0) {
+            if (
+                Object.keys(raspCache.groups.timetable).length == 0 &&
+                Object.keys(raspCache.teachers.timetable).length == 0
+            ) {
                 return context.send('Данные с сервера ещё не загружены, ожидайте...', {
                     keyboard: keyboard.MainMenu
                 });
@@ -28,9 +30,9 @@ export default class extends AbstractCommand {
                     const randGroup = randArray(Object.keys(raspCache.groups.timetable));
                     return context.send(
                         'Ваша учебная группа не выбрана\n\n' +
-                        'Выбрать группу можно командой /setGroup <group>\n' +
-                        'Пример:\n' +
-                        `/setGroup ${randGroup}`,
+                            'Выбрать группу можно командой /setGroup <group>\n' +
+                            'Пример:\n' +
+                            `/setGroup ${randGroup}`,
                         { keyboard: keyboard.MainMenu }
                     );
                 }
@@ -48,9 +50,11 @@ export default class extends AbstractCommand {
                 });
                 actions.deleteUserMsg();
 
-                return context.send(message, {
-                    keyboard: keyboard.MainMenu
-                }).then(context => actions.handlerLastMsgUpdate(context));
+                return context
+                    .send(message, {
+                        keyboard: keyboard.MainMenu
+                    })
+                    .then((context) => actions.handlerLastMsgUpdate(context));
             }
 
             if (chat.mode === 'teacher') {
@@ -58,9 +62,9 @@ export default class extends AbstractCommand {
                     const randTeacher = randArray(Object.keys(raspCache.teachers.timetable));
                     return context.send(
                         'Имя преподавателя не выбрано\n\n' +
-                        'Выбрать преподавателя можно командой /setTeacher <teacher>\n' +
-                        'Пример:\n' +
-                        `/setTeacher ${randTeacher}`,
+                            'Выбрать преподавателя можно командой /setTeacher <teacher>\n' +
+                            'Пример:\n' +
+                            `/setTeacher ${randTeacher}`,
                         { keyboard: keyboard.MainMenu }
                     );
                 }
@@ -78,9 +82,11 @@ export default class extends AbstractCommand {
                 });
                 actions.deleteUserMsg();
 
-                return context.send(message, {
-                    keyboard: keyboard.MainMenu
-                }).then(context => actions.handlerLastMsgUpdate(context));
+                return context
+                    .send(message, {
+                        keyboard: keyboard.MainMenu
+                    })
+                    .then((context) => actions.handlerLastMsgUpdate(context));
             }
 
             return context.send('Главное меню', {
