@@ -12,4 +12,4 @@ export const sequelize = new Sequelize(Object.assign<Options, Options>({
     }
 }, config.db));
 
-export * from './clean';
+

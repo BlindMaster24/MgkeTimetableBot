@@ -10,7 +10,7 @@ export default class VkAppAuthMethod extends VKAppDefaultMethod {
     handler({ request, response }: HandlerParams) {
         const { teacher } = z.object({
             teacher: z.string({
-                required_error: 'Не указан преподаватель'
+                error: 'Не указан преподаватель'
             })
         }).parse(getParams(request));
 

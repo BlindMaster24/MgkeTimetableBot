@@ -36,11 +36,11 @@
 ## Build, Test, and Development Commands
 - Recommended Node.js runtime: LTS 22.x for local/dev/prod consistency.
 - Package manager: `pnpm` (pinned via the `packageManager` field in `package.json`). Enable it with Corepack: `corepack enable` (ships with Node.js 16.10+).
-- `pnpm install` installs all dependencies, including dev tools like `ts-node`. The repository lockfile is `pnpm-lock.yaml`.
+- `pnpm install` installs all dependencies, including dev tools like `tsx`. The repository lockfile is `pnpm-lock.yaml`.
 - `.npmrc` sets `shamefully-hoist=true` so transitive modules referenced directly in source (`google-auth-library`, `middleware-io`, etc.) resolve without extra setup.
 - On startup, `Timetable` self-heals `timetable_archive` from `cache/rasp/*.json`: if the max `day` in the file cache is greater than the max `day` in the archive table, the cache is flushed into the DB via the same idempotent `appendDays` path (`updateOnDuplicate: ['data']`). This prevents stale archive rows from hiding valid schedule data after DB swaps or when the parser skips a fresh run because the file cache already looks up-to-date.
 - If tests fail with `Cannot find module '../build/Release/canvas.node'`, run `pnpm rebuild canvas`.
-- `pnpm start` runs the bot via `ts-node src/bootstrap.ts` (runtime entry: `src/index.ts`).
+- `pnpm start` runs the bot via `tsx src/bootstrap.ts` (runtime entry: `src/index.ts`).
 - `src/bootstrap.ts` patches Node 25 `SlowBuffer` compatibility for `googleapis` transitive deps (`jws/jwa`).
 - `pnpm run ts-check` runs `tsc --noEmit` for type checking only.
 - `pnpm run test:logging` runs logging tests (`tests/loggingContextTest.ts`, `tests/loggingRedactionTest.ts`).
@@ -48,20 +48,20 @@
 - `pnpm run test:bot-flows` runs Telegram command-regexp flow checks (`tests/botTelegramFlowTest.ts`).
 - `pnpm run test:all` runs all test groups in sequence.
 - Source of truth for scripts: `package.json`.
-- `pnpm exec ts-node tests/inputTest.ts` runs the existing test script.
-- `pnpm exec ts-node scripts/findGroupBySameDays.ts` runs the utility script.
-- `pnpm exec ts-node tests/parserV2Test.ts` runs parser v2 fixture checks.
-- `pnpm exec ts-node tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
+- `pnpm exec tsx tests/inputTest.ts` runs the existing test script.
+- `pnpm exec tsx scripts/findGroupBySameDays.ts` runs the utility script.
+- `pnpm exec tsx tests/parserV2Test.ts` runs parser v2 fixture checks.
+- `pnpm exec tsx tests/parserV2Test.ts` should be used after parser v2 table-selection changes.
 
 ## Verification Checklist
 - `pnpm run ts-check` for type safety after parser or command changes.
 - `pnpm run test:logging` after logger/correlation/redaction changes.
 - `pnpm start` for a smoke run of parser/bot behavior (manual check).
-- `pnpm exec ts-node tests/parserV2Test.ts` after parser changes.
+- `pnpm exec tsx tests/parserV2Test.ts` after parser changes.
 - `pnpm run test:parser-v2` after parser v2 parser/diff/validate changes.
 - `pnpm run test:bot-flows` after command regexp, menu text, or command routing changes.
 - `pnpm run test:all` before release or before merge of large refactors.
-- If you add tests, list the exact `pnpm exec ts-node ...` command in the PR description.
+- If you add tests, list the exact `pnpm exec tsx ...` command in the PR description.
 - `GET /api/parser-health` (API key required) for parser status and metrics.
 
 ## Current Features Snapshot

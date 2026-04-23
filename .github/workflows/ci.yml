@@ -63,6 +63,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Seed config.ts from example
+        run: cp config.example.ts config.ts
+
       - name: Type check
         run: pnpm run ts-check
 
@@ -73,7 +76,6 @@ jobs:
     name: audit
     needs: lockfile
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -89,5 +91,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Audit high/critical (production dependencies)
-        run: pnpm audit --audit-level=high --prod
+      - name: Audit (fails on any known vulnerability)
+        run: pnpm audit --audit-level=low

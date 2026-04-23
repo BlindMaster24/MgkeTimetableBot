@@ -11,10 +11,10 @@ export default class VkAppAuthMethod extends VKAppDefaultMethod {
         const { group } = z.object({
             group: z.union([
                 z.string({
-                    required_error: 'Не указана группа'
+                    error: 'Не указана группа'
                 }),
                 z.number({
-                    required_error: 'Не указана группа'
+                    error: 'Не указана группа'
                 }).int().pipe(z.coerce.string())
             ])
         }).parse(getParams(request));
