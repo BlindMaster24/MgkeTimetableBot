@@ -1,5 +1,6 @@
 # МГКЦТ Бот расписаний
 
+[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
 
 ## Описание
 МГКЦТ Бот расписаний - это бот для удобного просмотра расписания в Минском государственном колледже цифровых технологий. Если у вас возникли проблемы с использованием бота или вы нашли ошибку, пожалуйста, создайте **issue** в репозитории проекта или внесите свои изменения через **Pull Request**.
