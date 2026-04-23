@@ -17,12 +17,12 @@ const htmlFiles = existsSync(fixturesDir)
 
 describe('parser v2 fixtures', () => {
     if (!existsSync(fixturesDir)) {
-        it.skip('fixtures directory is missing', () => { /* no fixtures */ });
+        it.skip('fixtures directory is missing', () => {});
         return;
     }
 
     if (htmlFiles.length === 0) {
-        it.skip('no fixtures found', () => { /* no fixtures */ });
+        it.skip('no fixtures found', () => {});
         return;
     }
 
