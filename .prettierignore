@@ -1,0 +1,10 @@
+node_modules
+coverage
+cache
+dist
+build
+public
+pnpm-lock.yaml
+*.md
+*.html
+*.csv

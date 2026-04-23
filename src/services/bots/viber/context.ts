@@ -1,16 +1,16 @@
-import { Message, ReceivedTextMessage, Response } from "viber-bot";
-import { ViberBot } from ".";
-import { ParsedPayload, parsePayload } from "../../../utils";
-import { ImageFile } from "../../image/builder";
-import { AbstractCommandContext, KeyboardBuilder, MessageOptions } from "../abstract";
-import { BotChat } from "../chat";
-import { Keyboard, StaticKeyboard } from "../keyboard";
-import { convertAbstractToViber } from "./keyboard";
+import { Message, ReceivedTextMessage, Response } from 'viber-bot';
+import { ViberBot } from '.';
+import { ParsedPayload, parsePayload } from '../../../utils';
+import { ImageFile } from '../../image/builder';
+import { AbstractCommandContext, KeyboardBuilder, MessageOptions } from '../abstract';
+import { BotChat } from '../chat';
+import { Keyboard, StaticKeyboard } from '../keyboard';
+import { convertAbstractToViber } from './keyboard';
 
 export type ViberContext = {
-    message: ReceivedTextMessage,
-    response: Response
-}
+    message: ReceivedTextMessage;
+    response: Response;
+};
 
 export class ViberCommandContext extends AbstractCommandContext {
     public id: string;
@@ -19,7 +19,7 @@ export class ViberCommandContext extends AbstractCommandContext {
     public peerId: string;
     public userId: string;
     public messageId: undefined;
-    
+
     private response: Response;
     private chat: BotChat;
 
@@ -35,8 +35,8 @@ export class ViberCommandContext extends AbstractCommandContext {
         this.response = response;
         this.chat = chat;
 
-        let matchedPayload: null | RegExpMatchArray = null;
-        if (matchedPayload = this.text.match(/^payload\:(.*)/i)) {
+        const matchedPayload: null | RegExpMatchArray = this.text.match(/^payload\:(.*)/i);
+        if (matchedPayload) {
             this.parsedPayload = parsePayload(matchedPayload[1]);
         }
     }
@@ -50,14 +50,12 @@ export class ViberCommandContext extends AbstractCommandContext {
         if (!keyboard || keyboard.isInline) {
             if (keyboard && keyboard.withCancelButton) {
                 keyboard = StaticKeyboard.Cancel;
-            } else { 
+            } else {
                 keyboard = new Keyboard(this.app, this.chat, this).MainMenu;
             }
         }
 
-        const response = await this.response.send(new Message.Text(
-            text, convertAbstractToViber(keyboard)
-        ));
+        const response = await this.response.send(new Message.Text(text, convertAbstractToViber(keyboard)));
 
         return response[0].toString();
     }
@@ -69,16 +67,14 @@ export class ViberCommandContext extends AbstractCommandContext {
     }
 
     public async sendPhoto(image: ImageFile, options: MessageOptions = {}): Promise<string> {
-        let keyboard: KeyboardBuilder | undefined = options.keyboard
+        let keyboard: KeyboardBuilder | undefined = options.keyboard;
         if (!keyboard || keyboard.isInline) {
-            keyboard = new Keyboard(this.app, this.chat, this).MainMenu
+            keyboard = new Keyboard(this.app, this.chat, this).MainMenu;
         }
 
-        const response = await this.response.send(new Message.Picture(
-            'https://mgke.keller.by/image/',
-            undefined, undefined,
-            convertAbstractToViber(keyboard)
-        ))
+        const response = await this.response.send(
+            new Message.Picture('https://mgke.keller.by/image/', undefined, undefined, convertAbstractToViber(keyboard))
+        );
 
         return response[0].toString();
     }
