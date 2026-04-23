@@ -14,7 +14,6 @@ export function validateConfig(value: unknown): void {
         unionSeparator: '\n    or '
     });
 
-    // eslint-disable-next-line no-console
     console.error(`[config] ${pretty.toString()}`);
     throw new Error(pretty.toString());
 }
