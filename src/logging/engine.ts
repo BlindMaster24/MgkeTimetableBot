@@ -1,19 +1,6 @@
-import { formatJson, formatText } from './formatter';
+import { createPinoLogger, PinoLogger } from './pino';
 import { redactContext, redactMessageText } from './redact';
-import { writeFileLine } from './transport/file';
-import { writeStdout } from './transport/stdout';
-import { LogContext, LogLevel, LogRecord, LoggingConfig } from './types';
-
-const LEVEL_WEIGHT: Record<LogLevel, number> = {
-    error: 40,
-    warn: 30,
-    info: 20,
-    debug: 10
-};
-
-function shouldWrite(target: LogLevel, current: LogLevel): boolean {
-    return LEVEL_WEIGHT[target] >= LEVEL_WEIGHT[current];
-}
+import { LogContext, LoggingConfig, LogLevel } from './types';
 
 function normalizeError(context: LogContext): LogContext {
     const next = { ...context };
@@ -31,13 +18,13 @@ function normalizeError(context: LogContext): LogContext {
 }
 
 export class LoggingEngine {
-    constructor(private cfg: LoggingConfig) {}
+    private pino: PinoLogger;
+
+    constructor(private cfg: LoggingConfig) {
+        this.pino = createPinoLogger(cfg);
+    }
 
     public async write(level: LogLevel, logger: string, message: string, context?: LogContext): Promise<void> {
-        if (!shouldWrite(level, this.cfg.level)) {
-            return;
-        }
-
         let normalized = context ? normalizeError(context) : undefined;
 
         if (normalized) {
@@ -47,27 +34,11 @@ export class LoggingEngine {
             }
         }
 
-        const record: LogRecord = {
-            timestamp: new Date().toISOString(),
-            level,
-            logger,
-            message,
-            ...(normalized ? { context: normalized } : {})
-        };
-
-        const line = this.cfg.format === 'json' ? formatJson(record) : formatText(record);
-
-        if (this.cfg.output.stdout) {
-            writeStdout(line);
+        const payload: Record<string, unknown> = { logger };
+        if (normalized) {
+            payload.context = normalized;
         }
 
-        if (this.cfg.output.file.enabled) {
-            await writeFileLine(
-                this.cfg.output.file.path,
-                line,
-                this.cfg.output.file.maxSizeMb,
-                this.cfg.output.file.maxFiles
-            );
-        }
+        this.pino[level](payload, message);
     }
 }
