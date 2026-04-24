@@ -11,6 +11,7 @@ import { VkBot } from './services/bots/vk';
 import { GoogleService } from './services/google';
 import { ImageService } from './services/image';
 import { ParserService } from './services/parser';
+import { topologicalSort, validateServiceDependencies } from './services/registry';
 import { Timetable } from './services/timetable';
 import { VKApp } from './services/vk_app';
 
@@ -43,8 +44,12 @@ export class App {
     private init: boolean = false;
 
     constructor(initialServices: AppServiceName[] = []) {
-        for (const service of initialServices) {
-            this.registerService(service);
+        if (initialServices.length > 0) {
+            validateServiceDependencies(initialServices);
+            const ordered = topologicalSort(initialServices);
+            for (const service of ordered) {
+                this.registerService(service);
+            }
         }
     }
 
@@ -90,7 +95,7 @@ export class App {
         }
         this.logger.log('Подключение к БД: Успешно!');
 
-        for (const [serviceId, service] of this.services) {
+        for (const [, service] of this.services) {
             promises.push(service.run());
         }
 
