@@ -17,6 +17,7 @@ import { VKApp } from './services/vk_app';
 
 export interface AppService {
     run(): Promise<any> | any;
+    stop?(): Promise<any> | any;
 }
 
 const services = {
@@ -113,5 +114,33 @@ export class App {
 
     public getServiceList(): Array<string> {
         return Array.from(this.services.keys());
+    }
+
+    public async stop(options: { timeoutMs?: number } = {}): Promise<void> {
+        const timeoutMs = options.timeoutMs ?? 15_000;
+        this.logger.log('Остановка...');
+
+        const order = Array.from(this.services.entries()).reverse();
+        for (const [name, service] of order) {
+            if (typeof service.stop !== 'function') continue;
+            try {
+                await Promise.race([
+                    Promise.resolve(service.stop()),
+                    new Promise<void>((_resolve, reject) =>
+                        setTimeout(() => reject(new Error(`stop timeout after ${timeoutMs}ms`)), timeoutMs)
+                    )
+                ]);
+                this.logger.log(`Остановлено: ${name}`);
+            } catch (error) {
+                this.logger.error('service_stop_failed', { service: name, error });
+            }
+        }
+
+        try {
+            await sequelize.close();
+            this.logger.log('БД отключена');
+        } catch (error) {
+            this.logger.error('db_close_failed', { error });
+        }
     }
 }
