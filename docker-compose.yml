@@ -18,7 +18,7 @@ services:
             test:
                 [
                     'CMD-SHELL',
-                    "curl --silent --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/parser-health | grep -qE '^[234]' || exit 1"
+                    "curl --silent --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/health | grep -qE '^2' || exit 1"
                 ]
             interval: 30s
             timeout: 5s

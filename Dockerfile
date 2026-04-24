@@ -57,7 +57,7 @@ USER app
 EXPOSE 8081
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl --silent --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/parser-health | grep -qE '^[234]' || exit 1
+    CMD curl --silent --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/health | grep -qE '^2' || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["pnpm", "start"]
