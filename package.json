@@ -38,6 +38,7 @@
         "cron": "^4.4.0",
         "express": "^5.2.1",
         "express-async-handler": "^1.2.0",
+        "express-rate-limit": "^8.4.0",
         "gaxios": "^7.1.4",
         "googleapis": "^171.4.0",
         "got": "^11.8.6",

@@ -27,6 +27,9 @@ export class HttpService implements AppService {
     }
 
     public run() {
+        if (config.api.rateLimit.trustProxy) {
+            this.http.set('trust proxy', 1);
+        }
         this.http.use(express.static('./public/'));
         this.http.use((req, res, next) => {
             const incoming = req.header('x-request-id');
