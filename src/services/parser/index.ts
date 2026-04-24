@@ -89,6 +89,7 @@ export class ParserService implements AppService {
     private _forceCallsParse: boolean = false;
     private _lastHtmlByUrl: Map<string, string> = new Map();
     private _stopping: boolean = false;
+    private _loopDone?: Promise<void>;
 
     constructor(private app: App) {
         loadCache();
@@ -120,7 +121,7 @@ export class ParserService implements AppService {
         }
 
         await this.loadCallsSettings();
-        this.runLoop();
+        this._loopDone = this.runLoop();
     }
 
     public lastSuccessUpdate(): number {
@@ -289,6 +290,10 @@ export class ParserService implements AppService {
     public async stop(): Promise<void> {
         this._stopping = true;
         this.delayPromise?.resolve();
+        if (this._loopDone) {
+            await this._loopDone;
+            this._loopDone = undefined;
+        }
     }
 
     public async parse() {
