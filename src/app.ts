@@ -43,13 +43,19 @@ export class App {
     private services: Map<AppServiceName, AppService> = new Map();
     private init: boolean = false;
 
-    constructor(initialServices: AppServiceName[] = []) {
-        if (initialServices.length > 0) {
+    constructor(initialServices: AppServiceName[] = [], options: { validate?: boolean } = {}) {
+        if (initialServices.length === 0) return;
+        const shouldValidate = options.validate ?? true;
+        if (shouldValidate) {
             validateServiceDependencies(initialServices);
             const ordered = topologicalSort(initialServices);
             for (const service of ordered) {
                 this.registerService(service);
             }
+            return;
+        }
+        for (const service of initialServices) {
+            this.registerService(service);
         }
     }
 
