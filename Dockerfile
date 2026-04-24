@@ -46,6 +46,7 @@ COPY src ./src
 COPY scripts ./scripts
 COPY public ./public
 COPY config.example.ts config.scheme.ts ./
+COPY config.t[s] ./
 RUN if [ ! -f config.ts ]; then cp config.example.ts config.ts; fi
 
 RUN useradd --system --uid 1001 --home /app --shell /usr/sbin/nologin app \

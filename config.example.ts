@@ -19,7 +19,7 @@ export const config: ConfigScheme = {
             maxPreviewLen: 128
         }
     },
-    services: ['http', 'api', 'timetable', 'parser'],
+    services: ['http', 'timetable', 'parser'],
     db: {
         dialect: 'sqlite',
         storage: 'sqlite3.db'
@@ -222,7 +222,7 @@ export const config: ConfigScheme = {
             ['14:50', '15:50']
         ]
     },
-    encrypt_key: Buffer.from('REPLACE_ME_BEFORE_PRODUCTION____'.padEnd(32, '_'), 'utf8'), // Ключ шифрования для ключей (API, Запрос на ацепт, и т.д.). ДЛЯ ПРОДАКШЕНА обязательно заменить на `crypto.randomBytes(32).toString('base64')` → `Buffer.from('<ваш-ключ>', 'base64')`
+    encrypt_key: Buffer.from('', 'base64'), // Ключ шифрования. Пустой по умолчанию — безопасно только если в `services` нет `api`, `vkApp`, `tg`, `vk`, `viber`, `image`, `google_calendar`. Для этих сервисов сгенерируйте: `crypto.randomBytes(32).toString('base64')`, затем `Buffer.from('<ключ>', 'base64')`.
     globalNoticer: false, // Отключить везде оповещения
     globalAdblock: false // Отключить рекламу в приложениях
 };
