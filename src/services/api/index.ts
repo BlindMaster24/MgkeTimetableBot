@@ -65,7 +65,11 @@ export class Api implements AppService {
 
         this.loadMethods();
 
-        const rl = config.api.rateLimit;
+        const rl = {
+            enabled: config.api.rateLimit?.enabled ?? true,
+            windowMs: config.api.rateLimit?.windowMs ?? 60_000,
+            max: config.api.rateLimit?.max ?? 120
+        };
         if (rl.enabled) {
             server.use(`${config.api.url}/:method`, createApiRateLimiter(rl));
         }

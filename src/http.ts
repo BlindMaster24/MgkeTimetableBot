@@ -27,7 +27,7 @@ export class HttpService implements AppService {
     }
 
     public run() {
-        if (config.api.rateLimit.trustProxy) {
+        if (config.api.rateLimit?.trustProxy) {
             this.http.set('trust proxy', 1);
         }
         this.http.use(express.static('./public/'));

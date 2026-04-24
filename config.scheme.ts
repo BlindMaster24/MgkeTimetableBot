@@ -62,6 +62,12 @@ export type ConfigScheme = {
     // apk: {},
     api: {
         url: string;
+        rateLimit?: {
+            enabled?: boolean;
+            windowMs?: number;
+            max?: number;
+            trustProxy?: boolean;
+        };
     };
     alice: {};
     google: {

@@ -83,7 +83,12 @@ const apiSchema = z.object({
             max: z.number().int().positive().default(120),
             trustProxy: z.boolean().default(false)
         })
-        .default({})
+        .default({
+            enabled: true,
+            windowMs: 60_000,
+            max: 120,
+            trustProxy: false
+        })
 });
 
 const googleSchema = z.object({
