@@ -1,47 +1,48 @@
 import { Bot } from 'grammy';
-import type { ApiResponse, Message, Update } from 'grammy/types';
-import { describe, expect, it, vi } from 'vitest';
+import type { Update } from 'grammy/types';
+import { describe, expect, it } from 'vitest';
 
 type ApiCall = { method: string; payload: Record<string, unknown> };
 
-const makeBot = (botInfoOverride: Partial<NonNullable<ConstructorParameters<typeof Bot>[1]>['botInfo']> = {}) => {
-    const calls: ApiCall[] = [];
-    const bot = new Bot('1234567890:TEST', {
-        botInfo: {
-            id: 1234567890,
-            is_bot: true,
-            first_name: 'MgkeTest',
-            username: 'mgke_test_bot',
-            can_join_groups: true,
-            can_read_all_group_messages: false,
-            supports_inline_queries: false,
-            can_connect_to_business: false,
-            has_main_web_app: false,
-            ...botInfoOverride
-        }
-    });
+const BOT_INFO = {
+    id: 1234567890,
+    is_bot: true as const,
+    first_name: 'MgkeTest',
+    username: 'mgke_test_bot',
+    can_join_groups: true,
+    can_read_all_group_messages: false,
+    supports_inline_queries: false,
+    can_connect_to_business: false,
+    has_main_web_app: false
+};
 
-    bot.api.config.use((_prev, method, payload) => {
-        calls.push({ method, payload: payload as Record<string, unknown> });
-        const result: Message.TextMessage = {
-            message_id: calls.length,
-            date: Math.floor(Date.now() / 1000),
-            chat: { id: 42, type: 'private', first_name: 'Tester' },
-            from: { id: 1234567890, is_bot: true, first_name: 'MgkeTest' },
-            text: typeof (payload as { text?: unknown }).text === 'string' ? (payload as { text: string }).text : ''
-        };
-        const response: ApiResponse<Message.TextMessage> = { ok: true, result };
-        return Promise.resolve(response);
-    });
+const makeBot = () => {
+    const calls: ApiCall[] = [];
+    const bot = new Bot('1234567890:TEST', { botInfo: BOT_INFO as any });
+
+    bot.api.config.use(((_prev: unknown, method: string, payload: Record<string, unknown>) => {
+        calls.push({ method, payload });
+        const text = typeof payload.text === 'string' ? payload.text : '';
+        return Promise.resolve({
+            ok: true,
+            result: {
+                message_id: calls.length,
+                date: Math.floor(Date.now() / 1000),
+                chat: { id: 42, type: 'private', first_name: 'Tester' },
+                from: { id: BOT_INFO.id, is_bot: true, first_name: BOT_INFO.first_name },
+                text
+            }
+        });
+    }) as any);
 
     return { bot, calls };
 };
 
 const textUpdate = (text: string): Update => {
-    const entities =
-        text.startsWith('/') && /^\/[A-Za-z_]+/.test(text)
-            ? [{ type: 'bot_command' as const, offset: 0, length: text.split(/\s/)[0].length }]
-            : undefined;
+    const isCommand = /^\/[A-Za-z_]+/.test(text);
+    const entities = isCommand
+        ? [{ type: 'bot_command' as const, offset: 0, length: text.split(/\s/)[0].length }]
+        : undefined;
     return {
         update_id: Math.floor(Math.random() * 1e9),
         message: {
