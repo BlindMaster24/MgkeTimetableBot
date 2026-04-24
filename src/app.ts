@@ -128,10 +128,7 @@ export class App {
                 await Promise.race([
                     Promise.resolve(service.stop()),
                     new Promise<void>((_resolve, reject) => {
-                        timer = setTimeout(
-                            () => reject(new Error(`stop timeout after ${timeoutMs}ms`)),
-                            timeoutMs
-                        );
+                        timer = setTimeout(() => reject(new Error(`stop timeout after ${timeoutMs}ms`)), timeoutMs);
                     })
                 ]);
                 this.logger.log(`Остановлено: ${name}`);
