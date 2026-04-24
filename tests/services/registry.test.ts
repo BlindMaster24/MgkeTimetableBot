@@ -22,26 +22,35 @@ describe('validateServiceDependencies', () => {
 
     it('reports every missing dep for clear diagnostics', () => {
         try {
-            validateServiceDependencies(['api', 'alice', 'tg', 'viber']);
+            validateServiceDependencies(['api', 'alice']);
             throw new Error('should have thrown');
         } catch (err) {
             expect(err).toBeInstanceOf(ServiceDependencyError);
             const e = err as ServiceDependencyError;
             expect(e.missing).toEqual([
                 { service: 'api', requires: 'http' },
-                { service: 'alice', requires: 'http' },
-                { service: 'tg', requires: 'bot' },
-                { service: 'viber', requires: 'bot' },
-                { service: 'viber', requires: 'http' }
+                { service: 'alice', requires: 'http' }
             ]);
             expect(e.message).toMatch(/requires 'http'/);
-            expect(e.message).toMatch(/requires 'bot'/);
         }
+    });
+
+    it('requires parser for bot and google_calendar transitive deps', () => {
+        expect(() => validateServiceDependencies(['bot', 'tg'])).toThrow(/requires 'parser'/);
+        expect(() => validateServiceDependencies(['http', 'bot', 'parser', 'google_calendar'])).toThrow(
+            /requires 'timetable'/
+        );
     });
 
     it('ignores optional deps that are missing', () => {
         expect(() => validateServiceDependencies(['timetable'])).not.toThrow();
         expect(() => validateServiceDependencies(['api', 'http'])).not.toThrow();
+    });
+
+    it('passes for a full production set with every transitive dep present', () => {
+        expect(() =>
+            validateServiceDependencies(['http', 'parser', 'timetable', 'image', 'bot', 'tg', 'api', 'google_calendar'])
+        ).not.toThrow();
     });
 });
 

@@ -10,14 +10,14 @@ export const serviceDependencies: Record<AppServiceName, ServiceDependencySpec> 
     parser: { required: [], optional: [] },
     timetable: { required: [], optional: ['parser'] },
     image: { required: [], optional: ['http'] },
-    bot: { required: [], optional: [] },
+    bot: { required: ['parser'], optional: [] },
     tg: { required: ['bot'], optional: ['image', 'timetable'] },
     vk: { required: ['bot'], optional: ['image', 'timetable'] },
     viber: { required: ['bot', 'http'], optional: ['image', 'timetable'] },
     api: { required: ['http'], optional: ['timetable'] },
     alice: { required: ['http'], optional: ['timetable'] },
     vkApp: { required: ['http'], optional: [] },
-    google_calendar: { required: ['http', 'bot'], optional: [] }
+    google_calendar: { required: ['http', 'bot', 'parser', 'timetable'], optional: [] }
 };
 
 export class ServiceDependencyError extends Error {
