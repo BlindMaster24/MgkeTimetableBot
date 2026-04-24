@@ -239,12 +239,14 @@ export const configSchema = z
             'viber.token is required when "viber" service is enabled'
         );
 
-        const needsEncryptKey = services.includes('api') || services.includes('vkApp');
+        const encryptKeyConsumers = ['api', 'vkApp', 'tg', 'vk', 'viber', 'image', 'google_calendar'] as const;
+        const needsEncryptKey = services.some((s) => (encryptKeyConsumers as readonly string[]).includes(s as string));
         if (needsEncryptKey && cfg.encrypt_key.length === 0) {
+            const enabled = services.filter((s) => (encryptKeyConsumers as readonly string[]).includes(s as string));
             ctx.addIssue({
                 code: 'custom',
                 path: ['encrypt_key'],
-                message: 'encrypt_key must be a non-empty Buffer when "api" or "vkApp" service is enabled'
+                message: `encrypt_key must be a non-empty Buffer when any of these services is enabled: ${enabled.join(', ')}`
             });
         }
     });
