@@ -25,11 +25,7 @@ export const createApiRateLimiter = (rl: Pick<ApiRateLimitConfig, 'windowMs' | '
         limit: rl.max,
         standardHeaders: 'draft-7',
         legacyHeaders: false,
-        keyGenerator: (request) => {
-            const token = request.header('authorization')?.split(' ')[1];
-            if (token) return `key:${token}`;
-            return `ip:${ipKeyGenerator(request.ip ?? '')}`;
-        },
+        keyGenerator: (request) => ipKeyGenerator(request.ip ?? ''),
         handler: (_request, response) => {
             response.status(StatusCode.ClientErrorTooManyRequests).send({
                 error: 'Превышен лимит запросов'

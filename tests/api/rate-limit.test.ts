@@ -24,18 +24,16 @@ describe('createApiRateLimiter', () => {
         expect(overflow.body.error).toBe('Превышен лимит запросов');
     });
 
-    it('counts requests per authorization key separately from ip', async () => {
-        const srv = mkServer(2);
+    it('limits by ip regardless of authorization header (prevents token rotation bypass)', async () => {
+        const srv = mkServer(3);
+        const agent = request.agent(srv);
 
-        for (let i = 0; i < 2; i++) {
-            const res = await request(srv).get('/api/info').set('authorization', 'Bearer key-a');
+        for (let i = 0; i < 3; i++) {
+            const res = await agent.get('/api/info').set('authorization', `Bearer rotating-${i}`);
             expect(res.status).toBe(200);
         }
-        const blockedA = await request(srv).get('/api/info').set('authorization', 'Bearer key-a');
-        expect(blockedA.status).toBe(429);
-
-        const allowedB = await request(srv).get('/api/info').set('authorization', 'Bearer key-b');
-        expect(allowedB.status).toBe(200);
+        const overflow = await agent.get('/api/info').set('authorization', 'Bearer rotating-overflow');
+        expect(overflow.status).toBe(429);
     });
 
     it('emits RateLimit standard headers on successful requests', async () => {

@@ -65,7 +65,7 @@
 - `pnpm run test:all` before release or before merge of large refactors.
 - If you add tests, list the exact `pnpm exec vitest run <path>` command in the PR description.
 - `GET /api/parser-health` (API key required) for parser status and metrics.
-- API rate limiting: `config.api.rateLimit` (defaults: 120 req/min/key-or-ip). Responses use IETF `RateLimit*` headers (`draft-7`). Set `trustProxy: true` behind a reverse proxy so the IP fallback key is correct.
+- API rate limiting: `config.api.rateLimit` (defaults: 120 req/min/ip). Keyed strictly by IP to prevent token-rotation bypass. Responses use IETF `RateLimit*` headers (`draft-7`). Set `trustProxy: true` behind a reverse proxy so the real client IP is used.
 - `GET /api/health` (no auth) returns `{ ok, uptime, services, parserOk }` — safe for container healthchecks and load balancer probes.
 - `GET /api/metrics` (no auth) returns Prometheus text-format metrics: `bot_up`, `bot_uptime_seconds`, `bot_services_enabled`, `bot_service_enabled{service=...}`, `bot_parser_ok`, `bot_parser_last_update_timestamp_seconds`, `bot_parser_staleness_seconds`, `bot_process_memory_bytes{area=...}`.
 
