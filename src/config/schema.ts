@@ -220,9 +220,24 @@ export const configSchema = z
             }
         };
 
-        needStrong('tg', ['telegram', 'token'], cfg.telegram.token.length >= 1, 'telegram.token is required when "tg" service is enabled');
-        needStrong('vk', ['vk', 'bot', 'access_token'], cfg.vk.bot.access_token.length >= 1, 'vk.bot.access_token is required when "vk" service is enabled');
-        needStrong('viber', ['viber', 'token'], cfg.viber.token.length >= 1, 'viber.token is required when "viber" service is enabled');
+        needStrong(
+            'tg',
+            ['telegram', 'token'],
+            cfg.telegram.token.length >= 1,
+            'telegram.token is required when "tg" service is enabled'
+        );
+        needStrong(
+            'vk',
+            ['vk', 'bot', 'access_token'],
+            cfg.vk.bot.access_token.length >= 1,
+            'vk.bot.access_token is required when "vk" service is enabled'
+        );
+        needStrong(
+            'viber',
+            ['viber', 'token'],
+            cfg.viber.token.length >= 1,
+            'viber.token is required when "viber" service is enabled'
+        );
 
         const needsEncryptKey = services.includes('api') || services.includes('vkApp');
         if (needsEncryptKey && cfg.encrypt_key.length === 0) {
