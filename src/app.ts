@@ -123,16 +123,22 @@ export class App {
         const order = Array.from(this.services.entries()).reverse();
         for (const [name, service] of order) {
             if (typeof service.stop !== 'function') continue;
+            let timer: NodeJS.Timeout | undefined;
             try {
                 await Promise.race([
                     Promise.resolve(service.stop()),
-                    new Promise<void>((_resolve, reject) =>
-                        setTimeout(() => reject(new Error(`stop timeout after ${timeoutMs}ms`)), timeoutMs)
-                    )
+                    new Promise<void>((_resolve, reject) => {
+                        timer = setTimeout(
+                            () => reject(new Error(`stop timeout after ${timeoutMs}ms`)),
+                            timeoutMs
+                        );
+                    })
                 ]);
                 this.logger.log(`Остановлено: ${name}`);
             } catch (error) {
                 this.logger.error('service_stop_failed', { service: name, error });
+            } finally {
+                if (timer) clearTimeout(timer);
             }
         }
 
