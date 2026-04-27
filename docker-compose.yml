@@ -1,0 +1,31 @@
+services:
+    bot:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: mgke-timetable-bot:latest
+        container_name: mgke-timetable-bot
+        restart: unless-stopped
+        ports:
+            - '8081:8081'
+        environment:
+            TZ: Europe/Minsk
+            NODE_ENV: production
+        volumes:
+            - bot-cache:/app/cache
+            - bot-logs:/app/logs
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    "curl --silent --max-time 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/parser-health | grep -qE '^[234]' || exit 1"
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+        stop_grace_period: 20s
+
+volumes:
+    bot-cache:
+    bot-logs:

@@ -61,7 +61,7 @@ const vkSchema = z.object({
 });
 
 const telegramSchema = z.object({
-    token: z.string().min(1),
+    token: z.string(),
     admin_ids: z.array(z.number().int()),
     noticer: z.boolean()
 });
@@ -205,12 +205,50 @@ export const configSchema = z
         accept: acceptSchema,
         parser: parserSchema,
         timetable: timetableSchema,
-        encrypt_key: z.custom<Buffer>((val) => Buffer.isBuffer(val) && (val as Buffer).length > 0, {
-            message: 'encrypt_key must be a non-empty Buffer'
+        encrypt_key: z.custom<Buffer>((val) => Buffer.isBuffer(val), {
+            message: 'encrypt_key must be a Buffer'
         }),
         globalNoticer: z.boolean(),
         globalAdblock: z.boolean()
     })
-    .passthrough();
+    .passthrough()
+    .superRefine((cfg, ctx) => {
+        const services = cfg.services;
+        const needStrong = (svc: string, path: (string | number)[], ok: boolean, msg: string) => {
+            if (services.includes(svc as (typeof APP_SERVICE_NAMES)[number]) && !ok) {
+                ctx.addIssue({ code: 'custom', path, message: msg });
+            }
+        };
+
+        needStrong(
+            'tg',
+            ['telegram', 'token'],
+            cfg.telegram.token.length >= 1,
+            'telegram.token is required when "tg" service is enabled'
+        );
+        needStrong(
+            'vk',
+            ['vk', 'bot', 'access_token'],
+            cfg.vk.bot.access_token.length >= 1,
+            'vk.bot.access_token is required when "vk" service is enabled'
+        );
+        needStrong(
+            'viber',
+            ['viber', 'token'],
+            cfg.viber.token.length >= 1,
+            'viber.token is required when "viber" service is enabled'
+        );
+
+        const encryptKeyConsumers = ['api', 'vkApp', 'tg', 'vk', 'viber', 'image', 'google_calendar'] as const;
+        const needsEncryptKey = services.some((s) => (encryptKeyConsumers as readonly string[]).includes(s as string));
+        if (needsEncryptKey && cfg.encrypt_key.length === 0) {
+            const enabled = services.filter((s) => (encryptKeyConsumers as readonly string[]).includes(s as string));
+            ctx.addIssue({
+                code: 'custom',
+                path: ['encrypt_key'],
+                message: `encrypt_key must be a non-empty Buffer when any of these services is enabled: ${enabled.join(', ')}`
+            });
+        }
+    });
 
 export type ValidatedConfig = z.infer<typeof configSchema>;
