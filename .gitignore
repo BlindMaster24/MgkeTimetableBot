@@ -2,6 +2,7 @@
 config.ts
 config2.ts
 cache/
+coverage/
 sqlite3.db
 *.sqlite
 *.sqlite3
