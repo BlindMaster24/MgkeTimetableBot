@@ -1,7 +1,7 @@
 import { App } from '../../app';
 import { CalendarItem } from './models/calendar';
 
-const app = new App(['timetable', 'google_calendar', 'parser']);
+const app = new App(['timetable', 'google_calendar', 'parser'], { validate: false });
 
 const api = app.getService('google_calendar').api.calendar.api;
 const { calendarController: controller } = app.getService('google_calendar');
