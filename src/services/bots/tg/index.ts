@@ -133,11 +133,7 @@ export class TgBot extends AbstractBot implements AppService {
             this.logger.error('tg_set_commands_error', { error: e });
         });
 
-        const stopPolling = () => this.tg.stop();
-        process.once('SIGINT', stopPolling);
-        process.once('SIGTERM', stopPolling);
-
-        await this.tg
+        this.tg
             .start({
                 drop_pending_updates: false,
                 onStart: () => {
@@ -147,6 +143,14 @@ export class TgBot extends AbstractBot implements AppService {
             .catch((err) => {
                 this.logger.error('tg_polling_error', { error: err });
             });
+    }
+
+    public async stop(): Promise<void> {
+        try {
+            await this.tg.stop();
+        } catch (err) {
+            this.logger.error('tg_stop_error', { error: err });
+        }
     }
 
     public async getChat(

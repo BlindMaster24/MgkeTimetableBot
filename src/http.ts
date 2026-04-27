@@ -1,4 +1,5 @@
 import express, { Application, NextFunction, Request, Response } from 'express';
+import { Server } from 'http';
 import { config } from '../config';
 import { App, AppService } from './app';
 import { newTraceId, runWithLogContext } from './logging';
@@ -12,6 +13,7 @@ export class HttpService implements AppService {
     public logger: Logger = new Logger('HTTP');
 
     private http: Application;
+    private server?: Server;
 
     public ignoreJsonParserUrls: string[] = [];
 
@@ -61,9 +63,18 @@ export class HttpService implements AppService {
 
         this.http.use(this.errorHandler.bind(this));
 
-        this.http.listen(config.http.port, () => {
+        this.server = this.http.listen(config.http.port, () => {
             this.logger.log(`Сервер запущен на порту: ${config.http.port}`);
         });
+    }
+
+    public async stop(): Promise<void> {
+        const server = this.server;
+        if (!server) return;
+        await new Promise<void>((resolve, reject) => {
+            server.close((err) => (err ? reject(err) : resolve()));
+        });
+        this.server = undefined;
     }
 
     private setupOriginHeaders() {
