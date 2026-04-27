@@ -491,6 +491,10 @@ BotChat.init(
 
 export { BotChat };
 
+/**
+ * @deprecated Superseded by `src/db/migrations/0001-bot-chats-baseline.ts`
+ * run via `runMigrations()` at boot. Kept exported for tests/manual recovery.
+ */
 export async function ensureBotChatSchema() {
     const queryInterface = sequelize.getQueryInterface();
     const table = await queryInterface.describeTable('bot_chats');

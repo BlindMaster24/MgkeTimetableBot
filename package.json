@@ -16,7 +16,12 @@
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "migrate": "tsx scripts/migrate.ts",
+        "migrate:up": "tsx scripts/migrate.ts up",
+        "migrate:down": "tsx scripts/migrate.ts down",
+        "migrate:pending": "tsx scripts/migrate.ts pending",
+        "migrate:executed": "tsx scripts/migrate.ts executed"
     },
     "author": "Keller",
     "license": "MIT",
@@ -50,6 +55,7 @@
         "status-code-enum": "^1.0.0",
         "systeminformation": "^5.31.5",
         "throttled-queue": "^2.1.4",
+        "umzug": "^3.8.2",
         "viber-bot": "^1.0.18",
         "vk-io": "^4.10.1",
         "zod": "^4.3.6",
@@ -80,7 +86,8 @@
             "sqlite3"
         ],
         "overrides": {
-            "uuid@<14.0.0": "^14.0.0"
+            "uuid@<14.0.0": "^14.0.0",
+            "ajv@>=7.0.0-alpha.0 <8.18.0": "^8.18.0"
         }
     }
 }

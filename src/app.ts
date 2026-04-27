@@ -1,10 +1,10 @@
 import { sequelize } from './db';
+import { runMigrations } from './db/migrator';
 import { HttpService } from './http';
 import { Logger } from './logger';
 import { AliceApp } from './services/alice';
 import { Api } from './services/api';
 import { BotService } from './services/bots';
-import { ensureBotChatSchema } from './services/bots/chat/Chat';
 import { TgBot } from './services/bots/tg';
 import { ViberBot } from './services/bots/viber';
 import { VkBot } from './services/bots/vk';
@@ -84,7 +84,10 @@ export class App {
 
         this.logger.log('Подключение к БД...');
         await sequelize.sync();
-        await ensureBotChatSchema();
+        const applied = await runMigrations();
+        if (applied.length > 0) {
+            this.logger.log('Применены миграции:', applied.join(', '));
+        }
         this.logger.log('Подключение к БД: Успешно!');
 
         for (const [serviceId, service] of this.services) {
