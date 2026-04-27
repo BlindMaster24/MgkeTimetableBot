@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { readdirSync } from 'fs';
 import path from 'path';
 import { StatusCode } from 'status-code-enum';
@@ -10,6 +11,27 @@ import { newTraceId, runWithLogContext } from '../../logging';
 import { Logger } from '../../logger';
 import { ApiKeyModel } from './key';
 import ApiDefaultMethod, { HandlerParams } from './methods/_default';
+
+export type ApiRateLimitConfig = {
+    enabled: boolean;
+    windowMs: number;
+    max: number;
+    trustProxy: boolean;
+};
+
+export const createApiRateLimiter = (rl: Pick<ApiRateLimitConfig, 'windowMs' | 'max'>) =>
+    rateLimit({
+        windowMs: rl.windowMs,
+        limit: rl.max,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        keyGenerator: (request) => ipKeyGenerator(request.ip ?? ''),
+        handler: (_request, response) => {
+            response.status(StatusCode.ClientErrorTooManyRequests).send({
+                error: 'Превышен лимит запросов'
+            });
+        }
+    });
 
 export class Api implements AppService {
     private readonly logger = new Logger('API');
@@ -38,6 +60,15 @@ export class Api implements AppService {
         const server = this.app.getService('http').getServer();
 
         this.loadMethods();
+
+        const rl = {
+            enabled: config.api.rateLimit?.enabled ?? true,
+            windowMs: config.api.rateLimit?.windowMs ?? 60_000,
+            max: config.api.rateLimit?.max ?? 120
+        };
+        if (rl.enabled) {
+            server.use(`${config.api.url}/:method`, createApiRateLimiter(rl));
+        }
 
         server.use(`${config.api.url}/:method`, (request, response) => {
             const requestId = request.header('x-request-id') || newTraceId();

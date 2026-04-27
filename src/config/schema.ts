@@ -75,7 +75,20 @@ const viberSchema = z.object({
 });
 
 const apiSchema = z.object({
-    url: z.string().min(1)
+    url: z.string().min(1),
+    rateLimit: z
+        .object({
+            enabled: z.boolean().default(true),
+            windowMs: z.number().int().positive().default(60_000),
+            max: z.number().int().positive().default(120),
+            trustProxy: z.boolean().default(false)
+        })
+        .default({
+            enabled: true,
+            windowMs: 60_000,
+            max: 120,
+            trustProxy: false
+        })
 });
 
 const googleSchema = z.object({

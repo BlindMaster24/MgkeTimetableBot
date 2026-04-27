@@ -54,7 +54,13 @@ export const config: ConfigScheme = {
         noticer: true
     },
     api: {
-        url: '/api'
+        url: '/api',
+        rateLimit: {
+            enabled: true,
+            windowMs: 60_000,
+            max: 120,
+            trustProxy: false
+        }
     },
     alice: {},
     google: {
