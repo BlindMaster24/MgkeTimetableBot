@@ -13,9 +13,7 @@ export class GoogleServiceApi {
                 client_email: config.google.service_account.clientEmail,
                 private_key: config.google.service_account.privateKey
             },
-            scopes: [
-                'https://www.googleapis.com/auth/calendar'
-            ]
+            scopes: ['https://www.googleapis.com/auth/calendar']
         });
     }
 

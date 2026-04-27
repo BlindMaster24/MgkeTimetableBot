@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 import { ServiceProgressCallback } from '../../events/controller';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)send/i
+    public regexp = /^(!|\/)send/i;
     public payloadAction = null;
     public adminOnly: boolean = true;
     public tgCommand: TelegramBotCommand = {
@@ -22,7 +22,7 @@ export default class extends AbstractCommand {
         const interval = setInterval(async () => {
             if (!progress) return;
 
-            const text = `${progress.service}: ${progress.position}/${progress.count} (${(progress.position * 100 / progress.count).toFixed(2)}%)`;
+            const text = `${progress.service}: ${progress.position}/${progress.count} (${((progress.position * 100) / progress.count).toFixed(2)}%)`;
             if (text === lastText) return;
             lastText = text;
 
@@ -30,10 +30,10 @@ export default class extends AbstractCommand {
         }, 1e3);
 
         await this.app.getService('bot').events.sendDistibution(message, (data) => {
-            progress = data
+            progress = data;
         });
 
         clearInterval(interval);
-        await context.editOrSend('Успешно отправлено!')
+        await context.editOrSend('Успешно отправлено!');
     }
 }

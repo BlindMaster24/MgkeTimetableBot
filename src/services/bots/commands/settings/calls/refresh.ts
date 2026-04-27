@@ -1,4 +1,4 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
     public regexp = /^\u2705\s\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441 \u0441\u0430\u0439\u0442\u0430$/i;
@@ -16,24 +16,36 @@ export default class extends AbstractCommand {
         };
 
         const lines: string[] = [];
-        lines.push('\uD83D\uDD04 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0437\u0432\u043E\u043D\u043A\u043E\u0432');
+        lines.push(
+            '\uD83D\uDD04 \u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u0437\u0432\u043E\u043D\u043A\u043E\u0432'
+        );
 
         if (report.error) {
             lines.push('\u26A0\uFE0F \u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u0430\u0440\u0441\u0435\u0440\u0430');
         } else if (!report.siteParsed) {
-            lines.push('\u26A0\uFE0F \u0421\u0430\u0439\u0442 \u043E\u0442\u0434\u0430\u043B \u043F\u0443\u0441\u0442\u043E');
+            lines.push(
+                '\u26A0\uFE0F \u0421\u0430\u0439\u0442 \u043E\u0442\u0434\u0430\u043B \u043F\u0443\u0441\u0442\u043E'
+            );
         } else {
-            lines.push('\u2705 \u0421\u0430\u0439\u0442 \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0441\u043F\u0430\u0440\u0441\u0435\u043D');
+            lines.push(
+                '\u2705 \u0421\u0430\u0439\u0442 \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0441\u043F\u0430\u0440\u0441\u0435\u043D'
+            );
         }
 
-        lines.push(`\uD83E\uDDEA \u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430: ${report.siteParsed ? 'OK' : 'EMPTY'}`);
+        lines.push(
+            `\uD83E\uDDEA \u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0430: ${report.siteParsed ? 'OK' : 'EMPTY'}`
+        );
 
         if (report.updatedAtRaw) {
-            lines.push(`\uD83D\uDCC5 \u0414\u0430\u0442\u0430 \u043D\u0430 \u0441\u0430\u0439\u0442\u0435: ${report.updatedAtRaw}`);
+            lines.push(
+                `\uD83D\uDCC5 \u0414\u0430\u0442\u0430 \u043D\u0430 \u0441\u0430\u0439\u0442\u0435: ${report.updatedAtRaw}`
+            );
         }
 
         const active = report.override ?? report.active;
-        lines.push(`\uD83D\uDCCC \u0410\u043A\u0442\u0438\u0432\u043D\u044B\u0439 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ${sourceLabel(active)}`);
+        lines.push(
+            `\uD83D\uDCCC \u0410\u043A\u0442\u0438\u0432\u043D\u044B\u0439 \u0438\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ${sourceLabel(active)}`
+        );
 
         if (report.reason && report.active === 'manual') {
             lines.push(`\u270D\uFE0F \u041F\u0440\u0438\u0447\u0438\u043D\u0430: ${report.reason}`);

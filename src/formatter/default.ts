@@ -1,5 +1,5 @@
-import { GroupLessonExplain, TeacherLessonExplain } from "../services/parser/types";
-import { GroupLessonOptions, ScheduleFormatter } from "./abstract";
+import { GroupLessonExplain, TeacherLessonExplain } from '../services/parser/types';
+import { GroupLessonOptions, ScheduleFormatter } from './abstract';
 
 export class DefaultScheduleFormatter extends ScheduleFormatter {
     public static readonly label: string = '📝 Стуктурированный';
@@ -41,9 +41,7 @@ export class DefaultScheduleFormatter extends ScheduleFormatter {
             line.push(this.Subgroup(`${lesson.subgroup}`));
         }
 
-        line.push(
-            `${this.Group(lesson.group)}${this.Lesson(this.getLessonAlias(lesson.lesson))}`
-        );
+        line.push(`${this.Group(lesson.group)}${this.Lesson(this.getLessonAlias(lesson.lesson))}`);
 
         if (lesson.type) {
             line.push(this.Type(lesson.type));
@@ -61,9 +59,7 @@ export class DefaultScheduleFormatter extends ScheduleFormatter {
     }
 
     protected formatLessonHeader(header: string, mainLessons: string, withSubgroups: boolean): string {
-        const line: string[] = [
-            header
-        ];
+        const line: string[] = [header];
 
         if (mainLessons) {
             line.push(mainLessons);

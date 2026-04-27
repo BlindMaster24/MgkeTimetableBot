@@ -2,12 +2,20 @@ import { describe, it, expect } from 'vitest';
 import type { Request } from 'express';
 import { getIp, getParams, replaceWithValueLength } from '../../src/utils/http';
 
-const makeRequest = (query: any = {}, body: any = {}, headers: Record<string, string> = {}, ip = '127.0.0.1'): Request => ({
-    query,
-    body,
-    ip,
-    header(name: string) { return headers[name]; }
-} as unknown as Request);
+const makeRequest = (
+    query: any = {},
+    body: any = {},
+    headers: Record<string, string> = {},
+    ip = '127.0.0.1'
+): Request =>
+    ({
+        query,
+        body,
+        ip,
+        header(name: string) {
+            return headers[name];
+        }
+    }) as unknown as Request;
 
 describe('getParams', () => {
     it('merges query and body with body overriding query on key conflict', () => {

@@ -1,7 +1,7 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(✅|🚫)\sВключить раздел "Что изменилось"$/i
+    public regexp = /^(✅|🚫)\sВключить раздел "Что изменилось"$/i;
     public payloadAction = null;
     public scene?: string | null = 'settings';
 

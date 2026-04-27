@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import { VKAppUser } from "../user";
+import { VKAppUser } from '../user';
 
 export type HandlerParams = {
-    user: VKAppUser,
-    request: Request,
-    response: Response
-}
+    user: VKAppUser;
+    request: Request;
+    response: Response;
+};
 
 export default abstract class VKAppDefaultMethod {
     public abstract readonly method: string;
@@ -14,7 +14,7 @@ export default abstract class VKAppDefaultMethod {
 
     public watch: boolean = false;
 
-    abstract handler(params: HandlerParams): Promise<any> | any
+    abstract handler(params: HandlerParams): Promise<any> | any;
 
-    unload() { }
+    unload() {}
 }

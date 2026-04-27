@@ -1,9 +1,9 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 const PRESETS = [10, 20, 30, 50];
 
 export default class extends AbstractCommand {
-    public regexp = /^🧾\sЛимит строк:\s\d+$/i
+    public regexp = /^🧾\sЛимит строк:\s\d+$/i;
     public payloadAction = null;
     public scene?: string | null = 'settings';
 

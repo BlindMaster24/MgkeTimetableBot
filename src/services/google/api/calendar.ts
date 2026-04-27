@@ -6,14 +6,14 @@ import { config } from '../../../../config';
 export type OnDeleteGoogleEvent = (event: calendar_v3.Schema$Event) => void;
 
 type EventData = {
-    id?: string,
-    calendarId: string,
-    title: string,
-    description?: string,
-    location?: string,
-    start: Date,
-    end: Date
-}
+    id?: string;
+    calendarId: string;
+    title: string;
+    description?: string;
+    location?: string;
+    start: Date;
+    end: Date;
+};
 export class GoogleCalendarApi {
     private auth: OAuth2Client | GoogleAuth;
     private queue: <Return = unknown>(fn: () => Return | Promise<Return>) => Promise<Return>;
@@ -47,38 +47,42 @@ export class GoogleCalendarApi {
         });
 
         if (!id) {
-            throw new Error('couldn\'t create calendar');
+            throw new Error("couldn't create calendar");
         }
 
         const promises: Promise<any>[] = [];
 
-        promises.push(queue(() => {
-            return api.acl.insert({
-                calendarId: id,
-                sendNotifications: false,
-                requestBody: {
-                    role: 'reader',
-                    scope: {
-                        type: 'default'
-                    }
-                }
-            })
-        }));
-
-        for (const email of config.google.calendar_owners) {
-            promises.push(queue(() => {
+        promises.push(
+            queue(() => {
                 return api.acl.insert({
                     calendarId: id,
                     sendNotifications: false,
                     requestBody: {
-                        role: 'owner',
+                        role: 'reader',
                         scope: {
-                            type: 'user',
-                            value: email
+                            type: 'default'
                         }
                     }
+                });
+            })
+        );
+
+        for (const email of config.google.calendar_owners) {
+            promises.push(
+                queue(() => {
+                    return api.acl.insert({
+                        calendarId: id,
+                        sendNotifications: false,
+                        requestBody: {
+                            role: 'owner',
+                            scope: {
+                                type: 'user',
+                                value: email
+                            }
+                        }
+                    });
                 })
-            }))
+            );
         }
 
         await Promise.all(promises);
@@ -108,25 +112,27 @@ export class GoogleCalendarApi {
 
         if (!events) return;
 
-        const promises: Promise<any>[] = []
+        const promises: Promise<any>[] = [];
 
         for (const event of events) {
             if (!event.id) {
                 continue;
             }
 
-            promises.push(this.queueDeleteEvent(() => {
-                return queue(() => {
-                    if (onDelete) {
-                        onDelete(event);
-                    }
+            promises.push(
+                this.queueDeleteEvent(() => {
+                    return queue(() => {
+                        if (onDelete) {
+                            onDelete(event);
+                        }
 
-                    return api.events.delete({
-                        calendarId: calendarId,
-                        eventId: event.id!
+                        return api.events.delete({
+                            calendarId: calendarId,
+                            eventId: event.id!
+                        });
                     });
-                });
-            }));
+                })
+            );
         }
 
         await Promise.all(promises);
@@ -140,8 +146,8 @@ export class GoogleCalendarApi {
                     hidden: false,
                     selected: true
                 }
-            })
-        })
+            });
+        });
     }
 
     public async setUserRole(calendarId: string, email: string, role: 'reader' | 'writer') {
@@ -187,16 +193,18 @@ export class GoogleCalendarApi {
     public async getList(): Promise<string[]> {
         return this.queue(async () => {
             const list = await this.api.calendarList.list();
-            return list.data.items?.map((calendar) => {
-                return calendar.id!;
-            }) ?? [];
-        })
+            return (
+                list.data.items?.map((calendar) => {
+                    return calendar.id!;
+                }) ?? []
+            );
+        });
     }
 
     public async deleteFromListById(calendarId: string) {
         await this.queue(() => {
             return this.api.calendarList.delete({ calendarId });
-        })
+        });
     }
 
     public async createEvent({ id, calendarId, title, description, location, start, end }: EventData) {

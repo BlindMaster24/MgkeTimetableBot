@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { BotChat } from "../../chat";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { BotChat } from '../../chat';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)requireNewButtons$/i
+    public regexp = /^(!|\/)requireNewButtons$/i;
     public adminOnly: boolean = true;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
@@ -12,15 +12,18 @@ export default class extends AbstractCommand {
     };
 
     async handler({ context }: CmdHandlerParams) {
-        await BotChat.update({
-            needUpdateButtons: true
-        }, {
-            where: {
-                accepted: true,
-                service: ['vk', 'tg']
+        await BotChat.update(
+            {
+                needUpdateButtons: true
+            },
+            {
+                where: {
+                    accepted: true,
+                    service: ['vk', 'tg']
+                }
             }
-        });
+        );
 
-        return context.send('ok')
+        return context.send('ok');
     }
 }

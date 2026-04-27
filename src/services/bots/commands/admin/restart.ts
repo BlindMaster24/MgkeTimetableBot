@@ -1,10 +1,10 @@
-import { execSync } from "child_process";
+import { execSync } from 'child_process';
 import type { TelegramBotCommand } from '../../types/telegram';
-import { saveCache } from "../../../parser/raspCache";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { saveCache } from '../../../parser/raspCache';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)restart$/i
+    public regexp = /^(!|\/)restart$/i;
     public payloadAction = null;
     public adminOnly: boolean = true;
 
@@ -20,6 +20,6 @@ export default class extends AbstractCommand {
 
         setTimeout(() => {
             execSync('pm2 restart 0');
-        }, 1e3)
+        }, 1e3);
     }
 }

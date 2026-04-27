@@ -1,7 +1,7 @@
-import { createHash } from "crypto";
-import { config } from "../../../config";
-import { StringDate, WeekIndex } from "../../utils";
-import { GroupDay, GroupLesson, GroupLessonExplain, TeacherDay, TeacherLessonExplain } from "../parser/types";
+import { createHash } from 'crypto';
+import { config } from '../../../config';
+import { StringDate, WeekIndex } from '../../utils';
+import { GroupDay, GroupLesson, GroupLessonExplain, TeacherDay, TeacherLessonExplain } from '../parser/types';
 
 type CalendarType = 'group' | 'teacher';
 
@@ -81,7 +81,18 @@ function buildEvents({ type, value, weekIndex, days }: BuildIcsOptions): EventEn
                 continue;
             }
 
-            events.push(createEvent(type, value, weekNumber, day.day, i, start, end, lesson as GroupLessonExplain | TeacherLessonExplain));
+            events.push(
+                createEvent(
+                    type,
+                    value,
+                    weekNumber,
+                    day.day,
+                    i,
+                    start,
+                    end,
+                    lesson as GroupLessonExplain | TeacherLessonExplain
+                )
+            );
         }
     }
 

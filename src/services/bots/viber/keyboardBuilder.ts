@@ -1,6 +1,6 @@
-import { Keyboard, KeyboardButton } from "viber-bot";
+import { Keyboard, KeyboardButton } from 'viber-bot';
 
-export type Theme = 'white' | 'dark' | 'black'
+export type Theme = 'white' | 'dark' | 'black';
 
 export class KeyboardBuilder {
     public PRIMARY_COLOR: string = '#8875f0';
@@ -16,28 +16,28 @@ export class KeyboardBuilder {
 
     constructor(defaultHeight: boolean = false, theme: Theme = 'white') {
         this.defaultHeight = defaultHeight;
-        
+
         switch (theme) {
             case 'white': {
                 this.DEFAULT_COLOR = '#ffffff';
                 this.SECONDARY_COLOR = '#efefef';
                 break;
             }
-                
+
             case 'dark': {
                 this.DEFAULT_COLOR = '#1d2733';
                 this.SECONDARY_COLOR = '#2b4463';
                 break;
             }
-                
-            case 'black': { 
+
+            case 'black': {
                 this.DEFAULT_COLOR = '#000000';
                 this.SECONDARY_COLOR = '#3b3b3b';
                 break;
             }
-            
+
             default:
-                throw new Error('Unknown theme')
+                throw new Error('Unknown theme');
         }
 
         this.bgColor = this.DEFAULT_COLOR;
@@ -47,18 +47,18 @@ export class KeyboardBuilder {
         let index = this.buttons.length - 1;
 
         if (index == -1) {
-            index++
+            index++;
             this.buttons[index] = [];
         }
 
         this.buttons[index].push(button);
 
-        return this
+        return this;
     }
 
     public row() {
         this.buttons.push([]);
-        return this
+        return this;
     }
 
     private buildButtons(): KeyboardButton[] {
@@ -84,7 +84,7 @@ export class KeyboardBuilder {
             buttons.push(...row);
         }
 
-        return buttons
+        return buttons;
     }
 
     public build(): Keyboard {
@@ -93,6 +93,6 @@ export class KeyboardBuilder {
             DefaultHeight: this.defaultHeight,
             BgColor: this.bgColor,
             Buttons: this.buildButtons()
-        }
+        };
     }
 }

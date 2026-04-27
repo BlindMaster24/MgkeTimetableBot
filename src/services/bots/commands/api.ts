@@ -1,15 +1,15 @@
 import type { TelegramBotCommand } from '../types/telegram';
-import { config } from "../../../../config";
-import { AppServiceName } from "../../../app";
-import { ApiKey } from "../../../key";
-import { StringDate } from "../../../utils";
-import { ApiKeyModel } from "../../api/key";
-import { AbstractCommand, CmdHandlerParams } from "../abstract";
+import { config } from '../../../../config';
+import { AppServiceName } from '../../../app';
+import { ApiKey } from '../../../key';
+import { StringDate } from '../../../utils';
+import { ApiKeyModel } from '../../api/key';
+import { AbstractCommand, CmdHandlerParams } from '../abstract';
 
 const keyTool = new ApiKey(config.encrypt_key);
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)?api(_new)?)$/i
+    public regexp = /^((!|\/)?api(_new)?)$/i;
     public payloadAction = null;
     public requireServices: AppServiceName[] = ['api'];
 
@@ -32,14 +32,16 @@ export default class extends AbstractCommand {
             await key.renewIV();
         }
 
-        return context.send([
-            `${context.text.endsWith('_new') ? 'Новый ' : ''}API токен #${key.id}:`,
-            formatter.m(keyTool.getKey(key.id, key.iv)),
-            `Запросов в сек: ${key.limitPerSec}`,
-            `Последнее использование: ${key.lastUsed ? StringDate.fromDate(key.lastUsed).toStringDateTime() : 'нет'}`,
+        return context.send(
+            [
+                `${context.text.endsWith('_new') ? 'Новый ' : ''}API токен #${key.id}:`,
+                formatter.m(keyTool.getKey(key.id, key.iv)),
+                `Запросов в сек: ${key.limitPerSec}`,
+                `Последнее использование: ${key.lastUsed ? StringDate.fromDate(key.lastUsed).toStringDateTime() : 'нет'}`,
 
-            '\nДокументация: https://vk.com/@mgke_slave-api',
-            'Создать новый: /api_new'
-        ].join('\n'));
+                '\nДокументация: https://vk.com/@mgke_slave-api',
+                'Создать новый: /api_new'
+            ].join('\n')
+        );
     }
 }

@@ -1,10 +1,10 @@
-import { Group, Groups, Teacher, Teachers } from "../types";
+import { Group, Groups, Teacher, Teachers } from '../types';
 
 type DiffLine = {
-    key: string,
-    day: string,
-    reason: string
-}
+    key: string;
+    day: string;
+    reason: string;
+};
 
 function diffEntries(newEntry: Group | Teacher, oldEntry?: Group | Teacher): DiffLine[] {
     const lines: DiffLine[] = [];

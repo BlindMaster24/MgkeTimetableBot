@@ -49,39 +49,59 @@ export class ViberBot extends AbstractBot implements AppService {
     }
 
     public async run() {
-        this.bot.on(Events.MESSAGE_RECEIVED, (message, response) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'viber',
-            event: 'message_received',
-            updateId: response.userProfile.id,
-            peerId: response.userProfile.id,
-            userId: response.userProfile.id,
-            messageId: (message as any)?.trackingData
-        }, () => this.handleNewMessage(message, response)));
-        this.bot.on(Events.CONVERSATION_STARTED, (response, subscribed, context) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'viber',
-            event: 'conversation_started',
-            updateId: response.userProfile.id,
-            peerId: response.userProfile.id,
-            userId: response.userProfile.id
-        }, () => this.handleConversationStarted(response, subscribed, context)));
-        this.bot.on(Events.SUBSCRIBED, (response) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'viber',
-            event: 'subscribed',
-            updateId: response.userProfile.id,
-            peerId: response.userProfile.id,
-            userId: response.userProfile.id
-        }, () => this.handleSubscribe(response)));
-        this.bot.on(Events.UNSUBSCRIBED, (userId) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'viber',
-            event: 'unsubscribed',
-            updateId: userId,
-            peerId: userId,
-            userId
-        }, () => this.handleUnsubscribe(userId)));
+        this.bot.on(Events.MESSAGE_RECEIVED, (message, response) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'viber',
+                    event: 'message_received',
+                    updateId: response.userProfile.id,
+                    peerId: response.userProfile.id,
+                    userId: response.userProfile.id,
+                    messageId: (message as any)?.trackingData
+                },
+                () => this.handleNewMessage(message, response)
+            )
+        );
+        this.bot.on(Events.CONVERSATION_STARTED, (response, subscribed, context) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'viber',
+                    event: 'conversation_started',
+                    updateId: response.userProfile.id,
+                    peerId: response.userProfile.id,
+                    userId: response.userProfile.id
+                },
+                () => this.handleConversationStarted(response, subscribed, context)
+            )
+        );
+        this.bot.on(Events.SUBSCRIBED, (response) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'viber',
+                    event: 'subscribed',
+                    updateId: response.userProfile.id,
+                    peerId: response.userProfile.id,
+                    userId: response.userProfile.id
+                },
+                () => this.handleSubscribe(response)
+            )
+        );
+        this.bot.on(Events.UNSUBSCRIBED, (userId) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'viber',
+                    event: 'unsubscribed',
+                    updateId: userId,
+                    peerId: userId,
+                    userId
+                },
+                () => this.handleUnsubscribe(userId)
+            )
+        );
 
         const httpService = this.app.getService('http');
         httpService.ignoreJsonParserUrls.push(VIBER_URL); //fix for viber
@@ -93,12 +113,17 @@ export class ViberBot extends AbstractBot implements AppService {
 
         await this.getBotService().init();
 
-        await this.bot.getBotProfile().then((res) => {
-            this.domain = res.uri
-            console.log(`[VIBER] Бот '${res.name.trim()}' авторизован. Сообщения отправляются от '${config.viber.name}'`)
-        }, (err) => {
-            console.error('[VIBER] Не удалось получить информацию о боте. Вероятно невалидный токен.', err)
-        });
+        await this.bot.getBotProfile().then(
+            (res) => {
+                this.domain = res.uri;
+                console.log(
+                    `[VIBER] Бот '${res.name.trim()}' авторизован. Сообщения отправляются от '${config.viber.name}'`
+                );
+            },
+            (err) => {
+                console.error('[VIBER] Не удалось получить информацию о боте. Вероятно невалидный токен.', err);
+            }
+        );
 
         server.use(WEBHOOK_URL, this.bot.middleware());
         server.use(REDIRECT_URL, this.redirect.bind(this));
@@ -106,18 +131,24 @@ export class ViberBot extends AbstractBot implements AppService {
         await this.setupWebhook();
     }
 
-    public async getChat(peerId: string, creationDefaults?: Partial<CreationAttributes<BotChat>>): Promise<BotChat<ViberChat>> {
+    public async getChat(
+        peerId: string,
+        creationDefaults?: Partial<CreationAttributes<BotChat>>
+    ): Promise<BotChat<ViberChat>> {
         return BotChat.findByServicePeerId(ViberChat, peerId, creationDefaults);
     }
 
     private async setupWebhook() {
-        const URL = `https://${config.http.servername}${WEBHOOK_URL}`
+        const URL = `https://${config.http.servername}${WEBHOOK_URL}`;
 
-        await this.bot.setWebhook(URL).then((res) => {
-            console.log(`[VIBER] Вебхук установлен на ${URL}`)
-        }, (err) => {
-            console.error(`[VIBER] Ошибка установки вебхука`, err)
-        })
+        await this.bot.setWebhook(URL).then(
+            (res) => {
+                console.log(`[VIBER] Вебхук установлен на ${URL}`);
+            },
+            (err) => {
+                console.error(`[VIBER] Ошибка установки вебхука`, err);
+            }
+        );
     }
 
     private async handleNewMessage(message: ReceivedTextMessage, response: Response) {
@@ -130,7 +161,7 @@ export class ViberBot extends AbstractBot implements AppService {
 
         if (chat.serviceChat.needUpdateUserDetails()) {
             const userDetails = await this.bot.getUserDetails(response.userProfile).catch((err) => {
-                console.error('[VIBER] Не удалось получить информацию о пользователе', err)
+                console.error('[VIBER] Не удалось получить информацию о пользователе', err);
             });
 
             if (userDetails) {
@@ -168,7 +199,7 @@ export class ViberBot extends AbstractBot implements AppService {
         await chat.save();
 
         return context.send(defines['viber.first.message'], {
-            keyboard: StaticKeyboard.StartButton,
+            keyboard: StaticKeyboard.StartButton
         });
     }
 
@@ -195,16 +226,16 @@ export class ViberBot extends AbstractBot implements AppService {
             from: FromType.ViberBot,
             user_id: context.userId,
             time: Date.now()
-        }
+        };
     }
 
     private redirect(request: express.Request, response: express.Response) {
-        let url = `viber://pa?chatURI=${this.domain}`
+        let url = `viber://pa?chatURI=${this.domain}`;
 
         if (request.query.ref && typeof request.query.ref === 'string') {
-            url += '&context=' + encodeURIComponent(request.query.ref)
+            url += '&context=' + encodeURIComponent(request.query.ref);
         }
 
-        response.redirect(url)
+        response.redirect(url);
     }
 }

@@ -1,11 +1,11 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { QueryTypes } from "sequelize";
-import { App } from "../../../../app";
-import { sequelize } from "../../../../db";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { QueryTypes } from 'sequelize';
+import { App } from '../../../../app';
+import { sequelize } from '../../../../db';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)(sql|db)(_?run)?/i
+    public regexp = /^(!|\/)(sql|db)(_?run)?/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'sql',
@@ -26,7 +26,7 @@ export default class extends AbstractCommand {
     }
 
     public async handler({ context }: CmdHandlerParams) {
-        const sql = context.text?.replace(this.regexp, '').trim()
+        const sql = context.text?.replace(this.regexp, '').trim();
         if (sql === undefined) return;
 
         const [results] = await sequelize.query(sql, {

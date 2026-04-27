@@ -1,13 +1,16 @@
-import { GroupDay, TeacherDay } from "../services/parser/types";
+import { GroupDay, TeacherDay } from '../services/parser/types';
 
 /**
  * @description Перезаписывает старые дни, новыми, сохраняя старые неизменённые
  */
-export function mergeDays<T extends GroupDay | TeacherDay>(new_days: T[], old_days: T[]): { mergedDays: T[], added: T[], changed: T[] } {
+export function mergeDays<T extends GroupDay | TeacherDay>(
+    new_days: T[],
+    old_days: T[]
+): { mergedDays: T[]; added: T[]; changed: T[] } {
     const addedDays: T[] = [];
     const changedDays: T[] = [];
     const days: {
-        [day: string]: T
+        [day: string]: T;
     } = {};
 
     for (const _day of old_days) {
@@ -30,5 +33,5 @@ export function mergeDays<T extends GroupDay | TeacherDay>(new_days: T[], old_da
         mergedDays: Object.values(days),
         added: addedDays,
         changed: changedDays
-    }
+    };
 }

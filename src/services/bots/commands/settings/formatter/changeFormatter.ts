@@ -1,7 +1,7 @@
-import { App } from "../../../../../app";
-import { SCHEDULE_FORMATTERS } from "../../../../../formatter";
-import { escapeRegex } from "../../../../../utils";
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { App } from '../../../../../app';
+import { SCHEDULE_FORMATTERS } from '../../../../../formatter';
+import { escapeRegex } from '../../../../../utils';
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
     public regexp: RegExp | null = null;
@@ -10,7 +10,7 @@ export default class extends AbstractCommand {
 
     constructor(app: App) {
         super(app);
-        
+
         const regexp: string[] = [];
 
         for (const i in SCHEDULE_FORMATTERS) {
@@ -28,7 +28,7 @@ export default class extends AbstractCommand {
         let formatterIndex: number | undefined;
         for (const i in SCHEDULE_FORMATTERS) {
             const Formatter = SCHEDULE_FORMATTERS[i];
-            
+
             if (Formatter.label === formatterName) {
                 formatterIndex = +i;
                 break;
@@ -44,6 +44,6 @@ export default class extends AbstractCommand {
 
         return context.send(`Был успешно выбран "${Formatter.label}" форматировщик.`, {
             keyboard: keyboard.SettingsFormatters
-        })
+        });
     }
 }

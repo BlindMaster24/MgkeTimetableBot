@@ -1,11 +1,11 @@
 import { Bot, Message } from 'viber-bot';
-import { config } from "../../../../config";
+import { config } from '../../../../config';
 import { App } from '../../../app';
 import { BotServiceName, MessageOptions } from '../abstract';
 import { BotChat } from '../chat';
-import { AbstractBotEventListener } from "../events";
-import { Keyboard } from "../keyboard";
-import { ViberChat } from "./chat";
+import { AbstractBotEventListener } from '../events';
+import { Keyboard } from '../keyboard';
+import { ViberChat } from './chat';
 import { convertAbstractToViber } from './keyboard';
 
 export class ViberEventListener extends AbstractBotEventListener {
@@ -15,8 +15,8 @@ export class ViberEventListener extends AbstractBotEventListener {
     private bot: Bot;
 
     constructor(app: App, bot: Bot) {
-        super(app)
-        this.bot = bot
+        super(app);
+        this.bot = bot;
     }
 
     protected getAdminPeerIds(): Array<string | number> {
@@ -24,15 +24,20 @@ export class ViberEventListener extends AbstractBotEventListener {
     }
 
     public async sendMessage(chat: BotChat<ViberChat>, message: string, options: MessageOptions = {}) {
-        return this.bot.sendMessage({ id: chat.serviceChat.peerId }, [
-            new Message.Text(message, convertAbstractToViber(options.keyboard ? options.keyboard : new Keyboard(this.app, chat).MainMenu))
-        ]).catch((err) => {
-            if (err.status == 6) {
-                chat.allowSendMess = false;
-                return;
-            }
+        return this.bot
+            .sendMessage({ id: chat.serviceChat.peerId }, [
+                new Message.Text(
+                    message,
+                    convertAbstractToViber(options.keyboard ? options.keyboard : new Keyboard(this.app, chat).MainMenu)
+                )
+            ])
+            .catch((err) => {
+                if (err.status == 6) {
+                    chat.allowSendMess = false;
+                    return;
+                }
 
-            console.error('Viber send event error', err)
-        })
+                console.error('Viber send event error', err);
+            });
     }
 }

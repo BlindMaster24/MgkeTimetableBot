@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../types/telegram';
-import { defines } from "../../../defines";
-import { AbstractCommand, CmdHandlerParams } from "../abstract";
+import { defines } from '../../../defines';
+import { AbstractCommand, CmdHandlerParams } from '../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)?eula)$/i
+    public regexp = /^((!|\/)?eula)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand | null = {
         command: 'eula',

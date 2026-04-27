@@ -1,34 +1,34 @@
-import { watch } from "chokidar";
-import { existsSync, readdirSync, statSync } from "fs";
-import path from "path";
+import { watch } from 'chokidar';
+import { existsSync, readdirSync, statSync } from 'fs';
+import path from 'path';
 import type { TelegramBotCommand } from './types/telegram';
-import { config } from "../../../config";
-import { App, AppService } from "../../app";
-import { Logger } from "../../logger";
-import { ParsedPayload } from "../../utils";
-import { AbstractCallback, AbstractCommand, AbstractCommandContext } from "./abstract";
-import { BotChat } from "./chat";
-import { BotCron } from "./cron";
-import { BotEventController } from "./events/controller";
-import "./subscriptions/model";
+import { config } from '../../../config';
+import { App, AppService } from '../../app';
+import { Logger } from '../../logger';
+import { ParsedPayload } from '../../utils';
+import { AbstractCallback, AbstractCommand, AbstractCommandContext } from './abstract';
+import { BotChat } from './chat';
+import { BotCron } from './cron';
+import { BotEventController } from './events/controller';
+import './subscriptions/model';
 
 const cmdRootPath = path.join(__dirname, 'commands');
 const cbRootPath = path.join(__dirname, 'callbacks');
 
 type LoadedInstance<T> = {
-    id: string,
-    path: string,
-    instance: T
-}
+    id: string;
+    path: string;
+    instance: T;
+};
 
 export class BotService implements AppService {
     private readonly logger = new Logger('BOTS');
     public commands: {
-        [id: string]: LoadedInstance<AbstractCommand>
+        [id: string]: LoadedInstance<AbstractCommand>;
     } = {};
 
     public callbacks: {
-        [id: string]: LoadedInstance<AbstractCallback>
+        [id: string]: LoadedInstance<AbstractCallback>;
     } = {};
 
     public events: BotEventController;
@@ -62,8 +62,11 @@ export class BotService implements AppService {
         return cb.instance as T;
     }
 
-    public searchCommandByMessage(message?: string, scene?: string | null): { regexp: string, cmd: AbstractCommand } | null {
-        if (!message) return null
+    public searchCommandByMessage(
+        message?: string,
+        scene?: string | null
+    ): { regexp: string; cmd: AbstractCommand } | null {
+        if (!message) return null;
 
         const cmds = this.commands;
 
@@ -120,7 +123,10 @@ export class BotService implements AppService {
         return null;
     }
 
-    public getCommand(context: AbstractCommandContext, chat: BotChat): { regexp?: string, cmd: AbstractCommand } | null {
+    public getCommand(
+        context: AbstractCommandContext,
+        chat: BotChat
+    ): { regexp?: string; cmd: AbstractCommand } | null {
         if (context.parsedPayload) {
             const cmd = this.searchCommandByPayload(context.parsedPayload);
 
@@ -178,7 +184,7 @@ export class BotService implements AppService {
             }
 
             return commands;
-        }, [])
+        }, []);
     }
 
     public init() {
@@ -199,7 +205,7 @@ export class BotService implements AppService {
 
                 this.logger.info('commands_loaded', { count: Object.keys(this.commands).length });
 
-                this.initFolderWatcher(cmdRootPath, AbstractCommand)
+                this.initFolderWatcher(cmdRootPath, AbstractCommand);
             })(),
             (async () => {
                 const promises = this.loadFromDirectory(AbstractCallback, cbRootPath);
@@ -212,7 +218,11 @@ export class BotService implements AppService {
         ]);
     }
 
-    private loadFromDirectory(classType: typeof AbstractCommand | typeof AbstractCallback, dir: string, rootPath?: string) {
+    private loadFromDirectory(
+        classType: typeof AbstractCommand | typeof AbstractCallback,
+        dir: string,
+        rootPath?: string
+    ) {
         const promises: Promise<void>[] = [];
 
         if (!rootPath) {
@@ -240,7 +250,11 @@ export class BotService implements AppService {
         return promises;
     }
 
-    public async loadClass(classType: typeof AbstractCommand | typeof AbstractCallback, rootPath: string, filePath: string) {
+    public async loadClass(
+        classType: typeof AbstractCommand | typeof AbstractCallback,
+        rootPath: string,
+        filePath: string
+    ) {
         if (!filePath.endsWith('.ts') && !filePath.endsWith('.js')) {
             return;
         }
@@ -303,7 +317,7 @@ export class BotService implements AppService {
         }
 
         if (!path) {
-            throw new Error('Could\'t reload unloaded command by id without path')
+            throw new Error("Could't reload unloaded command by id without path");
         }
 
         await this.loadClass(AbstractCommand, cmdRootPath, path);
@@ -317,7 +331,7 @@ export class BotService implements AppService {
         }
 
         if (!path) {
-            throw new Error('Could\'t reload unloaded callback by id without path')
+            throw new Error("Could't reload unloaded callback by id without path");
         }
 
         await this.loadClass(AbstractCallback, cbRootPath, path);
@@ -328,7 +342,7 @@ export class BotService implements AppService {
             .replace(rootPath, '')
             .replace(/^(\\|\/)/i, '')
             .replace(/(\.(ts|js))$/i, '')
-            .replace(/\\|\//ig, '_');
+            .replace(/\\|\//gi, '_');
     }
 
     private initFolderWatcher(folderPath: string, classType: typeof AbstractCommand | typeof AbstractCallback) {
@@ -348,7 +362,7 @@ export class BotService implements AppService {
                         await this.reloadCommandById(id, path);
                     } else if (classType === AbstractCallback) {
                         await this.reloadCallbackById(id, path);
-                    } else throw new Error('unknown class type')
+                    } else throw new Error('unknown class type');
                 } catch (e) {
                     this.logger.error('reload_failed', { className, id, path, error: e });
 
@@ -377,7 +391,7 @@ export class BotService implements AppService {
 
                         this.logger.info('detected_unlink_unloading', { className, id, path });
                         this.unloadCallback(cb);
-                    } else throw new Error('unknown class type')
+                    } else throw new Error('unknown class type');
                 } catch (e) {
                     this.logger.error('unload_failed', { className, id, path, error: e });
 
@@ -385,7 +399,6 @@ export class BotService implements AppService {
                 }
 
                 this.logger.info('unload_success', { className, id });
-            })
+            });
     }
 }
-

@@ -1,15 +1,15 @@
-import { Request } from "express";
+import { Request } from 'express';
 
 export function getParams(request: Request) {
     return {
-        ...request.query,  // параметры строки запроса
-        ...request.body   // параметры тела запроса (POST)
+        ...request.query, // параметры строки запроса
+        ...request.body // параметры тела запроса (POST)
         // ...request.params  // параметры пути
     };
 }
 
 export function getIp(req: Request) {
-    return req.header('X-Forwarded-For')?.split(', ')[0] ?? req.ip
+    return req.header('X-Forwarded-For')?.split(', ')[0] ?? req.ip;
 }
 
 export function replaceWithValueLength(obj: any) {

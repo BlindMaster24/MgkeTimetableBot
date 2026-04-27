@@ -1,8 +1,8 @@
-import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes, Model } from "sequelize";
-import { config } from "../../../config";
-import { sequelize } from "../../db";
-import { ApiKey } from "../../key";
-import { BotChat } from "../bots/chat";
+import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes, Model } from 'sequelize';
+import { config } from '../../../config';
+import { sequelize } from '../../db';
+import { ApiKey } from '../../key';
+import { BotChat } from '../bots/chat';
 
 const keyTool = new ApiKey(config.encrypt_key);
 
@@ -36,39 +36,42 @@ class ApiKeyModel extends Model<InferAttributes<ApiKeyModel>, InferCreationAttri
     }
 }
 
-ApiKeyModel.init({
-    id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-        allowNull: true
-    },
-    chatId: {
-        type: DataTypes.INTEGER,
-        unique: true,
-        allowNull: false
-    },
-    limitPerSec: {
-        type: DataTypes.SMALLINT,
-        defaultValue: 2
-    },
-    iv: {
-        type: DataTypes.BLOB,
-        allowNull: false,
-        defaultValue: () => {
-            return keyTool.createIV();
+ApiKeyModel.init(
+    {
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true,
+            allowNull: true
+        },
+        chatId: {
+            type: DataTypes.INTEGER,
+            unique: true,
+            allowNull: false
+        },
+        limitPerSec: {
+            type: DataTypes.SMALLINT,
+            defaultValue: 2
+        },
+        iv: {
+            type: DataTypes.BLOB,
+            allowNull: false,
+            defaultValue: () => {
+                return keyTool.createIV();
+            }
+        },
+        lastUsed: {
+            type: DataTypes.DATE,
+            allowNull: true
         }
     },
-    lastUsed: {
-        type: DataTypes.DATE,
-        allowNull: true
+    {
+        sequelize: sequelize,
+        tableName: 'api',
+        timestamps: true,
+        indexes: []
     }
-}, {
-    sequelize: sequelize,
-    tableName: 'api',
-    timestamps: true,
-    indexes: []
-});
+);
 
 ApiKeyModel.belongsTo(BotChat, {
     targetKey: 'id',
@@ -76,4 +79,3 @@ ApiKeyModel.belongsTo(BotChat, {
 });
 
 export { ApiKeyModel };
-

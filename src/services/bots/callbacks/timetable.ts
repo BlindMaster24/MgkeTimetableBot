@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { StringDate, WeekIndex, removePastDays } from "../../../utils";
-import { raspCache } from "../../parser";
-import { AbstractCallback, CbHandlerParams } from "../abstract";
+import { z } from 'zod';
+import { StringDate, WeekIndex, removePastDays } from '../../../utils';
+import { raspCache } from '../../parser';
+import { AbstractCallback, CbHandlerParams } from '../abstract';
 
 export default class extends AbstractCallback {
     public payloadAction: string = 'timetable';
@@ -9,19 +9,25 @@ export default class extends AbstractCallback {
     handler(params: CbHandlerParams) {
         const { context, chat }: CbHandlerParams = params;
 
-        const [type, value, weekIndex, hidePastDays, showHeader] = z.tuple([
-            z.enum(['g', 'group', 't', 'teacher']),
-            z.coerce.string(),
-            z.number().int().nullish().transform((arg) => {
-                if (!arg) {
-                    return WeekIndex.getRelevant().valueOf();
-                }
+        const [type, value, weekIndex, hidePastDays, showHeader] = z
+            .tuple([
+                z.enum(['g', 'group', 't', 'teacher']),
+                z.coerce.string(),
+                z
+                    .number()
+                    .int()
+                    .nullish()
+                    .transform((arg) => {
+                        if (!arg) {
+                            return WeekIndex.getRelevant().valueOf();
+                        }
 
-                return arg;
-            }),
-            z.coerce.boolean().default(chat.hidePastDays),
-            z.coerce.boolean().default(true)
-        ]).parse(context.payload);
+                        return arg;
+                    }),
+                z.coerce.boolean().default(chat.hidePastDays),
+                z.coerce.boolean().default(true)
+            ])
+            .parse(context.payload);
 
         if (['g', 'group'].includes(type)) {
             return this.groupRasp(params, value, weekIndex, hidePastDays, showHeader);
@@ -34,7 +40,13 @@ export default class extends AbstractCallback {
         return context.editOrSend('unknown type');
     }
 
-    private async groupRasp({ context, scheduleFormatter, keyboard }: CbHandlerParams, value: string, weekIndex: number, hidePastDays: boolean, showHeader: boolean) {
+    private async groupRasp(
+        { context, scheduleFormatter, keyboard }: CbHandlerParams,
+        value: string,
+        weekIndex: number,
+        hidePastDays: boolean,
+        showHeader: boolean
+    ) {
         const group = raspCache.groups.timetable[value];
         if (group === undefined) return context.editOrSend('Данной учебной группы не существует');
 
@@ -46,7 +58,7 @@ export default class extends AbstractCallback {
             days = removePastDays(days);
         }
 
-        const message = scheduleFormatter.formatGroupFull(String(value), {      
+        const message = scheduleFormatter.formatGroupFull(String(value), {
             showHeader,
             days,
             weekLabel: this.getAcademicWeekLabel(weekIndex)
@@ -57,7 +69,13 @@ export default class extends AbstractCallback {
         });
     }
 
-    private async teacherRasp({ context, scheduleFormatter, keyboard }: CbHandlerParams, value: string, weekIndex: number, hidePastDays: boolean, showHeader: boolean) {
+    private async teacherRasp(
+        { context, scheduleFormatter, keyboard }: CbHandlerParams,
+        value: string,
+        weekIndex: number,
+        hidePastDays: boolean,
+        showHeader: boolean
+    ) {
         const teacher = raspCache.teachers.timetable[value];
         if (teacher === undefined) return context.editOrSend('Данного преподавателя не существует');
 

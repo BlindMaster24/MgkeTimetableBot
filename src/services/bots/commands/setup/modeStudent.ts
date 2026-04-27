@@ -1,11 +1,11 @@
-import { defines } from "../../../../defines";
-import { randArray } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { StaticKeyboard } from "../../keyboard";
+import { defines } from '../../../../defines';
+import { randArray } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { StaticKeyboard } from '../../keyboard';
 
 export default class extends AbstractCommand {
-    public regexp = /^((👩‍🎓\s)?(Ученик|Учащийся)|(👨‍👩‍👦\s)?Родитель)$/i
+    public regexp = /^((👩‍🎓\s)?(Ученик|Учащийся)|(👨‍👩‍👦\s)?Родитель)$/i;
     public payloadAction = null;
     public scene?: string | null = 'setup';
 
@@ -18,17 +18,19 @@ export default class extends AbstractCommand {
 
         const randGroup = randArray(Object.keys(raspCache.groups.timetable));
 
-        let group: string | number | false | undefined = await context.input(`Введите номер своей группы (например, ${randGroup})`, {
-            keyboard: StaticKeyboard.Cancel
-        }).then<string | undefined>(value => {
-            return value?.text;
-        });
+        let group: string | number | false | undefined = await context
+            .input(`Введите номер своей группы (например, ${randGroup})`, {
+                keyboard: StaticKeyboard.Cancel
+            })
+            .then<string | undefined>((value) => {
+                return value?.text;
+            });
 
         while (true) {
             group = await this.findGroup(params, group);
 
             if (!group) {
-                group = await context.waitInput().then<string | undefined>(value => {
+                group = await context.waitInput().then<string | undefined>((value) => {
                     return value?.text;
                 });
                 continue;

@@ -15,23 +15,23 @@ const VALID_URL_TIME: number = 86400;
 const acceptTool = new RequestKey(config.encrypt_key);
 
 type ErrorParams = {
-    userId: number | null,
-    request: Request,
-    response: Response
-}
+    userId: number | null;
+    request: Request;
+    response: Response;
+};
 
 function parseUrl(url: string) {
-    const data = new URL(url)
+    const data = new URL(url);
 
     const query: {
-        [key: string]: string
-    } = {}
+        [key: string]: string;
+    } = {};
 
     data.searchParams.forEach((value, key) => {
-        query[key] = value
-    })
+        query[key] = value;
+    });
 
-    return query
+    return query;
 }
 
 export class VKApp implements AppService {
@@ -39,64 +39,65 @@ export class VKApp implements AppService {
 
     private loaded: {
         [method: string]: {
-            [method: string]: VKAppDefaultMethod
-        }
+            [method: string]: VKAppDefaultMethod;
+        };
     } = {};
 
-    constructor(private app: App) { }
+    constructor(private app: App) {}
 
     public run() {
         const server = this.app.getService('http').getServer();
 
         this.loadMethods();
 
-        server.use(`${config.vk.app.url}/:method`,
-            (request, response) => {
-                const requestId = request.header('x-request-id') || newTraceId();
-                return runWithLogContext({
-                traceId: requestId,
-                requestId,
-                service: 'vk_app',
-                event: 'http_request',
-                path: request.path,
-                method: request.method
-                }, () => this.handler(request, response));
-            }
-        )
+        server.use(`${config.vk.app.url}/:method`, (request, response) => {
+            const requestId = request.header('x-request-id') || newTraceId();
+            return runWithLogContext(
+                {
+                    traceId: requestId,
+                    requestId,
+                    service: 'vk_app',
+                    event: 'http_request',
+                    path: request.path,
+                    method: request.method
+                },
+                () => this.handler(request, response)
+            );
+        });
     }
 
     private loadMethods() {
-        const methodsPath = path.join(__dirname, 'methods')
+        const methodsPath = path.join(__dirname, 'methods');
 
-        const files = readdirSync(methodsPath)
+        const files = readdirSync(methodsPath);
 
         for (const file of files) {
-            const { default: _class } = require(path.join(methodsPath, file))
+            const { default: _class } = require(path.join(methodsPath, file));
             if (_class === undefined) {
                 continue;
             }
 
-            const method: VKAppDefaultMethod = new _class()
+            const method: VKAppDefaultMethod = new _class();
             if (method.method === undefined) {
                 continue;
             }
 
             if (this.loaded[method.httpMethod]?.[method.method] !== undefined) {
-                throw new Error(`${method.httpMethod} /${method.method} is already loaded!`)
+                throw new Error(`${method.httpMethod} /${method.method} is already loaded!`);
             }
 
             if (this.loaded[method.httpMethod] === undefined) {
-                this.loaded[method.httpMethod] = {}
+                this.loaded[method.httpMethod] = {};
             }
 
             this.loaded[method.httpMethod][method.method] = method;
         }
 
-        this.logger.log(`Загружено методов: ${this.getCountMethods()}`)
+        this.logger.log(`Загружено методов: ${this.getCountMethods()}`);
     }
 
     public getCountMethods(): number {
-        let count = 0
+        let count = 0;
 
         for (const httpMethod in this.loaded) {
             count += Object.keys(this.loaded[httpMethod]).length;
@@ -105,8 +106,11 @@ export class VKApp implements AppService {
         return count;
     }
 
-    private async handler(request: Request<{ method: string; }>, response: Response) {
-        if (request.method.toUpperCase() === 'POST' && request.headers['content-type']?.split(';')[0] !== 'application/json') {
+    private async handler(request: Request<{ method: string }>, response: Response) {
+        if (
+            request.method.toUpperCase() === 'POST' &&
+            request.headers['content-type']?.split(';')[0] !== 'application/json'
+        ) {
             return this.badRequest(request, response);
         }
 
@@ -132,11 +136,14 @@ export class VKApp implements AppService {
 
         (async () => {
             try {
-                await user.update({
-                    loginAt: new Date()
-                }, {
-                    silent: true
-                });
+                await user.update(
+                    {
+                        loginAt: new Date()
+                    },
+                    {
+                        silent: true
+                    }
+                );
 
                 const message = await _class.handler({ user, request, response });
                 if (message === undefined) {
@@ -149,7 +156,7 @@ export class VKApp implements AppService {
                     response: message
                 });
             } catch (e) {
-                response.status(StatusCode.ServerErrorInternal).send('server error')
+                response.status(StatusCode.ServerErrorInternal).send('server error');
                 this.logger.error(e);
             }
         })();
@@ -174,7 +181,7 @@ export class VKApp implements AppService {
         });
     }
 
-    private badRequest(request: Request<{ method: string; }>, response: Response) {
+    private badRequest(request: Request<{ method: string }>, response: Response) {
         return response.status(StatusCode.ClientErrorBadRequest).send('Bad Request');
     }
 
@@ -185,7 +192,6 @@ export class VKApp implements AppService {
 
         return Number(parseUrl(url).vk_user_id);
     }
-
 
     private getAcceptKey(userId: number): string {
         return acceptTool.getKey({

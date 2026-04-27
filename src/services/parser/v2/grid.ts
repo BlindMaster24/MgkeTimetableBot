@@ -1,9 +1,9 @@
-import { DayRange, GridCell, TableGrid } from "./types";
-import { parseDayLabel } from "./text";
+import { DayRange, GridCell, TableGrid } from './types';
+import { parseDayLabel } from './text';
 
 export function buildTableGrid(table: HTMLTableElement): TableGrid {
     const grid: GridCell[][] = [];
-    const pending: { cell: HTMLTableCellElement, row: number, col: number, remaining: number }[] = [];
+    const pending: { cell: HTMLTableCellElement; row: number; col: number; remaining: number }[] = [];
 
     const rows = Array.from(table.rows);
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {

@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)notice)|(🔊\s)?(Настройка оповещений|Оповещения)$/i
+    public regexp = /^((!|\/)notice)|(🔊\s)?(Настройка оповещений|Оповещения)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'notice',
@@ -14,6 +14,6 @@ export default class extends AbstractCommand {
 
         return context.send('Меню настройки оповещений.', {
             keyboard: keyboard.SettingsNotice
-        })
+        });
     }
 }

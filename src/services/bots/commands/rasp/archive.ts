@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { DayIndex, StringDate, WeekIndex } from "../../../../utils";
-import { GroupDay, TeacherDay } from "../../../parser/types";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { StaticKeyboard } from "../../keyboard";
+import { DayIndex, StringDate, WeekIndex } from '../../../../utils';
+import { GroupDay, TeacherDay } from '../../../parser/types';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { StaticKeyboard } from '../../keyboard';
 
 export default class extends AbstractCommand {
     public regexp = /^((!|\/)archive)(\b|$|\s)/i;
@@ -49,7 +49,11 @@ export default class extends AbstractCommand {
                 });
 
                 return context.send(text, {
-                    keyboard: StaticKeyboard.GetWeekTimetable({ type: 'group', value: chat.group, weekIndex: weekIndex.valueOf() })
+                    keyboard: StaticKeyboard.GetWeekTimetable({
+                        type: 'group',
+                        value: chat.group,
+                        weekIndex: weekIndex.valueOf()
+                    })
                 });
             }
 
@@ -70,16 +74,24 @@ export default class extends AbstractCommand {
                 });
 
                 return context.send(text, {
-                    keyboard: StaticKeyboard.GetWeekTimetable({ type: 'teacher', value: chat.teacher, weekIndex: weekIndex.valueOf() })
+                    keyboard: StaticKeyboard.GetWeekTimetable({
+                        type: 'teacher',
+                        value: chat.teacher,
+                        weekIndex: weekIndex.valueOf()
+                    })
                 });
             }
 
-            return context.send(`Для данного режима чата (${chat.mode}) нельзя автоматически получить группу или учителя.`);
+            return context.send(
+                `Для данного режима чата (${chat.mode}) нельзя автоматически получить группу или учителя.`
+            );
         }
 
         const day = this.parseDayInput(raw);
         if (!day) {
-            return context.send('Неверный формат даты. Пример: /archive 12.02 или /archive 12.02.2026 или /archive week 5');
+            return context.send(
+                'Неверный формат даты. Пример: /archive 12.02 или /archive 12.02.2026 или /archive week 5'
+            );
         }
 
         const dayIndex: number = DayIndex.fromStringDate(day).valueOf();
@@ -120,7 +132,9 @@ export default class extends AbstractCommand {
             }
         } else {
             //todo get from args
-            return context.send(`Для данного режима чата (${chat.mode}) нельзя автоматически получить группу или учителя.`);
+            return context.send(
+                `Для данного режима чата (${chat.mode}) нельзя автоматически получить группу или учителя.`
+            );
         }
 
         if (!entry || !text) {
@@ -131,10 +145,12 @@ export default class extends AbstractCommand {
                 const toDay = StringDate.fromDayIndex(maxDayIndex).toString();
 
                 //todo another day format
-                return context.send([
-                    'Вы указали день, который находится вне периода сохранённых дней.',
-                    `В базе хранятся дни, начиная с ${fromDay} по ${toDay}`
-                ].join('\n'));
+                return context.send(
+                    [
+                        'Вы указали день, который находится вне периода сохранённых дней.',
+                        `В базе хранятся дни, начиная с ${fromDay} по ${toDay}`
+                    ].join('\n')
+                );
             }
 
             return context.send('Ничего не найдено на данный день');
@@ -148,7 +164,10 @@ export default class extends AbstractCommand {
     }
 
     private parseDayInput(raw: string): string | null {
-        const parts = raw.split('.').map((value) => value.trim()).filter((value) => value.length > 0);
+        const parts = raw
+            .split('.')
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
         if (parts.length < 2 || parts.length > 3) {
             return null;
         }

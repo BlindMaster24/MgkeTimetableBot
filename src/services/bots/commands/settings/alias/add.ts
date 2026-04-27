@@ -1,13 +1,13 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(⌨️\s)?(Добавить)$/i
+    public regexp = /^(⌨️\s)?(Добавить)$/i;
     public payloadAction = null;
-    public scene: string  = 'settings_alias';
+    public scene: string = 'settings_alias';
 
     handler({ context, chat, keyboard }: CmdHandlerParams) {
         return context.send('Меню настройки алиасов.', {
             keyboard: keyboard.SettingsAliases
-        })
+        });
     }
 }

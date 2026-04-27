@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { config } from "../../../../../config";
-import { WeekIndex } from "../../../../utils";
-import { buildIcs } from "../../../calendar/ics";
-import { AbstractCommand, BotServiceName, CmdHandlerParams } from "../../abstract";
+import { config } from '../../../../../config';
+import { WeekIndex } from '../../../../utils';
+import { buildIcs } from '../../../calendar/ics';
+import { AbstractCommand, BotServiceName, CmdHandlerParams } from '../../abstract';
 
 export default class IcsCommand extends AbstractCommand {
     public regexp = /^((!|\/)ics|(📅\s*)?ics)$/i;

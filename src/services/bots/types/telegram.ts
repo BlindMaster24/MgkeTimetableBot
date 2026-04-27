@@ -1,4 +1,4 @@
 export type TelegramBotCommand = {
-    command: string,
-    description: string
+    command: string;
+    description: string;
 };

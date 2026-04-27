@@ -2,9 +2,9 @@ export function escapeRegex(string: string): string {
     return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
-export type ParsedPayload = { action: string, data?: any };
+export type ParsedPayload = { action: string; data?: any };
 export function parsePayload(data?: string): ParsedPayload | undefined {
-    if (!data) { 
+    if (!data) {
         return;
     }
 
@@ -16,5 +16,5 @@ export function parsePayload(data?: string): ParsedPayload | undefined {
     return {
         action: parsed[1],
         data: parsed[2] ? JSON.parse(parsed[2]) : null
-    }
+    };
 }

@@ -17,28 +17,28 @@ import { TgCallbackContext, TgCallbackRealContext, TgCommandContext, TgMessageRe
 import { TgEventListener } from './event';
 
 type TgUser = {
-    id: number,
-    is_bot?: boolean
+    id: number;
+    is_bot?: boolean;
 };
 
 type TgChatInfo = {
-    id: number,
-    type: string,
-    username?: string
+    id: number;
+    type: string;
+    username?: string;
 };
 
 type TgMyChatMemberContext = {
     update: {
-        update_id: number,
+        update_id: number;
         my_chat_member?: {
-            chat: TgChatInfo,
-            from?: TgUser,
+            chat: TgChatInfo;
+            from?: TgUser;
             new_chat_member: {
-                status: string
-            }
-        }
-    },
-    api: Bot['api']
+                status: string;
+            };
+        };
+    };
+    api: Bot['api'];
 };
 
 function parseStartPayload(messageText?: string): string | undefined {
@@ -76,37 +76,52 @@ export class TgBot extends AbstractBot implements AppService {
             });
         });
 
-        this.tg.on('message', (context) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'tg',
-            event: 'message',
-            updateId: context.update.update_id,
-            chatId: context.chat?.id,
-            peerId: context.chat?.id,
-            userId: context.from?.id,
-            messageId: context.msg?.message_id
-        }, () => this.messageHandler(context as TgMessageRealContext)));
+        this.tg.on('message', (context) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'tg',
+                    event: 'message',
+                    updateId: context.update.update_id,
+                    chatId: context.chat?.id,
+                    peerId: context.chat?.id,
+                    userId: context.from?.id,
+                    messageId: context.msg?.message_id
+                },
+                () => this.messageHandler(context as TgMessageRealContext)
+            )
+        );
 
-        this.tg.on('my_chat_member', (context) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'tg',
-            event: 'my_chat_member',
-            updateId: context.update.update_id,
-            chatId: context.chat?.id,
-            peerId: context.chat?.id,
-            userId: context.from?.id
-        }, () => this.myChatMember(context as unknown as TgMyChatMemberContext)));
+        this.tg.on('my_chat_member', (context) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'tg',
+                    event: 'my_chat_member',
+                    updateId: context.update.update_id,
+                    chatId: context.chat?.id,
+                    peerId: context.chat?.id,
+                    userId: context.from?.id
+                },
+                () => this.myChatMember(context as unknown as TgMyChatMemberContext)
+            )
+        );
 
-        this.tg.on('callback_query:data', (context) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'tg',
-            event: 'callback_query',
-            updateId: context.update.update_id,
-            chatId: context.callbackQuery.message?.chat.id,
-            peerId: context.callbackQuery.message?.chat.id,
-            userId: context.from?.id,
-            messageId: context.callbackQuery.message?.message_id
-        }, () => this.callbackHandler(context as TgCallbackRealContext)));
+        this.tg.on('callback_query:data', (context) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'tg',
+                    event: 'callback_query',
+                    updateId: context.update.update_id,
+                    chatId: context.callbackQuery.message?.chat.id,
+                    peerId: context.callbackQuery.message?.chat.id,
+                    userId: context.from?.id,
+                    messageId: context.callbackQuery.message?.message_id
+                },
+                () => this.callbackHandler(context as TgCallbackRealContext)
+            )
+        );
 
         if (config.telegram.noticer) {
             this.getBotService().events.registerListener(this.event);
@@ -122,43 +137,46 @@ export class TgBot extends AbstractBot implements AppService {
         process.once('SIGINT', stopPolling);
         process.once('SIGTERM', stopPolling);
 
-        await this.tg.start({
-            drop_pending_updates: false,
-            onStart: () => {
-                this.logger.info('tg_start_polling');
-            }
-        }).catch(err => {
-            this.logger.error('tg_polling_error', { error: err });
-        });
+        await this.tg
+            .start({
+                drop_pending_updates: false,
+                onStart: () => {
+                    this.logger.info('tg_start_polling');
+                }
+            })
+            .catch((err) => {
+                this.logger.error('tg_polling_error', { error: err });
+            });
     }
 
-    public async getChat(peerId: number, creationDefaults?: Partial<CreationAttributes<BotChat>>): Promise<BotChat<TgChat>> {
+    public async getChat(
+        peerId: number,
+        creationDefaults?: Partial<CreationAttributes<BotChat>>
+    ): Promise<BotChat<TgChat>> {
         return BotChat.findByServicePeerId(TgChat, peerId, creationDefaults);
     }
 
     private async setBotCommands() {
         const cmdPromises: Promise<boolean>[] = [];
 
-        cmdPromises.push(this.tg.api.setMyCommands(
-            this.getBotService().getBotCommands(),
-            {
+        cmdPromises.push(
+            this.tg.api.setMyCommands(this.getBotService().getBotCommands(), {
                 scope: {
                     type: 'default'
                 }
-            }
-        ));
+            })
+        );
 
         const adminCommands = this.getBotService().getBotCommands(true);
         for (const adminId of config.telegram.admin_ids) {
-            cmdPromises.push(this.tg.api.setMyCommands(
-                adminCommands,
-                {
+            cmdPromises.push(
+                this.tg.api.setMyCommands(adminCommands, {
                     scope: {
                         type: 'chat',
                         chat_id: adminId
                     }
-                }
-            ));
+                })
+            );
         }
 
         const result = await Promise.all(cmdPromises);
@@ -196,7 +214,10 @@ export class TgBot extends AbstractBot implements AppService {
     }
 
     protected override handleMessageError(cmd: AbstractCommand, context: AbstractCommandContext, err: Error): void {
-        if (err instanceof GrammyError && [StatusCode.ClientErrorTooManyRequests, StatusCode.ClientErrorForbidden].includes(err.error_code)) {
+        if (
+            err instanceof GrammyError &&
+            [StatusCode.ClientErrorTooManyRequests, StatusCode.ClientErrorForbidden].includes(err.error_code)
+        ) {
             return;
         }
 
@@ -210,7 +231,10 @@ export class TgBot extends AbstractBot implements AppService {
         const _context = new TgCallbackContext(this, context);
 
         const chat = await this.getChat(context.callbackQuery.message.chat.id, this._defaultCreationParams(_context));
-        await chat.serviceChat.updateChat(context.callbackQuery.message.chat as any, context.callbackQuery.message.from as any);
+        await chat.serviceChat.updateChat(
+            context.callbackQuery.message.chat as any,
+            context.callbackQuery.message.from as any
+        );
 
         return this.handleCallback({
             service: 'tg',
@@ -230,13 +254,15 @@ export class TgBot extends AbstractBot implements AppService {
             peer_id: context.peerId,
             sender_id: context.userId,
             time: Date.now()
-        }
+        };
     }
 
-    protected _defaultCreationParams(context: TgCommandContext | TgCallbackContext): Partial<CreationAttributes<BotChat>> {
+    protected _defaultCreationParams(
+        context: TgCommandContext | TgCallbackContext
+    ): Partial<CreationAttributes<BotChat>> {
         return {
             accepted: context.isChat ? config.accept.room : config.accept.private
-        }
+        };
     }
 
     private async myChatMember(context: TgMyChatMemberContext) {

@@ -1,7 +1,7 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { getDayRasp } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { getDayRasp } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
     public regexp = /^((!|\/)?endings)$/i;
@@ -17,9 +17,9 @@ export default class extends AbstractCommand {
 
         const stat: {
             [day: string]: {
-                [lesson: number]: number
-            }
-        } = {}
+                [lesson: number]: number;
+            };
+        } = {};
 
         for (const groupIndex in groups) {
             const group = groups[groupIndex];
@@ -81,6 +81,6 @@ export default class extends AbstractCommand {
             message.push(part.join('\n'));
         }
 
-        return context.send(message.join('\n\n'))
+        return context.send(message.join('\n\n'));
     }
 }

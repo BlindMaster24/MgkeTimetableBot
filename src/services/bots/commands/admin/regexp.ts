@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)regexp$/i
+    public regexp = /^(!|\/)regexp$/i;
     public payloadAction = null;
     public adminOnly: boolean = true;
     public tgCommand: TelegramBotCommand | null = {
@@ -18,7 +18,7 @@ export default class extends AbstractCommand {
             const { instance } = commands[id];
             const regexp: string = String(instance.regexp);
 
-            message.push(`${id}: ${regexp}`)
+            message.push(`${id}: ${regexp}`);
         }
 
         return context.send(message.join('\n'));

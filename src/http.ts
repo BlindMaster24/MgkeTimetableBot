@@ -5,7 +5,7 @@ import { newTraceId, runWithLogContext } from './logging';
 import { Logger } from './logger';
 import { getIp, getParams, replaceWithValueLength } from './utils';
 
-type ErrorWithStatus = Error & Partial<{ status: number; statusCode: number, code: any, type: any }>;
+type ErrorWithStatus = Error & Partial<{ status: number; statusCode: number; code: any; type: any }>;
 
 export class HttpService implements AppService {
     public logger: Logger = new Logger('HTTP');
@@ -29,27 +29,30 @@ export class HttpService implements AppService {
             const requestId = typeof incoming === 'string' && incoming.trim().length > 0 ? incoming : newTraceId();
             res.setHeader('x-request-id', requestId);
 
-            runWithLogContext({
-                traceId: requestId,
-                requestId,
-                service: 'http',
-                event: 'http_request',
-                method: req.method,
-                path: req.path
-            }, () => {
-                next();
-            });
+            runWithLogContext(
+                {
+                    traceId: requestId,
+                    requestId,
+                    service: 'http',
+                    event: 'http_request',
+                    method: req.method,
+                    path: req.path
+                },
+                () => {
+                    next();
+                }
+            );
         });
-        
+
         if (config.dev) {
             this.logRoutes();
         }
-        
+
         this.setupOriginHeaders();
         this.setupJsonBodyParser();
-        
+
         this.http.use(this.errorHandler.bind(this));
-        
+
         this.http.listen(config.http.port, () => {
             this.logger.log(`Сервер запущен на порту: ${config.http.port}`);
         });
@@ -58,16 +61,16 @@ export class HttpService implements AppService {
     private setupOriginHeaders() {
         this.http.use((req, res, next) => {
             res.header('Access-Control-Allow-Origin', '*');
-            res.header('Access-Control-Allow-Methods', 'DELETE, POST, GET, OPTIONS')
+            res.header('Access-Control-Allow-Methods', 'DELETE, POST, GET, OPTIONS');
             res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-            res.header('Access-Control-Max-Age', '86400')
+            res.header('Access-Control-Max-Age', '86400');
             next();
         });
 
         this.http.use((req, res, next) => {
             if (req.method.toUpperCase() !== 'OPTIONS') return next();
 
-            res.send()
+            res.send();
         });
     }
 
@@ -79,15 +82,15 @@ export class HttpService implements AppService {
                 }
             }
 
-            return express.json({})(req, res, next)
-        })
+            return express.json({})(req, res, next);
+        });
     }
 
     private logRoutes() {
         this.http.use((req, res, next) => {
             this.logger.debug(getIp(req), req.path, replaceWithValueLength(getParams(req)));
             next();
-        })
+        });
     }
 
     private errorHandler(err: ErrorWithStatus | null, req: Request, response: Response, next: NextFunction) {
@@ -107,12 +110,14 @@ export class HttpService implements AppService {
 
         if (process.env.NODE_ENV !== 'production') {
             // body.stack = err.stack;
-            body.trace = err.stack?.replace(/\ +/g, ' ')
-                .replace(/(\n\ )+/g, '\n')
-                .split('\t')
-                .join('')
-                .split('\n')
-                .slice(1) || [];
+            body.trace =
+                err.stack
+                    ?.replace(/\ +/g, ' ')
+                    .replace(/(\n\ )+/g, '\n')
+                    .split('\t')
+                    .join('')
+                    .split('\n')
+                    .slice(1) || [];
         }
 
         Object.assign(body, {
@@ -126,6 +131,6 @@ export class HttpService implements AppService {
             this.logger.error(err);
         }
 
-        return response.json(body)
+        return response.json(body);
     }
 }

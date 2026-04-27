@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)diff(settings)?)|(📊\s)?(Сравнение)$/i
+    public regexp = /^((!|\/)diff(settings)?)|(📊\s)?(Сравнение)$/i;
     public payloadAction = null;
     public scene?: string | null = 'settings';
     public tgCommand: TelegramBotCommand = {

@@ -1,17 +1,17 @@
-import { App, AppService } from "../../app";
-import { sequelize } from "../../db";
-import { Logger } from "../../logger";
-import { DayIndex, WeekIndex } from "../../utils";
-import { loadCache, raspCache } from "../parser/raspCache";
-import { GroupDay, TeacherDay } from "../parser/types";
-import { TimetableArchive } from "./models/timetable";
-import { ArchiveAppendDay, TimetableArchiveRepository } from "./repository";
+import { App, AppService } from '../../app';
+import { sequelize } from '../../db';
+import { Logger } from '../../logger';
+import { DayIndex, WeekIndex } from '../../utils';
+import { loadCache, raspCache } from '../parser/raspCache';
+import { GroupDay, TeacherDay } from '../parser/types';
+import { TimetableArchive } from './models/timetable';
+import { ArchiveAppendDay, TimetableArchiveRepository } from './repository';
 
 export class Timetable implements AppService {
     private readonly repository = new TimetableArchiveRepository();
     private readonly logger = new Logger('Timetable');
 
-    constructor(private app: App) { }
+    constructor(private app: App) {}
 
     public run() {
         if (this.app.isServiceRegistered('parser')) {
@@ -67,17 +67,17 @@ export class Timetable implements AppService {
         await this.appendDays(entries);
     }
 
-    public async getDayIndexBounds(): Promise<{ min: number, max: number }> {
+    public async getDayIndexBounds(): Promise<{ min: number; max: number }> {
         return this.repository.getDayIndexBounds();
     }
 
-    public async getWeekIndexBounds(): Promise<{ min: number, max: number }> {
+    public async getWeekIndexBounds(): Promise<{ min: number; max: number }> {
         const { min, max } = await this.getDayIndexBounds();
 
         return {
             min: WeekIndex.fromDayIndex(min).valueOf(),
             max: WeekIndex.fromDayIndex(max).valueOf()
-        }
+        };
     }
 
     public async getGroups(): Promise<string[]> {
@@ -118,27 +118,36 @@ export class Timetable implements AppService {
         }
 
         await sequelize.transaction(async (transaction) => {
-            await TimetableArchive.bulkCreate(entries.filter((entry) => {
-                return entry.type === 'group';
-            }).map((entry) => this.repository.toArchiveRow(entry)), {
-                transaction,
-                returning: false,
-                updateOnDuplicate: ['data'],
-                conflictAttributes: ['day', 'group']
-            });
+            await TimetableArchive.bulkCreate(
+                entries
+                    .filter((entry) => {
+                        return entry.type === 'group';
+                    })
+                    .map((entry) => this.repository.toArchiveRow(entry)),
+                {
+                    transaction,
+                    returning: false,
+                    updateOnDuplicate: ['data'],
+                    conflictAttributes: ['day', 'group']
+                }
+            );
 
-            await TimetableArchive.bulkCreate(entries.filter((entry) => {
-                return entry.type === 'teacher';
-            }).map((entry) => this.repository.toArchiveRow(entry)), {
-                transaction,
-                returning: false,
-                updateOnDuplicate: ['data'],
-                conflictAttributes: ['day', 'teacher']
-            });
+            await TimetableArchive.bulkCreate(
+                entries
+                    .filter((entry) => {
+                        return entry.type === 'teacher';
+                    })
+                    .map((entry) => this.repository.toArchiveRow(entry)),
+                {
+                    transaction,
+                    returning: false,
+                    updateOnDuplicate: ['data'],
+                    conflictAttributes: ['day', 'teacher']
+                }
+            );
         });
     }
 }
 
 export * from '../parser/types';
 export type { ArchiveAppendDay } from './repository';
-

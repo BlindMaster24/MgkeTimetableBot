@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { randArray } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { Subscription } from "../../subscriptions/model";
+import { randArray } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { Subscription } from '../../subscriptions/model';
 
 type SubscriptionEntry = {
     id: number;
@@ -51,10 +51,7 @@ export default class SubscriptionsCommand extends AbstractCommand {
                 return context.send('Подписок нет.', { keyboard: keyboard.SubscriptionsMenu });
             }
 
-            const prompt = [
-                'Введите номер подписки для удаления:',
-                this.formatSubscriptions(list)
-            ].join('\n');
+            const prompt = ['Введите номер подписки для удаления:', this.formatSubscriptions(list)].join('\n');
 
             const selected = await context.input(prompt, { keyboard: keyboard.SubscriptionsMenu });
             const index = selected?.text ? Number(selected.text) : NaN;
@@ -87,19 +84,24 @@ export default class SubscriptionsCommand extends AbstractCommand {
     private async addGroupSubscription(params: CmdHandlerParams) {
         const { context, keyboard } = params;
         if (Object.keys(raspCache.groups.timetable).length === 0) {
-            return context.send('Данные с сервера ещё не загружены, ожидайте...', { keyboard: keyboard.SubscriptionsMenu });
+            return context.send('Данные с сервера ещё не загружены, ожидайте...', {
+                keyboard: keyboard.SubscriptionsMenu
+            });
         }
 
         const count = await Subscription.count({ where: { chatId: params.chat.id } });
         if (count >= MAX_SUBSCRIPTIONS) {
-            return context.send(`Достигнут лимит подписок (${MAX_SUBSCRIPTIONS}).`, { keyboard: keyboard.SubscriptionsMenu });
+            return context.send(`Достигнут лимит подписок (${MAX_SUBSCRIPTIONS}).`, {
+                keyboard: keyboard.SubscriptionsMenu
+            });
         }
 
         const randGroup = randArray(Object.keys(raspCache.groups.timetable));
-        let group: string | undefined = await context.input(
-            `Введите номер группы, на которую хотите подписаться (например, ${randGroup})`,
-            { keyboard: keyboard.GroupHistory }
-        ).then(value => value?.text);
+        let group: string | undefined = await context
+            .input(`Введите номер группы, на которую хотите подписаться (например, ${randGroup})`, {
+                keyboard: keyboard.GroupHistory
+            })
+            .then((value) => value?.text);
 
         while (true) {
             const selected = await this.findGroup(params, group, keyboard.SubscriptionsMenu);
@@ -138,19 +140,22 @@ export default class SubscriptionsCommand extends AbstractCommand {
     private async addTeacherSubscription(params: CmdHandlerParams) {
         const { context, keyboard } = params;
         if (Object.keys(raspCache.teachers.timetable).length === 0) {
-            return context.send('Данные с сервера ещё не загружены, ожидайте...', { keyboard: keyboard.SubscriptionsMenu });
+            return context.send('Данные с сервера ещё не загружены, ожидайте...', {
+                keyboard: keyboard.SubscriptionsMenu
+            });
         }
 
         const count = await Subscription.count({ where: { chatId: params.chat.id } });
         if (count >= MAX_SUBSCRIPTIONS) {
-            return context.send(`Достигнут лимит подписок (${MAX_SUBSCRIPTIONS}).`, { keyboard: keyboard.SubscriptionsMenu });
+            return context.send(`Достигнут лимит подписок (${MAX_SUBSCRIPTIONS}).`, {
+                keyboard: keyboard.SubscriptionsMenu
+            });
         }
 
         const randTeacher = randArray(Object.keys(raspCache.teachers.timetable));
-        let teacher: string | undefined = await context.input(
-            `Введите фамилию преподавателя (например, ${randTeacher})`,
-            { keyboard: keyboard.TeacherHistory }
-        ).then(value => value?.text);
+        let teacher: string | undefined = await context
+            .input(`Введите фамилию преподавателя (например, ${randTeacher})`, { keyboard: keyboard.TeacherHistory })
+            .then((value) => value?.text);
 
         while (true) {
             const selected = await this.findTeacher(params, teacher, keyboard.SubscriptionsMenu);
@@ -183,7 +188,9 @@ export default class SubscriptionsCommand extends AbstractCommand {
             return context.send('Такая подписка уже существует.', { keyboard: keyboard.SubscriptionsMenu });
         }
 
-        return context.send(`Подписка на преподавателя ${teacher} добавлена.`, { keyboard: keyboard.SubscriptionsMenu });
+        return context.send(`Подписка на преподавателя ${teacher} добавлена.`, {
+            keyboard: keyboard.SubscriptionsMenu
+        });
     }
 
     private async getSubscriptions({ chat }: CmdHandlerParams): Promise<SubscriptionEntry[]> {
@@ -197,12 +204,14 @@ export default class SubscriptionsCommand extends AbstractCommand {
     }
 
     private formatSubscriptions(list: SubscriptionEntry[]): string {
-        return list.map((item, index) => {
-            if (item.type === 'group') {
-                return `${index + 1}. Группа ${item.value}`;
-            }
-            return `${index + 1}. Преподаватель ${item.value}`;
-        }).join('\n');
+        return list
+            .map((item, index) => {
+                if (item.type === 'group') {
+                    return `${index + 1}. Группа ${item.value}`;
+                }
+                return `${index + 1}. Преподаватель ${item.value}`;
+            })
+            .join('\n');
     }
 
     private async retrySqliteBusy<T>(action: () => Promise<T>, attempts: number = 3): Promise<T> {
@@ -214,7 +223,7 @@ export default class SubscriptionsCommand extends AbstractCommand {
                 const message = typeof error?.message === 'string' ? error.message : '';
                 if (message.includes('SQLITE_BUSY')) {
                     lastError = error;
-                    await new Promise(resolve => setTimeout(resolve, 200 * (i + 1)));
+                    await new Promise((resolve) => setTimeout(resolve, 200 * (i + 1)));
                     continue;
                 }
                 throw error;

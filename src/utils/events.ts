@@ -1,19 +1,16 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from 'events';
 
 export const EventResolverSymbol = Symbol.for('EventResolver');
 
 export class AsyncEventEmitter extends EventEmitter {
-    private listenerMap = new WeakMap<
-        (...args: any[]) => void,
-        (...args: any[]) => void
-    >();
+    private listenerMap = new WeakMap<(...args: any[]) => void, (...args: any[]) => void>();
 
     emitAsync(eventName: string | symbol, ...args: any[]): Promise<void> | void {
         if (!this.listenerCount(eventName)) {
             return;
         }
 
-        return new Promise(async resolve => {
+        return new Promise(async (resolve) => {
             if (!resolve.prototype) {
                 resolve.prototype = {};
             }
@@ -29,10 +26,7 @@ export class AsyncEventEmitter extends EventEmitter {
             // check if event called from `awaitForEventDone` function
             if (args?.length) {
                 const resolver = args[args.length - 1];
-                if (
-                    typeof resolver === 'function' &&
-                    resolver.prototype?.key === EventResolverSymbol
-                ) {
+                if (typeof resolver === 'function' && resolver.prototype?.key === EventResolverSymbol) {
                     // try {
                     // } catch (e) { }
 
@@ -51,13 +45,10 @@ export class AsyncEventEmitter extends EventEmitter {
         const wrappedListener = async (...args: any[]) => {
             if (args?.length) {
                 const resolver = args[args.length - 1];
-                if (
-                    typeof resolver === 'function' &&
-                    resolver.prototype.key === EventResolverSymbol
-                ) {
+                if (typeof resolver === 'function' && resolver.prototype.key === EventResolverSymbol) {
                     try {
                         await listener(...args);
-                    } catch (e) { }
+                    } catch (e) {}
                     // remove listeners after the event is done
                     this.removeListener(eventName, listener);
                     this.removeListener(eventName, wrappedListener);
@@ -73,10 +64,7 @@ export class AsyncEventEmitter extends EventEmitter {
         return super.once(eventName, wrappedListener);
     }
 
-    removeListener(
-        eventName: string | symbol,
-        listener: (...args: any[]) => void,
-    ): this {
+    removeListener(eventName: string | symbol, listener: (...args: any[]) => void): this {
         const wrappedListener = this.listenerMap.get(listener);
         if (wrappedListener) {
             this.listenerMap.delete(listener);
@@ -86,10 +74,7 @@ export class AsyncEventEmitter extends EventEmitter {
         return this;
     }
 
-    off(
-        eventName: string | symbol,
-        listener: (...args: any[]) => void
-    ): this {
+    off(eventName: string | symbol, listener: (...args: any[]) => void): this {
         return this.removeListener(eventName, listener);
     }
 }
@@ -100,10 +85,7 @@ export interface TypedEventEmitter<TEvents extends Record<string, any>> extends 
         ...eventArg: TEvents[TEventName]
     ): Promise<void>;
 
-    emit<TEventName extends keyof TEvents & string>(
-        eventName: TEventName,
-        ...eventArg: TEvents[TEventName]
-    ): boolean;
+    emit<TEventName extends keyof TEvents & string>(eventName: TEventName, ...eventArg: TEvents[TEventName]): boolean;
 
     on<TEventName extends keyof TEvents & string>(
         eventName: TEventName,
@@ -121,4 +103,4 @@ export interface TypedEventEmitter<TEvents extends Record<string, any>> extends 
     ): this;
 }
 
-export class TypedEventEmitter<TEvents extends Record<string, any>> extends AsyncEventEmitter { }
+export class TypedEventEmitter<TEvents extends Record<string, any>> extends AsyncEventEmitter {}

@@ -1,10 +1,10 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { StringDate, WeekIndex, getDayRasp, randArray } from "../../../../utils";
-import { ImageFile } from "../../../image/builder";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams, MessageOptions } from "../../abstract";
-import { InputInitiator } from "../../input";
-import { StaticKeyboard, withCancelButton } from "../../keyboard";
+import { StringDate, WeekIndex, getDayRasp, randArray } from '../../../../utils';
+import { ImageFile } from '../../../image/builder';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams, MessageOptions } from '../../abstract';
+import { InputInitiator } from '../../input';
+import { StaticKeyboard, withCancelButton } from '../../keyboard';
 
 export default class GetGroupCommand extends AbstractCommand {
     public regexp = {
@@ -41,13 +41,15 @@ export default class GetGroupCommand extends AbstractCommand {
         if (group == '' || group == undefined || group.length > 3 || isNaN(+group)) {
             const randGroup = randArray(Object.keys(raspCache.groups.timetable));
 
-            group = await context.input(`Введите номер группы, которой хотите узнать расписание (например, ${randGroup})`, {
-                keyboard: withCancelButton(keyboard.GroupHistory)
-            }).then<string | undefined>(value => {
-                initiator = value?.initiator;
+            group = await context
+                .input(`Введите номер группы, которой хотите узнать расписание (например, ${randGroup})`, {
+                    keyboard: withCancelButton(keyboard.GroupHistory)
+                })
+                .then<string | undefined>((value) => {
+                    initiator = value?.initiator;
 
-                return value?.text;
-            });
+                    return value?.text;
+                });
         }
 
         while (true) {
@@ -86,7 +88,7 @@ export default class GetGroupCommand extends AbstractCommand {
 
         const options: MessageOptions = {
             keyboard: StaticKeyboard.GetWeekTimetable({ type: 'group', value: group })
-        }
+        };
 
         if (initiator === 'callback') {
             return context.editOrSend(message, options);
@@ -95,7 +97,11 @@ export default class GetGroupCommand extends AbstractCommand {
         return context.send(message, options);
     }
 
-    private async sendWeek(group: string, initiator: InputInitiator, { context, keyboard, formatter }: CmdHandlerParams) {
+    private async sendWeek(
+        group: string,
+        initiator: InputInitiator,
+        { context, keyboard, formatter }: CmdHandlerParams
+    ) {
         const weekIndex = WeekIndex.getRelevant();
         const weekRange = weekIndex.getWeekDayIndexRange();
         const days = await this.app.getService('timetable').getGroupDaysByRange(weekRange, group);
@@ -108,7 +114,7 @@ export default class GetGroupCommand extends AbstractCommand {
 
         const options: MessageOptions = {
             keyboard: await keyboard.WeekControl('group', group, weekIndex.valueOf(), false)
-        }
+        };
 
         if (initiator === 'callback') {
             return context.editOrSend(message, options);

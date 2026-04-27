@@ -9,47 +9,48 @@ export enum KeyType {
 }
 
 export type KeyHeader = {
-    type: KeyType
-}
+    type: KeyType;
+};
 
 export abstract class AbstractKey {
     private key: Buffer;
 
-    private encryptKeyLength: number = 32
+    private encryptKeyLength: number = 32;
     private encryptMethod: string = 'aes-256-cbc';
 
-    private hmacLength: number = 20
-    private hmacMethod: string = 'sha1'
+    private hmacLength: number = 20;
+    private hmacMethod: string = 'sha1';
 
     protected abstract keyType: KeyType;
 
     protected _iv?: Buffer;
 
     constructor(key: Buffer) {
-        this.key = key
+        this.key = key;
     }
 
     protected keyHeader(buffer: ReadBuffer): KeyHeader {
-        const bits = buffer.readBuffer(1).readUInt8().toString(2).padStart(8, '0')
+        const bits = buffer.readBuffer(1).readUInt8().toString(2).padStart(8, '0');
 
-        const keyType: KeyType = parseInt(bits.slice(0, 2), 2)
+        const keyType: KeyType = parseInt(bits.slice(0, 2), 2);
 
-        if (keyType != this.keyType) throw new Error('key type error')
+        if (keyType != this.keyType) throw new Error('key type error');
 
         return {
             type: keyType
-        }
+        };
     }
 
     protected createKeyHeader(buffer: WriteBuffer) {
-        buffer.writeBuffer(this.packBits(
-            this.keyType.toString(2).padStart(2, '0') +
-            '000000' //reserved
-        ))
+        buffer.writeBuffer(
+            this.packBits(
+                this.keyType.toString(2).padStart(2, '0') + '000000' //reserved
+            )
+        );
     }
 
-    abstract getKey(...params: any[]): any
-    abstract parseKey(...params: any[]): any
+    abstract getKey(...params: any[]): any;
+    abstract parseKey(...params: any[]): any;
 
     // private decodeZeroBytes(buffer: Buffer): Buffer {
     //     let countZero: number = 0;
@@ -156,86 +157,82 @@ export abstract class AbstractKey {
     // }
 
     protected packBits(bits: string): Buffer {
-        bits = bits.replace(/\s/g, '')
+        bits = bits.replace(/\s/g, '');
 
-        if (bits.length > 8) throw new Error('incorrect bits')
+        if (bits.length > 8) throw new Error('incorrect bits');
 
-        const number = parseInt(bits, 2)
+        const number = parseInt(bits, 2);
 
-        const buffer: Buffer = Buffer.alloc(1)
-        buffer.writeUInt8(number)
+        const buffer: Buffer = Buffer.alloc(1);
+        buffer.writeUInt8(number);
 
-        return buffer
+        return buffer;
     }
 
     protected packNumberU64LE(number: number | bigint): Buffer {
-        if (typeof number === 'number') number = BigInt(number)
+        if (typeof number === 'number') number = BigInt(number);
 
-        const buffer: Buffer = Buffer.alloc(8)
-        buffer.writeBigUInt64LE(number)
+        const buffer: Buffer = Buffer.alloc(8);
+        buffer.writeBigUInt64LE(number);
 
-        return buffer
+        return buffer;
     }
 
     private encrypt(data: Buffer, _iv?: Buffer): [Buffer, Buffer] {
-        const iv = _iv || randomBytes(16)
-        const cipherKey = createSecretKey(this.key.slice(0, this.encryptKeyLength))
+        const iv = _iv || randomBytes(16);
+        const cipherKey = createSecretKey(this.key.slice(0, this.encryptKeyLength));
 
-        const cipher = createCipheriv(this.encryptMethod, cipherKey, iv)
+        const cipher = createCipheriv(this.encryptMethod, cipherKey, iv);
 
-        const encrypted = Buffer.concat([cipher.update(data), cipher.final()])
+        const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
 
-        return [
-            iv,
-            encrypted
-        ]
+        return [iv, encrypted];
     }
 
     protected finallyEncrypt(buffer: WriteBuffer | Buffer, _iv?: Buffer): string {
-        if (buffer instanceof WriteBuffer) buffer = buffer.toBuffer()
+        if (buffer instanceof WriteBuffer) buffer = buffer.toBuffer();
 
         //buffer = this.encodeZeroBytes(buffer)
 
-        const [iv, encrypted] = this.encrypt(buffer, _iv)
-        buffer = Buffer.concat([iv, encrypted])
+        const [iv, encrypted] = this.encrypt(buffer, _iv);
+        buffer = Buffer.concat([iv, encrypted]);
 
-        const hash = this.hmac(buffer)
-        buffer = Buffer.concat([hash, buffer])
+        const hash = this.hmac(buffer);
+        buffer = Buffer.concat([hash, buffer]);
 
-        return buffer.toString('base64url')
+        return buffer.toString('base64url');
     }
 
     private decrypt(data: Buffer, iv: Buffer): Buffer {
-        const cipherKey = createSecretKey(this.key.slice(0, this.encryptKeyLength))
+        const cipherKey = createSecretKey(this.key.slice(0, this.encryptKeyLength));
 
-        const cipher = createDecipheriv(this.encryptMethod, cipherKey, iv)
+        const cipher = createDecipheriv(this.encryptMethod, cipherKey, iv);
 
-        const decrypted = Buffer.concat([cipher.update(data), cipher.final()])
+        const decrypted = Buffer.concat([cipher.update(data), cipher.final()]);
 
-        return decrypted
+        return decrypted;
     }
 
     protected finallyDecrypt(encoded: string): ReadBuffer {
-        const buffer_reader_public = new ReadBuffer(Buffer.from(encoded, 'base64url'))
+        const buffer_reader_public = new ReadBuffer(Buffer.from(encoded, 'base64url'));
 
         const [got_hash, iv, encrypted] = [
             buffer_reader_public.readBuffer(this.hmacLength),
             buffer_reader_public.readBuffer(16),
             buffer_reader_public.readPadding()
-        ]
-        this._iv = iv
-        const calc_hash = this.hmac(Buffer.concat([iv, encrypted]))
+        ];
+        this._iv = iv;
+        const calc_hash = this.hmac(Buffer.concat([iv, encrypted]));
 
-        if (Buffer.compare(calc_hash, got_hash) !== 0) throw new Error('invalid data')
+        if (Buffer.compare(calc_hash, got_hash) !== 0) throw new Error('invalid data');
 
-        let data = this.decrypt(encrypted, iv)
+        const data = this.decrypt(encrypted, iv);
         //data = this.decodeZeroBytes(data)
 
-        return new ReadBuffer(data)
+        return new ReadBuffer(data);
     }
 
     private hmac(data: Buffer) {
-        return createHmac(this.hmacMethod, this.key).update(data).digest()
+        return createHmac(this.hmacMethod, this.key).update(data).digest();
     }
 }
-

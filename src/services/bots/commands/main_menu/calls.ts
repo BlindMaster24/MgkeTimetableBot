@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import CallsCallback from "../../callbacks/calls";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import CallsCallback from '../../callbacks/calls';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)(get)?(times|calls)|(🕐\s)?звонки)$/i
+    public regexp = /^((!|\/)(get)?(times|calls)|(🕐\s)?звонки)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'calls',

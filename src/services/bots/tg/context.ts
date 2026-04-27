@@ -1,51 +1,51 @@
-import { Context, InputFile } from "grammy";
-import { TgBot } from ".";
-import { config } from "../../../../config";
-import { ParsedPayload, parsePayload } from "../../../utils";
-import { ImageFile } from "../../image/builder";
-import { AbstractCallbackContext, AbstractCommandContext, MessageOptions } from "../abstract";
-import { StaticKeyboard } from "../keyboard";
-import { convertAbstractToTg } from "./keyboard";
+import { Context, InputFile } from 'grammy';
+import { TgBot } from '.';
+import { config } from '../../../../config';
+import { ParsedPayload, parsePayload } from '../../../utils';
+import { ImageFile } from '../../image/builder';
+import { AbstractCallbackContext, AbstractCommandContext, MessageOptions } from '../abstract';
+import { StaticKeyboard } from '../keyboard';
+import { convertAbstractToTg } from './keyboard';
 
 type TgUser = {
-    id: number,
-    is_bot?: boolean,
-    username?: string,
-    first_name?: string,
-    last_name?: string,
-    language_code?: string
+    id: number;
+    is_bot?: boolean;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    language_code?: string;
 };
 
 type TgChat = {
-    id: number,
-    type: string,
-    username?: string
+    id: number;
+    type: string;
+    username?: string;
 };
 
 type TgMessage = {
-    message_id: number,
-    chat: TgChat,
-    from?: TgUser,
-    text?: string,
-    photo?: Array<{ file_id: string }>
+    message_id: number;
+    chat: TgChat;
+    from?: TgUser;
+    text?: string;
+    photo?: Array<{ file_id: string }>;
 };
 
 type TgCallbackQueryData = {
-    id: string,
-    from: TgUser,
-    data?: string,
-    message?: TgMessage
+    id: string;
+    from: TgUser;
+    data?: string;
+    message?: TgMessage;
 };
 
 export type TgMessageRealContext = Context & {
-    chat: TgChat,
-    from?: TgUser,
-    msg: TgMessage
+    chat: TgChat;
+    from?: TgUser;
+    msg: TgMessage;
 };
 
 export type TgCallbackRealContext = Context & {
-    from: TgUser,
-    callbackQuery: TgCallbackQueryData
+    from: TgUser;
+    callbackQuery: TgCallbackQueryData;
 };
 
 function resolveReplyTo(replyTo?: string): number | undefined {
@@ -62,7 +62,7 @@ function resolveReplyTo(replyTo?: string): number | undefined {
     return value;
 }
 
-function appendCancelHint(text: string, options: MessageOptions): { text: string, options: MessageOptions } {
+function appendCancelHint(text: string, options: MessageOptions): { text: string; options: MessageOptions } {
     if (options?.keyboard?.name !== StaticKeyboard.Cancel.name) {
         return { text, options };
     }
@@ -79,12 +79,14 @@ function appendCancelHint(text: string, options: MessageOptions): { text: string
 function buildSendOptions(options: MessageOptions = {}, replyTo?: number): any {
     return {
         ...(!options.disableHtmlParser ? { parse_mode: 'HTML' } : {}),
-        ...(replyTo ? {
-            reply_parameters: {
-                message_id: replyTo,
-                allow_sending_without_reply: true
-            }
-        } : {}),
+        ...(replyTo
+            ? {
+                  reply_parameters: {
+                      message_id: replyTo,
+                      allow_sending_without_reply: true
+                  }
+              }
+            : {}),
         disable_notification: options.disable_mentions,
         reply_markup: convertAbstractToTg(options.keyboard)
     };
@@ -167,11 +169,7 @@ export class TgCommandContext extends AbstractCommandContext {
 
         const photo = fileId || new InputFile(await image.data(), `${image.id}.png`);
 
-        const result = await this.context.api.sendPhoto(
-            this.peerId,
-            photo,
-            buildSendOptions(options, replyTo)
-        );
+        const result = await this.context.api.sendPhoto(this.peerId, photo, buildSendOptions(options, replyTo));
 
         const photoList = (result as TgMessage).photo;
         if (!fileId && Array.isArray(photoList) && photoList.length > 0) {
@@ -290,15 +288,9 @@ export class TgCallbackContext extends AbstractCallbackContext {
 
         let fileId = await this.cache.get(image.id);
 
-        const photo = (!config.dev && fileId)
-            ? fileId
-            : new InputFile(await image.data(), `${image.id}.png`);
+        const photo = !config.dev && fileId ? fileId : new InputFile(await image.data(), `${image.id}.png`);
 
-        const result = await this.context.api.sendPhoto(
-            this.peerId,
-            photo,
-            buildSendOptions(options, replyTo)
-        );
+        const result = await this.context.api.sendPhoto(this.peerId, photo, buildSendOptions(options, replyTo));
 
         const photoList = (result as TgMessage).photo;
         if (!fileId && Array.isArray(photoList) && photoList.length > 0) {

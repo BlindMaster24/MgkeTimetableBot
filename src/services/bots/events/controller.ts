@@ -1,12 +1,12 @@
-import { AbstractBotEventListener, CronDay, ProgressCallback } from ".";
-import { config } from "../../../../config";
-import { App } from "../../../app";
-import { DayIndex } from "../../../utils";
-import { GroupDayEvent, TeacherDayEvent } from "../../parser";
-import { raspCache, saveCache } from "../../parser/raspCache";
-import { GroupLesson, GroupLessonExplain, TeacherLesson, TeacherLessonExplain } from "../../timetable";
-import { BotServiceName } from "../abstract";
-import { ChatMode } from "../chat";
+import { AbstractBotEventListener, CronDay, ProgressCallback } from '.';
+import { config } from '../../../../config';
+import { App } from '../../../app';
+import { DayIndex } from '../../../utils';
+import { GroupDayEvent, TeacherDayEvent } from '../../parser';
+import { raspCache, saveCache } from '../../parser/raspCache';
+import { GroupLesson, GroupLessonExplain, TeacherLesson, TeacherLessonExplain } from '../../timetable';
+import { BotServiceName } from '../abstract';
+import { ChatMode } from '../chat';
 
 export type ServiceProgressCallback = (data: { service: BotServiceName } & Parameters<ProgressCallback>[0]) => void;
 
@@ -14,7 +14,7 @@ export class BotEventController {
     private serviceList: AbstractBotEventListener[] = [];
     private deferred: { [id: string]: () => any } = {};
 
-    constructor(private app: App) { }
+    constructor(private app: App) {}
 
     public run() {
         const ev = this.app.getService('parser').events;
@@ -142,9 +142,14 @@ export class BotEventController {
 
     public async sendDistibution(message: string, cb?: ServiceProgressCallback) {
         for (const service of this.serviceList) {
-            await service.sendDistribution(message, cb ? (data) => {
-                cb(Object.assign({ service: service.service }, data))
-            } : undefined);
+            await service.sendDistribution(
+                message,
+                cb
+                    ? (data) => {
+                          cb(Object.assign({ service: service.service }, data));
+                      }
+                    : undefined
+            );
         }
     }
 
@@ -175,7 +180,7 @@ export class BotEventController {
             try {
                 await defer();
             } catch (e) {
-                console.log('deferred function error', e)
+                console.log('deferred function error', e);
             }
 
             delete this.deferred[id];
@@ -183,49 +188,57 @@ export class BotEventController {
     }
 
     private hasAlertableGroupLessons(_lessons: GroupLesson[]): boolean {
-        return _lessons.reduce((store: GroupLessonExplain[], lesson) => {
-            if (lesson === null) {
-                return store;
-            }
+        return (
+            _lessons
+                .reduce((store: GroupLessonExplain[], lesson) => {
+                    if (lesson === null) {
+                        return store;
+                    }
 
-            const lessons = Array.isArray(lesson) ? lesson : [lesson];
-            store.push(...lessons);
+                    const lessons = Array.isArray(lesson) ? lesson : [lesson];
+                    store.push(...lessons);
 
-            return store;
-        }, []).filter((value) => {
-            let valid: boolean = true;
+                    return store;
+                }, [])
+                .filter((value) => {
+                    let valid: boolean = true;
 
-            for (const filter of config.parser.alertableIgnoreFilter.group) {
-                if (filter.lesson === value.lesson && filter.type === value.type) {
-                    valid = false;
-                    break;
-                }
-            }
+                    for (const filter of config.parser.alertableIgnoreFilter.group) {
+                        if (filter.lesson === value.lesson && filter.type === value.type) {
+                            valid = false;
+                            break;
+                        }
+                    }
 
-            return valid;
-        }).length > 0;
+                    return valid;
+                }).length > 0
+        );
     }
 
     private hasAlertableTeacherLessons(_lessons: TeacherLesson[]): boolean {
-        return _lessons.reduce((store: TeacherLessonExplain[], lesson) => {
-            if (lesson === null) {
-                return store;
-            }
+        return (
+            _lessons
+                .reduce((store: TeacherLessonExplain[], lesson) => {
+                    if (lesson === null) {
+                        return store;
+                    }
 
-            store.push(lesson);
+                    store.push(lesson);
 
-            return store;
-        }, []).filter((value) => {
-            let valid: boolean = true;
+                    return store;
+                }, [])
+                .filter((value) => {
+                    let valid: boolean = true;
 
-            for (const filter of config.parser.alertableIgnoreFilter.teacher) {
-                if (filter.lesson === value.lesson && filter.type === value.type) {
-                    valid = false;
-                    break;
-                }
-            }
+                    for (const filter of config.parser.alertableIgnoreFilter.teacher) {
+                        if (filter.lesson === value.lesson && filter.type === value.type) {
+                            valid = false;
+                            break;
+                        }
+                    }
 
-            return valid;
-        }).length > 0;
+                    return valid;
+                }).length > 0
+        );
     }
 }

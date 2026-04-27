@@ -33,18 +33,18 @@ export function convertAbstractToViber(aKeyboard?: KeyboardBuilder): Keyboard | 
                     ActionType: 'open-url',
                     ActionBody: button.url,
                     Text: button.text
-                }
+                };
             } else if (button.payload) {
                 data = {
                     ActionType: 'reply',
                     ActionBody: `payload:${button.payload}`,
                     Text: button.text
-                }
+                };
             } else {
                 data = {
                     ActionType: 'reply',
                     ActionBody: button.text
-                }
+                };
             }
 
             data.BgColor = convertColor(keyboard, button.color);
@@ -52,8 +52,8 @@ export function convertAbstractToViber(aKeyboard?: KeyboardBuilder): Keyboard | 
             keyboard.add(data);
         }
 
-        keyboard.row()
+        keyboard.row();
     }
 
-    return keyboard.build()
+    return keyboard.build();
 }

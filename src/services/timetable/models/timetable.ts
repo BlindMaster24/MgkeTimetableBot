@@ -1,5 +1,5 @@
-import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes, Model } from "sequelize";
-import { sequelize } from "../../../db";
+import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes, Model } from 'sequelize';
+import { sequelize } from '../../../db';
 
 class TimetableArchive extends Model<InferAttributes<TimetableArchive>, InferCreationAttributes<TimetableArchive>> {
     declare id: CreationOptional<number>;
@@ -9,47 +9,50 @@ class TimetableArchive extends Model<InferAttributes<TimetableArchive>, InferCre
     declare data: string;
 }
 
-TimetableArchive.init({
-    id: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    day: {
-        type: DataTypes.INTEGER,
-        allowNull: false
-    },
-    group: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    teacher: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    data: {
-        type: DataTypes.TEXT,
-        allowNull: false
-    }
-}, {
-    sequelize: sequelize,
-    tableName: 'timetable_archive',
-    indexes: [
-        {
-            fields: ['day', 'group'],
-            unique: true
+TimetableArchive.init(
+    {
+        id: {
+            type: DataTypes.INTEGER,
+            autoIncrement: true,
+            primaryKey: true
         },
-        {
-            fields: ['day', 'teacher'],
-            unique: true
+        day: {
+            type: DataTypes.INTEGER,
+            allowNull: false
         },
-        {
-            fields: ['group', 'day']
+        group: {
+            type: DataTypes.STRING,
+            allowNull: true
         },
-        {
-            fields: ['teacher', 'day']
+        teacher: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        data: {
+            type: DataTypes.TEXT,
+            allowNull: false
         }
-    ]
-});
+    },
+    {
+        sequelize: sequelize,
+        tableName: 'timetable_archive',
+        indexes: [
+            {
+                fields: ['day', 'group'],
+                unique: true
+            },
+            {
+                fields: ['day', 'teacher'],
+                unique: true
+            },
+            {
+                fields: ['group', 'day']
+            },
+            {
+                fields: ['teacher', 'day']
+            }
+        ]
+    }
+);
 
 export { TimetableArchive };

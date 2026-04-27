@@ -1,11 +1,11 @@
-import { defines } from "../../../../defines";
-import { randArray } from "../../../../utils";
-import { raspCache } from "../../../parser";
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
-import { StaticKeyboard } from "../../keyboard";
+import { defines } from '../../../../defines';
+import { randArray } from '../../../../utils';
+import { raspCache } from '../../../parser';
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
+import { StaticKeyboard } from '../../keyboard';
 
 export default class extends AbstractCommand {
-    public regexp = /^(👩‍🏫\s)?(Учитель|Преподаватель)$/i
+    public regexp = /^(👩‍🏫\s)?(Учитель|Преподаватель)$/i;
     public payloadAction = null;
     public scene?: string | null = 'setup';
 
@@ -18,17 +18,19 @@ export default class extends AbstractCommand {
 
         const randTeacher = randArray(Object.keys(raspCache.teachers.timetable));
 
-        let teacher: string | null | false | undefined = await context.input(`Введите фамилию преподавателя (например, ${randTeacher})`, {
-            keyboard: StaticKeyboard.Cancel
-        }).then<string | undefined>(value => {
-            return value?.text;
-        });
+        let teacher: string | null | false | undefined = await context
+            .input(`Введите фамилию преподавателя (например, ${randTeacher})`, {
+                keyboard: StaticKeyboard.Cancel
+            })
+            .then<string | undefined>((value) => {
+                return value?.text;
+            });
 
         while (true) {
             teacher = await this.findTeacher(params, teacher);
 
             if (!teacher) {
-                teacher = await context.waitInput().then<string | undefined>(value => {
+                teacher = await context.waitInput().then<string | undefined>((value) => {
                     return value?.text;
                 });
                 continue;

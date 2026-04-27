@@ -1,5 +1,5 @@
-import { randomInt } from "crypto";
-import { BotInput } from "../src/services/bots/input";
+import { randomInt } from 'crypto';
+import { BotInput } from '../src/services/bots/input';
 
 const main = async () => {
     const input = new BotInput(10 * 1e3);
@@ -18,15 +18,15 @@ const main = async () => {
 
                 const [result] = await Promise.all([promise, message]);
             } catch (e) {
-                console.log('CATCHED SUCCESS')
+                console.log('CATCHED SUCCESS');
             }
         })();
     }
 
     //wait to timeout for 10 sec
 
-    console.log('PASSED')
+    console.log('PASSED');
     // input.cancel(peerId);
-}
+};
 
 main();

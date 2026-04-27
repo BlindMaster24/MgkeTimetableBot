@@ -1,9 +1,9 @@
-import type { Chat, User } from "grammy/types";
-import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes } from "sequelize";
-import { config } from "../../../../config";
-import { sequelize } from "../../../db";
-import { BotServiceName } from "../abstract";
-import { AbstractServiceChat, BotChat } from "../chat";
+import type { Chat, User } from 'grammy/types';
+import { CreationOptional, DataTypes, InferAttributes, InferCreationAttributes } from 'sequelize';
+import { config } from '../../../../config';
+import { sequelize } from '../../../db';
+import { BotServiceName } from '../abstract';
+import { AbstractServiceChat, BotChat } from '../chat';
 
 class TgChat extends AbstractServiceChat<InferAttributes<TgChat>, InferCreationAttributes<TgChat>> {
     public static service: BotServiceName = 'tg';
@@ -39,46 +39,49 @@ class TgChat extends AbstractServiceChat<InferAttributes<TgChat>, InferCreationA
     }
 }
 
-TgChat.init({
-    id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-    },
-    chatId: {
-        type: DataTypes.INTEGER,
-        unique: true,
-        allowNull: false
-    },
-    peerId: {
-        type: DataTypes.BIGINT,
-        unique: true,
-        allowNull: false,
-        
-        get(): number {
-            return Number(this.getDataValue('peerId'))
+TgChat.init(
+    {
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+        },
+        chatId: {
+            type: DataTypes.INTEGER,
+            unique: true,
+            allowNull: false
+        },
+        peerId: {
+            type: DataTypes.BIGINT,
+            unique: true,
+            allowNull: false,
+
+            get(): number {
+                return Number(this.getDataValue('peerId'));
+            }
+        },
+        domain: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        firstName: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        lastName: {
+            type: DataTypes.STRING,
+            allowNull: true
+        },
+        lang: {
+            type: DataTypes.STRING,
+            allowNull: true
         }
     },
-    domain: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    firstName: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    lastName: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
-    lang: {
-        type: DataTypes.STRING,
-        allowNull: true
+    {
+        sequelize: sequelize,
+        tableName: 'bot_chats_tg'
     }
-}, {
-    sequelize: sequelize,
-    tableName: 'bot_chats_tg'
-});
+);
 
 TgChat.belongsTo(BotChat, {
     foreignKey: 'chatId',
@@ -92,4 +95,3 @@ BotChat.hasOne(TgChat, {
 });
 
 export { TgChat };
-

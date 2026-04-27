@@ -22,5 +22,5 @@ export function unserialize(data: string): any {
         throw new Error('Invalid data');
     }
 
-    return decode(buffer);    
+    return decode(buffer);
 }

@@ -24,7 +24,7 @@ describe('mergeDays', () => {
 
         expect(res.added).toEqual([day('02.03.2026')]);
         expect(res.changed).toEqual([]);
-        expect(res.mergedDays.map(d => d.day).sort()).toEqual(['01.03.2026', '02.03.2026']);
+        expect(res.mergedDays.map((d) => d.day).sort()).toEqual(['01.03.2026', '02.03.2026']);
     });
 
     it('marks a day with different lessons as changed and overwrites it in the merged list', () => {

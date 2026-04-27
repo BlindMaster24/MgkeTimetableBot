@@ -7,12 +7,12 @@ import { AbstractBot } from './bot';
 import { KeyboardBuilder } from './keyboardBuilder';
 
 export type MessageOptions = {
-    keyboard?: KeyboardBuilder,
-    reply_to?: string,
-    disable_mentions?: boolean,
-    disable_intents?: boolean,
-    disableHtmlParser?: boolean
-}
+    keyboard?: KeyboardBuilder;
+    reply_to?: string;
+    disable_mentions?: boolean;
+    disable_intents?: boolean;
+    disableHtmlParser?: boolean;
+};
 
 export abstract class AbstractContext {
     public abstract peerId: number | string;
@@ -46,10 +46,7 @@ export abstract class AbstractContext {
     }
 
     public async input(text: string, options?: MessageOptions | undefined): Promise<InputResolvedValue> {
-        const [answer, messageId] = await Promise.all([
-            this.waitInput(),
-            this.send(text, options)
-        ]);
+        const [answer, messageId] = await Promise.all([this.waitInput(), this.send(text, options)]);
 
         return answer;
     }

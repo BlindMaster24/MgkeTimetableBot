@@ -1,4 +1,4 @@
-import { Model, Optional } from "sequelize";
+import { Model, Optional } from 'sequelize';
 
 export interface IAbstractServiceChatAttributes {
     id: number;

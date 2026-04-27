@@ -3,14 +3,14 @@ import { AbstractParser } from './abstract';
 import { Teacher, TeacherDay, TeacherLesson, Teachers } from './types/teacher';
 
 export default class TeacherParser extends AbstractParser {
-    protected teachers: Teachers = {}
+    protected teachers: Teachers = {};
 
     public run(): Teachers {
         for (const table of this.parseBodyTables()) {
-            const h3 = table.previousElementSibling! as HTMLHeadingElement //date
-            const h2 = h3.previousElementSibling! as HTMLHeadingElement //teacher
+            const h3 = table.previousElementSibling! as HTMLHeadingElement; //date
+            const h2 = h3.previousElementSibling! as HTMLHeadingElement; //teacher
 
-            this.parseTeacher(table, h2)
+            this.parseTeacher(table, h2);
         }
 
         this.clearSundays(this.teachers);
@@ -29,15 +29,15 @@ export default class TeacherParser extends AbstractParser {
         if (!label) return;
 
         if (!label.toLowerCase().startsWith('преподаватель')) {
-            throw new Error('Это расписание не для преподавателя')
+            throw new Error('Это расписание не для преподавателя');
         }
 
-        const teacherName = label.split('-')[1].trim()
+        const teacherName = label.split('-')[1].trim();
         if (teacherName == undefined) {
-            throw new Error('Невозможно получить имя преподавателя')
+            throw new Error('Невозможно получить имя преподавателя');
         }
 
-        const rows = Array.from(table.rows)
+        const rows = Array.from(table.rows);
 
         const days: TeacherDay[] = this.getDays(rows[0]);
         this.parseLessons(rows, days);
@@ -45,40 +45,40 @@ export default class TeacherParser extends AbstractParser {
         const teacherWeek: Teacher = {
             teacher: teacherName,
             days: days
-        }
+        };
 
-        this.teachers[teacherName] = teacherWeek
+        this.teachers[teacherName] = teacherWeek;
     }
 
     protected getDays(row: HTMLTableRowElement): TeacherDay[] {
-        const days: TeacherDay[] = []
+        const days: TeacherDay[] = [];
 
-        const dayNames = this.parseDayNames(row)
+        const dayNames = this.parseDayNames(row);
         for (const dayName of dayNames) {
-            const { day, weekday } = this.parseDayName(dayName)
+            const { day, weekday } = this.parseDayName(dayName);
 
             days.push({
                 day: day,
                 lessons: []
-            })
+            });
         }
 
-        return days
+        return days;
     }
 
     protected parseDayNames(row: HTMLTableRowElement): string[] {
-        const cells = Array.from(row.cells)
+        const cells = Array.from(row.cells);
 
-        const days: string[] = []
+        const days: string[] = [];
 
         for (const cell_i in cells) {
             if (+cell_i == 0) continue;
-            const cell = cells[cell_i]
+            const cell = cells[cell_i];
 
-            const day = cell.textContent?.replaceAll('\n', '')
+            const day = cell.textContent?.replaceAll('\n', '');
             if (day == undefined) throw new Error('Невозможно получить название дня недели');
 
-            days.push(day)
+            days.push(day);
         }
 
         return days;
@@ -87,8 +87,8 @@ export default class TeacherParser extends AbstractParser {
     protected parseLessons(rows: HTMLTableRowElement[], days: TeacherDay[]) {
         for (const row_i in rows) {
             if (+row_i <= 1) continue;
-            const row = rows[row_i]
-            const cells = row.cells
+            const row = rows[row_i];
+            const cells = row.cells;
 
             for (let cell_i: number = 1; cell_i < Math.ceil(cells.length / 2); cell_i++) {
                 const day = cell_i - 1;
@@ -97,7 +97,7 @@ export default class TeacherParser extends AbstractParser {
                 const cabinetCell = cells[cell_i * 2];
 
                 const lesson = this.parseLesson(lessonCell, cabinetCell);
-                days[day].lessons.push(lesson)
+                days[day].lessons.push(lesson);
             }
         }
     }
@@ -107,27 +107,22 @@ export default class TeacherParser extends AbstractParser {
         let cabinet: string | undefined | null = cabinetCell.textContent?.trim();
 
         if (lessonData == undefined || cabinet == undefined) {
-            throw new Error('Урок или кабинет не определены')
+            throw new Error('Урок или кабинет не определены');
         }
 
-        lessonData = this.setNullIfEmpty(lessonData === '-' ? '' : lessonData)
-        cabinet = this.setNullIfEmpty(this.removeDashes(cabinet))
+        lessonData = this.setNullIfEmpty(lessonData === '-' ? '' : lessonData);
+        cabinet = this.setNullIfEmpty(this.removeDashes(cabinet));
 
         if (!lessonData) {
             return null;
         }
 
-        const data = Array
-            .from(lessonCell.childNodes)
-            .filter(_ => _.nodeType === _.TEXT_NODE)
-            .map(_ => _.textContent!);
+        const data = Array.from(lessonCell.childNodes)
+            .filter((_) => _.nodeType === _.TEXT_NODE)
+            .map((_) => _.textContent!);
         const type = data[1]?.match(/\((.+)\)/)?.slice(1)[0];
-    
-        
-        const groupParts = data[0]
-            .split('-', 2)[0]
-            .replace(/\s/ig, '')
-            .split('.', 2);
+
+        const groupParts = data[0].split('-', 2)[0].replace(/\s/gi, '').split('.', 2);
 
         let subgroup: number | undefined;
         let group: string;
@@ -148,7 +143,7 @@ export default class TeacherParser extends AbstractParser {
             group: group,
             cabinet: cabinet,
             comment: null
-        }
+        };
     }
 
     private postProcessDay(day: TeacherDay) {
@@ -182,6 +177,6 @@ export default class TeacherParser extends AbstractParser {
             }
         }
 
-        this.clearEndingNull(day.lessons)
+        this.clearEndingNull(day.lessons);
     }
 }

@@ -1,15 +1,15 @@
-import { config } from "../../../../config";
-import { WeekIndex, getShortSubjectName, mergeDays } from "../../../utils";
-import { AbstractParser } from "../abstract";
-import { TeacherDay, TeacherLesson, TeacherLessonExplain, Teachers } from "../types/teacher";
-import { buildTableGrid, findHeaderRowIndex, getDayRangesFromGrid } from "./grid";
-import { DayRange, GridCell } from "./types";
-import { cleanText, extractLines, parseLessonNumber } from "./text";
+import { config } from '../../../../config';
+import { WeekIndex, getShortSubjectName, mergeDays } from '../../../utils';
+import { AbstractParser } from '../abstract';
+import { TeacherDay, TeacherLesson, TeacherLessonExplain, Teachers } from '../types/teacher';
+import { buildTableGrid, findHeaderRowIndex, getDayRangesFromGrid } from './grid';
+import { DayRange, GridCell } from './types';
+import { cleanText, extractLines, parseLessonNumber } from './text';
 
 type ParsedTable = {
-    teacher: string,
-    days: TeacherDay[]
-}
+    teacher: string;
+    days: TeacherDay[];
+};
 
 export default class TeacherParserV2 extends AbstractParser {
     protected teachers: Teachers = {};
@@ -129,7 +129,7 @@ export default class TeacherParserV2 extends AbstractParser {
 
     protected findTables(): HTMLTableElement[] {
         const tables = Array.from(this.content.querySelectorAll('table') as NodeListOf<HTMLTableElement>);
-        const candidates: { table: HTMLTableElement, weekIndex: number }[] = [];
+        const candidates: { table: HTMLTableElement; weekIndex: number }[] = [];
         const minDays = config.parser.v2?.minDaysInTable ?? 5;
         const headerScanRows = config.parser.v2?.headerScanRows ?? 5;
 
@@ -190,7 +190,9 @@ export default class TeacherParserV2 extends AbstractParser {
             if (holdCurrentOnSunday && isSunday && past.length) {
                 targetWeek = past[0];
             } else {
-                targetWeek = future.length ? future[0] : weekIndexes.sort((a, b) => Math.abs(a - currentWeek) - Math.abs(b - currentWeek))[0];
+                targetWeek = future.length
+                    ? future[0]
+                    : weekIndexes.sort((a, b) => Math.abs(a - currentWeek) - Math.abs(b - currentWeek))[0];
             }
         }
 
@@ -241,7 +243,10 @@ export default class TeacherParserV2 extends AbstractParser {
         }
     }
 
-    protected parseLesson(lessonCell?: HTMLTableCellElement | null, cabinetCell?: HTMLTableCellElement | null): TeacherLesson {
+    protected parseLesson(
+        lessonCell?: HTMLTableCellElement | null,
+        cabinetCell?: HTMLTableCellElement | null
+    ): TeacherLesson {
         const lines = extractLines(lessonCell);
         if (!lines.length) {
             return null;
@@ -353,7 +358,7 @@ export default class TeacherParserV2 extends AbstractParser {
         return match ? match[1].trim() : null;
     }
 
-    protected parseGroupLessonLine(line: string): { lesson: string, group: string, subgroup?: number } | null {
+    protected parseGroupLessonLine(line: string): { lesson: string; group: string; subgroup?: number } | null {
         const normalized = cleanText(line);
         if (!normalized) {
             return null;
@@ -374,7 +379,7 @@ export default class TeacherParserV2 extends AbstractParser {
         };
     }
 
-    protected parseGroupPart(value: string): { group: string, subgroup?: number } {
+    protected parseGroupPart(value: string): { group: string; subgroup?: number } {
         const cleaned = value.replace(/\s+/g, '');
         const match = cleaned.match(/^(?:(\d+)\.)?(.+)$/);
 

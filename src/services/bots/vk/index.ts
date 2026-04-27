@@ -33,66 +33,93 @@ export class VkBot extends AbstractBot implements AppService {
     }
 
     public async run() {
-        this.vk.updates.on('message_new', (context, next) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'vk',
-            event: 'message_new',
-            updateId: context.id,
-            peerId: context.peerId,
-            userId: context.senderId,
-            messageId: context.id
-        }, () => this.messageHandler(context, next)))
-        this.vk.updates.on('message_event', (context, next) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'vk',
-            event: 'message_event',
-            updateId: context.id,
-            peerId: context.peerId,
-            userId: context.userId,
-            messageId: context.conversationMessageId
-        }, () => this.eventHandler(context, next)))
-        this.vk.updates.on('chat_invite_user', (context, next) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'vk',
-            event: 'chat_invite_user',
-            updateId: context.id,
-            peerId: context.peerId,
-            userId: context.senderId,
-            messageId: context.id
-        }, () => this.inviteUser(context, next)))
-        this.vk.updates.on('message_allow', (context, next) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'vk',
-            event: 'message_allow',
-            updateId: context.id,
-            peerId: context.userId,
-            userId: context.userId
-        }, () => this.setAllowSendMess(context, next, true)))
-        this.vk.updates.on('message_deny', (context, next) => runWithLogContext({
-            traceId: newTraceId(),
-            service: 'vk',
-            event: 'message_deny',
-            updateId: context.id,
-            peerId: context.userId,
-            userId: context.userId
-        }, () => this.setAllowSendMess(context, next, false)))
+        this.vk.updates.on('message_new', (context, next) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'vk',
+                    event: 'message_new',
+                    updateId: context.id,
+                    peerId: context.peerId,
+                    userId: context.senderId,
+                    messageId: context.id
+                },
+                () => this.messageHandler(context, next)
+            )
+        );
+        this.vk.updates.on('message_event', (context, next) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'vk',
+                    event: 'message_event',
+                    updateId: context.id,
+                    peerId: context.peerId,
+                    userId: context.userId,
+                    messageId: context.conversationMessageId
+                },
+                () => this.eventHandler(context, next)
+            )
+        );
+        this.vk.updates.on('chat_invite_user', (context, next) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'vk',
+                    event: 'chat_invite_user',
+                    updateId: context.id,
+                    peerId: context.peerId,
+                    userId: context.senderId,
+                    messageId: context.id
+                },
+                () => this.inviteUser(context, next)
+            )
+        );
+        this.vk.updates.on('message_allow', (context, next) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'vk',
+                    event: 'message_allow',
+                    updateId: context.id,
+                    peerId: context.userId,
+                    userId: context.userId
+                },
+                () => this.setAllowSendMess(context, next, true)
+            )
+        );
+        this.vk.updates.on('message_deny', (context, next) =>
+            runWithLogContext(
+                {
+                    traceId: newTraceId(),
+                    service: 'vk',
+                    event: 'message_deny',
+                    updateId: context.id,
+                    peerId: context.userId,
+                    userId: context.userId
+                },
+                () => this.setAllowSendMess(context, next, false)
+            )
+        );
 
-        await this.vk.api.groups.setLongPollSettings({
-            group_id: config.vk.bot.id,
-            enabled: true,
+        await this.vk.api.groups
+            .setLongPollSettings({
+                group_id: config.vk.bot.id,
+                enabled: true,
 
-            message_new: true,
-            message_event: true,
-            message_allow: true,
-            message_deny: true,
+                message_new: true,
+                message_event: true,
+                message_allow: true,
+                message_deny: true,
 
-            group_join: true,
-            group_leave: true,
+                group_join: true,
+                group_leave: true,
 
-            api_version: this.vk.api.options.apiVersion
-        }).then(() => {
-            console.log('[VK Bot] Settings set up')
-        });
+                api_version: this.vk.api.options.apiVersion
+            })
+            .then(() => {
+                console.log('[VK Bot] Settings set up');
+            });
 
         if (config.vk.bot.noticer) {
             this.getBotService().events.registerListener(this.event);
@@ -100,22 +127,29 @@ export class VkBot extends AbstractBot implements AppService {
 
         await this.getBotService().init();
 
-        await this.vk.updates.startPolling().then(() => {
-            console.log('[VK Bot] Start polling...')
-        }).catch(err => {
-            console.error('polling error', err)
-        });
+        await this.vk.updates
+            .startPolling()
+            .then(() => {
+                console.log('[VK Bot] Start polling...');
+            })
+            .catch((err) => {
+                console.error('polling error', err);
+            });
     }
 
-    public async getChat(peerId: number, creationDefaults?: Partial<CreationAttributes<BotChat>>): Promise<BotChat<VkChat>> {
+    public async getChat(
+        peerId: number,
+        creationDefaults?: Partial<CreationAttributes<BotChat>>
+    ): Promise<BotChat<VkChat>> {
         return BotChat.findByServicePeerId(VkChat, peerId, creationDefaults);
     }
 
     private parseMessage(text?: string) {
         const hasMention = /\[(?:club|public)(\d+?)\|[\s\S]+?\],?\s([\s\S]*)/m.test(text || '');
-        let [, parsedMentionId, mentionMessage] = text?.match(/\[(?:club|public)(\d+?)\|[\s\S]+?\],?\s([\s\S]*)/m) || [];
+        const [, parsedMentionId, mentionMessage] =
+            text?.match(/\[(?:club|public)(\d+?)\|[\s\S]+?\],?\s([\s\S]*)/m) || [];
 
-        let mentionId: number = 0
+        let mentionId: number = 0;
         if (hasMention && !isNaN(+parsedMentionId)) {
             mentionId = Number(parsedMentionId);
         }
@@ -142,19 +176,22 @@ export class VkBot extends AbstractBot implements AppService {
             chat.ref = context.referralValue?.slice(0, 255) || 'none';
         }
 
-        this.handleMessage({
-            service: 'vk',
-            context: _context,
-            chat: chat,
-            serviceChat: chat.serviceChat,
-            actions: new VkBotAction(this, context, chat),
-            keyboard: new Keyboard(this.app, chat, _context),
-            realContext: context,
-            formatter: createScheduleFormatter('vk', this.app, raspCache, chat),
-            cache: this.cache
-        }, {
-            selfMention: selfMention
-        });
+        this.handleMessage(
+            {
+                service: 'vk',
+                context: _context,
+                chat: chat,
+                serviceChat: chat.serviceChat,
+                actions: new VkBotAction(this, context, chat),
+                keyboard: new Keyboard(this.app, chat, _context),
+                realContext: context,
+                formatter: createScheduleFormatter('vk', this.app, raspCache, chat),
+                cache: this.cache
+            },
+            {
+                selfMention: selfMention
+            }
+        );
     }
 
     protected _getAcceptKeyParams(context: VkCommandContext): InputRequestKey {
@@ -163,13 +200,15 @@ export class VkBot extends AbstractBot implements AppService {
             peer_id: context.peerId,
             sender_id: context.userId,
             time: Date.now()
-        }
+        };
     }
 
-    protected _defaultCreationParams(context: VkCommandContext | VkCallbackContext): Partial<CreationAttributes<BotChat>> {
+    protected _defaultCreationParams(
+        context: VkCommandContext | VkCallbackContext
+    ): Partial<CreationAttributes<BotChat>> {
         return {
             accepted: context.isChat ? config.accept.room : config.accept.private
-        }
+        };
     }
 
     private async eventHandler(context: MessageEventContext<ContextDefaultState>, next: NextMiddleware) {
@@ -205,7 +244,11 @@ export class VkBot extends AbstractBot implements AppService {
         });
     }
 
-    private async setAllowSendMess(context: MessageSubscriptionContext<ContextDefaultState>, next: NextMiddleware, status: boolean) {
+    private async setAllowSendMess(
+        context: MessageSubscriptionContext<ContextDefaultState>,
+        next: NextMiddleware,
+        status: boolean
+    ) {
         const chat = await this.getChat(context.userId, {
             accepted: config.accept.private,
             allowSendMess: status

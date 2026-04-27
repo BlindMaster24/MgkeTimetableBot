@@ -1,18 +1,18 @@
-import { InferAttributes, ModelStatic, Op, WhereOptions } from "sequelize";
-import { config } from "../../../../config";
-import { App } from "../../../app";
-import { createScheduleFormatter } from "../../../formatter";
-import { DayIndex, StringDate, WeekIndex, getFutureDays, prepareError } from "../../../utils";
-import { CallsUpdateEvent, GroupDayEvent, TeacherDayEvent } from "../../parser";
-import { raspCache, saveCache } from "../../parser/raspCache";
-import { GroupDay, TeacherDay } from "../../parser/types";
-import { DayCall } from "../../../../config.scheme";
-import { MessageOptions } from "../abstract";
-import { BotServiceName } from "../abstract/command";
-import { AbstractServiceChat, BotChat, ChatMode } from "../chat";
-import { StaticKeyboard } from "../keyboard";
-import { Subscription, SubscriptionType } from "../subscriptions/model";
-import { attachServiceChat, buildBaseChatWhere } from "./query";
+import { InferAttributes, ModelStatic, Op, WhereOptions } from 'sequelize';
+import { config } from '../../../../config';
+import { App } from '../../../app';
+import { createScheduleFormatter } from '../../../formatter';
+import { DayIndex, StringDate, WeekIndex, getFutureDays, prepareError } from '../../../utils';
+import { CallsUpdateEvent, GroupDayEvent, TeacherDayEvent } from '../../parser';
+import { raspCache, saveCache } from '../../parser/raspCache';
+import { GroupDay, TeacherDay } from '../../parser/types';
+import { DayCall } from '../../../../config.scheme';
+import { MessageOptions } from '../abstract';
+import { BotServiceName } from '../abstract/command';
+import { AbstractServiceChat, BotChat, ChatMode } from '../chat';
+import { StaticKeyboard } from '../keyboard';
+import { SubscriptionType } from '../subscriptions/model';
+import { attachServiceChat, buildBaseChatWhere } from './query';
 
 function getDayPhrase(day: string, nextDayPhrase: string = 'день'): string {
     if (WeekIndex.fromStringDate(day).isFutureWeek()) {
@@ -32,21 +32,18 @@ function getDayPhrase(day: string, nextDayPhrase: string = 'день'): string {
     return nextDayPhrase;
 }
 
-export type ProgressCallback = (data: {
-    position: number,
-    count: number
-}) => void
+export type ProgressCallback = (data: { position: number; count: number }) => void;
 
 export type CronDay = {
-    index: number,
-    latest?: boolean
-}
+    index: number;
+    latest?: boolean;
+};
 
 export abstract class AbstractBotEventListener {
     protected abstract _model: ModelStatic<AbstractServiceChat>;
-    public readonly abstract service: BotServiceName;
+    public abstract readonly service: BotServiceName;
 
-    constructor(protected app: App) { }
+    constructor(protected app: App) {}
 
     // protected abstract createChat(chat: DbChat): T;
     public abstract sendMessage(chat: BotChat, message: string, options?: MessageOptions): Promise<any>;
@@ -55,13 +52,18 @@ export abstract class AbstractBotEventListener {
         return this.app.getService('bot').events;
     }
 
-    protected async sendMessages(chats: BotChat | BotChat[], message: string, options?: MessageOptions, cb?: ProgressCallback): Promise<void> {
+    protected async sendMessages(
+        chats: BotChat | BotChat[],
+        message: string,
+        options?: MessageOptions,
+        cb?: ProgressCallback
+    ): Promise<void> {
         if (!Array.isArray(chats)) {
             chats = [chats];
         }
 
         if (cb) {
-            cb({ position: 0, count: chats.length })
+            cb({ position: 0, count: chats.length });
         }
 
         for (const i in chats) {
@@ -70,7 +72,7 @@ export abstract class AbstractBotEventListener {
             await this.sendMessage(chat, message, options);
 
             if (cb) {
-                cb({ position: +i + 1, count: chats.length })
+                cb({ position: +i + 1, count: chats.length });
             }
         }
     }
@@ -81,8 +83,8 @@ export abstract class AbstractBotEventListener {
             include: {
                 association: BotChat.associations[this._model.name],
                 required: true
-            },
-        }).then(chats => {
+            }
+        }).then((chats) => {
             return attachServiceChat(chats, this._model);
         });
     }
@@ -109,13 +111,17 @@ export abstract class AbstractBotEventListener {
             include: {
                 association: BotChat.associations[this._model.name],
                 required: true
-            },
-        }).then(chats => {
+            }
+        }).then((chats) => {
             return attachServiceChat(chats, this._model);
         });
     }
 
-    protected async getSubscribedChats(type: SubscriptionType, value: string, where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
+    protected async getSubscribedChats(
+        type: SubscriptionType,
+        value: string,
+        where?: WhereOptions<InferAttributes<BotChat>>
+    ): Promise<BotChat[]> {
         return BotChat.findAll({
             where: buildBaseChatWhere(this.service, where),
             include: [
@@ -133,7 +139,7 @@ export abstract class AbstractBotEventListener {
                     attributes: []
                 }
             ]
-        }).then(chats => {
+        }).then((chats) => {
             return attachServiceChat(chats, this._model);
         });
     }
@@ -153,24 +159,40 @@ export abstract class AbstractBotEventListener {
         return base;
     }
 
-    protected async getGroupsChats<T>(group: string | string[], where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
-        return this.getChats(Object.assign({
-            group: group,
-            [Op.or]: {
-                deactivateSecondaryCheck: true,
-                mode: ['student', 'parent']
-            },
-        }, where));
+    protected async getGroupsChats<T>(
+        group: string | string[],
+        where?: WhereOptions<InferAttributes<BotChat>>
+    ): Promise<BotChat[]> {
+        return this.getChats(
+            Object.assign(
+                {
+                    group: group,
+                    [Op.or]: {
+                        deactivateSecondaryCheck: true,
+                        mode: ['student', 'parent']
+                    }
+                },
+                where
+            )
+        );
     }
 
-    protected getTeachersChats<T>(teacher: string | string[], where?: WhereOptions<InferAttributes<BotChat>>): Promise<BotChat[]> {
-        return this.getChats(Object.assign({
-            teacher: teacher,
-            [Op.or]: {
-                deactivateSecondaryCheck: true,
-                mode: 'teacher'
-            },
-        }, where));
+    protected getTeachersChats<T>(
+        teacher: string | string[],
+        where?: WhereOptions<InferAttributes<BotChat>>
+    ): Promise<BotChat[]> {
+        return this.getChats(
+            Object.assign(
+                {
+                    teacher: teacher,
+                    [Op.or]: {
+                        deactivateSecondaryCheck: true,
+                        mode: 'teacher'
+                    }
+                },
+                where
+            )
+        );
     }
 
     public async cronGroupDay({ index, latest }: CronDay) {
@@ -181,29 +203,36 @@ export abstract class AbstractBotEventListener {
                 });
 
                 return [group, todayDay];
-            }).filter(([, day]): boolean => {
+            })
+            .filter(([, day]): boolean => {
                 if (!day) return false;
 
-                return (latest ? (day.lessons.length >= index + 1) : (day.lessons.length === index + 1)) ||
-                    (day.lessons.length === 0 && index + 1 === config.parser.lessonIndexIfEmpty);
-            }).map(([group]): string => {
+                return (
+                    (latest ? day.lessons.length >= index + 1 : day.lessons.length === index + 1) ||
+                    (day.lessons.length === 0 && index + 1 === config.parser.lessonIndexIfEmpty)
+                );
+            })
+            .map(([group]): string => {
                 return group;
             });
 
         const chats: BotChat[] = await this.getGroupsChats(groups, { noticeChanges: true });
         if (chats.length === 0) return;
 
-        const chatsKeyed: { [group: string]: BotChat[] } = chats.reduce<{ [group: string]: BotChat[] }>((obj, chat: BotChat) => {
-            const group: string = String(chat.group!);
+        const chatsKeyed: { [group: string]: BotChat[] } = chats.reduce<{ [group: string]: BotChat[] }>(
+            (obj, chat: BotChat) => {
+                const group: string = String(chat.group!);
 
-            if (!obj[group]) {
-                obj[group] = [];
-            }
+                if (!obj[group]) {
+                    obj[group] = [];
+                }
 
-            obj[group].push(chat);
+                obj[group].push(chat);
 
-            return obj;
-        }, {});
+                return obj;
+            },
+            {}
+        );
 
         for (const group in chatsKeyed) {
             const groupEntry = raspCache.groups.timetable[group];
@@ -213,7 +242,7 @@ export abstract class AbstractBotEventListener {
             if (!nextDays.length) continue;
 
             //если дальше всё расписание пустое, то больше не оповещаем
-            const isEmpty: boolean = nextDays.every(day => day.lessons.length === 0);
+            const isEmpty: boolean = nextDays.every((day) => day.lessons.length === 0);
             if (isEmpty) continue;
 
             const day = nextDays[0];
@@ -226,7 +255,7 @@ export abstract class AbstractBotEventListener {
             this.getBotEventControlller().deferFunction(`updateLastGroupNoticedDay_${group}`, async () => {
                 groupEntry.lastNoticedDay = dayIndex;
                 await saveCache();
-            })
+            });
 
             const phrase: string = getDayPhrase(day.day, 'следующий день');
 
@@ -315,29 +344,36 @@ export abstract class AbstractBotEventListener {
                 });
 
                 return [teacher, todayDay];
-            }).filter(([, day]): boolean => {
+            })
+            .filter(([, day]): boolean => {
                 if (!day) return false;
 
-                return (latest ? (day.lessons.length >= index + 1) : (day.lessons.length === index + 1)) ||
-                    (day.lessons.length === 0 && index + 1 === config.parser.lessonIndexIfEmpty);
-            }).map(([teacher]): string => {
+                return (
+                    (latest ? day.lessons.length >= index + 1 : day.lessons.length === index + 1) ||
+                    (day.lessons.length === 0 && index + 1 === config.parser.lessonIndexIfEmpty)
+                );
+            })
+            .map(([teacher]): string => {
                 return teacher;
             });
 
         const chats: BotChat[] = await this.getTeachersChats(teachers, { noticeChanges: true });
         if (chats.length === 0) return;
 
-        const chatsKeyed: { [teacher: string]: BotChat[] } = chats.reduce<{ [teacher: string]: BotChat[] }>((obj, chat: BotChat) => {
-            const teacher: string = String(chat.teacher!);
+        const chatsKeyed: { [teacher: string]: BotChat[] } = chats.reduce<{ [teacher: string]: BotChat[] }>(
+            (obj, chat: BotChat) => {
+                const teacher: string = String(chat.teacher!);
 
-            if (!obj[teacher]) {
-                obj[teacher] = [];
-            }
+                if (!obj[teacher]) {
+                    obj[teacher] = [];
+                }
 
-            obj[teacher].push(chat);
+                obj[teacher].push(chat);
 
-            return obj;
-        }, {});
+                return obj;
+            },
+            {}
+        );
 
         for (const teacher in chatsKeyed) {
             const teacherEntry = raspCache.teachers.timetable[teacher];
@@ -347,7 +383,7 @@ export abstract class AbstractBotEventListener {
             if (!nextDays.length) continue;
 
             //если дальше всё расписание пустое, то больше не оповещаем
-            const isEmpty: boolean = nextDays.every(day => day.lessons.length === 0);
+            const isEmpty: boolean = nextDays.every((day) => day.lessons.length === 0);
             if (isEmpty) continue;
 
             const day = nextDays[0];
@@ -360,7 +396,7 @@ export abstract class AbstractBotEventListener {
             this.getBotEventControlller().deferFunction(`updateLastTeacherNoticedDay_${teacher}`, async () => {
                 teacherEntry.lastNoticedDay = dayIndex;
                 await saveCache();
-            })
+            });
 
             const phrase: string = getDayPhrase(day.day, 'следующий день');
 
@@ -450,30 +486,37 @@ export abstract class AbstractBotEventListener {
 
         switch (chatMode) {
             case 'student': {
-                const groups: string[] = Object.entries(raspCache.groups.timetable).map(([group, { days }]): [string, GroupDay[]] => {
-                    const daysOfWeek = days.filter((day) => {
-                        return StringDate.fromStringDate(day.day).toDate() >= firstWeekDay && day.lessons.length > 0;
-                    });
+                const groups: string[] = Object.entries(raspCache.groups.timetable)
+                    .map(([group, { days }]): [string, GroupDay[]] => {
+                        const daysOfWeek = days.filter((day) => {
+                            return (
+                                StringDate.fromStringDate(day.day).toDate() >= firstWeekDay && day.lessons.length > 0
+                            );
+                        });
 
-                    return [group, daysOfWeek];
-                }).filter(([, days]): boolean => {
-                    return days.length > 0;
-                }).map(([group]): string => {
-                    return group;
-                });
+                        return [group, daysOfWeek];
+                    })
+                    .filter(([, days]): boolean => {
+                        return days.length > 0;
+                    })
+                    .map(([group]): string => {
+                        return group;
+                    });
 
                 const baseChats = await this.getGroupsChats(groups, { noticeNextWeek: true });
                 const baseIds = new Set(baseChats.map((chat) => chat.id));
 
                 for (const chat of baseChats) {
                     await this.sendMessage(chat, message, {
-                        keyboard: chat.group ? StaticKeyboard.GetWeekTimetable({
-                            type: 'group',
-                            value: chat.group,
-                            showHeader: false,
-                            label: '📃 Показать',
-                            weekIndex
-                        }) : undefined
+                        keyboard: chat.group
+                            ? StaticKeyboard.GetWeekTimetable({
+                                  type: 'group',
+                                  value: chat.group,
+                                  showHeader: false,
+                                  label: '📃 Показать',
+                                  weekIndex
+                              })
+                            : undefined
                     });
                 }
 
@@ -501,35 +544,44 @@ export abstract class AbstractBotEventListener {
             }
 
             case 'teacher': {
-                const teachers: string[] = Object.entries(raspCache.teachers.timetable).map(([group, { days }]): [string, TeacherDay[]] => {
-                    const daysOfWeek = days.filter((day) => {
-                        return StringDate.fromStringDate(day.day).toDate() >= firstWeekDay && day.lessons.length > 0;
-                    });
+                const teachers: string[] = Object.entries(raspCache.teachers.timetable)
+                    .map(([group, { days }]): [string, TeacherDay[]] => {
+                        const daysOfWeek = days.filter((day) => {
+                            return (
+                                StringDate.fromStringDate(day.day).toDate() >= firstWeekDay && day.lessons.length > 0
+                            );
+                        });
 
-                    return [group, daysOfWeek];
-                }).filter(([, days]): boolean => {
-                    return days.length > 0;
-                }).map(([teacher]): string => {
-                    return teacher;
-                });
+                        return [group, daysOfWeek];
+                    })
+                    .filter(([, days]): boolean => {
+                        return days.length > 0;
+                    })
+                    .map(([teacher]): string => {
+                        return teacher;
+                    });
 
                 const baseChats = await this.getTeachersChats(teachers, { noticeNextWeek: true });
                 const baseIds = new Set(baseChats.map((chat) => chat.id));
 
                 for (const chat of baseChats) {
                     await this.sendMessage(chat, message, {
-                        keyboard: chat.teacher ? StaticKeyboard.GetWeekTimetable({
-                            type: 'teacher',
-                            value: chat.teacher,
-                            showHeader: false,
-                            label: '📃 Показать',
-                            weekIndex
-                        }) : undefined
+                        keyboard: chat.teacher
+                            ? StaticKeyboard.GetWeekTimetable({
+                                  type: 'teacher',
+                                  value: chat.teacher,
+                                  showHeader: false,
+                                  label: '📃 Показать',
+                                  weekIndex
+                              })
+                            : undefined
                     });
                 }
 
                 for (const teacher of teachers) {
-                    const subscriptionChats = await this.getSubscribedChats('teacher', teacher, { noticeNextWeek: true });
+                    const subscriptionChats = await this.getSubscribedChats('teacher', teacher, {
+                        noticeNextWeek: true
+                    });
                     for (const chat of subscriptionChats) {
                         if (baseIds.has(chat.id)) {
                             continue;
@@ -596,7 +648,9 @@ export abstract class AbstractBotEventListener {
                 }
 
                 for (const teacher of teachers) {
-                    const subscriptionChats = await this.getSubscribedChats('teacher', teacher, { noticeNextWeek: true });
+                    const subscriptionChats = await this.getSubscribedChats('teacher', teacher, {
+                        noticeNextWeek: true
+                    });
                     for (const chat of subscriptionChats) {
                         if (baseIds.has(chat.id)) {
                             continue;
@@ -631,10 +685,7 @@ export abstract class AbstractBotEventListener {
             return;
         }
 
-        return this.sendMessages(chats, [
-            'Parser error\n',
-            prepareError(error)
-        ].join('\n'));
+        return this.sendMessages(chats, ['Parser error\n', prepareError(error)].join('\n'));
     }
 
     public async updateCalls(data: CallsUpdateEvent) {
@@ -644,15 +695,14 @@ export abstract class AbstractBotEventListener {
 
         const chats: BotChat[] = await this.getChats({
             noticeCalls: true,
-            [Op.or]: [
-                { group: { [Op.ne]: null } },
-                { teacher: { [Op.ne]: null } }
-            ]
+            [Op.or]: [{ group: { [Op.ne]: null } }, { teacher: { [Op.ne]: null } }]
         });
         if (chats.length === 0) return;
 
         const parts: string[] = [];
-        parts.push('\uD83D\uDD14 \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u043E \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0437\u0432\u043E\u043D\u043A\u043E\u0432');
+        parts.push(
+            '\uD83D\uDD14 \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u043E \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0437\u0432\u043E\u043D\u043A\u043E\u0432'
+        );
         if (data.reason) {
             parts.push(`\u041F\u0440\u0438\u0447\u0438\u043D\u0430: ${data.reason}`);
         }
@@ -667,7 +717,9 @@ export abstract class AbstractBotEventListener {
             parts.push(this.formatCalls(data.schedule.saturday));
         }
 
-        parts.push('\n\u041F\u043E\u043B\u043D\u043E\u0435 \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435: \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C');
+        parts.push(
+            '\n\u041F\u043E\u043B\u043D\u043E\u0435 \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0435: \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C'
+        );
         const message = parts.join('\n');
         await this.sendMessages(chats, message, { keyboard: StaticKeyboard.GetCalls() });
     }

@@ -1,7 +1,7 @@
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)(alias|aliases))|(⌨️\s)?(Настройка алиасов|Алиасы)$/i
+    public regexp = /^((!|\/)(alias|aliases))|(⌨️\s)?(Настройка алиасов|Алиасы)$/i;
     public payloadAction = null;
     // public tgCommand: TelegramBotCommand = {
     //     command: 'alias',
@@ -13,6 +13,6 @@ export default class extends AbstractCommand {
 
         return context.send('Меню настройки алиасов.', {
             keyboard: keyboard.SettingsAliases
-        })
+        });
     }
 }

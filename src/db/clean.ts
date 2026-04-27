@@ -15,13 +15,13 @@ export async function vanish(app: App) {
                 [Op.lt]: Math.ceil(Date.now() / 1e3)
             }
         }
-    })
+    });
 
     //clean timetable days larger then 5 years
     await TimetableArchive.destroy({
         where: {
             day: {
-                [Op.lte]: DayIndex.fromDate(new Date(Date.now() - (1e3 * 60 * 60 * 24 * 365 * 5))).valueOf()
+                [Op.lte]: DayIndex.fromDate(new Date(Date.now() - 1e3 * 60 * 60 * 24 * 365 * 5)).valueOf()
             }
         }
     });

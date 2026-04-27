@@ -2,10 +2,10 @@ import { Request, Response } from 'express';
 import { App } from '../../../app';
 
 export type HandlerParams = {
-    app: App,
-    request: Request,
-    response: Response
-}
+    app: App;
+    request: Request;
+    response: Response;
+};
 
 export default abstract class ApiDefaultMethod {
     public abstract readonly method: string;
@@ -14,7 +14,7 @@ export default abstract class ApiDefaultMethod {
 
     public watch: boolean = false;
 
-    abstract handler(params: HandlerParams): Promise<any> | any
+    abstract handler(params: HandlerParams): Promise<any> | any;
 
-    unload() { }
+    unload() {}
 }

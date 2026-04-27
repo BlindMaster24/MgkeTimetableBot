@@ -1,8 +1,8 @@
-import { DayCall } from "../../../../../../config.scheme";
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
-import { nowInTime } from "../../../../../utils";
-import { raspCache } from "../../../../parser";
-import { config } from "../../../../../../config";
+import { DayCall } from '../../../../../../config.scheme';
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
+import { nowInTime } from '../../../../../utils';
+import { raspCache } from '../../../../parser';
+import { config } from '../../../../../../config';
 
 export default class extends AbstractCommand {
     public regexp = /^\uD83D\uDCCA\s\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C$/i;
@@ -10,10 +10,12 @@ export default class extends AbstractCommand {
     public payloadAction = null;
 
     async handler({ context }: CmdHandlerParams) {
-        const activeSchedule = raspCache.calls.active.schedule.weekdays.length ? raspCache.calls.active.schedule : {
-            weekdays: config.timetable.weekdays,
-            saturday: config.timetable.saturday
-        };
+        const activeSchedule = raspCache.calls.active.schedule.weekdays.length
+            ? raspCache.calls.active.schedule
+            : {
+                  weekdays: config.timetable.weekdays,
+                  saturday: config.timetable.saturday
+              };
 
         const message: string[] = [];
         const maxLessons = Math.max(activeSchedule.weekdays.length, activeSchedule.saturday.length);

@@ -1,6 +1,6 @@
-import { AsyncLocalStorage } from "async_hooks";
-import { randomUUID } from "crypto";
-import { LogContext } from "./types";
+import { AsyncLocalStorage } from 'async_hooks';
+import { randomUUID } from 'crypto';
+import { LogContext } from './types';
 
 const store = new AsyncLocalStorage<LogContext>();
 
@@ -25,4 +25,3 @@ export function setLogContext(context: LogContext): void {
 export function newTraceId(): string {
     return randomUUID();
 }
-

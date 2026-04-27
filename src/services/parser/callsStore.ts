@@ -1,4 +1,4 @@
-import { StorageModel } from "../bots/storage/model";
+import { StorageModel } from '../bots/storage/model';
 
 export type CallsOverrideSource = 'site' | 'manual' | 'config';
 

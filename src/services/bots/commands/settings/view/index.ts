@@ -1,8 +1,8 @@
 import type { TelegramBotCommand } from '../../../types/telegram';
-import { AbstractCommand, CmdHandlerParams } from "../../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)view)|(🖼️\s)?(Отображение)$/i
+    public regexp = /^((!|\/)view)|(🖼️\s)?(Отображение)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'view',
@@ -14,6 +14,6 @@ export default class extends AbstractCommand {
 
         return context.send('Меню настройки отображения внешнего вида расписания.', {
             keyboard: keyboard.SettingsView
-        })
+        });
     }
 }

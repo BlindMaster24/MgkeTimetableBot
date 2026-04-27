@@ -1,14 +1,15 @@
-import { AbstractParser } from "./abstract";
-import { Team } from "./types";
+import { AbstractParser } from './abstract';
+import { Team } from './types';
 
 export default class TeamParser extends AbstractParser {
     protected team: Team = {};
 
     protected get content(): Element {
-        const content = this.document.querySelector('.entry.employees-list')
-            || this.document.querySelector('.main.container #main-p')
-            || this.document.querySelector('.common-page-left-block')
-            || this.document.body;
+        const content =
+            this.document.querySelector('.entry.employees-list') ||
+            this.document.querySelector('.main.container #main-p') ||
+            this.document.querySelector('.common-page-left-block') ||
+            this.document.body;
         if (!content) {
             throw new Error('cannot get page content');
         }
@@ -52,11 +53,14 @@ export default class TeamParser extends AbstractParser {
             throw new Error('?????????? ???????? ?????? ??? ???????');
         }
 
-        const shortName = fullName.match(/(\W+)\s(\W)\W+\s(\W)\W+/i)?.slice(1, 4)
+        const shortName = fullName
+            .match(/(\W+)\s(\W)\W+\s(\W)\W+/i)
+            ?.slice(1, 4)
             .map((part, i) => {
                 if (i === 0) return part;
                 return part + '.';
-            }).join(' ');
+            })
+            .join(' ');
 
         if (!shortName) {
             throw new Error('?????????? ????????????? ?????? ??? ? ???????????');
@@ -71,11 +75,14 @@ export default class TeamParser extends AbstractParser {
             return;
         }
 
-        const shortName = fullName.match(/(\W+)\s(\W)\W+\s(\W)\W+/i)?.slice(1, 4)
+        const shortName = fullName
+            .match(/(\W+)\s(\W)\W+\s(\W)\W+/i)
+            ?.slice(1, 4)
             .map((part, i) => {
                 if (i === 0) return part;
                 return part + '.';
-            }).join(' ');
+            })
+            .join(' ');
 
         if (!shortName) {
             throw new Error('?????????? ????????????? ?????? ??? ? ???????????');

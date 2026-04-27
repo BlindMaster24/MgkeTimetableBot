@@ -1,8 +1,8 @@
-import { TgBot } from ".";
-import { AbstractAction, AbstractCommandContext } from "../abstract";
-import { BotChat } from "../chat";
-import { TgCommandContext, TgMessageRealContext } from "./context";
-import { Logger } from "../../../logger";
+import { TgBot } from '.';
+import { AbstractAction, AbstractCommandContext } from '../abstract';
+import { BotChat } from '../chat';
+import { TgCommandContext, TgMessageRealContext } from './context';
+import { Logger } from '../../../logger';
 
 export class TgBotAction extends AbstractAction {
     protected context: TgMessageRealContext;

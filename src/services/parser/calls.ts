@@ -1,4 +1,4 @@
-import { DayCall } from "../../../config.scheme";
+import { DayCall } from '../../../config.scheme';
 
 export type CallsSchedule = {
     weekdays: DayCall[];
@@ -25,7 +25,10 @@ const parseRowTimes = (text: string): DayCall | null => {
     if (times.length < 4) {
         return null;
     }
-    return [[times[0], times[1]], [times[2], times[3]]];
+    return [
+        [times[0], times[1]],
+        [times[2], times[3]]
+    ];
 };
 
 const extractTable = (table: Element): DayCall[] => {
@@ -55,9 +58,8 @@ const headingForTable = (table: Element): string => {
 };
 
 const parseUpdatedAt = (root: Element): { updatedAt?: number; updatedAtRaw?: string } => {
-    const attr = root.querySelector('[date-updated]')?.getAttribute('date-updated')
-        || root.getAttribute('date-updated')
-        || null;
+    const attr =
+        root.querySelector('[date-updated]')?.getAttribute('date-updated') || root.getAttribute('date-updated') || null;
     const raw = attr ?? '';
     if (raw) {
         const match = /(\d{2}\.\d{2}\.\d{4})(?:\s+(\d{2}:\d{2}))?/.exec(raw);

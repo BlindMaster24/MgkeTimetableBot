@@ -1,9 +1,9 @@
 import type { TelegramBotCommand } from '../../types/telegram';
 import { vanish } from '../../../../db/clean';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)(vacuum|vanish)/i
+    public regexp = /^(!|\/)(vacuum|vanish)/i;
     public payloadAction = null;
     public adminOnly: boolean = true;
     public tgCommand: TelegramBotCommand = {

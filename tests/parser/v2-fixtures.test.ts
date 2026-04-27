@@ -6,14 +6,12 @@ import StudentParserV2 from '../../src/services/parser/v2/group';
 import TeacherParserV2 from '../../src/services/parser/v2/teacher';
 
 type FixtureMeta = {
-    type: 'group' | 'teacher',
-    expected: unknown
+    type: 'group' | 'teacher';
+    expected: unknown;
 };
 
 const fixturesDir = path.join(__dirname, '..', 'fixtures', 'parser-v2');
-const htmlFiles = existsSync(fixturesDir)
-    ? readdirSync(fixturesDir).filter((file) => file.endsWith('.html'))
-    : [];
+const htmlFiles = existsSync(fixturesDir) ? readdirSync(fixturesDir).filter((file) => file.endsWith('.html')) : [];
 
 describe('parser v2 fixtures', () => {
     if (!existsSync(fixturesDir)) {
@@ -38,9 +36,7 @@ describe('parser v2 fixtures', () => {
             const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as FixtureMeta;
 
             const dom = new JSDOM(html);
-            const parser = meta.type === 'group'
-                ? new StudentParserV2(dom.window)
-                : new TeacherParserV2(dom.window);
+            const parser = meta.type === 'group' ? new StudentParserV2(dom.window) : new TeacherParserV2(dom.window);
             const actual = parser.run();
 
             expect(JSON.parse(JSON.stringify(actual))).toEqual(meta.expected);

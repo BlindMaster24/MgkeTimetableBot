@@ -1,22 +1,27 @@
-import { z } from "zod";
-import { AppServiceName } from "../../../app";
-import { WeekIndex } from "../../../utils";
-import { ImageFile } from "../../image/builder";
-import { raspCache } from "../../parser";
-import { AbstractCallback, CbHandlerParams } from "../abstract";
+import { z } from 'zod';
+import { AppServiceName } from '../../../app';
+import { WeekIndex } from '../../../utils';
+import { ImageFile } from '../../image/builder';
+import { raspCache } from '../../parser';
+import { AbstractCallback, CbHandlerParams } from '../abstract';
 
 export default class extends AbstractCallback {
     public payloadAction: string = 'image';
     public requireServices: AppServiceName[] = ['image'];
 
     async handler({ context }: CbHandlerParams) {
-        const [type, value, weekIndex] = z.tuple([
-            z.enum(['g', 'group', 't', 'teacher']),
-            z.coerce.string(),
-            z.number().int().default(() => {
-                return WeekIndex.getRelevant().valueOf();
-            })
-        ]).parse(context.payload);
+        const [type, value, weekIndex] = z
+            .tuple([
+                z.enum(['g', 'group', 't', 'teacher']),
+                z.coerce.string(),
+                z
+                    .number()
+                    .int()
+                    .default(() => {
+                        return WeekIndex.getRelevant().valueOf();
+                    })
+            ])
+            .parse(context.payload);
 
         const weekBounds = WeekIndex.fromWeekIndexNumber(weekIndex).getWeekDayIndexRange();
         const archive = this.app.getService('timetable');
@@ -52,6 +57,6 @@ export default class extends AbstractCallback {
             reply_to: context.messageId
         });
 
-        return context.answer('Изображение было отправлено').catch(() => { });
+        return context.answer('Изображение было отправлено').catch(() => {});
     }
 }

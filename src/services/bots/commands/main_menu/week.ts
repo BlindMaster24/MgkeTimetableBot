@@ -1,11 +1,11 @@
 import type { TelegramBotCommand } from '../../types/telegram';
-import { StringDate, WeekIndex, randArray, removePastDays } from "../../../../utils";
+import { StringDate, WeekIndex, randArray, removePastDays } from '../../../../utils';
 import { raspCache } from '../../../parser';
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 import { StaticKeyboard } from '../../keyboard';
 
 export default class extends AbstractCommand {
-    public regexp = /^((!|\/)(get)?(rasp)?week|(📑\s)?(расписание\s)?на неделю)$/i
+    public regexp = /^((!|\/)(get)?(rasp)?week|(📑\s)?(расписание\s)?на неделю)$/i;
     public payloadAction = null;
     public tgCommand: TelegramBotCommand = {
         command: 'week',
@@ -15,8 +15,10 @@ export default class extends AbstractCommand {
     async handler(params: CmdHandlerParams) {
         const { context, chat } = params;
 
-        if (Object.keys(raspCache.groups.timetable).length == 0 &&
-            Object.keys(raspCache.teachers.timetable).length == 0) {
+        if (
+            Object.keys(raspCache.groups.timetable).length == 0 &&
+            Object.keys(raspCache.teachers.timetable).length == 0
+        ) {
             return context.send('Данные с сервера ещё не загружены, ожидайте...');
         }
 
@@ -34,9 +36,9 @@ export default class extends AbstractCommand {
 
             return context.send(
                 'Ваша учебная группа не выбрана\n\n' +
-                'Выбрать группу можно командой /setGroup <group>\n' +
-                'Пример:\n' +
-                `/setGroup ${randGroup}`
+                    'Выбрать группу можно командой /setGroup <group>\n' +
+                    'Пример:\n' +
+                    `/setGroup ${randGroup}`
             );
         }
 
@@ -67,12 +69,19 @@ export default class extends AbstractCommand {
 
         actions.deleteUserMsg();
 
-        return context.send(message, {
-            keyboard: await keyboard.WeekControl('group', String(chat.group), weekIndex.valueOf(), chat.hidePastDays)
-        }).then(id => {
-            actions.handlerLastMsgUpdate(context);
-            return id;
-        });
+        return context
+            .send(message, {
+                keyboard: await keyboard.WeekControl(
+                    'group',
+                    String(chat.group),
+                    weekIndex.valueOf(),
+                    chat.hidePastDays
+                )
+            })
+            .then((id) => {
+                actions.handlerLastMsgUpdate(context);
+                return id;
+            });
     }
 
     private async teacherRasp({ context, chat, actions, formatter, keyboard }: CmdHandlerParams) {
@@ -81,9 +90,9 @@ export default class extends AbstractCommand {
 
             return context.send(
                 'Имя преподавателя не выбрано\n\n' +
-                'Выбрать преподавателя можно командой /setTeacher <teacher>\n' +
-                'Пример:\n' +
-                `/setTeacher ${randTeacher}`
+                    'Выбрать преподавателя можно командой /setTeacher <teacher>\n' +
+                    'Пример:\n' +
+                    `/setTeacher ${randTeacher}`
             );
         }
 
@@ -108,9 +117,11 @@ export default class extends AbstractCommand {
 
         actions.deleteUserMsg();
 
-        return context.send(message, {
-            keyboard: await keyboard.WeekControl('teacher', chat.teacher, weekIndex.valueOf(), chat.hidePastDays)
-        }).then(context => actions.handlerLastMsgUpdate(context));
+        return context
+            .send(message, {
+                keyboard: await keyboard.WeekControl('teacher', chat.teacher, weekIndex.valueOf(), chat.hidePastDays)
+            })
+            .then((context) => actions.handlerLastMsgUpdate(context));
     }
 
     private getAcademicWeekLabel(weekIndex: WeekIndex): string {

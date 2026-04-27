@@ -1,10 +1,10 @@
-import { StringDate } from "../../../utils";
-import { Group, Groups, Teacher, Teachers } from "../types";
+import { StringDate } from '../../../utils';
+import { Group, Groups, Teacher, Teachers } from '../types';
 
 type ValidationResult = {
-    ok: boolean,
-    errors: string[]
-}
+    ok: boolean;
+    errors: string[];
+};
 
 function shuffle<T>(items: T[]): T[] {
     const copy = items.slice();

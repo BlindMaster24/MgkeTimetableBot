@@ -1,13 +1,13 @@
-import { AbstractCommand, CmdHandlerParams } from "../../abstract";
+import { AbstractCommand, CmdHandlerParams } from '../../abstract';
 
 export default class extends AbstractCommand {
-    public regexp = /^(!|\/)trigger/i
+    public regexp = /^(!|\/)trigger/i;
     public payloadAction = null;
 
     public adminOnly: boolean = true;
 
     async handler({ context }: CmdHandlerParams) {
-        const [trigger, arg] = context.text?.replace(this.regexp, '').trim().split(' ');
+        const [trigger, arg] = (context.text ?? '').replace(this.regexp, '').trim().split(' ');
 
         switch (trigger) {
             case 'NextDayUpdater':

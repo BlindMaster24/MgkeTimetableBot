@@ -1,11 +1,11 @@
-import { config } from "../../../../config";
-import { raspCache } from "../../parser";
-import ApiDefaultMethod from "./_default";
-import { promises as fs } from "fs";
+import { config } from '../../../../config';
+import { raspCache } from '../../parser';
+import ApiDefaultMethod from './_default';
+import { promises as fs } from 'fs';
 
 export default class ParserHealthMethod extends ApiDefaultMethod {
-    public readonly method = "parser-health";
-    public readonly httpMethod = "GET";
+    public readonly method = 'parser-health';
+    public readonly httpMethod = 'GET';
 
     public async handler() {
         const metricsDir = config.parser.v2?.metrics?.dir || './cache/rasp/metrics';
@@ -18,10 +18,7 @@ export default class ParserHealthMethod extends ApiDefaultMethod {
             }
         };
 
-        const [studentMetrics, teacherMetrics] = await Promise.all([
-            readMetrics('student'),
-            readMetrics('teacher')
-        ]);
+        const [studentMetrics, teacherMetrics] = await Promise.all([readMetrics('student'), readMetrics('teacher')]);
 
         return {
             ok: Boolean(raspCache.successUpdate),
