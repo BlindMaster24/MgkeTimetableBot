@@ -158,7 +158,7 @@ context.send('\\xD0\\x92\\xD1\\x8B...');
 ## Coverage In This Project
 - V8 coverage via `@vitest/coverage-v8`. Run locally with `pnpm run test:coverage`.
 - CI uploads `coverage/` as an artifact (retention 14 days).
-- Thresholds are currently not enforced; they will be enabled after the suite stabilises across a few PRs.
+- Thresholds are enforced in `vitest.config.ts` and the `coverage` CI job fails on regression. Current floors: statements 18%, branches 13%, functions 22%, lines 18%. Raise these numbers in the same PR that adds coverage so the floor ratchets up.
 - PR template for this repository:
 - `Commands run:` `pnpm run test:all`, `pnpm run ts-check`
 - `Result:` pass/fail + first failing test file (if any)
