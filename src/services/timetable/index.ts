@@ -1,11 +1,12 @@
 import { App, AppService } from '../../app';
 import { sequelize } from '../../db';
 import { Logger } from '../../logger';
-import { DayIndex, WeekIndex } from '../../utils';
+import { WeekIndex } from '../../utils';
 import { loadCache, raspCache } from '../parser/raspCache';
 import { GroupDay, TeacherDay } from '../parser/types';
 import { TimetableArchive } from './models/timetable';
 import { ArchiveAppendDay, TimetableArchiveRepository } from './repository';
+import { computeSyncPlan } from './syncPlan';
 
 export class Timetable implements AppService {
     private readonly repository = new TimetableArchiveRepository();
@@ -28,28 +29,10 @@ export class Timetable implements AppService {
     }
 
     private async syncFromCacheIfStale(): Promise<void> {
-        const entries: ArchiveAppendDay[] = [];
-
-        for (const [group, cacheEntry] of Object.entries(raspCache.groups.timetable)) {
-            for (const day of cacheEntry.days) {
-                entries.push({ type: 'group', value: group, day });
-            }
-        }
-
-        for (const [teacher, cacheEntry] of Object.entries(raspCache.teachers.timetable)) {
-            for (const day of cacheEntry.days) {
-                entries.push({ type: 'teacher', value: teacher, day });
-            }
-        }
-
-        if (entries.length === 0) {
+        const plan = computeSyncPlan(raspCache);
+        if (plan.entries.length === 0) {
             return;
         }
-
-        const cacheMaxDay = entries.reduce((max, entry) => {
-            const dayIndex = DayIndex.fromStringDate(entry.day.day).valueOf();
-            return dayIndex > max ? dayIndex : max;
-        }, 0);
 
         let dbMaxDay = 0;
         try {
@@ -59,12 +42,16 @@ export class Timetable implements AppService {
             dbMaxDay = 0;
         }
 
-        if (cacheMaxDay <= dbMaxDay) {
+        if (plan.cacheMaxDay <= dbMaxDay) {
             return;
         }
 
-        this.logger.info('syncing cache to archive', { entries: entries.length, cacheMaxDay, dbMaxDay });
-        await this.appendDays(entries);
+        this.logger.info('syncing cache to archive', {
+            entries: plan.entries.length,
+            cacheMaxDay: plan.cacheMaxDay,
+            dbMaxDay
+        });
+        await this.appendDays(plan.entries);
     }
 
     public async getDayIndexBounds(): Promise<{ min: number; max: number }> {
