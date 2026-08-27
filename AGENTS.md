@@ -35,7 +35,7 @@
 - Runtime: Go 1.22+ (LTS).
 - Package manager: Go modules (go.mod).
 - `go mod tidy` — sync dependencies.
-- `go build ./cmd/bot/` — build binary.
+- `go build -o bot ./cmd/bot/` — build binary.
 - `go run ./cmd/bot/ -config configs/config.yaml` — run bot.
 - `go test ./internal/... ./tests/... -v` — run all tests.
 - `go test ./internal/... ./tests/... -cover` — run with coverage.
@@ -45,7 +45,7 @@
 ## Verification Checklist
 - `go vet ./...` for static analysis after any changes.
 - `go test ./internal/... ./tests/... -cover` before commit.
-- `go build ./cmd/bot/` to verify binary compiles.
+- `go build -o bot ./cmd/bot/` to verify binary compiles.
 - `go run ./cmd/bot/ -config configs/config.yaml` for a smoke run (manual).
 
 ## Current Features Snapshot

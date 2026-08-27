@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
@@ -19,6 +20,8 @@ type Bot struct {
 	cfg       *config.Config
 	log       *logger.Logger
 	i18n      *i18n.Localizer
+	chatRepo  *Repository
+	cache     *cache.RaspCache
 	commands  map[string]Command
 	callbacks map[string]Callback
 }
@@ -48,7 +51,7 @@ type Callback interface {
 	Handler(ctx context.Context, u *Update) error
 }
 
-func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer) (*Bot, error) {
+func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache) (*Bot, error) {
 	client, err := telego.NewBot(cfg.Telegram.Token, telego.WithDefaultDebugLogger())
 	if err != nil {
 		return nil, fmt.Errorf("create bot: %w", err)
@@ -59,6 +62,8 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer) (*Bot, 
 		cfg:       cfg,
 		log:       log,
 		i18n:      loc,
+		chatRepo:  chatRepo,
+		cache:     cache,
 		commands:  make(map[string]Command),
 		callbacks: make(map[string]Callback),
 	}
@@ -71,6 +76,7 @@ func (b *Bot) Client() *telego.Bot       { return b.client }
 func (b *Bot) Config() *config.Config    { return b.cfg }
 func (b *Bot) I18n() *i18n.Localizer     { return b.i18n }
 func (b *Bot) Log() *logger.Logger       { return b.log }
+func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
 
 func (b *Bot) RegisterCommand(cmd Command) {
 	b.commands[cmd.Name()] = cmd
@@ -147,6 +153,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *telego.Message) {
 		UserID:  msg.From.ID,
 		Text:    text,
 	}
+
+	b.handleMessageText(ctx, u)
 
 	if cmd, ok := b.commands[text]; ok {
 		if err := cmd.Handler(ctx, u); err != nil {

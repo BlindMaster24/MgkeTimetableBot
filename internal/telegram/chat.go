@@ -1,0 +1,359 @@
+package telegram
+
+import (
+	"database/sql"
+	"sync"
+
+	_ "modernc.org/sqlite"
+)
+
+type ChatMode string
+
+const (
+	ModeStudent ChatMode = "student"
+	ModeTeacher ChatMode = "teacher"
+	ModeParent  ChatMode = "parent"
+	ModeGuest   ChatMode = "guest"
+)
+
+type Chat struct {
+	ID                    int64
+	Service               string
+	PeerID                int64
+	Accepted              bool
+	Scene                 string
+	Mode                  ChatMode
+	Group                 string
+	Teacher               string
+	GoogleEmail           string
+	Formatter             int
+	ShowAbout             bool
+	ShowDaily             bool
+	ShowWeekly            bool
+	ShowCalls             bool
+	ShowFastGroup         bool
+	ShowFastTeacher       bool
+	HidePastDays          bool
+	DeleteLastMsg         bool
+	LastMsgID             int64
+	AllowSendMess         bool
+	NoticeChanges         bool
+	NoticeNextWeek        bool
+	NoticeCalls           bool
+	NoticeParserErrors    bool
+	ShowParserTime        bool
+	ShowHints             bool
+	DiffEnabled           bool
+	DiffAutoInWeek        bool
+	DiffAutoInUpdates     bool
+	DiffShowBeforeAfter   bool
+	DiffMaxLines          int
+	Ref                   string
+}
+
+type Repository struct {
+	db *sql.DB
+	mu sync.RWMutex
+}
+
+func New(dbPath string) (*Repository, error) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+
+	r := &Repository{db: db}
+	if err := r.migrate(); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (r *Repository) Close() error {
+	return r.db.Close()
+}
+
+func (r *Repository) migrate() error {
+	_, err := r.db.Exec(`CREATE TABLE IF NOT EXISTS bot_chats (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		service TEXT NOT NULL DEFAULT 'telegram',
+		peer_id INTEGER NOT NULL,
+		accepted INTEGER NOT NULL DEFAULT 1,
+		scene TEXT,
+		mode TEXT,
+		"group" TEXT,
+		teacher TEXT,
+		google_email TEXT,
+		formatter INTEGER NOT NULL DEFAULT 0,
+		show_about INTEGER NOT NULL DEFAULT 0,
+		show_daily INTEGER NOT NULL DEFAULT 0,
+		show_weekly INTEGER NOT NULL DEFAULT 0,
+		show_calls INTEGER NOT NULL DEFAULT 0,
+		show_fast_group INTEGER NOT NULL DEFAULT 0,
+		show_fast_teacher INTEGER NOT NULL DEFAULT 0,
+		hide_past_days INTEGER NOT NULL DEFAULT 0,
+		delete_last_msg INTEGER NOT NULL DEFAULT 0,
+		last_msg_id INTEGER NOT NULL DEFAULT 0,
+		allow_send_mess INTEGER NOT NULL DEFAULT 1,
+		notice_changes INTEGER NOT NULL DEFAULT 1,
+		notice_next_week INTEGER NOT NULL DEFAULT 1,
+		notice_calls INTEGER NOT NULL DEFAULT 1,
+		notice_parser_errors INTEGER NOT NULL DEFAULT 1,
+		notice_week INTEGER NOT NULL DEFAULT 1,
+		show_parser_time INTEGER NOT NULL DEFAULT 0,
+		show_hints INTEGER NOT NULL DEFAULT 1,
+		diff_enabled INTEGER NOT NULL DEFAULT 1,
+		diff_auto_in_week INTEGER NOT NULL DEFAULT 1,
+		diff_auto_in_updates INTEGER NOT NULL DEFAULT 1,
+		diff_show_before_after INTEGER NOT NULL DEFAULT 1,
+		diff_max_lines INTEGER NOT NULL DEFAULT 20,
+		ref TEXT,
+		UNIQUE(service, peer_id)
+	)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_chats_peer ON bot_chats(service, peer_id)`)
+	return err
+}
+
+func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	chat, err := r.findByPeerID(service, peerID)
+	if err == nil && chat != nil {
+		return chat, nil
+	}
+
+	_, err = r.db.Exec(
+		`INSERT OR IGNORE INTO bot_chats (service, peer_id) VALUES (?, ?)`,
+		service, peerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.findByPeerID(service, peerID)
+}
+
+func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
+	row := r.db.QueryRow(
+		`SELECT id, service, peer_id, accepted, scene, mode, "group", teacher,
+		        google_email, formatter, show_about, show_daily, show_weekly,
+		        show_calls, show_fast_group, show_fast_teacher, hide_past_days,
+		        delete_last_msg, last_msg_id, allow_send_mess, notice_changes,
+		        notice_next_week, notice_calls, notice_parser_errors,
+		        show_parser_time, show_hints, diff_enabled, diff_auto_in_week,
+		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref
+		 FROM bot_chats WHERE service = ? AND peer_id = ?`,
+		service, peerID,
+	)
+
+	chat := &Chat{}
+	var accepted, showAbout, showDaily, showWeekly, showCalls, showFastGroup, showFastTeacher int
+	var hidePastDays, deleteLastMsg, allowSendMess, noticeChanges, noticeNextWeek, noticeCalls, noticeParserErrors int
+	var showParserTime, showHints, diffEnabled, diffAutoInWeek, diffAutoInUpdates, diffShowBeforeAfter int
+
+	err := row.Scan(
+		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &chat.Scene, &chat.Mode,
+		&chat.Group, &chat.Teacher, &chat.GoogleEmail, &chat.Formatter,
+		&showAbout, &showDaily, &showWeekly, &showCalls, &showFastGroup, &showFastTeacher,
+		&hidePastDays, &deleteLastMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
+		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &showParserTime, &showHints,
+		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
+		&chat.DiffMaxLines, &chat.Ref,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	chat.Accepted = accepted != 0
+	chat.ShowAbout = showAbout != 0
+	chat.ShowDaily = showDaily != 0
+	chat.ShowWeekly = showWeekly != 0
+	chat.ShowCalls = showCalls != 0
+	chat.ShowFastGroup = showFastGroup != 0
+	chat.ShowFastTeacher = showFastTeacher != 0
+	chat.HidePastDays = hidePastDays != 0
+	chat.DeleteLastMsg = deleteLastMsg != 0
+	chat.AllowSendMess = allowSendMess != 0
+	chat.NoticeChanges = noticeChanges != 0
+	chat.NoticeNextWeek = noticeNextWeek != 0
+	chat.NoticeCalls = noticeCalls != 0
+	chat.NoticeParserErrors = noticeParserErrors != 0
+	chat.ShowParserTime = showParserTime != 0
+	chat.ShowHints = showHints != 0
+	chat.DiffEnabled = diffEnabled != 0
+	chat.DiffAutoInWeek = diffAutoInWeek != 0
+	chat.DiffAutoInUpdates = diffAutoInUpdates != 0
+	chat.DiffShowBeforeAfter = diffShowBeforeAfter != 0
+
+	return chat, nil
+}
+
+func (r *Repository) Save(chat *Chat) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	toInt := func(b bool) int {
+		if b {
+			return 1
+		}
+		return 0
+	}
+
+	_, err := r.db.Exec(
+		`UPDATE bot_chats SET
+			accepted=?, scene=?, mode=?, "group"=?, teacher=?,
+			google_email=?, formatter=?, show_about=?, show_daily=?, show_weekly=?,
+			show_calls=?, show_fast_group=?, show_fast_teacher=?, hide_past_days=?,
+			delete_last_msg=?, last_msg_id=?, allow_send_mess=?, notice_changes=?,
+			notice_next_week=?, notice_calls=?, notice_parser_errors=?,
+			show_parser_time=?, show_hints=?, diff_enabled=?, diff_auto_in_week=?,
+			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?
+		 WHERE id=?`,
+		toInt(chat.Accepted), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
+		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
+		toInt(chat.ShowWeekly), toInt(chat.ShowCalls), toInt(chat.ShowFastGroup),
+		toInt(chat.ShowFastTeacher), toInt(chat.HidePastDays), toInt(chat.DeleteLastMsg),
+		chat.LastMsgID, toInt(chat.AllowSendMess), toInt(chat.NoticeChanges),
+		toInt(chat.NoticeNextWeek), toInt(chat.NoticeCalls), toInt(chat.NoticeParserErrors),
+		toInt(chat.ShowParserTime), toInt(chat.ShowHints), toInt(chat.DiffEnabled),
+		toInt(chat.DiffAutoInWeek), toInt(chat.DiffAutoInUpdates), toInt(chat.DiffShowBeforeAfter),
+		chat.DiffMaxLines, chat.Ref, chat.ID,
+	)
+	return err
+}
+
+func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT id, service, peer_id, mode, "group", teacher, notice_changes, notice_next_week, notice_calls
+		 FROM bot_chats WHERE service = ? AND accepted = 1 AND mode IS NOT NULL AND allow_send_mess = 1`,
+		service,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var noticeChanges, noticeNextWeek, noticeCalls int
+		err := rows.Scan(&chat.ID, &chat.Service, &chat.PeerID, &chat.Mode, &chat.Group, &chat.Teacher, &noticeChanges, &noticeNextWeek, &noticeCalls)
+		if err != nil {
+			continue
+		}
+		chat.NoticeChanges = noticeChanges != 0
+		chat.NoticeNextWeek = noticeNextWeek != 0
+		chat.NoticeCalls = noticeCalls != 0
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func (r *Repository) DB() *sql.DB {
+	return r.db
+}
+
+func (r *Repository) FindGroupsForNotification(service string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT DISTINCT "group" FROM bot_chats WHERE service = ? AND mode IN ('student', 'parent') AND "group" IS NOT NULL AND notice_changes = 1 AND allow_send_mess = 1`,
+		service,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var groups []string
+	for rows.Next() {
+		var g string
+		if rows.Scan(&g) == nil {
+			groups = append(groups, g)
+		}
+	}
+	return groups
+}
+
+func (r *Repository) FindTeachersForNotification(service string) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT DISTINCT teacher FROM bot_chats WHERE service = ? AND mode = 'teacher' AND teacher IS NOT NULL AND notice_changes = 1 AND allow_send_mess = 1`,
+		service,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var teachers []string
+	for rows.Next() {
+		var t string
+		if rows.Scan(&t) == nil {
+			teachers = append(teachers, t)
+		}
+	}
+	return teachers
+}
+
+func (r *Repository) FindByGroup(service string, group string) []*Chat {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, "group" FROM bot_chats WHERE service = ? AND "group" = ? AND accepted = 1 AND allow_send_mess = 1`,
+		service, group,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		if rows.Scan(&chat.ID, &chat.PeerID, &chat.Mode, &chat.Group) == nil {
+			result = append(result, chat)
+		}
+	}
+	return result
+}
+
+func (r *Repository) FindByTeacher(service string, teacher string) []*Chat {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, teacher FROM bot_chats WHERE service = ? AND teacher = ? AND accepted = 1 AND allow_send_mess = 1`,
+		service, teacher,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		if rows.Scan(&chat.ID, &chat.PeerID, &chat.Mode, &chat.Teacher) == nil {
+			result = append(result, chat)
+		}
+	}
+	return result
+}
+
+func NewChatRepo(dbPath string) (*Repository, error) {
+	return New(dbPath)
+}

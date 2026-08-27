@@ -74,7 +74,13 @@ func main() {
 		}
 	}()
 
-	bot, err := telegrambot.NewBot(cfg, log, loc)
+	chatRepo, err := telegrambot.NewChatRepo("./bot_chats.db")
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to open chat DB")
+	}
+	defer chatRepo.Close()
+
+	bot, err := telegrambot.NewBot(cfg, log, loc, chatRepo, raspCache)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}

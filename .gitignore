@@ -1,5 +1,6 @@
 # Binaries
-bot
+/bot
+/bot.exe
 *.exe
 *.exe~
 *.dll
@@ -21,10 +22,12 @@ configs/config.yaml
 configs/config.local.yaml
 
 # Database
-sqlite3.db
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
-*.db-journal
 
 # Cache
 cache/
