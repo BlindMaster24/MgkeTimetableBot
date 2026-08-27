@@ -19,14 +19,30 @@ import (
 )
 
 func main() {
-	cfgPath := flag.String("config", "configs/config.yaml", "path to config file")
+	cfgPath := flag.String("config", "", "path to config file (default: configs/config.yaml)")
 	flag.Parse()
+
+	if *cfgPath == "" {
+		if env := os.Getenv("CONFIG_PATH"); env != "" {
+			cfgPath = &env
+		} else {
+			defaultPath := "configs/config.yaml"
+			cfgPath = &defaultPath
+		}
+	}
+
+	if _, err := os.Stat(*cfgPath); err != nil {
+		fmt.Fprintf(os.Stderr, "config file not found: %s\n", *cfgPath)
+		os.Exit(1)
+	}
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "load config %s: %v\n", *cfgPath, err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("config loaded: %s\n", *cfgPath)
 
 	fileCfg := &logger.FileConfig{}
 	if cfg.Logging.File.Enabled {
