@@ -1,35 +1,47 @@
-# Locals
-config.ts
-config2.ts
-cache/
-coverage/
+# Binaries
+bot
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+coverage.out
+
+# Go build cache
+.cache/
+
+# Config with secrets
+configs/config.local.yaml
+
+# Database
 sqlite3.db
 *.sqlite
 *.sqlite3
 *.db-journal
 
+# Cache
+cache/
+
 # Logs
-logs
+logs/
 *.log
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Dependency directories
-package-lock.json
-yarn.lock
-node_modules
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-# Optional npm cache directory
-.npm
-.pnpm-store
+# OS
+.DS_Store
+Thumbs.db
 
-# SFTP for deploy
-.vscode/sftp.json
-
-errors.txt
-
-# build
-.tsbuildinfo
-build
+# Freebuff
+.freebuff/

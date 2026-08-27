@@ -8,7 +8,7 @@
 2. Настройте **OAuth consent screen** (брендинг, аудитория, data access).
 3. Создайте **OAuth Client ID** (тип: Web application).
 4. Добавьте **Authorized redirect URI**:
-   - Значение должно **полностью совпадать** с `https://<redirectDomain><url>` из `config.ts`.
+   - Значение должно **полностью совпадать** с `https://<redirect_domain><url>` из `configs/config.yaml`.
    - Пример: `https://mgke.example.com/google/oauth`.
    - Для веб‑приложений используется HTTPS (локально допустим http://localhost).
 
@@ -16,30 +16,25 @@
 
 ## 2. Конфигурация в проекте
 
-В `config.ts` заполните:
-- `google.redirectDomain` — домен вашего сервера (с https).
-- `google.url` — путь OAuth (по умолчанию `/google/oauth`).
-- `google.oauth.clientId` и `google.oauth.clientSecret`.
+В `configs/config.yaml` заполните:
 
-Пример:
-
-```ts
-google: {
-    redirectDomain: 'https://mgke.example.com',
-    url: '/google/oauth',
-    oauth: {
-        clientId: '...apps.googleusercontent.com',
-        clientSecret: '...'
-    },
-    service_account: { ... },
-    calendar_owners: []
-}
+```yaml
+google:
+  redirect_domain: "https://mgke.example.com"
+  url: "/google/oauth"
+  oauth:
+    client_id: "...apps.googleusercontent.com"
+    client_secret: "..."
+  service_account:
+    client_email: "calendar@project.iam.gserviceaccount.com"
+    private_key: "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+  calendar_owners: []
 ```
 
 ## 3. Привязка аккаунта пользователем
 
 1. В Telegram: команда `/calendar` → выбрать **Google**.
-2. Нажать кнопку “Привязать Google аккаунт”.
+2. Нажать кнопку "Привязать Google аккаунт".
 3. Пройти OAuth и вернуться в чат.
 
 После этого бот сохранит email пользователя и сможет добавлять календарь в его аккаунт.
@@ -71,12 +66,12 @@ google: {
 ## 6. Частые ошибки
 
 ### redirect_uri_mismatch
-Причина: redirect URI в Google Cloud не совпадает с `redirectDomain + url` в конфиге.
+Причина: redirect URI в Google Cloud не совпадает с `redirect_domain + url` в конфиге.
 Решение: исправьте URI в Google Cloud Console или в конфиге.
 
 ### Недостаточно прав
 Причина: аккаунт не авторизован или не выдан writer.
-Решение: пройти OAuth и дать права через меню “Права”.
+Решение: пройти OAuth и дать права через меню "Права".
 
 ## Ссылки на официальные документы
 - OAuth redirect URI и правила совпадения: [Google OAuth 2.0 (Web Server)](https://developers.google.com/identity/protocols/oauth2/web-server)

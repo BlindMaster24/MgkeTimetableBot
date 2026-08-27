@@ -1,128 +1,113 @@
 # МГКЦТ Бот расписаний
 
-[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
+[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
 
 ## Описание
-МГКЦТ Бот расписаний - это бот для удобного просмотра расписания в Минском государственном колледже цифровых технологий. Если у вас возникли проблемы с использованием бота или вы нашли ошибку, пожалуйста, создайте **issue** в репозитории проекта или внесите свои изменения через **Pull Request**.
+МГКЦТ Бот расписаний — бот для удобного просмотра расписания в Минском государственном колледже цифровых технологий.
 
-### Прошлый репозиторий
-Я хотел бы также упомянуть, что ранее этот проект размещался в отдельном приватном репозитории, который насчитывал 223 коммита. Однако, в процессе разработки в старом репозитории были хранены конфиденциальные данные, что потребовало отделить проект и разместить его в новом, открытом репозитории.
+Написан на **Go** с использованием:
+- [telego](https://github.com/mymmrac/telego) — Telegram Bot API
+- [gin](https://github.com/gin-gonic/gin) — HTTP сервер
+- [goquery](https://github.com/PuerkitoBio/goquery) — парсинг HTML
+- [zerolog](https://github.com/rs/zerolog) — логирование
+- [lumberjack](https://github.com/natefinch/lumberjack) — ротация логов
+- [go-i18n](https://github.com/nicksnyder/go-i18n) — интернационализация
+- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) — SQLite (чистый Go, без CGO)
+- [fogleman/gg](https://github.com/fogleman/gg) — генерация изображений
+- [golang-ical](https://github.com/arran4/golang-ical) — ICS экспорт
 
-При переносе проекта в новый репозиторий я постарался убедиться, что все конфиденциальные данные были удалены и заменены соответствующими конфигурационными файлами и примерами для облегчения работы других разработчиков с проектом.
-
-Хотя некоторые коммиты могут быть потеряны, я надеюсь, что текущий репозиторий будет полезным и доступным для всех заинтересованных разработчиков.
-
-### Требуется помощь
-Я хочу предупредить и извиниться перед теми, кто заинтересован в этом проекте, что код был написан мной без строгого следования лучшим практикам разработки и стандартам качества. В результате, некоторые части кода могут показаться громоздкими, сложными для понимания или неэффективными. Я осознаю, что это может затруднить работу с проектом и его доработку.
-
-Тем не менее, я приглашаю всех желающих присоединиться к разработке и внести свой вклад в улучшение кода, оптимизацию и переписывание отдельных компонентов. Я буду рад любой помощи в улучшении качества проекта и сделаю все возможное, чтобы поддержать участников в этом процессе.
-
-Еще раз приношу извинения за возможные неудобства и надеюсь на ваше понимание и содействие в развитии проекта.
-
-
-## Действующие проекты
-- Viber бот: https://mgke.keller.by/viber
-- Telegram бот: https://t.me/mgke_slave_bot
-- ВК бот: https://vk.com/mgke_slave
-- Мини-приложение ВК: https://vk.com/app8071219
-
-
-## Структура проекта
-Проект состоит из различных модулей и компонентов, важные из которых описаны ниже:
-
-1. **Папка команд (src/services/bots/commands)** - здесь находятся все команды для различных платформ (ВК, Telegram и Viber). Команды разделены по категориям, таким как `admin`, `main_menu`, `rasp`, `settings`, и другим.
-
-2. **Папка сервисов (src/services)** - содержит различные сервисы для работы с Алисой, API, ботами и созданием изображений. В каждой подпапке находятся специфичные файлы для каждого сервиса:
-    - Alice: обработка навыков и пользовательских запросов
-    - API: обработка методов API
-    - Bots: реализация абстрактных классов и методов для ботов
-    - Image: создание изображений с расписанием
-    - VK App: обработка методов для мини-приложения ВКонтакте
-    - Parser: отвечает за обновление данных расписания и кэширование
-    - Timetable: хранение данных о расписании. В папке types находятся типы данных для расписания преподавателей и групп.
-
-Дополнительно к этим ключевым папкам, следует обратить внимание на следующие файлы и папки:
-
-- **db/** - подключение базы данных
-- **http.ts** - настройка и работа с HTTP-сервером
-- **src/formatter** - форматировщик расписания
-- **src/services/bots/abstract** - содержит абстрактные классы и методы для ботов
-- **src/utils** - содержит различные утилиты, такие как сортировка, преобразование времени, проверка подписи и другие функции
-
-Это краткое описание ключевых компонентов и структуры проекта. Ознакомьтесь с этими папками и файлами для более глубокого понимания работы бота и его возможностей.
-
+## Требования
+- Go 1.22+
+- SQLite (для archive)
 
 ## Установка и запуск
-Для запуска бота требуется Node.js 22 LTS и менеджер пакетов `pnpm`. Следуйте приведенным ниже шагам:
 
-1. Установите Node.js 22.x с официального сайта: https://nodejs.org/
-
-2. Включите `pnpm` через Corepack (входит в Node.js 16.10+):
+1. Клонируйте репозиторий:
     ```bash
-    corepack enable
-    ```
-    Точная версия `pnpm` закреплена в поле `packageManager` файла `package.json` — Corepack автоматически подтянет нужную.
-
-3. Клонируйте репозиторий проекта:
-    ```bash
-    git clone https://github.com/Keller18306/MgkeTimetableBot.git
+    git clone https://github.com/BlindMaster24/MgkeTimetableBot.git
     cd MgkeTimetableBot
+    git checkout main
     ```
 
-4. Установите зависимости (всё сразу, включая `tsx`):
+2. Скопируйте и заполните конфиг:
     ```bash
-    pnpm install
+    cp configs/config.yaml configs/config.local.yaml
+    # Отредактируйте configs/config.local.yaml — добавьте токен Telegram, ключи и т.д.
     ```
 
-5. Скопируйте файл `config.example.ts` и переименуйте его в `config.ts`. Откройте `config.ts` и заполните необходимые значения переменных, согласно схеме из файла `config.scheme.ts`. В конфиге можно настраивать различные сервисы, такие как ВКонтакте, Telegram, Viber и API.
+3. Установите зависимости:
+    ```bash
+    go mod tidy
+    ```
 
-    **ВАЖНО!** По умолчанию в конфиге включены следующие сервисы: `http`, `api`, `timetable`, `parser`. Для того, чтобы запустить бота/ботов необходимо указать сервис `bot`, а также сервис соц-сети (например `tg`, `vk`, `viber`).
+4. Соберите бинарник:
+    ```bash
+    go build -o bot ./cmd/bot/
+    ```
+
+5. Запустите:
+    ```bash
+    ./bot -config configs/config.local.yaml
+    ```
+
+    Или через `go run`:
+    ```bash
+    go run ./cmd/bot/ -config configs/config.yaml
+    ```
+
+## Тесты
+
+```bash
+go test ./internal/... ./tests/... -v        # все тесты
+go test ./internal/... ./tests/... -cover    # с покрытием
+go vet ./...                                 # статический анализ
+```
+
+## Структура проекта
+
+```
+cmd/bot/main.go              — entrypoint
+internal/
+  config/                    — YAML конфигурация
+  logger/                    — zerolog + lumberjack
+  i18n/                      — go-i18n + locales/ru.json
+  model/                     — Group, Teacher, Day, Lesson
+  parser/                    — goquery v1 парсер
+  parser/v2/                 — goquery v2: grid, validate, diff
+  archive/                   — SQLite репозиторий
+  cache/                     — file-backed RaspCache
+  telegram/                  — telego бот
+  api/                       — gin REST API
+  google/                    — Google Calendar
+  image/                     — PNG рендеринг
+  calendar/                  — ICS экспорт
+configs/config.yaml          — конфигурация
+migrations/001_init.sql      — SQLite миграция
+```
+
+## Конфигурация
+
+Основные настройки в `configs/config.yaml`:
+
+| Поле | Описание |
+|------|----------|
+| `telegram.token` | Токен Telegram бота |
+| `telegram.admin_ids` | ID администраторов |
+| `db_path` | Путь к SQLite базе |
+| `http.port` | Порт HTTP API |
+| `parser.enabled` | Включить парсер |
+| `parser.v2.enabled` | Включить v2 парсер |
+| `calendar.ics.enabled` | Включить ICS экспорт |
 
 ## Google Calendar
-Инструкция по настройке и правам доступа: [docs/google-calendar.md](docs/google-calendar.md).
 
-    Некоторые сервисы требуют наличия других сервисов, например:
-    |      Сервис     | Обязательные сервисы | Второстепенные |
-    |:---------------:|----------------------|----------------|
-    | tg              | bot, timetable       | image, google  |
-    | vk              | bot, timetable       | image, google  |
-    | viber           | bot, http, timetable | image, google  |
-    | vkApp           | http, timetable      |                |
-    | api             | http, timetable      |                |
-    | alice           | http, timetable      |                |
-    | google_calendar | timetable            | bot, http      |   
-    | parser          | timetable            | bot            |   
-    | image           |                      | http           |   
+Инструкция по настройке: [docs/google-calendar.md](docs/google-calendar.md).
 
-    Пример для запуска телеграм (без апи, но с генерацией изображения):
-    ```typescript
-    export const config: ConfigScheme = {
-        dev: false,
-        services: ['timetable', 'parser', 'bot', 'tg', 'image'],
-        db: {
-        ...
-    ```
-    *Полный список сервисов можно найти в **src/app.ts***
+## Боты
 
-6. Добавьте в конфиг 32-байтный ключ шифрования. Вы можете сгенерировать его, выполнив следующую команду в консоли:
-    ```less
-    node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-    ```
-    Скопируйте полученный ключ и добавьте его в соответствующее поле в файле config.ts.
-
-7. Запустите бота:
-    ```bash
-    pnpm start
-    ```
-
-    Дополнительные скрипты:
-    ```bash
-    pnpm run ts-check    # проверка типов (tsc --noEmit)
-    pnpm run test:all    # все тестовые скрипты
-    ```
-
-Поздравляем, ваш МГКЦТ Бот расписаний успешно запущен и готов к работе!
-
+| Платформа | Ссылка |
+|-----------|--------|
+| Telegram | https://t.me/mgke_slave_bot |
 
 ## Лицензия
-Данный проект распространяется под MIT лицензией. Если вы хотите создать свою версию бота, обязательно указывайте авторство оригинального проекта.
+MIT. При создании своей версии обязательно указывайте авторство оригинального проекта.
