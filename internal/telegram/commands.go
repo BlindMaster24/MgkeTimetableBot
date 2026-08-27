@@ -336,6 +336,40 @@ func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
 }
 
+type forceParseCmd struct{ bot *Bot }
+
+func (c *forceParseCmd) Name() string        { return "/forceparse" }
+func (c *forceParseCmd) Description() string { return c.bot.loc("cmd_forceparse") }
+func (c *forceParseCmd) Handler(ctx context.Context, u *Update) error {
+	if c.bot.parseFunc == nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("parse_not_available"))
+	}
+	if err := u.Bot.SendText(u.ChatID, c.bot.loc("force_parse_started")); err != nil {
+		return err
+	}
+	go func() {
+		if err := c.bot.parseFunc(); err != nil {
+			c.bot.log.Error().Err(err).Msg("force parse error")
+			c.bot.SendText(u.ChatID, c.bot.loc("force_parse_error"))
+			return
+		}
+		c.bot.SendText(u.ChatID, c.bot.loc("force_parse_done"))
+	}()
+	return nil
+}
+
+type resetCacheCmd struct{ bot *Bot }
+
+func (c *resetCacheCmd) Name() string        { return "/resetcache" }
+func (c *resetCacheCmd) Description() string { return c.bot.loc("cmd_resetcache") }
+func (c *resetCacheCmd) Handler(ctx context.Context, u *Update) error {
+	c.bot.cache.Reset()
+	if err := c.bot.cache.Save(); err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("reset_cache_error"))
+	}
+	return u.Bot.SendText(u.ChatID, c.bot.loc("reset_cache_done"))
+}
+
 func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {

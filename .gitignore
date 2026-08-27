@@ -30,7 +30,7 @@ configs/config.local.yaml
 *.sqlite3
 
 # Cache
-cache/
+/cache/
 
 # Logs
 logs/

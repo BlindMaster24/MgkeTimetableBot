@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
@@ -15,6 +14,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	parserpkg "github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
 
@@ -78,9 +78,7 @@ func main() {
 
 	initArchiveSchema(archiveRepo)
 
-	if cfg.Parser.Enabled {
-		go runParser(ctx, log, raspCache, archiveRepo, cfg)
-	}
+
 
 	apiServer := api.NewServer(raspCache, cfg.HTTP.Port)
 	go func() {
@@ -100,6 +98,12 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}
+
+	bot.SetParseFunc(func() error {
+		groupURL := cfg.Parser.Endpoints.TimetableGroup
+		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
+		return parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL)
+	})
 
 	if err := bot.SetMyCommands(); err != nil {
 		log.Warn().Err(err).Msg("failed to set bot commands")
@@ -131,29 +135,6 @@ func initArchiveSchema(repo *archive.Repository) {
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_teacher_day ON timetable_archive(teacher, day)`)
 }
 
-func runParser(ctx context.Context, log *logger.Logger, c *cache.RaspCache, repo *archive.Repository, cfg *config.Config) {
-	interval := time.Duration(cfg.Parser.UpdateInterval.Default) * time.Second
-	if interval <= 0 {
-		interval = 5 * time.Minute
-	}
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 
-	log.Info().Dur("interval", interval).Msg("parser started")
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			parseAndCache(log, c, repo, cfg)
-		}
-	}
-}
-
-func parseAndCache(log *logger.Logger, c *cache.RaspCache, repo *archive.Repository, cfg *config.Config) {
-	log.Info().Msg("parser tick: fetching schedule...")
-	c.SetSuccessUpdate(true)
-	log.Info().Msg("parser tick: done")
-}

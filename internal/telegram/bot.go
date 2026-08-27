@@ -24,6 +24,7 @@ type Bot struct {
 	cache     *cache.RaspCache
 	commands  map[string]Command
 	callbacks map[string]Callback
+	parseFunc func() error
 }
 
 type Update struct {
@@ -77,6 +78,7 @@ func (b *Bot) Config() *config.Config    { return b.cfg }
 func (b *Bot) I18n() *i18n.Localizer     { return b.i18n }
 func (b *Bot) Log() *logger.Logger       { return b.log }
 func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
+func (b *Bot) SetParseFunc(fn func() error) { b.parseFunc = fn }
 
 func (b *Bot) RegisterCommand(cmd Command) {
 	b.commands[cmd.Name()] = cmd
@@ -99,6 +101,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&teacherCmd{bot: b})
 	b.RegisterCommand(&settingsCmd{bot: b})
 	b.RegisterCommand(&imageCmd{bot: b})
+	b.RegisterCommand(&forceParseCmd{bot: b})
+	b.RegisterCommand(&resetCacheCmd{bot: b})
 
 	b.RegisterCallback(&timetableCb{bot: b})
 	b.RegisterCallback(&callsCb{bot: b})
