@@ -1,0 +1,124 @@
+dev: true
+db_path: "./sqlite3.db"
+
+logging:
+  level: "debug"
+  format: "pretty"
+  file:
+    enabled: false
+    path: "./logs/app.log"
+    max_size_mb: 10
+    max_files: 5
+
+http:
+  server_name: "localhost"
+  port: 8081
+
+telegram:
+  token: ""
+  admin_ids: [804594266]
+  noticer: true
+
+api:
+  url: "/api"
+
+google:
+  redirect_domain: "https://mgke.keller.by"
+  url: "/google/oauth"
+  oauth:
+    client_id: ""
+    client_secret: ""
+  service_account:
+    client_email: "calendar@mgkct-timetable.iam.gserviceaccount.com"
+    private_key: ""
+  calendar_owners: []
+
+calendar:
+  ics:
+    enabled: false
+
+accept:
+  room: false
+  private: true
+
+parser:
+  enabled: true
+  sync_mode: false
+  local_mode: false
+  ignore_hash: false
+  v2:
+    enabled: false
+    fallback_to_v1: true
+    week_policy: "preferCurrent"
+    allow_two_tables: true
+    strict: false
+    diff_log: false
+    diff_log_limit: 20
+    header_scan_rows: 5
+    min_days_in_table: 5
+    max_lessons_per_day: 6
+    validation_sample: 5
+    hash_mode: "content"
+    fetch_retry: 1
+    week_jump_threshold: 1
+    sunday_hold_current: true
+    quarantine:
+      enabled: true
+      min_lessons: 1
+    metrics:
+      enabled: true
+      dir: "./cache/rasp/metrics"
+  end_hour: 17
+  activity: [9, 17]
+  endpoints:
+    timetable_group: "https://mgkct.minskedu.gov.by/personnel/for-students/weekly-timetable"
+    timetable_teacher: "https://mgkct.minskedu.gov.by/personnel/for-teachers/weekly-timetable"
+    team:
+      - "https://mgkct.minskedu.gov.by/about/administration"
+      - "https://mgkct.minskedu.gov.by/about/teachers"
+      - "https://mgkct.minskedu.gov.by/about/employees"
+      - "https://mgkct.minskedu.gov.by/about/maintenance"
+    bell_schedule: "https://mgkct.minskedu.gov.by/personnel/for-teachers/bell-schedule"
+  update_interval:
+    default: 3600
+    activity: 30
+    error: 60
+    teams: 86400
+    calls: 3600
+  alertable_ignore_filter:
+    group:
+      - lesson: "Уч прак програм"
+        type: "Пр-ка"
+    teacher: []
+  lesson_index_if_empty: 2
+  calls:
+    enabled: true
+    prefer_site: true
+    notify: true
+
+timetable:
+  weekdays:
+    - [["09:00", "09:45"], ["09:55", "10:40"]]
+    - [["10:50", "11:35"], ["11:55", "12:40"]]
+    - [["13:00", "13:45"], ["13:55", "14:40"]]
+    - [["14:50", "15:35"], ["15:45", "16:30"]]
+    - [["16:40", "17:25"], ["17:35", "18:20"]]
+    - [["18:30", "19:15"], ["19:25", "20:10"]]
+  saturday:
+    - [["09:00", "09:45"], ["09:55", "10:40"]]
+    - [["10:50", "11:35"], ["11:55", "12:40"]]
+    - [["12:50", "13:35"], ["13:45", "14:30"]]
+    - [["14:40", "15:25"], ["15:35", "16:20"]]
+    - [["16:30", "17:15"], ["17:25", "18:10"]]
+    - [["18:20", "19:05"], ["19:15", "20:00"]]
+  shortened_1h:
+    - ["09:00", "10:00"]
+    - ["10:10", "11:10"]
+    - ["11:20", "12:20"]
+    - ["12:30", "13:30"]
+    - ["13:40", "14:40"]
+    - ["14:50", "15:50"]
+
+encrypt_key: ""
+global_noticer: false
+global_adblock: false

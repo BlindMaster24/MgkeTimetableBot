@@ -8,6 +8,12 @@ import (
 
 type CallSlot [2][2]string
 
+type TimetableConfig struct {
+	Weekdays    []CallSlot   `yaml:"weekdays"`
+	Saturday    []CallSlot   `yaml:"saturday"`
+	Shortened1h [][2]string  `yaml:"shortened_1h"`
+}
+
 type Config struct {
 	Dev    bool   `yaml:"dev" env:"DEV"`
 	DBPath string `yaml:"db_path" env:"DB_PATH"`
@@ -121,11 +127,7 @@ type Config struct {
 		Proxy *string `yaml:"proxy"`
 	} `yaml:"parser"`
 
-	Timetable struct {
-		Weekdays   []CallSlot `yaml:"weekdays"`
-		Saturday   []CallSlot `yaml:"saturday"`
-		Shortened1h [][2]string `yaml:"shortened_1h"`
-	} `yaml:"timetable"`
+	Timetable TimetableConfig `yaml:"timetable"`
 
 	EncryptKey string `yaml:"encrypt_key" env:"ENCRYPT_KEY"`
 
