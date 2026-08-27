@@ -2,7 +2,6 @@ package image
 
 import (
 	"fmt"
-	"image"
 	"image/color"
 	"image/png"
 	"os"
@@ -10,216 +9,332 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/fogleman/gg"
 )
 
 type Renderer struct {
 	outputDir string
+	cacheDir  string
 }
 
 func NewRenderer(outputDir string) *Renderer {
 	os.MkdirAll(outputDir, 0755)
-	return &Renderer{outputDir: outputDir}
+	return &Renderer{outputDir: outputDir, cacheDir: outputDir}
 }
 
-type DayTable struct {
-	Date    string
-	Weekday string
-	Lessons []Row
+type Column struct {
+	Title string
+	Width int
+	Align string
 }
 
-type Row struct {
-	Index   int
-	Content string
+type TableData struct {
+	Title   string
+	Columns []Column
+	Rows    [][]string
 }
 
-func BuildDayTable(day model.GroupDay) DayTable {
-	return DayTable{
-		Date:    day.Day,
-		Weekday: weekdayName(day.Day),
-		Lessons: buildLessonRows(day.Lessons),
-	}
+type TimetableImage struct {
+	Group   string
+	Teacher string
+	Days    []DayData
 }
 
-func BuildTeacherDayTable(day model.TeacherDay) DayTable {
-	return DayTable{
-		Date:    day.Day,
-		Weekday: weekdayName(day.Day),
-		Lessons: buildTeacherLessonRows(day.Lessons),
-	}
+type DayData struct {
+	Date     string
+	Weekday  string
+	Lessons  []LessonRow
 }
 
-func buildLessonRows(lessons []model.GroupLesson) []Row {
-	var rows []Row
-	for i, l := range lessons {
-		idx := i + 1
-		text := formatGroupLesson(l)
-		if text == "" {
-			text = "-"
-		}
-		rows = append(rows, Row{Index: idx, Content: text})
-	}
-	return rows
+type LessonRow struct {
+	Number  int
+	Cells   []string
 }
 
-func buildTeacherLessonRows(lessons []model.TeacherLesson) []Row {
-	var rows []Row
-	for i, l := range lessons {
-		idx := i + 1
-		text := formatTeacherLesson(l)
-		if text == "" {
-			text = "-"
-		}
-		rows = append(rows, Row{Index: idx, Content: text})
-	}
-	return rows
+var groupColumns = []Column{
+	{Title: "№", Width: 30, Align: "center"},
+	{Title: "Предмет", Width: 250, Align: "left"},
+	{Title: "Вид", Width: 60, Align: "center"},
+	{Title: "Аудитория", Width: 80, Align: "center"},
+	{Title: "Преподаватель", Width: 200, Align: "left"},
 }
 
-func formatGroupLesson(l model.GroupLesson) string {
-	if l == nil {
-		return "-"
-	}
-	if s := model.AsSingle(l); s != nil {
-		return formatSingleGroupLesson(s)
-	}
-	if arr := model.AsArray(l); arr != nil {
-		parts := make([]string, 0, len(arr))
-		for _, e := range arr {
-			parts = append(parts, formatSingleGroupLesson(e))
-		}
-		return strings.Join(parts, " | ")
-	}
-	return "-"
+var teacherColumns = []Column{
+	{Title: "№", Width: 30, Align: "center"},
+	{Title: "Предмет", Width: 250, Align: "left"},
+	{Title: "Вид", Width: 60, Align: "center"},
+	{Title: "Аудитория", Width: 80, Align: "center"},
+	{Title: "Группа", Width: 80, Align: "center"},
 }
 
-func formatSingleGroupLesson(e *model.GroupLessonExplain) string {
-	if e == nil {
-		return "-"
-	}
-	var parts []string
-	if e.Subgroup != nil && *e.Subgroup > 0 {
-		parts = append(parts, fmt.Sprintf("%d.", *e.Subgroup))
-	}
-	parts = append(parts, e.Lesson)
-	if e.Type != nil && *e.Type != "" {
-		parts = append(parts, fmt.Sprintf("(%s)", *e.Type))
-	}
-	if e.Teacher != nil && *e.Teacher != "" {
-		parts = append(parts, *e.Teacher)
-	}
-	if e.Cabinet != nil && *e.Cabinet != "" {
-		parts = append(parts, *e.Cabinet)
-	}
-	if e.Comment != nil && *e.Comment != "" {
-		parts = append(parts, fmt.Sprintf("[%s]", *e.Comment))
-	}
-	return strings.Join(parts, " ")
+func (r *Renderer) RenderGroupImage(group string, days []DayData) (string, error) {
+	return r.renderTimetable(TimetableImage{Group: group, Days: days}, true)
 }
 
-func formatTeacherLesson(l model.TeacherLesson) string {
-	if l == nil {
-		return "-"
-	}
-	var parts []string
-	if l.Subgroup != nil && *l.Subgroup > 0 {
-		parts = append(parts, fmt.Sprintf("%d.", *l.Subgroup))
-	}
-	parts = append(parts, l.Group, l.Lesson)
-	if l.Type != nil && *l.Type != "" {
-		parts = append(parts, fmt.Sprintf("(%s)", *l.Type))
-	}
-	if l.Cabinet != nil && *l.Cabinet != "" {
-		parts = append(parts, *l.Cabinet)
-	}
-	if l.Comment != nil && *l.Comment != "" {
-		parts = append(parts, fmt.Sprintf("[%s]", *l.Comment))
-	}
-	return strings.Join(parts, " ")
+func (r *Renderer) RenderTeacherImage(teacher string, days []DayData) (string, error) {
+	return r.renderTimetable(TimetableImage{Teacher: teacher, Days: days}, false)
 }
 
-func (r *Renderer) RenderDayTables(label string, tables []DayTable) (string, error) {
-	if len(tables) == 0 {
-		return "", fmt.Errorf("no tables to render")
+func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, error) {
+	if len(ti.Days) == 0 {
+		return "", fmt.Errorf("no days to render")
+	}
+
+	cols := groupColumns
+	if !isGroup {
+		cols = teacherColumns
 	}
 
 	const (
-		padding    = 30
-		lineHeight = 28
-		colWidth   = 300
-		headerH    = 40
+		padding      = 20
+		headerH      = 36
+		rowH         = 28
+		titleH       = 60
+		footerH      = 40
+		cellPadX     = 5
+		dpr          = 1
 	)
 
-	totalWidth := padding*2 + len(tables)*colWidth + (len(tables)-1)*10
-	maxRows := 0
-	for _, t := range tables {
-		if len(t.Lessons) > maxRows {
-			maxRows = len(t.Lessons)
+	colsWidth := 0
+	for _, c := range cols {
+		colsWidth += c.Width
+	}
+
+	cellsPerRow := 2
+	rows := (len(ti.Days) + cellsPerRow - 1) / cellsPerRow
+
+	maxLessons := 0
+	for _, d := range ti.Days {
+		if len(d.Lessons) > maxLessons {
+			maxLessons = len(d.Lessons)
 		}
 	}
-	totalHeight := padding + headerH + maxRows*lineHeight + padding
+	if maxLessons < 3 {
+		maxLessons = 3
+	}
 
-	dc := gg.NewContext(totalWidth, totalHeight)
-	dc.SetColor(color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	tableH := headerH + maxLessons*rowH + 10
+	totalW := colsWidth*cellsPerRow + padding*2
+	totalH := titleH + rows*tableH + footerH + padding*2
+
+	dc := gg.NewContext(totalW*dpr, totalH*dpr)
+	dc.SetColor(color.White)
 	dc.Clear()
 
-	fontPaths := []string{
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-		"/usr/share/fonts/TTF/DejaVuSans.ttf",
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+	fontPath := findFont()
+	if fontPath == "" {
+		return "", fmt.Errorf("no suitable font found on this system")
 	}
-	loaded := false
-	for _, p := range fontPaths {
-		if err := dc.LoadFontFace(p, 14); err == nil {
-			loaded = true
-			break
+
+	dc.LoadFontFace(fontPath, float64(14*dpr))
+	dc.SetColor(color.Black)
+
+	title := fmt.Sprintf("Группа - %s", ti.Group)
+	if !isGroup {
+		title = fmt.Sprintf("Преподаватель - %s", ti.Teacher)
+	}
+	dc.DrawStringAnchored(title, float64(totalW*dpr)/2, float64(padding*dpr+30*dpr), 0.5, 0.5)
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cellsPerRow; col++ {
+			idx := row*cellsPerRow + col
+			if idx >= len(ti.Days) {
+				break
+			}
+			day := ti.Days[idx]
+
+			tx := float64((padding + col*colsWidth) * dpr)
+			ty := float64((titleH + row*tableH + padding) * dpr)
+
+			dc.SetColor(color.RGBA{R: 41, G: 128, B: 185, A: 255})
+			dc.DrawRectangle(tx, ty, float64(colsWidth*dpr), float64(headerH*dpr))
+			dc.Fill()
+
+			dc.SetColor(color.White)
+			dc.LoadFontFace(fontPath, float64(13*dpr))
+			headerText := fmt.Sprintf("%s, %s", day.Weekday, day.Date)
+			dc.DrawStringAnchored(headerText, tx+float64(colsWidth*dpr)/2, ty+float64(headerH*dpr)/2, 0.5, 0.5)
+
+			dc.SetColor(color.RGBA{R: 240, G: 240, B: 240, A: 255})
+			dc.DrawRectangle(tx, ty+float64(headerH*dpr), float64(colsWidth*dpr), float64(headerH*dpr))
+			dc.Fill()
+
+			dc.SetColor(color.Black)
+			dc.LoadFontFace(fontPath, float64(11*dpr))
+			cx := tx
+			for _, c := range cols {
+				titleText := c.Title
+				dc.DrawStringAnchored(titleText, cx+float64(c.Width*dpr)/2, ty+float64(headerH*dpr)+float64(headerH*dpr)/2, 0.5, 0.5)
+				cx += float64(c.Width * dpr)
+			}
+
+			ly := ty + float64(2*headerH*dpr) + 2
+			dc.LoadFontFace(fontPath, float64(12*dpr))
+			for i := 0; i < maxLessons; i++ {
+				if i < len(day.Lessons) {
+				lesson := day.Lessons[i]
+					cx := tx
+					for ci, c := range cols {
+						if ci < len(lesson.Cells) {
+							dc.SetColor(color.Black)
+							if c.Align == "center" {
+								dc.DrawStringAnchored(lesson.Cells[ci], cx+float64(c.Width*dpr)/2, ly, 0.5, 0.5)
+							} else {
+								dc.DrawString(lesson.Cells[ci], cx+float64(cellPadX*dpr), ly)
+							}
+						}
+						cx += float64(c.Width * dpr)
+					}
+				}
+				ly += float64(rowH * dpr)
+			}
+
+			dc.SetColor(color.RGBA{R: 200, G: 200, B: 200, A: 255})
+			dc.DrawRectangle(tx, ty, float64(colsWidth*dpr), float64(tableH*dpr))
+			dc.Stroke()
 		}
 	}
-	if !loaded {
-		return "", fmt.Errorf("no suitable font found")
-	}
 
-	dc.SetColor(color.RGBA{R: 0, G: 0, B: 0, A: 255})
-	dc.DrawStringAnchored(label, float64(totalWidth)/2, float64(padding)/2, 0.5, 0.5)
+	dc.SetColor(color.RGBA{R: 150, G: 150, B: 150, A: 255})
+	dc.LoadFontFace(fontPath, float64(8*dpr))
+	fy := float64((totalH - footerH/2) * dpr)
+	dc.DrawString("TG: https://t.me/mgkect_info_bot", float64(padding*dpr), fy)
+	dc.DrawString(fmt.Sprintf("Сгенерировано: %s", time.Now().Format("02.01.2006 15:04")), float64(totalW*dpr-padding*dpr), fy)
 
-	y := float64(padding + 20)
-	for i, t := range tables {
-		x := float64(padding + i*(colWidth+10))
-
-		dc.SetColor(color.RGBA{R: 41, G: 128, B: 185, A: 255})
-		dc.DrawRectangle(x, y, float64(colWidth), float64(headerH))
-		dc.Fill()
-
-		dc.SetColor(color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		header := fmt.Sprintf("%s %s", t.Weekday, t.Date)
-		dc.DrawStringAnchored(header, x+float64(colWidth)/2, y+float64(headerH)/2, 0.5, 0.5)
-
-		ly := y + float64(headerH) + 5
-		for _, row := range t.Lessons {
-			dc.SetColor(color.RGBA{R: 0, G: 0, B: 0, A: 255})
-			line := fmt.Sprintf("%d. %s", row.Index, row.Content)
-			dc.DrawString(line, x+5, ly)
-			ly += float64(lineHeight)
-		}
-	}
-
-	outputPath := filepath.Join(r.outputDir, fmt.Sprintf("timetable_%d.png", time.Now().UnixNano()))
-
-	img := dc.Image()
-	return savePNG(img, outputPath)
-}
-
-func savePNG(img image.Image, path string) (string, error) {
-	f, err := os.Create(path)
+	fname := fmt.Sprintf("timetable_%d.png", time.Now().UnixNano())
+	outPath := filepath.Join(r.outputDir, fname)
+	f, err := os.Create(outPath)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	if err := png.Encode(f, img); err != nil {
+	if err := png.Encode(f, dc.Image()); err != nil {
 		return "", err
 	}
-	return path, nil
+	return outPath, nil
+}
+
+func (r *Renderer) Cleanup(maxAge time.Duration) {
+	entries, err := os.ReadDir(r.outputDir)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if now.Sub(info.ModTime()) > maxAge {
+			os.Remove(filepath.Join(r.outputDir, e.Name()))
+		}
+	}
+}
+
+func findFont() string {
+	candidates := []string{
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/TTF/DejaVuSans.ttf",
+		"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+		"/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+		"C:/Windows/Fonts/arial.ttf",
+		"C:/Windows/Fonts/calibri.ttf",
+		"C:/Windows/Fonts/segoeui.ttf",
+	}
+	for _, p := range candidates {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+func FormatGroupLesson(lesson any, index int) []string {
+	if lesson == nil {
+		return nil
+	}
+	switch v := lesson.(type) {
+	case map[string]any:
+		return []string{
+			fmt.Sprintf("%d", index),
+			getStr(v, "lesson"),
+			getStr(v, "type"),
+			getStrDefault(v, "cabinet", "-"),
+			getStr(v, "teacher"),
+		}
+	case []any:
+		var lessons []string
+		for _, sub := range v {
+			if subMap, ok := sub.(map[string]any); ok {
+				parts := []string{
+					fmt.Sprintf("%d", index),
+					getSubgroupPrefix(subMap) + getStr(subMap, "lesson"),
+					getStr(subMap, "type"),
+					getStrDefault(subMap, "cabinet", "-"),
+					getStr(subMap, "teacher"),
+				}
+				lessons = append(lessons, strings.Join(parts, "|||"))
+			}
+		}
+		if len(lessons) == 1 {
+			return strings.Split(lessons[0], "|||")
+		}
+		var result []string
+		for i := 0; i < 5; i++ {
+			var col []string
+			for _, l := range lessons {
+				parts := strings.Split(l, "|||")
+				if i < len(parts) {
+					col = append(col, parts[i])
+				}
+			}
+			result = append(result, strings.Join(col, "\n"))
+		}
+		return result
+	}
+	return nil
+}
+
+func FormatTeacherLesson(lesson any, index int) []string {
+	if lesson == nil {
+		return nil
+	}
+	switch v := lesson.(type) {
+	case map[string]any:
+		return []string{
+			fmt.Sprintf("%d", index),
+			getStr(v, "lesson"),
+			getStr(v, "type"),
+			getStrDefault(v, "cabinet", "-"),
+			getStrDefault(v, "group", "-"),
+		}
+	}
+	return nil
+}
+
+func getStr(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func getStrDefault(m map[string]any, key, def string) string {
+	if v := getStr(m, key); v != "" {
+		return v
+	}
+	return def
+}
+
+func getSubgroupPrefix(m map[string]any) string {
+	if sub, ok := m["subgroup"].(float64); ok && sub > 0 {
+		return fmt.Sprintf("%d. ", int(sub))
+	}
+	return ""
 }
 
 func weekdayName(date string) string {

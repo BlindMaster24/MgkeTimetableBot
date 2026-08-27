@@ -3,142 +3,180 @@ package image
 import (
 	"os"
 	"testing"
-
-	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
+	"time"
 )
 
-func TestBuildDayTable(t *testing.T) {
-	subgroup := 1
-	ltype := "лекция"
-	teacher := "Иванов"
-	cabinet := "101"
-	comment := "2 часа"
+func TestRenderer_RenderGroupImage(t *testing.T) {
+	dir := t.TempDir()
+	r := NewRenderer(dir)
 
-	lessons := []model.GroupLesson{
-		&model.GroupLessonExplain{
-			Subgroup: &subgroup,
-			Lesson:   "Математика",
-			Type:     &ltype,
-			Teacher:  &teacher,
-			Cabinet:  &cabinet,
-			Comment:  &comment,
-		},
-		nil,
-		[]*model.GroupLessonExplain{
-			{Lesson: "А"},
-			{Lesson: "Б"},
-		},
-	}
-
-	day := model.GroupDay{
-		Day:     "01.09.2025",
-		Lessons: lessons,
-	}
-
-	table := BuildDayTable(day)
-
-	if table.Date != "01.09.2025" {
-		t.Errorf("expected date 01.09.2025, got %s", table.Date)
-	}
-	if len(table.Lessons) != 3 {
-		t.Errorf("expected 3 lesson rows, got %d", len(table.Lessons))
-	}
-	if table.Lessons[0].Index != 1 {
-		t.Errorf("expected index 1, got %d", table.Lessons[0].Index)
-	}
-	if table.Lessons[1].Content != "-" {
-		t.Errorf("expected dash for nil lesson, got %s", table.Lessons[1].Content)
-	}
-}
-
-func TestBuildTeacherDayTable(t *testing.T) {
-	ltype := "пр-ка"
-	day := model.TeacherDay{
-		Day: "01.09.2025",
-		Lessons: []model.TeacherLesson{
-			{
-				Group:  "63",
-				Lesson: "Математика",
-				Type:   &ltype,
+	days := []DayData{
+		{
+			Date:    "01.09.2025",
+			Weekday: "Понедельник",
+			Lessons: []LessonRow{
+				{Number: 1, Cells: []string{"1", "Математика", "лекция", "101", "Иванов А.А."}},
+				{Number: 2, Cells: []string{"2", "Физика", "пр-ка", "202", "Петров Б.Б."}},
+				{Number: 3, Cells: []string{"3", "Информатика", "пр-ка", "303", "Сидоров В.В."}},
 			},
 		},
 	}
 
-	table := BuildTeacherDayTable(day)
+	path, err := r.RenderGroupImage("63ТП", days)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if len(table.Lessons) != 1 {
-		t.Errorf("expected 1 lesson row, got %d", len(table.Lessons))
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() == 0 {
+		t.Error("expected non-empty PNG file")
+	}
+	t.Logf("rendered %s (%d bytes)", path, info.Size())
+}
+
+func TestRenderer_RenderTeacherImage(t *testing.T) {
+	dir := t.TempDir()
+	r := NewRenderer(dir)
+
+	days := []DayData{
+		{
+			Date:    "01.09.2025",
+			Weekday: "Понедельник",
+			Lessons: []LessonRow{
+				{Number: 1, Cells: []string{"1", "Математика", "лекция", "101", "63ТП"}},
+				{Number: 2, Cells: []string{"2", "Физика", "пр-ка", "202", "64ИС"}},
+			},
+		},
+		{
+			Date:    "02.09.2025",
+			Weekday: "Вторник",
+			Lessons: []LessonRow{
+				{Number: 1, Cells: []string{"1", "Информатика", "лекция", "303", "63ТП"}},
+			},
+		},
+	}
+
+	path, err := r.RenderTeacherImage("Иванов А.А.", days)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() == 0 {
+		t.Error("expected non-empty PNG file")
+	}
+	t.Logf("rendered %s (%d bytes)", path, info.Size())
+}
+
+func TestRenderer_EmptyDays(t *testing.T) {
+	dir := t.TempDir()
+	r := NewRenderer(dir)
+
+	_, err := r.RenderGroupImage("63", nil)
+	if err == nil {
+		t.Error("expected error for empty days")
 	}
 }
 
-func TestFormatGroupLessonNil(t *testing.T) {
-	result := formatGroupLesson(nil)
-	if result != "-" {
-		t.Errorf("expected '-', got %s", result)
+func TestRenderer_Cleanup(t *testing.T) {
+	dir := t.TempDir()
+	r := NewRenderer(dir)
+
+	days := []DayData{
+		{Date: "01.09.2025", Weekday: "Пн", Lessons: []LessonRow{
+			{Number: 1, Cells: []string{"1", "Math", "", "", ""}},
+		}},
+	}
+
+	path, err := r.RenderGroupImage("63", days)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(entries))
+	}
+
+	r.Cleanup(time.Hour)
+	entries, _ = os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Errorf("file should not be cleaned up yet, got %d files", len(entries))
+	}
+
+	t.Log("cleanup test: file has age 0, may or may not be cleaned depending on timing")
+
+	_ = path
+}
+
+func TestFormatGroupLesson(t *testing.T) {
+	lesson := map[string]any{
+		"lesson":  "Математика",
+		"type":    "лекция",
+		"cabinet": "101",
+		"teacher": "Иванов А.А.",
+	}
+	cells := FormatGroupLesson(lesson, 3)
+	if len(cells) != 5 {
+		t.Fatalf("expected 5 cells, got %d", len(cells))
+	}
+	if cells[0] != "3" {
+		t.Errorf("expected number 3, got %q", cells[0])
+	}
+	if cells[1] != "Математика" {
+		t.Errorf("expected 'Математика', got %q", cells[1])
 	}
 }
 
-func TestFormatSingleGroupLesson(t *testing.T) {
-	subgroup := 2
-	ltype := "лекция"
-	teacher := "Петров"
-	cabinet := "202"
-
-	e := &model.GroupLessonExplain{
-		Subgroup: &subgroup,
-		Lesson:   "Физика",
-		Type:     &ltype,
-		Teacher:  &teacher,
-		Cabinet:  &cabinet,
-	}
-
-	result := formatSingleGroupLesson(e)
-	if result == "" || result == "-" {
-		t.Error("expected non-empty formatted lesson")
+func TestFormatGroupLesson_Nil(t *testing.T) {
+	cells := FormatGroupLesson(nil, 1)
+	if cells != nil {
+		t.Errorf("expected nil, got %v", cells)
 	}
 }
 
-func TestFormatTeacherLessonNil(t *testing.T) {
-	result := formatTeacherLesson(nil)
-	if result != "-" {
-		t.Errorf("expected '-', got %s", result)
+func TestFormatTeacherLesson(t *testing.T) {
+	lesson := map[string]any{
+		"lesson":  "Физика",
+		"type":    "пр-ка",
+		"cabinet": "202",
+		"group":   "63ТП",
+	}
+	cells := FormatTeacherLesson(lesson, 1)
+	if len(cells) != 5 {
+		t.Fatalf("expected 5 cells, got %d", len(cells))
+	}
+	if cells[4] != "63ТП" {
+		t.Errorf("expected group 63ТП, got %q", cells[4])
 	}
 }
 
 func TestWeekdayName(t *testing.T) {
-	cases := []struct {
-		date string
-		want string
+	tests := []struct {
+		date     string
+		expected string
 	}{
 		{"01.09.2025", "Понедельник"},
 		{"02.09.2025", "Вторник"},
+		{"03.09.2025", "Среда"},
+		{"04.09.2025", "Четверг"},
+		{"05.09.2025", "Пятница"},
 		{"06.09.2025", "Суббота"},
-		{"invalid", ""},
+		{"07.09.2025", "Воскресенье"},
 	}
 
-	for _, c := range cases {
-		got := weekdayName(c.date)
-		if got != c.want {
-			t.Errorf("weekdayName(%s) = %s, want %s", c.date, got, c.want)
-		}
-	}
-}
-
-func TestRenderDayTablesEmpty(t *testing.T) {
-	dir := t.TempDir()
-	r := NewRenderer(dir)
-
-	_, err := r.RenderDayTables("Test", nil)
-	if err == nil {
-		t.Error("expected error for empty tables")
-	}
-}
-
-func TestRendererOutputDir(t *testing.T) {
-	dir := t.TempDir()
-	_ = NewRenderer(dir)
-
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		t.Error("expected output dir to exist")
+	for _, tt := range tests {
+		t.Run(tt.date, func(t *testing.T) {
+			result := weekdayName(tt.date)
+			if result != tt.expected {
+				t.Errorf("weekdayName(%s) = %q, want %q", tt.date, result, tt.expected)
+			}
+		})
 	}
 }
