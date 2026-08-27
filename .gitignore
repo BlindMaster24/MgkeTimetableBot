@@ -17,6 +17,7 @@ coverage.out
 .cache/
 
 # Config with secrets
+configs/config.yaml
 configs/config.local.yaml
 
 # Database
