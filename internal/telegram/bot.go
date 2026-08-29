@@ -101,21 +101,32 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&teacherCmd{bot: b})
 	b.RegisterCommand(&settingsCmd{bot: b})
 	b.RegisterCommand(&imageCmd{bot: b})
+	b.RegisterCommand(&buttonsCmd{bot: b})
+	b.RegisterCommand(&formatterCmd{bot: b})
 	b.RegisterCommand(&forceParseCmd{bot: b})
 	b.RegisterCommand(&resetCacheCmd{bot: b})
 
 	b.RegisterCallback(&timetableCb{bot: b})
 	b.RegisterCallback(&callsCb{bot: b})
+	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
 	b.RegisterCallback(&cancelCb{bot: b})
 	b.RegisterCallback(&setupCb{bot: b})
-	b.RegisterCallback(&dayCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})
 	b.RegisterCallback(&aboutCb{bot: b})
 	b.RegisterCallback(&groupCb{bot: b})
 	b.RegisterCallback(&teacherCb{bot: b})
 	b.RegisterCallback(&settingsCb{bot: b})
 	b.RegisterCallback(&icsCb{bot: b})
+	b.RegisterCallback(&btnToggleCb{bot: b})
+	b.RegisterCallback(&btnMenuCb{bot: b})
+	b.RegisterCallback(&fmtMenuCb{bot: b})
+	b.RegisterCallback(&fmtSelectCb{bot: b})
+	b.RegisterCallback(&noticeMenuCb{bot: b})
+	b.RegisterCallback(&viewMenuCb{bot: b})
+	b.RegisterCallback(&noticeToggleCb{bot: b})
+	b.RegisterCallback(&viewToggleCb{bot: b})
+	b.RegisterCallback(&mainMenuCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {
@@ -228,8 +239,9 @@ func (b *Bot) SetMyCommands() error {
 
 func (b *Bot) SendText(chatID int64, text string) error {
 	_, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
-		ChatID: telego.ChatID{ID: chatID},
-		Text:   text,
+		ChatID:    telego.ChatID{ID: chatID},
+		Text:      text,
+		ParseMode: "HTML",
 	})
 	return err
 }
@@ -238,6 +250,7 @@ func (b *Bot) SendTextWithKeyboard(chatID int64, text string, kb *telego.InlineK
 	_, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
 		ChatID:      telego.ChatID{ID: chatID},
 		Text:        text,
+		ParseMode:   "HTML",
 		ReplyMarkup: kb,
 	})
 	return err
@@ -255,6 +268,7 @@ func (b *Bot) SendPhoto(chatID int64, filePath string, caption string) error {
 	}
 	if caption != "" {
 		params.Caption = caption
+		params.ParseMode = "HTML"
 	}
 	_, err = b.client.SendPhoto(context.Background(), params)
 	return err
@@ -272,6 +286,7 @@ func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *tele
 		ChatID:    telego.ChatID{ID: chatID},
 		MessageID: messageID,
 		Text:      text,
+		ParseMode: "HTML",
 	}
 	if kb != nil {
 		params.ReplyMarkup = kb
@@ -300,34 +315,4 @@ func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {
 	}
 }
 
-func (b *Bot) formatCallsSchedule() string {
-	timetable := b.cfg.Timetable
-	var sb strings.Builder
-	if len(timetable.Weekdays) > 0 {
-		sb.WriteString(b.loc("calls_weekdays"))
-		sb.WriteString("\n")
-		for i, slot := range timetable.Weekdays {
-			sb.WriteString(fmt.Sprintf("  %s-%s / %s-%s", slot[0][0], slot[0][1], slot[1][0], slot[1][1]))
-			if i < len(timetable.Weekdays)-1 {
-				sb.WriteString("\n")
-			}
-		}
-	}
-	if len(timetable.Saturday) > 0 {
-		if sb.Len() > 0 {
-			sb.WriteString("\n\n")
-		}
-		sb.WriteString(b.loc("calls_saturday"))
-		sb.WriteString("\n")
-		for i, slot := range timetable.Saturday {
-			sb.WriteString(fmt.Sprintf("  %s-%s / %s-%s", slot[0][0], slot[0][1], slot[1][0], slot[1][1]))
-			if i < len(timetable.Saturday)-1 {
-				sb.WriteString("\n")
-			}
-		}
-	}
-	if sb.Len() == 0 {
-		return b.loc("calls_not_configured")
-	}
-	return sb.String()
-}
+

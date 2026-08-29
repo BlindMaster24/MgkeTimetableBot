@@ -1,196 +1,159 @@
 package telegram
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 )
 
-func formatGroupDay(data any) string {
-	return formatScheduleDay(data, false)
+var hints = []string{
+	"Настроить оповещения можно в настройках (/notice)",
+	"Не нравится вид расписания? Попробуй новый в настройках! (/formatter)",
+	"Мешают лишние кнопки? Убери их в настройках! (/buttons)",
+	"Установил не ту группу или учителя? Измени в настройках! (/setup)",
+	"Проблема с ботом? Не бойся писать разработчику (/about)",
+	"Мешают подсказки? Убери в настройках! (/view)",
 }
 
-func formatTeacherDay(data any) string {
-	return formatScheduleDay(data, true)
+func (b *Bot) getRandHint() string {
+	if len(hints) == 0 {
+		return ""
+	}
+	return hints[time.Now().UnixNano()%int64(len(hints))]
 }
 
-func formatScheduleDay(data any, isTeacher bool) string {
+func (b *Bot) getFormatterOpts(chat *Chat) formatter.FormatOptions {
+	opts := formatter.FormatOptions{
+		IsTelegram:     true,
+		ShowParserTime: chat.ShowParserTime,
+		ShowHints:      chat.ShowHints,
+		HasParserError: !b.cache.SuccessUpdate,
+	}
+
+	if opts.ShowHints && !opts.HasParserError {
+		opts.RandHint = b.getRandHint()
+
+		if (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group == "" {
+			opts.RandHint = "Выберите группу в настройках (/setup)"
+		} else if chat.Mode == "teacher" && chat.Teacher == "" {
+			opts.RandHint = "Выберите преподавателя в настройках (/setup)"
+		} else if !chat.ShowDaily && !chat.ShowWeekly {
+			opts.RandHint = "Верни кнопки расписания в настройках (/buttons)"
+		}
+	}
+
+	return opts
+}
+
+func (b *Bot) fmtOpts(chat *Chat, showHeader bool) formatter.FormatOptions {
+	opts := b.getFormatterOpts(chat)
+	opts.ShowHeader = showHeader
+	return opts
+}
+
+func (b *Bot) formatGroupDay(chat *Chat, data any) string {
+	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, extractDays(data), b.fmtOpts(chat, true))
+}
+
+func (b *Bot) formatTeacherDay(chat *Chat, data any) string {
+	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, extractDays(data), b.fmtOpts(chat, true))
+}
+
+func (b *Bot) formatGroupWeek(chat *Chat, data any) string {
+	opts := b.fmtOpts(chat, false)
+	opts.WeekLabel = buildWeekLabel(extractDays(data))
+	return formatter.GetByIndex(chat.Formatter).FormatGroupFull("", extractDays(data), opts)
+}
+
+func (b *Bot) formatTeacherWeek(chat *Chat, data any) string {
+	opts := b.fmtOpts(chat, false)
+	opts.WeekLabel = buildWeekLabel(extractDays(data))
+	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull("", extractDays(data), opts)
+}
+
+func buildWeekLabel(days []map[string]any) string {
+	if len(days) == 0 {
+		return ""
+	}
+
+	firstDay, _ := days[0]["day"].(string)
+	lastDay, _ := days[len(days)-1]["day"].(string)
+
+	t1, err1 := time.Parse("02.01.2006", firstDay)
+	t2, err2 := time.Parse("02.01.2006", lastDay)
+	if err1 != nil || err2 != nil {
+		return ""
+	}
+
+	_, week1 := t1.ISOWeek()
+	_, week2 := t2.ISOWeek()
+
+	weekNum := week1
+	if week2 != week1 {
+		weekNum = week1
+	}
+
+	return fmt.Sprintf("Учебная неделя №%d (%s-%s)", weekNum,
+		t1.Format("02.01"), t2.Format("02.01"))
+}
+
+func (b *Bot) formatGroupFull(chat *Chat, group string, data any) string {
+	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(group, extractDays(data), b.fmtOpts(chat, true))
+}
+
+func (b *Bot) formatTeacherFull(chat *Chat, teacher string, data any) string {
+	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(teacher, extractDays(data), b.fmtOpts(chat, true))
+}
+
+func extractDays(data any) []map[string]any {
 	daysRaw, ok := data.(map[string]any)
 	if !ok {
-		return ""
-	}
-
-	daysArr, ok := daysRaw["days"].([]any)
-	if !ok {
-		return ""
-	}
-
-	now := time.Now()
-	today := now.Format("02.01.2006")
-	yesterday := now.AddDate(0, 0, -1).Format("02.01.2006")
-
-	for _, d := range daysArr {
-		dayMap, ok := d.(map[string]any)
-		if !ok {
-			continue
-		}
-		dayStr, _ := dayMap["day"].(string)
-		if dayStr == today || dayStr == yesterday {
-			continue
-		}
-		if dayStr != today {
-			continue
-		}
-	}
-
-	var targetDay string
-	for _, d := range daysArr {
-		dayMap, ok := d.(map[string]any)
-		if !ok {
-			continue
-		}
-		dayStr, _ := dayMap["day"].(string)
-		if dayStr == today {
-			targetDay = dayStr
-			break
-		}
-	}
-
-	if targetDay == "" && len(daysArr) > 0 {
-		dayMap, _ := daysArr[0].(map[string]any)
-		targetDay, _ = dayMap["day"].(string)
-	}
-
-	for _, d := range daysArr {
-		dayMap, ok := d.(map[string]any)
-		if !ok {
-			continue
-		}
-		dayStr, _ := dayMap["day"].(string)
-		if dayStr != targetDay {
-			continue
-		}
-		lessons, _ := dayMap["lessons"].([]any)
-		var sb strings.Builder
-		dayName := getDayName(dayStr)
-		sb.WriteString(fmt.Sprintf("📅 %s (%s)\n", dayStr, dayName))
-		if len(lessons) == 0 {
-			sb.WriteString("Пар нет")
-		} else {
-			for i, l := range lessons {
-				text := formatLesson(l, i+1)
-				if text != "" {
-					sb.WriteString(text)
-					sb.WriteString("\n")
-				}
-			}
-		}
-		return sb.String()
-	}
-
-	return ""
-}
-
-func formatGroupWeek(data any) string {
-	return formatScheduleWeek(data, false)
-}
-
-func formatTeacherWeek(data any) string {
-	return formatScheduleWeek(data, true)
-}
-
-func formatScheduleWeek(data any, isTeacher bool) string {
-	daysRaw, ok := data.(map[string]any)
-	if !ok {
-		return ""
-	}
-	daysArr, ok := daysRaw["days"].([]any)
-	if !ok {
-		return ""
-	}
-
-	var sb strings.Builder
-	for _, d := range daysArr {
-		dayMap, ok := d.(map[string]any)
-		if !ok {
-			continue
-		}
-		dayStr, _ := dayMap["day"].(string)
-		lessons, _ := dayMap["lessons"].([]any)
-		dayName := getDayName(dayStr)
-		sb.WriteString(fmt.Sprintf("📅 %s (%s)\n", dayStr, dayName))
-		if len(lessons) == 0 {
-			sb.WriteString("Пар нет\n")
-		} else {
-			for i, l := range lessons {
-				text := formatLesson(l, i+1)
-				if text != "" {
-					sb.WriteString(text)
-					sb.WriteString("\n")
-				}
-			}
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
-func formatLesson(lesson any, index int) string {
-	if lesson == nil {
-		return ""
-	}
-
-	switch v := lesson.(type) {
-	case map[string]any:
-		return formatSingleLesson(v, index)
-	case []any:
-		var parts []string
-		for _, sub := range v {
-			if subMap, ok := sub.(map[string]any); ok {
-				text := formatSingleLesson(subMap, index)
-				if text != "" {
-					parts = append(parts, text)
-				}
-			}
-		}
-		return strings.Join(parts, " | ")
-	}
-	return ""
-}
-
-func formatSingleLesson(m map[string]any, index int) string {
-	var parts []string
-
-	if sub, ok := m["subgroup"].(float64); ok && sub > 0 {
-		parts = append(parts, fmt.Sprintf("%d.", int(sub)))
-	}
-
-	if lesson, ok := m["lesson"].(string); ok {
-		parts = append(parts, lesson)
-	}
-
-	if typ, ok := m["type"].(string); ok && typ != "" {
-		parts = append(parts, fmt.Sprintf("(%s)", typ))
-	}
-
-	if comment, ok := m["comment"].(string); ok && comment != "" {
-		parts = append(parts, fmt.Sprintf("[%s]", comment))
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return fmt.Sprintf("%d. %s", index, strings.Join(parts, " "))
-}
-
-func anyToMap(v any) map[string]any {
-	if v == nil {
 		return nil
 	}
-	data, _ := json.Marshal(v)
-	var m map[string]any
-	json.Unmarshal(data, &m)
-	return m
+	daysArr, ok := daysRaw["days"].([]any)
+	if !ok {
+		return nil
+	}
+
+	var result []map[string]any
+	for _, d := range daysArr {
+		if m, ok := d.(map[string]any); ok {
+			result = append(result, m)
+		}
+	}
+	return result
+}
+
+func (b *Bot) formatCallsSchedule() string {
+	timetable := b.cfg.Timetable
+	var sb strings.Builder
+	if len(timetable.Weekdays) > 0 {
+		sb.WriteString(b.loc("calls_weekdays"))
+		sb.WriteString("\n")
+		for i, slot := range timetable.Weekdays {
+			sb.WriteString(fmt.Sprintf("  %s-%s / %s-%s", slot[0][0], slot[0][1], slot[1][0], slot[1][1]))
+			if i < len(timetable.Weekdays)-1 {
+				sb.WriteString("\n")
+			}
+		}
+	}
+	if len(timetable.Saturday) > 0 {
+		if sb.Len() > 0 {
+			sb.WriteString("\n\n")
+		}
+		sb.WriteString(b.loc("calls_saturday"))
+		sb.WriteString("\n")
+		for i, slot := range timetable.Saturday {
+			sb.WriteString(fmt.Sprintf("  %s-%s / %s-%s", slot[0][0], slot[0][1], slot[1][0], slot[1][1]))
+			if i < len(timetable.Saturday)-1 {
+				sb.WriteString("\n")
+			}
+		}
+	}
+	if sb.Len() == 0 {
+		return b.loc("calls_not_configured")
+	}
+	return sb.String()
 }

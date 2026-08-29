@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"time"
 
-
+	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
+	"github.com/mymmrac/telego"
 )
 
 func (b *Bot) loc(key string) string {
@@ -16,15 +16,6 @@ func (b *Bot) loc(key string) string {
 
 func (b *Bot) locData(key string, data map[string]interface{}) string {
 	return b.i18n.T("ru", key, data)
-}
-
-func getDayName(dateStr string) string {
-	t, err := time.Parse("02.01.2006", dateStr)
-	if err != nil {
-		return ""
-	}
-	names := []string{"Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"}
-	return names[t.Weekday()]
 }
 
 type startCmd struct{ bot *Bot }
@@ -63,11 +54,11 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
 		}
-		text := formatGroupDay(data)
+		text := b.formatGroupFull(chat, chat.Group, data)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, mainMenuKeyboard(b.i18n.T))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
 
 	case ModeTeacher:
 		if chat.Teacher == "" {
@@ -77,14 +68,14 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
 		}
-		text := formatTeacherDay(data)
+		text := b.formatTeacherFull(chat, chat.Teacher, data)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, mainMenuKeyboard(b.i18n.T))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
 	}
 
-	return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("main_menu"), mainMenuKeyboard(b.i18n.T))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("main_menu"), b.mainMenuKeyboard(chat))
 }
 
 func randomKey(m map[string]any) string {
@@ -177,7 +168,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
 		}
-		text := formatGroupDay(data)
+		text := b.formatGroupDay(chat, data)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -191,7 +182,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
 		}
-		text := formatTeacherDay(data)
+		text := b.formatTeacherDay(chat, data)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -232,7 +223,7 @@ func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
 		}
-		text := formatGroupWeek(data)
+		text := b.formatGroupWeek(chat, data)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -246,7 +237,7 @@ func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
 		}
-		text := formatTeacherWeek(data)
+		text := b.formatTeacherWeek(chat, data)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -318,7 +309,11 @@ func (c *settingsCmd) MatchText(text string) bool {
 	return text == c.bot.loc("button_settings")
 }
 func (c *settingsCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.loc("settings_menu"), settingsKeyboard(c.bot.i18n.T))
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.loc("settings_menu"), c.bot.settingsKeyboardFull(chat))
 }
 
 type imageCmd struct{ bot *Bot }
@@ -334,6 +329,36 @@ func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("setup_needed"))
 	}
 	return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+}
+
+type buttonsCmd struct{ bot *Bot }
+
+func (c *buttonsCmd) Name() string        { return "/buttons" }
+func (c *buttonsCmd) Description() string { return "Настройка кнопок" }
+func (c *buttonsCmd) MatchText(text string) bool {
+	return text == "⌨️ Кнопки"
+}
+func (c *buttonsCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка кнопок", c.bot.buttonsKeyboard(chat))
+}
+
+type formatterCmd struct{ bot *Bot }
+
+func (c *formatterCmd) Name() string        { return "/formatter" }
+func (c *formatterCmd) Description() string { return "Выбор формата расписания" }
+func (c *formatterCmd) MatchText(text string) bool {
+	return text == "📃 Форматировщик"
+}
+func (c *formatterCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите формат расписания:", c.bot.formatterKeyboard(chat))
 }
 
 type forceParseCmd struct{ bot *Bot }
@@ -404,29 +429,41 @@ func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
+
+	var matched string
 	for key := range groups {
 		if strings.EqualFold(key, input) {
-			chat.Group = key
-			chat.Mode = ModeStudent
-			chat.Scene = ""
-			b.chatRepo.Save(chat)
-			b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": key}))
-			return
+			matched = key
+			break
+		}
+	}
+	if matched == "" {
+		for key := range groups {
+			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
+				matched = key
+				break
+			}
 		}
 	}
 
-	for key := range groups {
-		if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-			chat.Group = key
-			chat.Mode = ModeStudent
-			chat.Scene = ""
-			b.chatRepo.Save(chat)
-			b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": key}))
-			return
-		}
+	if matched == "" {
+		b.SendText(u.ChatID, b.loc("invalid_group_number"))
+		return
 	}
 
-	b.SendText(u.ChatID, b.loc("invalid_group_number"))
+	chat.Group = matched
+	chat.Mode = ModeStudent
+	chat.Scene = ""
+	b.chatRepo.Save(chat)
+	b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": matched}))
+
+	data, ok := groups[matched]
+	if ok {
+		text := b.formatGroupFull(chat, matched, data)
+		if text != "" {
+			b.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
+		}
+	}
 }
 
 func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
@@ -436,27 +473,159 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
+
+	var matched string
 	for key := range teachers {
 		if strings.EqualFold(key, input) {
-			chat.Teacher = key
-			chat.Mode = ModeTeacher
-			chat.Scene = ""
-			b.chatRepo.Save(chat)
-			b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": key}))
-			return
+			matched = key
+			break
+		}
+	}
+	if matched == "" {
+		for key := range teachers {
+			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
+				matched = key
+				break
+			}
 		}
 	}
 
-	for key := range teachers {
-		if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-			chat.Teacher = key
-			chat.Mode = ModeTeacher
-			chat.Scene = ""
-			b.chatRepo.Save(chat)
-			b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": key}))
-			return
+	if matched == "" {
+		b.SendText(u.ChatID, b.loc("teacher_not_found"))
+		return
+	}
+
+	chat.Teacher = matched
+	chat.Mode = ModeTeacher
+	chat.Scene = ""
+	b.chatRepo.Save(chat)
+	b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": matched}))
+
+	data, ok := teachers[matched]
+	if ok {
+		text := b.formatTeacherFull(chat, matched, data)
+		if text != "" {
+			b.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
+		}
+	}
+}
+
+func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	var rows [][]telego.InlineKeyboardButton
+
+	if chat.Mode == "" {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: b.loc("button_setup"), CallbackData: "setup"},
+		})
+	} else if chat.Mode == ModeGuest {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: b.loc("button_group"), CallbackData: "group"},
+			{Text: b.loc("button_teacher"), CallbackData: "teacher"},
+		})
+	} else {
+		canShow := (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" ||
+			chat.Mode == ModeTeacher && chat.Teacher != ""
+
+		if canShow {
+			var row []telego.InlineKeyboardButton
+			if chat.ShowDaily {
+				row = append(row, telego.InlineKeyboardButton{Text: b.loc("button_day"), CallbackData: "day"})
+			}
+			if chat.ShowWeekly {
+				row = append(row, telego.InlineKeyboardButton{Text: b.loc("button_week"), CallbackData: "week"})
+			}
+			if len(row) > 0 {
+				rows = append(rows, row)
+			}
 		}
 	}
 
-	b.SendText(u.ChatID, b.loc("teacher_not_found"))
+	if chat.Mode != "" && chat.ShowFastGroup {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: b.loc("button_group"), CallbackData: "group"},
+		})
+	}
+
+	if chat.ShowCalls {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: b.loc("button_calls"), CallbackData: "calls"},
+		})
+	}
+
+	if chat.Mode != "" && chat.ShowFastTeacher {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: b.loc("button_teacher"), CallbackData: "teacher"},
+		})
+	}
+
+	var bottomRow []telego.InlineKeyboardButton
+	if chat.ShowAbout {
+		bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: b.loc("button_about"), CallbackData: "about"})
+	}
+	bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: b.loc("button_settings"), CallbackData: "settings"})
+	rows = append(rows, bottomRow)
+
+	if len(rows) == 0 {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: b.loc("button_settings"), CallbackData: "settings"},
+		})
+	}
+
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+func (b *Bot) settingsKeyboardFull(chat *Chat) *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: b.loc("button_setup"), CallbackData: "setup"}},
+			{{Text: "⌨️ Кнопки", CallbackData: "btn_menu"}, {Text: "📃 Форматировщик", CallbackData: "fmt_menu"}},
+			{{Text: "🔊 Оповещения", CallbackData: "notice_menu"}, {Text: "🖼️ Отображение", CallbackData: "view_menu"}},
+			{{Text: b.loc("button_cancel"), CallbackData: "cancel"}},
+		},
+	}
+}
+
+func (b *Bot) buttonsKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	onOff := func(v bool) string {
+		if v {
+			return "✅"
+		}
+		return "❌"
+	}
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{
+				{Text: onOff(chat.ShowDaily) + " \"📄 На день\"", CallbackData: "btn_toggle:show_daily"},
+				{Text: onOff(chat.ShowWeekly) + " \"📑 На неделю\"", CallbackData: "btn_toggle:show_weekly"},
+			},
+			{
+				{Text: onOff(chat.ShowCalls) + " \"🕐 Звонки\"", CallbackData: "btn_toggle:show_calls"},
+				{Text: onOff(chat.ShowAbout) + " \"💡 О боте\"", CallbackData: "btn_toggle:show_about"},
+			},
+			{
+				{Text: onOff(chat.ShowFastGroup) + " \"👩‍🎓 Группа\"", CallbackData: "btn_toggle:show_fast_group"},
+				{Text: onOff(chat.ShowFastTeacher) + " \"👩‍🏫 Преподаватель\"", CallbackData: "btn_toggle:show_fast_teacher"},
+			},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	var rows [][]telego.InlineKeyboardButton
+	for i, f := range formatter.AllFormatters {
+		label := f.Label()
+		if chat.Formatter == i {
+			label += " (выбран)"
+		}
+		cbData := fmt.Sprintf("fmt_select:%d", i)
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: label, CallbackData: cbData},
+		})
+	}
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: "Меню настроек", CallbackData: "settings"},
+		{Text: "Главное меню", CallbackData: "main_menu"},
+	})
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
