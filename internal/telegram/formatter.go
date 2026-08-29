@@ -61,17 +61,7 @@ func (b *Bot) formatTeacherDay(chat *Chat, data any) string {
 	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, getDayRasp(extractDays(data)), b.fmtOpts(chat, true))
 }
 
-func (b *Bot) formatGroupWeek(chat *Chat, data any) string {
-	opts := b.fmtOpts(chat, false)
-	opts.WeekLabel = buildWeekLabel(extractDays(data))
-	return formatter.GetByIndex(chat.Formatter).FormatGroupFull("", extractDays(data), opts)
-}
 
-func (b *Bot) formatTeacherWeek(chat *Chat, data any) string {
-	opts := b.fmtOpts(chat, false)
-	opts.WeekLabel = buildWeekLabel(extractDays(data))
-	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull("", extractDays(data), opts)
-}
 
 func buildWeekLabel(days []map[string]any) string {
 	if len(days) == 0 {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
+	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
 )
 
@@ -66,7 +67,73 @@ type imageCb struct{ bot *Bot }
 func (cb *imageCb) Prefix() string { return "image" }
 func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
+	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
+	if chat.Mode == ModeStudent || chat.Mode == ModeParent {
+		if chat.Group == "" {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("need_group"))
+		}
+		data, ok := cb.bot.cache.GetGroups()[chat.Group]
+		if !ok {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("group_not_exists"))
+		}
+		path, err := imagepkg.RenderGroupFromCache(chat.Group, data, "./cache/images")
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
+		}
+		return u.Bot.SendPhoto(u.ChatID, path, "")
+	}
+	if chat.Mode == "teacher" {
+		if chat.Teacher == "" {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("need_teacher"))
+		}
+		data, ok := cb.bot.cache.GetTeachers()[chat.Teacher]
+		if !ok {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("teacher_not_exists"))
+		}
+		path, err := imagepkg.RenderTeacherFromCache(chat.Teacher, data, "./cache/images")
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
+		}
+		return u.Bot.SendPhoto(u.ChatID, path, "")
+	}
 	return u.Bot.SendText(u.ChatID, cb.bot.loc("need_group"))
+}
+
+type imageGroupCb struct{ bot *Bot }
+
+func (cb *imageGroupCb) Prefix() string { return "image_group:" }
+func (cb *imageGroupCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	group := strings.TrimPrefix(u.Data, "image_group:")
+	data, ok := cb.bot.cache.GetGroups()[group]
+	if !ok {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("group_not_exists"))
+	}
+	path, err := imagepkg.RenderGroupFromCache(group, data, "./cache/images")
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
+	}
+	return u.Bot.SendPhoto(u.ChatID, path, "")
+}
+
+type imageTeacherCb struct{ bot *Bot }
+
+func (cb *imageTeacherCb) Prefix() string { return "image_teacher:" }
+func (cb *imageTeacherCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	teacher := strings.TrimPrefix(u.Data, "image_teacher:")
+	data, ok := cb.bot.cache.GetTeachers()[teacher]
+	if !ok {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("teacher_not_exists"))
+	}
+	path, err := imagepkg.RenderTeacherFromCache(teacher, data, "./cache/images")
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
+	}
+	return u.Bot.SendPhoto(u.ChatID, path, "")
 }
 
 type cancelCb struct{ bot *Bot }

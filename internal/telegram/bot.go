@@ -110,6 +110,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&callsCb{bot: b})
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
+	b.RegisterCallback(&imageGroupCb{bot: b})
+	b.RegisterCallback(&imageTeacherCb{bot: b})
 	b.RegisterCallback(&cancelCb{bot: b})
 	b.RegisterCallback(&setupCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})

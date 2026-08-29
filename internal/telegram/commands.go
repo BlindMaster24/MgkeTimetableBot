@@ -212,40 +212,7 @@ func (c *weekCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
-	groups := b.GetRaspCache().GetGroups()
-	teachers := b.GetRaspCache().GetTeachers()
-
-	switch chat.Mode {
-	case ModeStudent, ModeParent:
-		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("need_group"))
-		}
-		data, ok := groups[chat.Group]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
-		}
-		text := b.formatGroupWeek(chat, data)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-		return u.Bot.SendText(u.ChatID, text)
-
-	case ModeTeacher:
-		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("need_teacher"))
-		}
-		data, ok := teachers[chat.Teacher]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
-		}
-		text := b.formatTeacherWeek(chat, data)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-		return u.Bot.SendText(u.ChatID, text)
-	}
-
-	return u.Bot.SendText(u.ChatID, b.loc("need_group"))
+	return b.showWeekScheduleWithKeyboard(u, chat, "", "")
 }
 
 type callsCmd struct{ bot *Bot }
