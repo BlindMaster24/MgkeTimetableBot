@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
+	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
 )
 
@@ -255,7 +256,12 @@ func (c *callsCmd) MatchText(text string) bool {
 	return text == c.bot.loc("button_calls")
 }
 func (c *callsCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendText(u.ChatID, c.bot.formatCallsSchedule())
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	c.bot.showCallsFull(u, chat)
+	return nil
 }
 
 type aboutCmd struct{ bot *Bot }
@@ -325,9 +331,43 @@ func (c *imageCmd) MatchText(text string) bool {
 }
 func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err == nil && chat.Mode == "" {
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	if chat.Mode == "" {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("setup_needed"))
 	}
+
+	switch chat.Mode {
+	case ModeStudent, ModeParent:
+		if chat.Group == "" {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+		}
+		data, ok := c.bot.cache.GetGroups()[chat.Group]
+		if !ok {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("group_not_exists"))
+		}
+		path, err := imagepkg.RenderGroupFromCache(chat.Group, data, "./cache/images")
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("image_failed"))
+		}
+		return u.Bot.SendPhoto(u.ChatID, path, "")
+
+	case ModeTeacher:
+		if chat.Teacher == "" {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("need_teacher"))
+		}
+		data, ok := c.bot.cache.GetTeachers()[chat.Teacher]
+		if !ok {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("teacher_not_exists"))
+		}
+		path, err := imagepkg.RenderTeacherFromCache(chat.Teacher, data, "./cache/images")
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("image_failed"))
+		}
+		return u.Bot.SendPhoto(u.ChatID, path, "")
+	}
+
 	return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
 }
 

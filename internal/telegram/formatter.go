@@ -54,11 +54,11 @@ func (b *Bot) fmtOpts(chat *Chat, showHeader bool) formatter.FormatOptions {
 }
 
 func (b *Bot) formatGroupDay(chat *Chat, data any) string {
-	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, extractDays(data), b.fmtOpts(chat, true))
+	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, getDayRasp(extractDays(data)), b.fmtOpts(chat, true))
 }
 
 func (b *Bot) formatTeacherDay(chat *Chat, data any) string {
-	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, extractDays(data), b.fmtOpts(chat, true))
+	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, getDayRasp(extractDays(data)), b.fmtOpts(chat, true))
 }
 
 func (b *Bot) formatGroupWeek(chat *Chat, data any) string {
@@ -124,6 +124,24 @@ func extractDays(data any) []map[string]any {
 		}
 	}
 	return result
+}
+
+func getDayRasp(days []map[string]any) []map[string]any {
+	if len(days) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	today := now.Format("02.01.2006")
+
+	for _, day := range days {
+		dateStr, _ := day["day"].(string)
+		if dateStr == today {
+			return []map[string]any{day}
+		}
+	}
+
+	return []map[string]any{days[0]}
 }
 
 func (b *Bot) formatCallsSchedule() string {
