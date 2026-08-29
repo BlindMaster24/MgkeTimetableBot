@@ -33,7 +33,7 @@ func setupTestBot(t *testing.T) *Bot {
 
 func TestBotRegisterCommands(t *testing.T) {
 	b := setupTestBot(t)
-	expected := []string{"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about", "/group", "/teacher", "/settings", "/image", "/buttons", "/formatter", "/forceparse", "/resetcache"}
+	expected := []string{"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about", "/group", "/teacher", "/settings", "/image", "/buttons", "/formatter", "/forceparse", "/resetcache", "/eula", "/api"}
 	for _, name := range expected {
 		if _, ok := b.commands[name]; !ok {
 			t.Errorf("missing command %s", name)

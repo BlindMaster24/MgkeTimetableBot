@@ -402,6 +402,22 @@ func (c *resetCacheCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("reset_cache_done"))
 }
 
+type eulaCmd struct{ bot *Bot }
+
+func (c *eulaCmd) Name() string        { return "/eula" }
+func (c *eulaCmd) Description() string { return "Лицензионное соглашение" }
+func (c *eulaCmd) Handler(ctx context.Context, u *Update) error {
+	return u.Bot.SendText(u.ChatID, c.bot.loc("eula_text"))
+}
+
+type apiCmd struct{ bot *Bot }
+
+func (c *apiCmd) Name() string        { return "/api" }
+func (c *apiCmd) Description() string { return "Просмотр API ключа" }
+func (c *apiCmd) Handler(ctx context.Context, u *Update) error {
+	return u.Bot.SendText(u.ChatID, c.bot.loc("api_info"))
+}
+
 func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {

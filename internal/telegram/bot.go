@@ -105,6 +105,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&formatterCmd{bot: b})
 	b.RegisterCommand(&forceParseCmd{bot: b})
 	b.RegisterCommand(&resetCacheCmd{bot: b})
+	b.RegisterCommand(&eulaCmd{bot: b})
+	b.RegisterCommand(&apiCmd{bot: b})
 
 	b.RegisterCallback(&timetableCb{bot: b})
 	b.RegisterCallback(&callsCb{bot: b})
