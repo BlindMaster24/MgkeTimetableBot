@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
@@ -446,12 +445,11 @@ func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 }
 
 func (b *Bot) showCallsFull(u *Update, chat *Chat) {
-	activeWeekdays := b.cache.GetActiveCallSlots()
-	activeSaturday := activeWeekdays
+	activeWeekdays := b.cache.GetCallsWeekdays()
+	activeSaturday := b.cache.GetCallsSaturday()
 	if activeWeekdays == nil {
-		timetable := b.cfg.Timetable
-		activeWeekdays = convertCallSlots(timetable.Weekdays)
-		activeSaturday = convertCallSlots(timetable.Saturday)
+		activeWeekdays = b.cfg.Timetable.Weekdays
+		activeSaturday = b.cfg.Timetable.Saturday
 	}
 
 	maxLessons := len(activeWeekdays)
@@ -535,12 +533,11 @@ func (b *Bot) callsLines(slots [][2][2]string, maxLessons int) string {
 }
 
 func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
-	weekdays := b.cache.GetActiveCallSlots()
-	saturday := weekdays
+	weekdays := b.cache.GetCallsWeekdays()
+	saturday := b.cache.GetCallsSaturday()
 	if weekdays == nil {
-		timetable := b.cfg.Timetable
-		weekdays = convertCallSlots(timetable.Weekdays)
-		saturday = convertCallSlots(timetable.Saturday)
+		weekdays = b.cfg.Timetable.Weekdays
+		saturday = b.cfg.Timetable.Saturday
 	}
 	var msg []string
 	msg = append(msg, "__ <b>Звонки (будни)</b> __")
@@ -550,7 +547,7 @@ func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
 	b.SendText(u.ChatID, strings.Join(msg, "\n"))
 }
 
-func isNowInSlot(weekday time.Weekday, slot config.CallSlot) bool {
+func isNowInSlot(weekday time.Weekday, slot [2][2]string) bool {
 	isWorkday := weekday >= time.Monday && weekday <= time.Friday
 	if !isWorkday {
 		return false
@@ -614,10 +611,3 @@ func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
 	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", kb)
 }
 
-func convertCallSlots(slots []config.CallSlot) [][2][2]string {
-	result := make([][2][2]string, len(slots))
-	for i, s := range slots {
-		result[i] = s
-	}
-	return result
-}

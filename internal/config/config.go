@@ -6,11 +6,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type CallSlot [2][2]string
 
 type TimetableConfig struct {
-	Weekdays    []CallSlot   `yaml:"weekdays"`
-	Saturday    []CallSlot   `yaml:"saturday"`
+	Weekdays    [][2][2]string   `yaml:"weekdays"`
+	Saturday    [][2][2]string   `yaml:"saturday"`
 	Shortened1h [][2]string  `yaml:"shortened_1h"`
 }
 

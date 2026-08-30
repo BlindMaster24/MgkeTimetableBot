@@ -14,7 +14,7 @@ func ParseCallsSchedule(doc *goquery.Document) *cache.Schedule {
 	content := findContent(doc)
 	tables := content.Find("table")
 
-	var weekdays [][2]string
+	var weekdays [][2][2]string
 
 	tables.Each(func(_ int, table *goquery.Selection) {
 		slots := extractCallSlots(table)
@@ -33,8 +33,8 @@ func ParseCallsSchedule(doc *goquery.Document) *cache.Schedule {
 	}
 }
 
-func extractCallSlots(table *goquery.Selection) [][2]string {
-	var slots [][2]string
+func extractCallSlots(table *goquery.Selection) [][2][2]string {
+	var slots [][2][2]string
 
 	rows := table.Find("tr")
 	rows.Each(func(_ int, row *goquery.Selection) {
@@ -43,33 +43,42 @@ func extractCallSlots(table *goquery.Selection) [][2]string {
 			return
 		}
 
-		cells.Last().Find("br").ReplaceWithHtml(" ")
-		timeText := cells.Last().Text()
-		parsed := parseCallTimes(timeText)
-		slots = append(slots, parsed...)
+		timeCell := cells.Last()
+		timeCell.Find("br").ReplaceWithHtml(" ")
+		timeText := timeCell.Text()
+
+		slot := parseCallSlot(timeText)
+		if slot != nil {
+			slots = append(slots, *slot)
+		}
 	})
 
 	return slots
 }
 
-func parseCallTimes(text string) [][2]string {
+func parseCallSlot(text string) *[2][2]string {
 	text = strings.ReplaceAll(text, "\u00a0", " ")
-	text = strings.ReplaceAll(text, "\u2013", "-")
-	text = strings.ReplaceAll(text, "\u2014", "-")
+	text = strings.ReplaceAll(text, "\u2013", " ")
+	text = strings.ReplaceAll(text, "\u2014", " ")
 
 	matches := callsTimeRe.FindAllStringSubmatch(text, -1)
 	if len(matches) < 2 {
 		return nil
 	}
 
-	var result [][2]string
-	for i := 0; i+1 < len(matches); i += 2 {
-		start := normalizeCallsTime(matches[i][1], matches[i][2])
-		end := normalizeCallsTime(matches[i+1][1], matches[i+1][2])
-		result = append(result, [2]string{start, end})
+	if len(matches) >= 4 {
+		start1 := normalizeCallsTime(matches[0][1], matches[0][2])
+		end1 := normalizeCallsTime(matches[1][1], matches[1][2])
+		start2 := normalizeCallsTime(matches[2][1], matches[2][2])
+		end2 := normalizeCallsTime(matches[3][1], matches[3][2])
+		slot := [2][2]string{{start1, end1}, {start2, end2}}
+		return &slot
 	}
 
-	return result
+	start := normalizeCallsTime(matches[0][1], matches[0][2])
+	end := normalizeCallsTime(matches[1][1], matches[1][2])
+	slot := [2][2]string{{start, end}, {start, end}}
+	return &slot
 }
 
 func normalizeCallsTime(h, m string) string {

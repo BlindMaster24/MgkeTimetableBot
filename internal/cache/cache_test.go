@@ -142,8 +142,12 @@ func TestCacheSetCalls(t *testing.T) {
 	}
 
 	site := Schedule{
-		Weekdays: [][2]string{{"08:00", "08:45"}},
-		Saturday: [][2]string{{"09:00", "09:45"}},
+		Weekdays: [][2][2]string{
+			{{"08:00", "08:45"}},
+		},
+		Saturday: [][2][2]string{
+			{{"09:00", "09:45"}},
+		},
 	}
 	manual := Schedule{}
 

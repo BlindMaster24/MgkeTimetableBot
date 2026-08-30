@@ -13,8 +13,8 @@ func setupTestBot(t *testing.T) *Bot {
 	t.Helper()
 	cfg := &config.Config{}
 	cfg.Telegram.Token = "test:token"
-	cfg.Timetable.Weekdays = []config.CallSlot{{{"08:00", "08:45"}, {"08:55", "09:40"}}}
-	cfg.Timetable.Saturday = []config.CallSlot{{{"09:00", "09:45"}, {"09:55", "10:40"}}}
+	cfg.Timetable.Weekdays = [][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}}
+	cfg.Timetable.Saturday = [][2][2]string{{{"09:00", "09:45"}, {"09:55", "10:40"}}}
 
 	log := logger.New("error", nil)
 	loc := i18n.New("ru")

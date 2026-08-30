@@ -38,44 +38,47 @@ func TestParseCallsSchedule(t *testing.T) {
 		t.Fatal("expected non-nil schedule")
 	}
 
-	if len(schedule.Weekdays) == 0 {
-		t.Fatal("expected weekdays calls")
-	}
-
-	if len(schedule.Weekdays) < 6 {
-		t.Fatalf("expected at least 6 lesson slots, got %d", len(schedule.Weekdays))
-	}
-
-	if schedule.Weekdays[0][0] != "08:00" {
-		t.Errorf("first lesson start = %q, want 08:00", schedule.Weekdays[0][0])
-	}
-	if schedule.Weekdays[0][1] != "08:45" {
-		t.Errorf("first lesson end = %q, want 08:45", schedule.Weekdays[0][1])
+	if len(schedule.Weekdays) != 7 {
+		t.Fatalf("expected 7 lesson slots, got %d", len(schedule.Weekdays))
 	}
 }
 
-func TestParseCallsScheduleTwoHalves(t *testing.T) {
+func TestParseCallsScheduleFirstLesson(t *testing.T) {
 	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(mockBellScheduleHTML))
 	schedule := ParseCallsSchedule(doc)
 
 	lesson1 := schedule.Weekdays[0]
-	if lesson1[0] != "08:00" || lesson1[1] != "08:45" {
-		t.Errorf("lesson 1 first half = %v, want [08:00 08:45]", lesson1)
+	if lesson1[0][0] != "08:00" || lesson1[0][1] != "08:45" {
+		t.Errorf("lesson 1 first half = %v, want [08:00 08:45]", lesson1[0])
 	}
-
-	lesson1second := schedule.Weekdays[1]
-	if lesson1second[0] != "08:55" || lesson1second[1] != "09:40" {
-		t.Errorf("lesson 1 second half = %v, want [08:55 09:40]", lesson1second)
+	if lesson1[1][0] != "08:55" || lesson1[1][1] != "09:40" {
+		t.Errorf("lesson 1 second half = %v, want [08:55 09:40]", lesson1[1])
 	}
 }
 
-func TestParseCallsScheduleSingleTime(t *testing.T) {
+func TestParseCallsScheduleSecondLesson(t *testing.T) {
 	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(mockBellScheduleHTML))
 	schedule := ParseCallsSchedule(doc)
 
-	lesson5 := schedule.Weekdays[8]
-	if lesson5[0] != "15:40" || lesson5[1] != "17:10" {
-		t.Errorf("lesson 5 (single time) = %v, want [15:40 17:10]", lesson5)
+	lesson2 := schedule.Weekdays[1]
+	if lesson2[0][0] != "09:50" || lesson2[0][1] != "10:35" {
+		t.Errorf("lesson 2 first half = %v, want [09:50 10:35]", lesson2[0])
+	}
+	if lesson2[1][0] != "10:45" || lesson2[1][1] != "11:30" {
+		t.Errorf("lesson 2 second half = %v, want [10:45 11:30]", lesson2[1])
+	}
+}
+
+func TestParseCallsScheduleSingleTimeLesson(t *testing.T) {
+	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(mockBellScheduleHTML))
+	schedule := ParseCallsSchedule(doc)
+
+	lesson5 := schedule.Weekdays[4]
+	if lesson5[0][0] != "15:40" || lesson5[0][1] != "17:10" {
+		t.Errorf("lesson 5 first half = %v, want [15:40 17:10]", lesson5[0])
+	}
+	if lesson5[1][0] != "15:40" || lesson5[1][1] != "17:10" {
+		t.Errorf("lesson 5 second half should equal first for single-time lesson, got %v", lesson5[1])
 	}
 }
 
@@ -95,31 +98,6 @@ func TestParseCallsScheduleEmptyHTML(t *testing.T) {
 
 	if schedule != nil {
 		t.Error("expected nil for empty HTML")
-	}
-}
-
-func TestParseCallTimes(t *testing.T) {
-	tests := []struct {
-		input string
-		count int
-		first [2]string
-	}{
-		{"8.00 – 8.45", 1, [2]string{"08:00", "08:45"}},
-		{"8.00 – 8.45\n8.55 – 9.40", 2, [2]string{"08:00", "08:45"}},
-		{"9:00 – 9:45\n9:55 – 10:40", 2, [2]string{"09:00", "09:45"}},
-		{"", 0, [2]string{}},
-		{"no times here", 0, [2]string{}},
-	}
-
-	for _, tt := range tests {
-		result := parseCallTimes(tt.input)
-		if len(result) != tt.count {
-			t.Errorf("parseCallTimes(%q) returned %d items, want %d", tt.input, len(result), tt.count)
-			continue
-		}
-		if tt.count > 0 && result[0] != tt.first {
-			t.Errorf("parseCallTimes(%q)[0] = %v, want %v", tt.input, result[0], tt.first)
-		}
 	}
 }
 
@@ -151,8 +129,8 @@ func TestFetchAndParseCalls(t *testing.T) {
 		t.Fatal("expected non-nil schedule")
 	}
 
-	if len(schedule.Weekdays) < 6 {
-		t.Errorf("expected at least 6 weekday slots, got %d", len(schedule.Weekdays))
+	if len(schedule.Weekdays) != 7 {
+		t.Errorf("expected 7 weekday slots, got %d", len(schedule.Weekdays))
 	}
 }
 

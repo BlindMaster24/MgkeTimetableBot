@@ -51,7 +51,7 @@ func NewScheduler(cfg *config.Config, cache *cache.RaspCache, log *logger.Logger
 func (s *Scheduler) Start() {
 	schedule := s.cfg.Timetable
 
-	for dayType, slots := range map[string][]config.CallSlot{
+	for dayType, slots := range map[string][][2][2]string{
 		"weekday": schedule.Weekdays,
 		"saturday": schedule.Saturday,
 	} {

@@ -39,8 +39,8 @@ type CallsActive struct {
 }
 
 type CallsSchedule struct {
-	Weekdays [][2]string `json:"weekdays"`
-	Saturday [][2]string `json:"saturday"`
+	Weekdays [][2][2]string `json:"weekdays"`
+	Saturday [][2][2]string `json:"saturday"`
 }
 
 type CallsCache struct {
@@ -191,8 +191,8 @@ func (c *RaspCache) SetCalls(site Schedule, manual Schedule, source string) {
 }
 
 type Schedule struct {
-	Weekdays [][2]string
-	Saturday [][2]string
+	Weekdays [][2][2]string
+	Saturday [][2][2]string
 }
 
 func (c *RaspCache) SetSuccessUpdate(ok bool) {
@@ -300,23 +300,15 @@ func hashSchedule(s Schedule) string {
 	return h
 }
 
-func (c *RaspCache) GetActiveCallSlots() [][2][2]string {
+
+func (c *RaspCache) GetCallsWeekdays() [][2][2]string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	return c.Calls.Active.Schedule.Weekdays
+}
 
-	flat := c.Calls.Active.Schedule.Weekdays
-	if len(flat) == 0 {
-		return nil
-	}
-
-	var result [][2][2]string
-	for i := 0; i+1 < len(flat); i += 2 {
-		result = append(result, [2][2]string{flat[i], flat[i+1]})
-	}
-	if len(flat)%2 == 1 {
-		last := flat[len(flat)-1]
-		result = append(result, [2][2]string{last, last})
-	}
-
-	return result
+func (c *RaspCache) GetCallsSaturday() [][2][2]string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.Calls.Active.Schedule.Saturday
 }
