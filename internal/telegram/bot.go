@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
@@ -22,6 +23,7 @@ type Bot struct {
 	i18n      *i18n.Localizer
 	chatRepo  *Repository
 	cache     *cache.RaspCache
+	cacheMu   sync.Mutex
 	commands  map[string]Command
 	callbacks map[string]Callback
 	parseFunc func() error
@@ -109,6 +111,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&resetCacheCmd{bot: b})
 	b.RegisterCommand(&eulaCmd{bot: b})
 	b.RegisterCommand(&apiCmd{bot: b})
+	b.RegisterCommand(&diffCmd{bot: b})
+	b.RegisterCommand(&flushCacheCmd{bot: b})
 	b.RegisterCommand(&debugCmd{bot: b})
 	b.RegisterCommand(&sendCmd{bot: b})
 	b.RegisterCommand(&triggerCmd{bot: b})
@@ -136,6 +140,13 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&noticeToggleCb{bot: b})
 	b.RegisterCallback(&viewToggleCb{bot: b})
 	b.RegisterCallback(&mainMenuCb{bot: b})
+	b.RegisterCallback(&diffMenuCb{bot: b})
+	b.RegisterCallback(&diffToggleCb{bot: b})
+	b.RegisterCallback(&callsMenuCb{bot: b})
+	b.RegisterCallback(&callsShowCb{bot: b})
+	b.RegisterCallback(&callsRefreshCb{bot: b})
+	b.RegisterCallback(&callsSourceCb{bot: b})
+	b.RegisterCallback(&callsSourceResetCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {

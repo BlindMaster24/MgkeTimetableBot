@@ -418,6 +418,32 @@ func (c *apiCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("api_info"))
 }
 
+type diffCmd struct{ bot *Bot }
+
+func (c *diffCmd) Name() string        { return "/diff" }
+func (c *diffCmd) Description() string { return "Настройки diff" }
+func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return c.bot.showDiffSettings(u, chat)
+}
+
+type flushCacheCmd struct{ bot *Bot }
+
+func (c *flushCacheCmd) Name() string        { return "/flushCache" }
+func (c *flushCacheCmd) Description() string { return "Сбросить кеш в БД" }
+func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	if err := c.bot.cache.Save(); err != nil {
+		return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
+	}
+	return u.Bot.SendText(u.ChatID, "✅ Кеш сброшен в БД")
+}
+
 func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -603,6 +629,7 @@ func (b *Bot) settingsKeyboardFull(chat *Chat) *telego.InlineKeyboardMarkup {
 			{{Text: b.loc("button_setup"), CallbackData: "setup"}},
 			{{Text: "⌨️ Кнопки", CallbackData: "btn_menu"}, {Text: "📃 Форматировщик", CallbackData: "fmt_menu"}},
 			{{Text: "🔊 Оповещения", CallbackData: "notice_menu"}, {Text: "🖼️ Отображение", CallbackData: "view_menu"}},
+			{{Text: "📊 Что изменилось", CallbackData: "diff_menu"}, {Text: "🔔 Звонки", CallbackData: "calls_menu"}},
 			{{Text: b.loc("button_cancel"), CallbackData: "cancel"}},
 		},
 	}

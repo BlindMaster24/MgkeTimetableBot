@@ -312,3 +312,9 @@ func (c *RaspCache) GetCallsSaturday() [][2][2]string {
 	defer c.mu.RUnlock()
 	return c.Calls.Active.Schedule.Saturday
 }
+
+func (c *RaspCache) SetCallsFromCache(calls CallsCache) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Calls = calls
+}
