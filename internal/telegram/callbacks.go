@@ -446,9 +446,13 @@ func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 }
 
 func (b *Bot) showCallsFull(u *Update, chat *Chat) {
-	timetable := b.cfg.Timetable
-	activeWeekdays := timetable.Weekdays
-	activeSaturday := timetable.Saturday
+	activeWeekdays := b.cache.GetActiveCallSlots()
+	activeSaturday := activeWeekdays
+	if activeWeekdays == nil {
+		timetable := b.cfg.Timetable
+		activeWeekdays = convertCallSlots(timetable.Weekdays)
+		activeSaturday = convertCallSlots(timetable.Saturday)
+	}
 
 	maxLessons := len(activeWeekdays)
 	if len(activeSaturday) > maxLessons {
@@ -509,7 +513,7 @@ func (b *Bot) showCallsFull(u *Update, chat *Chat) {
 	b.SendText(u.ChatID, strings.Join(msg, "\n"))
 }
 
-func (b *Bot) callsLines(slots []config.CallSlot, maxLessons int) string {
+func (b *Bot) callsLines(slots [][2][2]string, maxLessons int) string {
 	now := time.Now()
 	weekday := now.Weekday()
 
@@ -531,12 +535,18 @@ func (b *Bot) callsLines(slots []config.CallSlot, maxLessons int) string {
 }
 
 func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
-	timetable := b.cfg.Timetable
+	weekdays := b.cache.GetActiveCallSlots()
+	saturday := weekdays
+	if weekdays == nil {
+		timetable := b.cfg.Timetable
+		weekdays = convertCallSlots(timetable.Weekdays)
+		saturday = convertCallSlots(timetable.Saturday)
+	}
 	var msg []string
 	msg = append(msg, "__ <b>Звонки (будни)</b> __")
-	msg = append(msg, b.callsLines(timetable.Weekdays, len(timetable.Weekdays)))
+	msg = append(msg, b.callsLines(weekdays, len(weekdays)))
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
-	msg = append(msg, b.callsLines(timetable.Saturday, len(timetable.Saturday)))
+	msg = append(msg, b.callsLines(saturday, len(saturday)))
 	b.SendText(u.ChatID, strings.Join(msg, "\n"))
 }
 
@@ -602,4 +612,12 @@ func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
 		},
 	}
 	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", kb)
+}
+
+func convertCallSlots(slots []config.CallSlot) [][2][2]string {
+	result := make([][2][2]string, len(slots))
+	for i, s := range slots {
+		result[i] = s
+	}
+	return result
 }

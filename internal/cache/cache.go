@@ -299,3 +299,24 @@ func hashSchedule(s Schedule) string {
 	h := fmt.Sprintf("%x", data)
 	return h
 }
+
+func (c *RaspCache) GetActiveCallSlots() [][2][2]string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	flat := c.Calls.Active.Schedule.Weekdays
+	if len(flat) == 0 {
+		return nil
+	}
+
+	var result [][2][2]string
+	for i := 0; i+1 < len(flat); i += 2 {
+		result = append(result, [2][2]string{flat[i], flat[i+1]})
+	}
+	if len(flat)%2 == 1 {
+		last := flat[len(flat)-1]
+		result = append(result, [2][2]string{last, last})
+	}
+
+	return result
+}

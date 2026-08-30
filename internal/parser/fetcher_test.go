@@ -61,7 +61,7 @@ func TestFetchAndParseGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = FetchAndParse(log, c, srv.URL, srv.URL)
+	err = FetchAndParse(log, c, srv.URL, srv.URL, srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestFetchAndParseTeachers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = FetchAndParse(log, c, srv.URL, srv.URL)
+	err = FetchAndParse(log, c, srv.URL, srv.URL, srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestFetchAndParseEmptyResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = FetchAndParse(log, c, srv.URL, srv.URL)
+	err = FetchAndParse(log, c, srv.URL, srv.URL, srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}

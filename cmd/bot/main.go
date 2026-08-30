@@ -102,7 +102,7 @@ func main() {
 	bot.SetParseFunc(func() error {
 		groupURL := cfg.Parser.Endpoints.TimetableGroup
 		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
-		return parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL)
+		return parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
 	})
 
 	if err := bot.SetMyCommands(); err != nil {

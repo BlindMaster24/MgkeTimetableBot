@@ -14,7 +14,7 @@ import (
 
 const userAgent = "MGKE timetable bot (https://github.com/BlindMaster24/MgkeTimetableBot)"
 
-func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL string) error {
+func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL, bellScheduleURL string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	groupData, groupHash, err := fetchAndParseGroups(client, groupURL)
@@ -31,6 +31,15 @@ func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL 
 	} else {
 		c.SetTeachers(teacherData, teacherHash)
 		log.Info().Int("teachers", len(teacherData)).Str("hash", teacherHash).Msg("teachers parsed")
+	}
+
+	if bellScheduleURL != "" {
+		if schedule := fetchAndParseCalls(client, bellScheduleURL); schedule != nil {
+			c.SetCalls(*schedule, cache.Schedule{}, "site")
+			log.Info().Int("weekdays", len(schedule.Weekdays)).Msg("calls parsed from site")
+		} else {
+			log.Warn().Str("url", bellScheduleURL).Msg("calls parse returned empty")
+		}
 	}
 
 	if err := c.Save(); err != nil {
@@ -126,3 +135,18 @@ func truncate(s string, maxLen int) string {
 	}
 	return s
 }
+func fetchAndParseCalls(client *http.Client, url string) *cache.Schedule {
+	resp, err := fetchHTML(client, url)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	return ParseCallsSchedule(doc)
+}
+
