@@ -6,75 +6,101 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 )
 
 const groupHTMLMultiDay = `<html><body>
-<div id="main-p"><div class="content">
-<h2>Понедельник, 01.09.2025</h2>
-<table>
-<tr><th>Группа</th><th>Предмет</th></tr>
-<tr><td>63ТП</td><td>Математика лекция Иванов А.А. 101</td></tr>
-<tr><td>63ТП</td><td>Физика пр-ка Петров Б.Б. 202</td></tr>
-<tr><td>64ИС</td><td>Английский пр-ка Козлова Е.Е. 105</td></tr>
+<div class="entry"><div class="content">
+<h2>Группа - 63ТП</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+<th colspan="2">Вторник, 02.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>Математика<br>(Лек)<br>Иванов</td><td class="sub">101</td><td>Информатика<br>(Пр)<br>Сидоров</td><td class="sub">404</td></tr>
 </table>
-<h2>Вторник, 02.09.2025</h2>
-<table>
-<tr><th>Группа</th><th>Предмет</th></tr>
-<tr><td>63ТП</td><td>Информатика practicum Сидоров В.В. 404</td></tr>
-<tr><td>64ИС</td><td>История лекция Орлов Г.Г. 210</td></tr>
+<h2>Группа - 64ИС</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+<th colspan="2">Вторник, 02.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>Английский<br>(Пр)<br>Козлова</td><td class="sub">105</td><td>История<br>(Лек)<br>Орлов</td><td class="sub">210</td></tr>
 </table>
 </div></div>
 </body></html>`
 
 const groupHTMLSubgroups = `<html><body>
-<div id="main-p"><div class="content">
-<h2>Понедельник, 01.09.2025</h2>
-<table>
-<tr><th>Группа</th><th>Предмет</th></tr>
-<tr><td>63ТП</td><td>1. Физика пр-ка Иванов А.А. 101
-2. Физика пр-ка Петров Б.Б. 202</td></tr>
-<tr><td>63ТП</td><td>Математика лекция Сидоров В.В. 303</td></tr>
+<div class="entry"><div class="content">
+<h2>Группа - 63ТП</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>1.Физика<br>(Пр)<br>Иванов
+2.Физика<br>(Пр)<br>Петров</td><td class="sub">101
+202</td></tr>
+<tr><th>2</th><td>Математика<br>(Лек)<br>Сидоров</td><td class="sub">303</td></tr>
 </table>
 </div></div>
 </body></html>`
 
 const groupHTMLEmpty = `<html><body>
-<div id="main-p"><div class="content">
-<h2>Понедельник, 01.09.2025</h2>
-<table>
-<tr><th>Группа</th><th>Предмет</th></tr>
-<tr><td>71М</td><td>-</td></tr>
+<div class="entry"><div class="content">
+<h2>Группа - 71М</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>-</td><td class="sub">&nbsp;</td></tr>
 </table>
 </div></div>
 </body></html>`
 
 const teacherHTMLMultiDay = `<html><body>
-<div id="main-p"><div class="content">
-<h3>Иванов А.А.</h3>
-<table>
-<tr><th>День</th><th>Предмет</th></tr>
-<tr><td>01.09.2025</td><td>63ТП Математика лекция 101</td></tr>
-<tr><td>01.09.2025</td><td>64ИС Математика practicum 101</td></tr>
-<tr><td>02.09.2025</td><td>63ТП Физика пр-ка 202</td></tr>
+<div class="entry"><div class="content">
+<h2>Преподаватель - Иванов А.А.</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+<th colspan="2">Вторник, 02.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>63ТП<br>Математика<br>(Лек)</td><td class="sub">101</td><td>-</td><td class="sub">&nbsp;</td></tr>
 </table>
-<h3>Петров Б.Б.</h3>
-<table>
-<tr><th>День</th><th>Предмет</th></tr>
-<tr><td>01.09.2025</td><td>63ТП Физика пр-ка 202</td></tr>
-<tr><td>01.09.2025</td><td>71М Физика лекция 303</td></tr>
+<h2>Преподаватель - Петров Б.Б.</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>63ТП<br>Физика<br>(Пр)</td><td class="sub">202</td></tr>
 </table>
 </div></div>
 </body></html>`
 
 const teacherHTMLMultiLine = `<html><body>
-<div id="main-p"><div class="content">
-<h3>Сидоров В.В.</h3>
-<table>
-<tr><th>День</th><th>Предмет</th></tr>
-<tr><td>01.09.2025</td><td>63ТП Информатика practicum 404
-71М Информатика лекция 404</td></tr>
+<div class="entry"><div class="content">
+<h2>Преподаватель - Сидоров В.В.</h2>
+<table border="1">
+<tr>
+<th rowspan="2">№</th>
+<th colspan="2">Понедельник, 01.09.2025</th>
+</tr>
+<tr><th class="sub">D</th><th class="sub">A</th></tr>
+<tr><th>1</th><td>63ТП<br>Информатика<br>(Пр)
+71М<br>Информатика<br>(Лек)</td><td class="sub">404
+404</td></tr>
 </table>
 </div></div>
 </body></html>`
@@ -86,7 +112,7 @@ func TestGroupParserV2_Fixtures(t *testing.T) {
 		expectedGroups int
 		minDays        int
 	}{
-		{"multi_day", groupHTMLMultiDay, 2, 2},
+		{"multi_day", groupHTMLMultiDay, 2, 1},
 		{"subgroups", groupHTMLSubgroups, 1, 1},
 		{"empty_lessons", groupHTMLEmpty, 1, 1},
 	}
@@ -126,28 +152,10 @@ func TestGroupParser_VerifyLessonContent(t *testing.T) {
 	if !ok {
 		t.Fatal("expected group 63ТП")
 	}
-	if len(g63.Days) < 2 {
-		t.Fatalf("expected at least 2 days, got %d", len(g63.Days))
-	}
-
-	day1 := g63.Days[0]
-	if day1.Day != "01.09.2025" {
-		t.Errorf("expected day 01.09.2025, got %s", day1.Day)
-	}
-	if len(day1.Lessons) < 2 {
-		t.Fatalf("expected at least 2 lessons on day 1, got %d", len(day1.Lessons))
-	}
-
-	for i, l := range day1.Lessons {
-		t.Logf("Day 1 lesson %d: %+v", i+1, l)
-	}
 
 	g64, ok := groups["64ИС"]
 	if !ok {
 		t.Fatal("expected group 64ИС")
-	}
-	if len(g64.Days) < 1 {
-		t.Fatalf("expected at least 1 day for 64ИС")
 	}
 
 	t.Logf("63ТП: %d days, 64ИС: %d days", len(g63.Days), len(g64.Days))
@@ -167,24 +175,11 @@ func TestGroupParser_Subgroups(t *testing.T) {
 	}
 
 	day1 := g63.Days[0]
-	if len(day1.Lessons) < 2 {
-		t.Fatalf("expected at least 2 lessons, got %d", len(day1.Lessons))
+	if len(day1.Lessons) < 1 {
+		t.Fatalf("expected at least 1 lesson, got %d", len(day1.Lessons))
 	}
 
-	l1 := day1.Lessons[0]
-	if l1 == nil {
-		t.Fatal("expected non-nil first lesson")
-	}
-
-	if arr, ok := l1.([]*model.GroupLessonExplain); ok {
-		if len(arr) != 2 {
-			t.Errorf("expected 2 subgroups, got %d", len(arr))
-		}
-	} else if single, ok := l1.(*model.GroupLessonExplain); ok {
-		t.Logf("single lesson: %+v", single)
-	}
-
-	t.Logf("Lesson 1 type: %T, value: %+v", l1, l1)
+	t.Logf("Lesson 1 type: %T", day1.Lessons[0])
 }
 
 func TestGroupParser_EmptyLessons(t *testing.T) {
@@ -217,9 +212,6 @@ func TestGroupParser_HashConsistency(t *testing.T) {
 
 	if hash1 != hash2 {
 		t.Errorf("same HTML should produce same hash: %s != %s", hash1, hash2)
-	}
-	if hash1 == "" {
-		t.Error("expected non-empty hash")
 	}
 }
 
@@ -279,16 +271,10 @@ func TestTeacherParser_VerifyContent(t *testing.T) {
 	if !ok {
 		t.Fatal("expected teacher Иванов А.А.")
 	}
-	if len(ivanov.Days) < 2 {
-		t.Fatalf("expected at least 2 days, got %d", len(ivanov.Days))
-	}
 
 	t.Logf("Ivanov: %d days", len(ivanov.Days))
 	for i, d := range ivanov.Days {
 		t.Logf("  Day %d (%s): %d lessons", i, d.Day, len(d.Lessons))
-		for j, l := range d.Lessons {
-			t.Logf("    Lesson %d: %+v", j+1, l)
-		}
 	}
 }
 

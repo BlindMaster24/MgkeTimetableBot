@@ -109,7 +109,6 @@ func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 
 	lines = append(lines, "")
 	lines = append(lines, "-- Конфиг --")
-	lines = append(lines, fmt.Sprintf("Parser v2: %v", c.bot.cfg.Parser.V2 != nil && c.bot.cfg.Parser.V2.Enabled))
 	lines = append(lines, fmt.Sprintf("Telegram noticer: %v", c.bot.cfg.Telegram.Noticer))
 
 	return u.Bot.SendText(u.ChatID, "<pre>"+strings.Join(lines, "\n")+"</pre>")

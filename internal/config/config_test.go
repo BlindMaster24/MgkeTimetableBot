@@ -64,12 +64,6 @@ timetable:
 	if cfg.Timetable.Weekdays[0][0][0] != "08:00" {
 		t.Errorf("expected first weekday start 08:00, got %s", cfg.Timetable.Weekdays[0][0][0])
 	}
-	if cfg.Parser.V2 == nil {
-		t.Fatal("expected v2 config")
-	}
-	if !cfg.Parser.V2.Enabled {
-		t.Error("expected v2.enabled=true")
-	}
 }
 
 func TestLoadConfigMissing(t *testing.T) {

@@ -74,32 +74,7 @@ type Config struct {
 		SyncMode   bool `yaml:"sync_mode"`
 		LocalMode  bool `yaml:"local_mode"`
 		IgnoreHash bool `yaml:"ignore_hash"`
-		V2         *struct {
-			Enabled           bool   `yaml:"enabled"`
-			FallbackToV1      bool   `yaml:"fallback_to_v1"`
-			WeekPolicy        string `yaml:"week_policy"`
-			AllowTwoTables    bool   `yaml:"allow_two_tables"`
-			Strict            bool   `yaml:"strict"`
-			DiffLog           bool   `yaml:"diff_log"`
-			DiffLogLimit      int    `yaml:"diff_log_limit"`
-			HeaderScanRows    int    `yaml:"header_scan_rows"`
-			MinDaysInTable    int    `yaml:"min_days_in_table"`
-			MaxLessonsPerDay  int    `yaml:"max_lessons_per_day"`
-			ValidationSample  int    `yaml:"validation_sample"`
-			HashMode          string `yaml:"hash_mode"`
-			FetchRetry        int    `yaml:"fetch_retry"`
-			WeekJumpThreshold int    `yaml:"week_jump_threshold"`
-			SundayHoldCurrent bool   `yaml:"sunday_hold_current"`
-			Quarantine        *struct {
-				Enabled    bool `yaml:"enabled"`
-				MinLessons int `yaml:"min_lessons"`
-			} `yaml:"quarantine"`
-			Metrics *struct {
-				Enabled bool   `yaml:"enabled"`
-				Dir     string `yaml:"dir"`
-			} `yaml:"metrics"`
-		} `yaml:"v2"`
-		EndHour   int       `yaml:"end_hour"`
+EndHour   int       `yaml:"end_hour"`
 		Activity  [2]int    `yaml:"activity"`
 		Endpoints struct {
 			TimetableGroup  string   `yaml:"timetable_group"`
