@@ -357,3 +357,62 @@ func (r *Repository) FindByTeacher(service string, teacher string) []*Chat {
 func NewChatRepo(dbPath string) (*Repository, error) {
 	return New(dbPath)
 }
+
+func (r *Repository) FindAllTGChats() ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, "group", teacher, allow_send_mess, notice_changes
+		 FROM bot_chats WHERE service = 'telegram' AND accepted = 1 AND allow_send_mess = 1`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var allowSend, noticeChanges int
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &chat.Mode, &chat.Group, &chat.Teacher, &allowSend, &noticeChanges); err != nil {
+			continue
+		}
+		chat.AllowSendMess = allowSend != 0
+		chat.NoticeChanges = noticeChanges != 0
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func (r *Repository) CountAll() (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var count int
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM bot_chats WHERE service = 'telegram' AND accepted = 1`).Scan(&count)
+	return count, err
+}
+
+func (r *Repository) CountByMode() (map[string]int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT COALESCE(mode, 'none'), COUNT(*) FROM bot_chats WHERE service = 'telegram' AND accepted = 1 GROUP BY mode`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]int)
+	for rows.Next() {
+		var mode string
+		var count int
+		if rows.Scan(&mode, &count) == nil {
+			result[mode] = count
+		}
+	}
+	return result, err
+}

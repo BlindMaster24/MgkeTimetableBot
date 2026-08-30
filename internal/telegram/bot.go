@@ -25,6 +25,7 @@ type Bot struct {
 	commands  map[string]Command
 	callbacks map[string]Callback
 	parseFunc func() error
+	startTime time.Time
 }
 
 type Update struct {
@@ -67,6 +68,7 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 		cache:     cache,
 		commands:  make(map[string]Command),
 		callbacks: make(map[string]Callback),
+		startTime: time.Now(),
 	}
 
 	b.registerAll()
@@ -107,6 +109,9 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&resetCacheCmd{bot: b})
 	b.RegisterCommand(&eulaCmd{bot: b})
 	b.RegisterCommand(&apiCmd{bot: b})
+	b.RegisterCommand(&debugCmd{bot: b})
+	b.RegisterCommand(&sendCmd{bot: b})
+	b.RegisterCommand(&triggerCmd{bot: b})
 
 	b.RegisterCallback(&timetableCb{bot: b})
 	b.RegisterCallback(&callsCb{bot: b})

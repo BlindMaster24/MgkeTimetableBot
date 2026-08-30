@@ -98,5 +98,8 @@
   "api_version": "2.0",
   "api_group_not_found": "Группа не найдена",
   "api_teacher_not_found": "Преподаватель не найден",
-  "api_info": "Для доступа к API обратитесь к разработчику.\n\nДокументация: https://github.com/BlindMaster24/MgkeTimetableBot"
+  "api_info": "Для доступа к API обратитесь к разработчику.\n\nДокументация: https://github.com/BlindMaster24/MgkeTimetableBot",
+  "cmd_debug": "Отладочная информация",
+  "cmd_send": "Рассылка всем пользователям",
+  "cmd_trigger": "Триггер события"
 }
