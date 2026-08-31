@@ -157,18 +157,25 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	var hidePastDays, deleteLastMsg, allowSendMess, noticeChanges, noticeNextWeek, noticeCalls, noticeParserErrors int
 	var showParserTime, showHints, diffEnabled, diffAutoInWeek, diffAutoInUpdates, diffShowBeforeAfter int
 
+	var nsScene, nsMode, nsGroup, nsTeacher, nsGoogleEmail, nsRef sql.NullString
 	err := row.Scan(
-		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &chat.Scene, &chat.Mode,
-		&chat.Group, &chat.Teacher, &chat.GoogleEmail, &chat.Formatter,
+		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &nsScene, &nsMode,
+		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
 		&showAbout, &showDaily, &showWeekly, &showCalls, &showFastGroup, &showFastTeacher,
 		&hidePastDays, &deleteLastMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
 		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &showParserTime, &showHints,
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
-		&chat.DiffMaxLines, &chat.Ref,
+		&chat.DiffMaxLines, &nsRef,
 	)
 	if err != nil {
 		return nil, err
 	}
+	chat.Scene = nsScene.String
+	chat.Mode = ChatMode(nsMode.String)
+	chat.Group = nsGroup.String
+	chat.Teacher = nsTeacher.String
+	chat.GoogleEmail = nsGoogleEmail.String
+	chat.Ref = nsRef.String
 
 	chat.Accepted = accepted != 0
 	chat.ShowAbout = showAbout != 0
