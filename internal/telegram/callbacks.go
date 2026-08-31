@@ -383,6 +383,8 @@ func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
 		chat.NoticeNextWeek = !chat.NoticeNextWeek
 	case "notice_calls":
 		chat.NoticeCalls = !chat.NoticeCalls
+	case "notice_parser_errors":
+		chat.NoticeParserErrors = !chat.NoticeParserErrors
 	}
 
 	cb.bot.chatRepo.Save(chat)

@@ -429,6 +429,36 @@ func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.showDiffSettings(u, chat)
 }
 
+type noticeCmd struct{ bot *Bot }
+
+func (c *noticeCmd) Name() string        { return "/notice" }
+func (c *noticeCmd) Description() string { return "Настройки оповещений" }
+func (c *noticeCmd) MatchText(text string) bool {
+	return text == "🔊 Оповещения"
+}
+func (c *noticeCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return c.bot.showNoticeSettings(u, chat)
+}
+
+type viewCmd struct{ bot *Bot }
+
+func (c *viewCmd) Name() string        { return "/view" }
+func (c *viewCmd) Description() string { return "Настройки отображения" }
+func (c *viewCmd) MatchText(text string) bool {
+	return text == "🖼️ Отображение"
+}
+func (c *viewCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return c.bot.showViewSettings(u, chat)
+}
+
 type flushCacheCmd struct{ bot *Bot }
 
 func (c *flushCacheCmd) Name() string        { return "/flushcache" }

@@ -74,13 +74,14 @@ func (b *Bot) showNoticeSettings(u *Update, chat *Chat) error {
 		if v {
 			return "✅"
 		}
-		return "❌"
+		return "🚫"
 	}
 	kb := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
 			{{Text: onOff(chat.NoticeNextWeek) + " О новой неделе", CallbackData: "notice_toggle:notice_next_week"}},
 			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
+			{{Text: onOff(chat.NoticeParserErrors) + " О ошибке парсера", CallbackData: "notice_toggle:notice_parser_errors"}},
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
@@ -92,7 +93,7 @@ func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
 		if v {
 			return "✅"
 		}
-		return "❌"
+		return "🚫"
 	}
 	kb := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -110,7 +111,7 @@ func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
 		if v {
 			return "✅"
 		}
-		return "❌"
+		return "🚫"
 	}
 	kb := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -128,7 +129,7 @@ func (b *Bot) showDiffAdvancedSettings(u *Update, chat *Chat) error {
 		if v {
 			return "✅"
 		}
-		return "❌"
+		return "🚫"
 	}
 	kb := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -157,7 +158,7 @@ func (b *Bot) showCurrentSettings(u *Update, chat *Chat) error {
 		if v {
 			return "✅"
 		}
-		return "❌"
+		return "🚫"
 	}
 	mode := string(chat.Mode)
 	if mode == "" {
@@ -331,13 +332,14 @@ func (b *Bot) sendCallsShow(u *Update) error {
 func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
 		if v { return "✅" }
-		return "❌"
+		return "🚫"
 	}
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
 			{{Text: onOff(chat.NoticeNextWeek) + " О новой неделе", CallbackData: "notice_toggle:notice_next_week"}},
 			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
+			{{Text: onOff(chat.NoticeParserErrors) + " О ошибке парсера", CallbackData: "notice_toggle:notice_parser_errors"}},
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
@@ -346,7 +348,7 @@ func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 func (b *Bot) viewKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
 		if v { return "✅" }
-		return "❌"
+		return "🚫"
 	}
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -361,7 +363,7 @@ func (b *Bot) viewKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 func (b *Bot) diffKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
 		if v { return "✅" }
-		return "❌"
+		return "🚫"
 	}
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -376,7 +378,7 @@ func (b *Bot) diffKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 func (b *Bot) diffAdvancedKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
 		if v { return "✅" }
-		return "❌"
+		return "🚫"
 	}
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -399,24 +401,37 @@ func (b *Bot) schedulesKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 }
 
 func (b *Bot) currentSettingsText(chat *Chat) string {
-	onOff := func(v bool) string {
-		if v { return "✅" }
-		return "❌"
-	}
-	mode := string(chat.Mode)
-	if mode == "" { mode = "не задан" }
-	group := chat.Group
-	if group == "" { group = "—" }
-	formatterName := "Структурированный"
-	if chat.Formatter >= 0 && chat.Formatter < len(formatter.AllFormatters) {
-		formatterName = formatter.AllFormatters[chat.Formatter].Label()
+	yesNo := func(v bool) string {
+		if v { return "да" }
+		return "нет"
 	}
 	lines := []string{
-		fmt.Sprintf("Режим: %s", mode),
-		fmt.Sprintf("Группа: %s", group),
-		fmt.Sprintf("Формат: %s", formatterName),
-		fmt.Sprintf("Неделя: %s", onOff(chat.NoticeNextWeek)),
-		fmt.Sprintf("Diff: %s (лимит: %d)", onOff(chat.DiffEnabled), chat.DiffMaxLines),
+		fmt.Sprintf(`Показывать кнопку расписания "📄 На день": %s`, yesNo(chat.ShowDaily)),
+		fmt.Sprintf(`Показывать кнопку расписания "📑 На неделю": %s`, yesNo(chat.ShowWeekly)),
+		fmt.Sprintf(`Показывать кнопку "🕐 Звонки": %s`, yesNo(chat.ShowCalls)),
+		fmt.Sprintf(`Показывать кнопку "💡 О боте": %s`, yesNo(chat.ShowAbout)),
+		fmt.Sprintf(`Показывать кнопку "👩‍🎓 Группа": %s`, yesNo(chat.ShowFastGroup)),
+		fmt.Sprintf(`Показывать кнопку "👩‍🏫 Преподаватель": %s`, yesNo(chat.ShowFastTeacher)),
+		"",
+		fmt.Sprintf("Скрывать прошедшие дни: %s", yesNo(chat.HidePastDays)),
+		fmt.Sprintf("Время последней загрузки расписания: %s", yesNo(chat.ShowParserTime)),
+		fmt.Sprintf("Подсказки под расписанием: %s", yesNo(chat.ShowHints)),
+		fmt.Sprintf(`Раздел "Что изменилось": %s`, yesNo(chat.DiffEnabled)),
+		fmt.Sprintf("Diff после /week: %s", yesNo(chat.DiffAutoInWeek)),
+		fmt.Sprintf("Diff в уведомлениях: %s", yesNo(chat.DiffAutoInUpdates)),
+		fmt.Sprintf("Показывать старое -> новое: %s", yesNo(chat.DiffShowBeforeAfter)),
+		fmt.Sprintf("Лимит строк diff: %d", chat.DiffMaxLines),
+		"",
+		fmt.Sprintf("О добавлении нового дня: %s", yesNo(chat.NoticeChanges)),
+		fmt.Sprintf("О добавлении новой недели: %s", yesNo(chat.NoticeNextWeek)),
+		fmt.Sprintf("Об изменении звонков: %s", yesNo(chat.NoticeCalls)),
+		fmt.Sprintf("Об ошибке парсера: %s", yesNo(chat.NoticeParserErrors)),
+		"",
+		"~~~ Системные ~~~",
+		fmt.Sprintf("Режим чата: %s", string(chat.Mode)),
+		fmt.Sprintf("Группа: %s", chat.Group),
+		fmt.Sprintf("Преподаватель: %s", chat.Teacher),
+		fmt.Sprintf("Разрешено отправлять: %s", yesNo(chat.AllowSendMess)),
 	}
 	return strings.Join(lines, "\n")
 }

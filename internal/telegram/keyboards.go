@@ -61,12 +61,15 @@ func selectModeKeyboard(loc func(string, string, map[string]interface{}) string)
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{
+				{Text: t("mode_guest"), CallbackData: "setup:guest"},
+			},
+			{
 				{Text: t("mode_student"), CallbackData: "setup:student"},
 				{Text: t("mode_teacher"), CallbackData: "setup:teacher"},
 			},
 			{
 				{Text: t("mode_parent"), CallbackData: "setup:parent"},
-				{Text: t("mode_guest"), CallbackData: "setup:guest"},
+				{Text: "🔙 Пропустить", CallbackData: "cancel"},
 			},
 		},
 	}

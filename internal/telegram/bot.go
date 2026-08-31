@@ -112,6 +112,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&eulaCmd{bot: b})
 	b.RegisterCommand(&apiCmd{bot: b})
 	b.RegisterCommand(&diffCmd{bot: b})
+	b.RegisterCommand(&noticeCmd{bot: b})
+	b.RegisterCommand(&viewCmd{bot: b})
 	b.RegisterCommand(&flushCacheCmd{bot: b})
 	b.RegisterCommand(&debugCmd{bot: b})
 	b.RegisterCommand(&sendCmd{bot: b})

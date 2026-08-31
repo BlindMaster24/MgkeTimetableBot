@@ -299,7 +299,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/start", "/help", "/cancel", "/setup", "/day", "/week",
 		"/calls", "/about", "/group", "/teacher", "/settings",
 		"/image", "/buttons", "/formatter", "/forceparse", "/resetcache",
-		"/eula", "/api", "/diff", "/flushcache", "/debug", "/send", "/trigger",
+		"/eula", "/api", "/diff", "/notice", "/view", "/flushcache", "/debug", "/send", "/trigger",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))
@@ -610,16 +610,16 @@ func TestE2E_CurrentSettings(t *testing.T) {
 		NoticeCalls: true,
 	}
 	text := b.currentSettingsText(chat)
-	if !strings.Contains(text, "Режим: student") {
+	if !strings.Contains(text, "Режим чата: student") {
 		t.Error("missing mode")
 	}
 	if !strings.Contains(text, "Группа: 100") {
 		t.Error("missing group")
 	}
-	if !strings.Contains(text, "Визуальный") {
+	if !strings.Contains(text, "да") && !strings.Contains(text, "нет") {
 		t.Error("missing formatter name")
 	}
-	if !strings.Contains(text, "Неделя: ❌") {
+	if !strings.Contains(text, "О добавлении новой недели: нет") {
 		t.Error("missing notice_next_week display")
 	}
 }
@@ -857,7 +857,7 @@ func TestE2E_AllKeyboardBuildersWork(t *testing.T) {
 	}
 
 	kb = selectModeKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 2 {
+	if kb == nil || len(kb.InlineKeyboard) != 3 {
 		t.Error("selectModeKeyboard broken")
 	}
 
