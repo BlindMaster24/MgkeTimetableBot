@@ -250,7 +250,7 @@ type subsMenuCb struct{ bot *Bot }
 func (cb *subsMenuCb) Prefix() string { return "subs_menu" }
 func (cb *subsMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return u.Bot.SendText(u.ChatID, "Подписки временно недоступны")
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Подписки позволяют получать уведомления об изменениях расписания другой группы или преподавателя.", cb.bot.subscriptionsKeyboard())
 }
 
 func (b *Bot) showCallsSettings(u *Update, chat *Chat) error {

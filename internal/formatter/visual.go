@@ -27,7 +27,7 @@ func (f *VisualFormatter) formatFull(name string, teacher string, days []DayInfo
 		if isGroup {
 			text = append(text, "👩‍🎓 Группа '"+name+"'")
 		} else {
-			text = append(text, "👩‍🏫 Преподаватель '"+teacher+"'")
+			text = append(text, "👩‍🏫 Преподаватель '"+opts.getFullTeacherName(teacher)+"'")
 		}
 	}
 

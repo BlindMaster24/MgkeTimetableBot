@@ -3,8 +3,10 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
+	"strconv"
 
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
@@ -484,7 +486,15 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		b.handleSetGroup(ctx, u, chat)
 		return
 	case "set_teacher":
-		b.handleSetTeacher(ctx, u, chat)
+		return
+	case "sub_add_group":
+		b.handleSubAddGroup(ctx, u, chat)
+		return
+	case "sub_add_teacher":
+		b.handleSubAddTeacher(ctx, u, chat)
+		return
+	case "sub_remove":
+		b.handleSubRemove(ctx, u, chat)
 		return
 	}
 
@@ -650,4 +660,246 @@ func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	}
 
 	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+type devCmd struct{ bot *Bot }
+
+func (c *devCmd) Name() string        { return "/dev" }
+func (c *devCmd) Description() string { return "Исходный код бота" }
+func (c *devCmd) Handler(ctx context.Context, u *Update) error {
+	return u.Bot.SendText(u.ChatID, "Привет! Хочешь помочь сделать бота лучше?\n\nhttps://github.com/BlindMaster24/MgkeTimetableBot")
+}
+
+type mathCmd struct{ bot *Bot }
+
+func (c *mathCmd) Name() string        { return "/math" }
+func (c *mathCmd) Description() string { return "Математический калькулятор" }
+func (c *mathCmd) Handler(ctx context.Context, u *Update) error {
+	text := strings.TrimPrefix(u.Text, "/math")
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return u.Bot.SendText(u.ChatID, "/math <пример>\n\nПримеры:\n/math 2+2\n/math (100+50)*2\n/math 1000/3")
+	}
+
+	allowed := "0123456789+-*/():. "
+	for _, ch := range text {
+		if !strings.ContainsRune(allowed, ch) {
+			return u.Bot.SendText(u.ChatID, "В примере есть лишние символы.\n\nРазрешены: 0-9 + - * / ( ) : .")
+		}
+	}
+
+	text = strings.ReplaceAll(text, "×", "*")
+	text = strings.ReplaceAll(text, "÷", "/")
+	text = strings.ReplaceAll(text, "к", "000")
+	text = strings.ReplaceAll(text, "k", "000")
+	text = strings.ReplaceAll(text, ",", ".")
+
+	if strings.Count(text, "(") != strings.Count(text, ")") {
+		return u.Bot.SendText(u.ChatID, "Неправильное количество скобок")
+	}
+
+	result, err := evalMath(text)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка: "+err.Error())
+	}
+
+	return u.Bot.SendText(u.ChatID, fmt.Sprintf("%g", result))
+}
+
+func evalMath(expr string) (float64, error) {
+	expr = strings.ReplaceAll(expr, " ", "")
+	idx := 0
+
+	var parse func(int) (float64, error)
+	parse = func(minPrec int) (float64, error) {
+		if idx >= len(expr) {
+			return 0, fmt.Errorf("пустое выражение")
+		}
+
+		var left float64
+
+		if expr[idx] == '(' {
+			idx++
+			v, err := parse(0)
+			if err != nil {
+				return 0, err
+			}
+			left = v
+			if idx >= len(expr) || expr[idx] != ')' {
+				return 0, fmt.Errorf("ожидалась закрывающая скобка")
+			}
+			idx++
+		} else if (expr[idx] >= '0' && expr[idx] <= '9') || expr[idx] == '.' {
+			start := idx
+			for idx < len(expr) && ((expr[idx] >= '0' && expr[idx] <= '9') || expr[idx] == '.') {
+				idx++
+			}
+			v, err := strconv.ParseFloat(expr[start:idx], 64)
+			if err != nil {
+				return 0, err
+			}
+			left = v
+		} else if expr[idx] == '-' {
+			idx++
+			v, err := parse(3)
+			if err != nil {
+				return 0, err
+			}
+			left = -v
+		} else {
+			return 0, fmt.Errorf("неожиданный символ '%c'", expr[idx])
+		}
+
+		for idx < len(expr) {
+			op := expr[idx]
+			prec := 0
+			switch op {
+			case '+', '-':
+				prec = 1
+			case '*', '/':
+				prec = 2
+			case '^':
+				prec = 3
+			}
+			if prec < minPrec {
+				break
+			}
+			idx++
+			right, err := parse(prec + 1)
+			if err != nil {
+				return 0, err
+			}
+			switch op {
+			case '+':
+				left += right
+			case '-':
+				left -= right
+			case '*':
+				left *= right
+			case '/':
+				if right == 0 {
+					return 0, fmt.Errorf("деление на ноль")
+				}
+				left /= right
+			case '^':
+				left = math.Pow(left, right)
+			}
+		}
+		return left, nil
+	}
+
+	return parse(0)
+}
+
+func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
+	groups := b.GetRaspCache().GetGroups()
+	if len(groups) == 0 {
+		return
+	}
+
+	input := strings.TrimSpace(u.Text)
+	var matched string
+	for key := range groups {
+		if strings.EqualFold(key, input) {
+			matched = key
+			break
+		}
+	}
+	if matched == "" {
+		for key := range groups {
+			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
+				matched = key
+				break
+			}
+		}
+	}
+
+	chat.Scene = ""
+	b.chatRepo.Save(chat)
+
+	if matched == "" {
+		b.SendText(u.ChatID, b.loc("invalid_group_number"))
+		return
+	}
+
+	added, _ := b.chatRepo.AddSubscription(u.UserID, "group", matched)
+	if added {
+		b.SendText(u.ChatID, fmt.Sprintf("Подписка на группу %s добавлена.", matched))
+	} else {
+		b.SendText(u.ChatID, "Такая подписка уже существует.")
+	}
+
+	b.SendTextWithKeyboard(u.ChatID, "Подписки:", b.subscriptionsKeyboard())
+}
+
+func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
+	teachers := b.GetRaspCache().GetTeachers()
+	if len(teachers) == 0 {
+		return
+	}
+
+	input := strings.TrimSpace(u.Text)
+	var matched string
+	for key := range teachers {
+		if strings.EqualFold(key, input) {
+			matched = key
+			break
+		}
+	}
+	if matched == "" {
+		for key := range teachers {
+			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
+				matched = key
+				break
+			}
+		}
+	}
+
+	chat.Scene = ""
+	b.chatRepo.Save(chat)
+
+	if matched == "" {
+		b.SendText(u.ChatID, b.loc("teacher_not_found"))
+		return
+	}
+
+	added, _ := b.chatRepo.AddSubscription(u.UserID, "teacher", matched)
+	if added {
+		b.SendText(u.ChatID, fmt.Sprintf("Подписка на преподавателя %s добавлена.", matched))
+	} else {
+		b.SendText(u.ChatID, "Такая подписка уже существует.")
+	}
+
+	b.SendTextWithKeyboard(u.ChatID, "Подписки:", b.subscriptionsKeyboard())
+}
+
+func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
+	input := strings.TrimSpace(u.Text)
+
+	list, _ := b.chatRepo.GetSubscriptions(u.UserID)
+	chat.Scene = ""
+	b.chatRepo.Save(chat)
+
+	if len(list) == 0 {
+		b.SendText(u.ChatID, "Подписок нет.")
+		return
+	}
+
+	var idx int
+	for _, c := range input {
+		if c >= '0' && c <= '9' {
+			idx = idx*10 + int(c-'0')
+		}
+	}
+
+	if idx < 1 || idx > len(list) {
+		b.SendText(u.ChatID, "Неверный номер подписки.")
+		return
+	}
+
+	target := list[idx-1]
+	b.chatRepo.RemoveSubscription(u.UserID, target.ID)
+	b.SendText(u.ChatID, "Подписка удалена.")
+
+	b.SendTextWithKeyboard(u.ChatID, "Подписки:", b.subscriptionsKeyboard())
 }

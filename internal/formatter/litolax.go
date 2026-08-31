@@ -27,7 +27,7 @@ func (f *LitolaxFormatter) formatFull(name string, teacher string, days []DayInf
 		if isGroup {
 			text = append(text, "Группа: "+opts.b(name))
 		} else {
-			text = append(text, "Преподаватель: "+opts.b(teacher))
+			text = append(text, "Преподаватель: "+opts.b(opts.getFullTeacherName(teacher)))
 		}
 	}
 

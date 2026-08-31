@@ -24,6 +24,7 @@ type FormatOptions struct {
 	WeekLabel        string
 	IsTelegram       bool
 	RandHint         string
+	TeacherNames     map[string]string
 }
 
 func (o FormatOptions) b(text string) string {
@@ -38,6 +39,15 @@ func (o FormatOptions) i(text string) string {
 		return "<i>" + text + "</i>"
 	}
 	return text
+}
+
+func (o FormatOptions) getFullTeacherName(shortName string) string {
+	if o.TeacherNames != nil {
+		if full, ok := o.TeacherNames[shortName]; ok {
+			return full
+		}
+	}
+	return shortName
 }
 
 var AllFormatters = []Formatter{

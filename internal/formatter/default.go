@@ -26,7 +26,7 @@ func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInf
 		if isGroup {
 			text = append(text, fmt.Sprintf("- Группа '%s' -", name))
 		} else {
-			text = append(text, fmt.Sprintf("- Преподаватель '%s' -", teacher))
+			text = append(text, fmt.Sprintf("- Преподаватель '%s' -", opts.getFullTeacherName(teacher)))
 		}
 	}
 
