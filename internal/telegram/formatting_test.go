@@ -663,7 +663,7 @@ func TestKeyboardButtons(t *testing.T) {
 			text += btn.Text + " "
 		}
 	}
-	if !strings.Contains(text, "✅") || !strings.Contains(text, "❌") {
+	if !strings.Contains(text, "✅") || !strings.Contains(text, "🚫") {
 		t.Errorf("expected toggle indicators, got %q", text)
 	}
 }

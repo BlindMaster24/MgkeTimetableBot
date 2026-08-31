@@ -513,13 +513,13 @@ func TestE2E_NoticeSettings_ThreeToggles(t *testing.T) {
 	}
 
 	texts := flattenKeyboardTexts(b.noticeKeyboard(chat))
-	if !strings.Contains(texts, "О новых днях") {
+	if !strings.Contains(texts, "новых днях") {
 		t.Error("missing notice changes toggle")
 	}
-	if !strings.Contains(texts, "О новой неделе") {
+	if !strings.Contains(texts, "новой неделе") {
 		t.Error("missing notice_next_week toggle (old feature)")
 	}
-	if !strings.Contains(texts, "О звонках") {
+	if !strings.Contains(texts, "звонках") {
 		t.Error("missing notice calls toggle")
 	}
 }

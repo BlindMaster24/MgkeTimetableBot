@@ -47,7 +47,7 @@ func noYesSmile(v bool, label string) string {
 	if v {
 		return "✅ " + label
 	}
-	return "❌ " + label
+	return "🚫 " + label
 }
 
 func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
@@ -70,40 +70,11 @@ func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 }
 
 func (b *Bot) showNoticeSettings(u *Update, chat *Chat) error {
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "🚫"
-	}
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
-			{{Text: onOff(chat.NoticeNextWeek) + " О новой неделе", CallbackData: "notice_toggle:notice_next_week"}},
-			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
-			{{Text: onOff(chat.NoticeParserErrors) + " О ошибке парсера", CallbackData: "notice_toggle:notice_parser_errors"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка оповещений:", kb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка оповещений:", b.noticeKeyboard(chat))
 }
 
 func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "🚫"
-	}
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.HidePastDays) + " Скрывать прошедшие дни", CallbackData: "view_toggle:hide_past_days"}},
-			{{Text: onOff(chat.ShowParserTime) + " Время последней загрузки расписания", CallbackData: "view_toggle:show_parser_time"}},
-			{{Text: onOff(chat.ShowHints) + " Показывать подсказки", CallbackData: "view_toggle:show_hints"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", kb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", b.viewKeyboard(chat))
 }
 
 func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
@@ -333,16 +304,19 @@ func (b *Bot) sendCallsShow(u *Update) error {
 }
 
 func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
-	onOff := func(v bool) string {
-		if v { return "✅" }
-		return "🚫"
+	smile := func(v bool) string {
+		if v { return "🔈" }
+		return "🔇"
+	}
+	yesNo := func(v bool) string {
+		if v { return "Да" }
+		return "Нет"
 	}
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
-			{{Text: onOff(chat.NoticeNextWeek) + " О новой неделе", CallbackData: "notice_toggle:notice_next_week"}},
-			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
-			{{Text: onOff(chat.NoticeParserErrors) + " О ошибке парсера", CallbackData: "notice_toggle:notice_parser_errors"}},
+			{{Text: smile(chat.NoticeChanges) + " Оповещение о новых днях: " + yesNo(chat.NoticeChanges), CallbackData: "notice_toggle:notice_changes"}},
+			{{Text: smile(chat.NoticeNextWeek) + " Оповещение о новой неделе: " + yesNo(chat.NoticeNextWeek), CallbackData: "notice_toggle:notice_next_week"}},
+			{{Text: smile(chat.NoticeCalls) + " Оповещение о звонках: " + yesNo(chat.NoticeCalls), CallbackData: "notice_toggle:notice_calls"}},
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
@@ -353,11 +327,15 @@ func (b *Bot) viewKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 		if v { return "✅" }
 		return "🚫"
 	}
+	yesNo := func(v bool) string {
+		if v { return "Да" }
+		return "Нет"
+	}
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{{Text: onOff(chat.HidePastDays) + " Скрывать прошедшие дни", CallbackData: "view_toggle:hide_past_days"}},
 			{{Text: onOff(chat.ShowParserTime) + " Время последней загрузки расписания", CallbackData: "view_toggle:show_parser_time"}},
-			{{Text: onOff(chat.ShowHints) + " Показывать подсказки", CallbackData: "view_toggle:show_hints"}},
+			{{Text: onOff(chat.ShowHints) + " Показывать подсказки: " + yesNo(chat.ShowHints), CallbackData: "view_toggle:show_hints"}},
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
