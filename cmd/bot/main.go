@@ -94,7 +94,7 @@ func main() {
 	}
 	defer chatRepo.Close()
 
-	bot, err := telegrambot.NewBot(cfg, log, loc, chatRepo, raspCache)
+	bot, err := telegrambot.NewBot(cfg, log, loc, chatRepo, raspCache, archiveRepo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}

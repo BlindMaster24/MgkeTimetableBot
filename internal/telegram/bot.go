@@ -28,6 +28,7 @@ type Bot struct {
 	callbacks map[string]Callback
 	parseFunc func() error
 	startTime time.Time
+	archive   any
 }
 
 type Update struct {
@@ -55,7 +56,7 @@ type Callback interface {
 	Handler(ctx context.Context, u *Update) error
 }
 
-func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache) (*Bot, error) {
+func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archive any) (*Bot, error) {
 	client, err := telego.NewBot(cfg.Telegram.Token, telego.WithDefaultDebugLogger())
 	if err != nil {
 		return nil, fmt.Errorf("create bot: %w", err)
@@ -68,6 +69,7 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 		i18n:      loc,
 		chatRepo:  chatRepo,
 		cache:     cache,
+		archive:   archive,
 		commands:  make(map[string]Command),
 		callbacks: make(map[string]Callback),
 		startTime: time.Now(),
@@ -120,6 +122,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&debugCmd{bot: b})
 	b.RegisterCommand(&sendCmd{bot: b})
 	b.RegisterCommand(&triggerCmd{bot: b})
+	b.RegisterCommand(&historyCmd{bot: b})
+	b.RegisterCommand(&statsCmd{bot: b})
 
 	b.RegisterCallback(&dayCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})
@@ -160,8 +164,11 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&subsListCb{bot: b})
 	b.RegisterCallback(&subsRemoveCb{bot: b})
 	b.RegisterCallback(&subsCheckCb{bot: b})
+	b.RegisterCallback(&subsCheckFullCb{bot: b})
 	b.RegisterCallback(&timetableGroupCb{bot: b})
 	b.RegisterCallback(&timetableTeacherCb{bot: b})
+	b.RegisterCallback(&historyCb{bot: b})
+	b.RegisterCallback(&callsEditCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {

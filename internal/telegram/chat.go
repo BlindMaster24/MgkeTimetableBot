@@ -201,6 +201,10 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	return chat, nil
 }
 
+func (r *Repository) SetScene(chat *Chat, scene string) {
+	chat.Scene = scene
+}
+
 func (r *Repository) Save(chat *Chat) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

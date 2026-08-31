@@ -496,6 +496,18 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	case "sub_remove":
 		b.handleSubRemove(ctx, u, chat)
 		return
+	case "history_week":
+		scene := &historyWeekScene{bot: b}
+		scene.Handle(ctx, u, chat)
+		return
+	case "sub_test_pick":
+		scene := &subTestPickScene{bot: b}
+		scene.Handle(ctx, u, chat)
+		return
+	case "calls_edit_input":
+		scene := &callsEditInputScene{bot: b}
+		scene.Handle(ctx, u, chat)
+		return
 	}
 
 	for _, cmd := range b.commands {
@@ -651,6 +663,9 @@ func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 		bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: b.loc("button_about"), CallbackData: "about"})
 	}
 	bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: b.loc("button_settings"), CallbackData: "settings"})
+	if chat.Mode == ModeTeacher && chat.Teacher != "" {
+		bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: "📚 История", CallbackData: "history"})
+	}
 	rows = append(rows, bottomRow)
 
 	if len(rows) == 0 {

@@ -287,6 +287,9 @@ func (b *Bot) showCallsSettings(u *Update, chat *Chat) error {
 		{Text: "✅ Обновить с сайта", CallbackData: "calls_refresh"},
 	})
 	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: "✎ Изменить вручную", CallbackData: "calls_edit"},
+	})
+	rows = append(rows, []telego.InlineKeyboardButton{
 		{Text: sourceCheck("Сайт", activeSource == "site"), CallbackData: "calls_source:site"},
 		{Text: sourceCheck("Вручную", activeSource == "manual"), CallbackData: "calls_source:manual"},
 	})

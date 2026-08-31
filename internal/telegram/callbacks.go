@@ -142,8 +142,12 @@ func (cb *cancelCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err == nil {
+		wasSetup := chat.Scene == "setup"
 		chat.Scene = ""
 		cb.bot.chatRepo.Save(chat)
+		if wasSetup {
+			return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("about_bot"), cb.bot.mainMenuKeyboard(chat))
+		}
 	}
 	return u.Bot.SendText(u.ChatID, cb.bot.loc("input_cancelled"))
 }
