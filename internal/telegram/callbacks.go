@@ -11,10 +11,10 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-type timetableCb struct{ bot *Bot }
+type dayCb struct{ bot *Bot }
 
-func (cb *timetableCb) Prefix() string { return "day" }
-func (cb *timetableCb) Handler(ctx context.Context, u *Update) error {
+func (cb *dayCb) Prefix() string { return "day" }
+func (cb *dayCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -338,23 +338,7 @@ func (cb *noticeMenuCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "❌"
-	}
-
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
-			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка оповещений:", kb)
+	return cb.bot.showNoticeSettings(u, chat)
 }
 
 type viewMenuCb struct{ bot *Bot }
@@ -366,24 +350,7 @@ func (cb *viewMenuCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "❌"
-	}
-
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.HidePastDays) + " Скрывать прошедшие дни", CallbackData: "view_toggle:hide_past_days"}},
-			{{Text: onOff(chat.ShowParserTime) + " Время загрузки расписания", CallbackData: "view_toggle:show_parser_time"}},
-			{{Text: onOff(chat.ShowHints) + " Подсказки", CallbackData: "view_toggle:show_hints"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", kb)
+	return cb.bot.showViewSettings(u, chat)
 }
 
 type mainMenuCb struct{ bot *Bot }
@@ -412,6 +379,8 @@ func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
 	switch field {
 	case "notice_changes":
 		chat.NoticeChanges = !chat.NoticeChanges
+	case "notice_next_week":
+		chat.NoticeNextWeek = !chat.NoticeNextWeek
 	case "notice_calls":
 		chat.NoticeCalls = !chat.NoticeCalls
 	}
@@ -573,41 +542,3 @@ func isNowInSlot(weekday time.Weekday, slot [2][2]string) bool {
 
 	return nowMin >= startMin && nowMin <= endMin
 }
-
-func (b *Bot) showNoticeSettings(u *Update, chat *Chat) error {
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "❌"
-	}
-
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
-			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка оповещений:", kb)
-}
-
-func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "❌"
-	}
-
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.HidePastDays) + " Скрывать прошедшие дни", CallbackData: "view_toggle:hide_past_days"}},
-			{{Text: onOff(chat.ShowParserTime) + " Время загрузки расписания", CallbackData: "view_toggle:show_parser_time"}},
-			{{Text: onOff(chat.ShowHints) + " Подсказки", CallbackData: "view_toggle:show_hints"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", kb)
-}
-

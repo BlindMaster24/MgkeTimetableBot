@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
+	"github.com/mymmrac/telego"
 )
 
 func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
@@ -88,6 +91,13 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	return b, chatRepo
 }
 
+func e2eJsonRoundTrip(v any) any {
+	data, _ := json.Marshal(v)
+	var result any
+	json.Unmarshal(data, &result)
+	return result
+}
+
 func TestE2E_StudentFullLifecycle(t *testing.T) {
 	b, repo := setupE2EBot(t, 999)
 	userID := int64(12345)
@@ -108,6 +118,7 @@ func TestE2E_StudentFullLifecycle(t *testing.T) {
 	chat.ShowCalls = true
 	chat.Formatter = 1
 	chat.NoticeChanges = true
+	chat.NoticeNextWeek = true
 	chat.DiffEnabled = true
 	chat.DiffMaxLines = 30
 	repo.Save(chat)
@@ -127,6 +138,9 @@ func TestE2E_StudentFullLifecycle(t *testing.T) {
 	}
 	if !saved.NoticeChanges {
 		t.Error("notice not persisted")
+	}
+	if !saved.NoticeNextWeek {
+		t.Error("notice_next_week not persisted")
 	}
 	if !saved.DiffEnabled {
 		t.Error("diff not persisted")
@@ -148,15 +162,6 @@ func TestE2E_StudentFullLifecycle(t *testing.T) {
 			t.Errorf("formatter %d missing lesson name", i)
 		}
 	}
-}
-
-
-
-func e2eJsonRoundTrip(v any) any {
-	data, _ := json.Marshal(v)
-	var result any
-	json.Unmarshal(data, &result)
-	return result
 }
 
 func TestE2E_TeacherFullLifecycle(t *testing.T) {
@@ -189,7 +194,7 @@ func TestE2E_TeacherFullLifecycle(t *testing.T) {
 }
 
 func TestE2E_ParentFullLifecycle(t *testing.T) {
-	b, repo := setupE2EBot(t)
+	_, repo := setupE2EBot(t)
 	userID := int64(66666)
 
 	chat, _ := repo.FindOrCreate("telegram", userID)
@@ -197,10 +202,12 @@ func TestE2E_ParentFullLifecycle(t *testing.T) {
 	chat.Group = "100"
 	repo.Save(chat)
 
-	data := b.cache.GetGroups()["100"]
-	text := b.formatGroupFull(chat, "100", data)
-	if text == "" {
-		t.Error("parent group schedule empty")
+	saved, _ := repo.FindOrCreate("telegram", userID)
+	if saved.Mode != ModeParent {
+		t.Errorf("mode: got %q", saved.Mode)
+	}
+	if saved.Group != "100" {
+		t.Errorf("group: got %q", saved.Group)
 	}
 }
 
@@ -312,8 +319,10 @@ func TestE2E_AllCallbacksRegistered(t *testing.T) {
 		"about", "group", "teacher", "settings", "ics",
 		"btn_toggle:", "btn_menu", "fmt_menu", "fmt_select:",
 		"notice_menu", "view_menu", "notice_toggle:", "view_toggle:",
-		"main_menu", "diff_menu", "diff_toggle:", "calls_menu",
+		"main_menu", "diff_menu", "diff_advanced", "diff_toggle:", "calls_menu",
 		"calls_show", "calls_refresh", "calls_source:", "calls_source_reset",
+		"schedules_menu", "current_settings", "subs_menu",
+		"timetable_g:", "timetable_t:",
 	}
 	for _, prefix := range expected {
 		found := false
@@ -339,69 +348,318 @@ func TestE2E_AllCommandsHaveDescriptions(t *testing.T) {
 	}
 }
 
-func TestE2E_AllKeyboardBuildersWork(t *testing.T) {
+func TestE2E_MainMenuKeyboard_StudentFull(t *testing.T) {
 	b, _ := setupE2EBot(t)
-
 	chat := &Chat{Mode: ModeStudent, Group: "100", ShowDaily: true, ShowWeekly: true, ShowCalls: true, ShowAbout: true, ShowFastGroup: true, ShowFastTeacher: true}
 	kb := b.mainMenuKeyboard(chat)
 	if kb == nil || len(kb.InlineKeyboard) < 3 {
 		t.Error("mainMenuKeyboard broken")
 	}
 
-	kb = b.settingsKeyboardFull(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 4 {
-		t.Error("settingsKeyboardFull broken")
+	texts := flattenKeyboardTexts(kb)
+	if !strings.Contains(texts, "📄 На день") {
+		t.Error("missing Day button")
 	}
-
-	kb = b.buttonsKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 2 {
-		t.Error("buttonsKeyboard broken")
+	if !strings.Contains(texts, "📑 На неделю") {
+		t.Error("missing Week button")
 	}
-
-	kb = b.formatterKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 2 {
-		t.Error("formatterKeyboard broken")
+	if !strings.Contains(texts, "🕐 Звонки") {
+		t.Error("missing Calls button")
 	}
-
-	kb = selectModeKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 2 {
-		t.Error("selectModeKeyboard broken")
+	if !strings.Contains(texts, "💡 О боте") {
+		t.Error("missing About button")
 	}
-
-	kb = cancelKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 1 {
-		t.Error("cancelKeyboard broken")
+	if !strings.Contains(texts, "⚙️ Настройки") {
+		t.Error("missing Settings button")
 	}
-
-	kb = settingsKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 2 {
-		t.Error("settingsKeyboard broken")
+	if !strings.Contains(texts, "👩‍🎓 Группа") {
+		t.Error("missing fast Group button")
+	}
+	if !strings.Contains(texts, "👩‍🏫 Преподаватель") {
+		t.Error("missing fast Teacher button")
 	}
 }
 
-func TestE2E_FormattersProduceValidOutput(t *testing.T) {
+func TestE2E_MainMenuKeyboard_GuestMode(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	data := b.cache.GetGroups()["100"]
-	chat := &Chat{Mode: ModeStudent, Group: "100", Formatter: 0, ShowHints: false}
+	chat := &Chat{Mode: ModeGuest}
+	kb := b.mainMenuKeyboard(chat)
+	if kb == nil {
+		t.Fatal("nil keyboard")
+	}
+	texts := flattenKeyboardTexts(kb)
+	if !strings.Contains(texts, "👩‍🎓 Группа") {
+		t.Error("guest mode should show Group button")
+	}
+	if !strings.Contains(texts, "👩‍🏫 Преподаватель") {
+		t.Error("guest mode should show Teacher button")
+	}
+}
 
-	for i := 0; i < 4; i++ {
-		chat.Formatter = i
-		text := b.formatGroupFull(chat, "100", data)
-		if text == "" {
-			t.Errorf("formatter %d empty", i)
-		}
-		t.Logf("formatter %d:\n%s", i, text)
+func TestE2E_MainMenuKeyboard_NoMode(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{Mode: ""}
+	kb := b.mainMenuKeyboard(chat)
+	if kb == nil {
+		t.Fatal("nil keyboard")
+	}
+	texts := flattenKeyboardTexts(kb)
+	if !strings.Contains(texts, "Первоначальная настройка") {
+		t.Error("no mode should show Setup button")
+	}
+}
+
+func TestE2E_MainMenuKeyboard_TeacherMode(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{Mode: ModeTeacher, Teacher: "Иванов", ShowDaily: true, ShowAbout: true}
+	kb := b.mainMenuKeyboard(chat)
+	texts := flattenKeyboardTexts(kb)
+	if !strings.Contains(texts, "📄 На день") {
+		t.Error("teacher mode should show Day button")
+	}
+}
+
+func TestE2E_SettingsKeyboardFull(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{Mode: ModeStudent}
+	kb := b.settingsKeyboardFull(chat)
+	texts := flattenKeyboardTexts(kb)
+
+	if !strings.Contains(texts, "Первоначальная настройка") {
+		t.Error("missing Setup button")
+	}
+	if !strings.Contains(texts, "🗓️ Управление расписаниями") {
+		t.Error("missing Schedule Management button (old feature)")
+	}
+	if !strings.Contains(texts, "Кнопки") {
+		t.Error("missing Buttons button")
+	}
+	if !strings.Contains(texts, "Форматировщик") {
+		t.Error("missing Formatter button")
+	}
+	if !strings.Contains(texts, "Оповещения") {
+		t.Error("missing Notifications button")
+	}
+	if !strings.Contains(texts, "Подписки") {
+		t.Error("missing Subscriptions button (old feature)")
+	}
+	if !strings.Contains(texts, "Отображение") {
+		t.Error("missing View button")
+	}
+	if !strings.Contains(texts, "Сравнение") {
+		t.Error("missing Diff button (old label)")
+	}
+	if !strings.Contains(texts, "Показать текущие") {
+		t.Error("missing Show Current button (old feature)")
+	}
+	if !strings.Contains(texts, "Главное меню") {
+		t.Error("should have Main Menu, not Cancel")
+	}
+}
+
+func TestE2E_ButtonsKeyboard(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{
+		Mode:            ModeStudent,
+		ShowDaily:       true,
+		ShowWeekly:      false,
+		ShowCalls:       true,
+		ShowAbout:       false,
+		ShowFastGroup:   true,
+		ShowFastTeacher: false,
+	}
+	kb := b.buttonsKeyboard(chat)
+	texts := flattenKeyboardTexts(kb)
+
+	if !strings.Contains(texts, "📄 На день") {
+		t.Error("missing Day button text")
+	}
+	if !strings.Contains(texts, "📑 На неделю") {
+		t.Error("missing Week button text")
+	}
+}
+
+func TestE2E_FormatterKeyboard(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{Formatter: 1}
+	kb := b.formatterKeyboard(chat)
+	texts := flattenKeyboardTexts(kb)
+
+	if !strings.Contains(texts, "Структурированный") {
+		t.Error("missing Default formatter label")
+	}
+	if !strings.Contains(texts, "Визуальный") {
+		t.Error("missing Visual formatter label")
+	}
+	if !strings.Contains(texts, "Компактный") {
+		t.Error("missing Compact formatter label")
+	}
+	if !strings.Contains(texts, "LitolaxStyle") {
+		t.Error("missing Litolax formatter label")
+	}
+	if !strings.Contains(texts, "выбран") {
+		t.Error("should show selected formatter")
+	}
+}
+
+func TestE2E_NoticeSettings_ThreeToggles(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{
+		Mode:          ModeStudent,
+		NoticeChanges: true,
+		NoticeNextWeek: false,
+		NoticeCalls:   true,
 	}
 
-	teacherData := b.cache.GetTeachers()["Иванов И.И."]
-	chat.Mode = "teacher"
-	chat.Teacher = "Иванов И.И."
-	for i := 0; i < 4; i++ {
-		chat.Formatter = i
-		text := b.formatTeacherFull(chat, "Иванов И.И.", teacherData)
-		if text == "" {
-			t.Errorf("teacher formatter %d empty", i)
-		}
+	texts := flattenKeyboardTexts(b.noticeKeyboard(chat))
+	if !strings.Contains(texts, "О новых днях") {
+		t.Error("missing notice changes toggle")
+	}
+	if !strings.Contains(texts, "О новой неделе") {
+		t.Error("missing notice_next_week toggle (old feature)")
+	}
+	if !strings.Contains(texts, "О звонках") {
+		t.Error("missing notice calls toggle")
+	}
+}
+
+func TestE2E_ViewSettings(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{
+		Mode:           ModeStudent,
+		HidePastDays:   true,
+		ShowParserTime: false,
+		ShowHints:      true,
+	}
+	kb := b.viewKeyboard(chat)
+	texts := flattenKeyboardTexts(kb)
+
+	if !strings.Contains(texts, "Скрывать прошедшие дни") {
+		t.Error("missing hide past days")
+	}
+	if !strings.Contains(texts, "последней загрузки") {
+		t.Error("missing show parser time (old text)")
+	}
+	if !strings.Contains(texts, "подсказки") && !strings.Contains(texts, "Подсказки") {
+		t.Error("missing show hints")
+	}
+}
+
+func TestE2E_DiffSettings_BasicAndAdvanced(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{
+		Mode:              ModeStudent,
+		DiffEnabled:       true,
+		DiffMaxLines:      20,
+		DiffAutoInWeek:    false,
+		DiffAutoInUpdates: true,
+		DiffShowBeforeAfter: false,
+	}
+
+	kbBasic := b.diffKeyboard(chat)
+	textsBasic := flattenKeyboardTexts(kbBasic)
+	if !strings.Contains(textsBasic, "Что изменилось") {
+		t.Error("diff basic missing enabled toggle")
+	}
+	if !strings.Contains(textsBasic, "Лимит строк") {
+		t.Error("diff basic missing max lines")
+	}
+	if !strings.Contains(textsBasic, "Расширенные") {
+		t.Error("diff basic missing advanced link (old feature)")
+	}
+
+	kbAdvanced := b.diffAdvancedKeyboard(chat)
+	textsAdvanced := flattenKeyboardTexts(kbAdvanced)
+	if !strings.Contains(textsAdvanced, "после /week") {
+		t.Error("diff advanced missing autoInWeek")
+	}
+	if !strings.Contains(textsAdvanced, "уведомлениях") {
+		t.Error("diff advanced missing autoInUpdates")
+	}
+	if !strings.Contains(textsAdvanced, "старое") || !strings.Contains(textsAdvanced, "новое") {
+		t.Error("diff advanced missing showBeforeAfter")
+	}
+	if !strings.Contains(textsAdvanced, "Базовые настройки") {
+		t.Error("diff advanced missing back to basic link (old feature)")
+	}
+}
+
+func TestE2E_SchedulesSettings(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{Mode: ModeStudent}
+	kb := b.schedulesKeyboard(chat)
+	texts := flattenKeyboardTexts(kb)
+	if !strings.Contains(texts, "Звонки: управление") {
+		t.Error("schedules missing calls management")
+	}
+}
+
+func TestE2E_CurrentSettings(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	chat := &Chat{
+		Mode:       ModeStudent,
+		Group:      "100",
+		Formatter:  1,
+		ShowDaily:  true,
+		ShowWeekly: false,
+		ShowCalls:  true,
+		DiffEnabled: true,
+		DiffMaxLines: 20,
+		NoticeChanges: true,
+		NoticeNextWeek: false,
+		NoticeCalls: true,
+	}
+	text := b.currentSettingsText(chat)
+	if !strings.Contains(text, "Режим: student") {
+		t.Error("missing mode")
+	}
+	if !strings.Contains(text, "Группа: 100") {
+		t.Error("missing group")
+	}
+	if !strings.Contains(text, "Визуальный") {
+		t.Error("missing formatter name")
+	}
+	if !strings.Contains(text, "Неделя: ❌") {
+		t.Error("missing notice_next_week display")
+	}
+}
+
+func TestE2E_WeekControlKeyboard(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	currentWeek := utils.WeekIndexFromDate(time.Now())
+	kb := b.weekControlKeyboard("group", "100", currentWeek.Value(), true)
+	texts := flattenKeyboardTexts(kb)
+
+	if !strings.Contains(texts, "📷 Сгенерировать изображение") {
+		t.Error("missing image button")
+	}
+	if !strings.Contains(texts, "🔼") {
+		t.Error("week control should have show-full button when hidePastDays=true and current week")
+	}
+
+	kb2 := b.weekControlKeyboard("group", "100", currentWeek.Value()-1, true)
+	texts2 := flattenKeyboardTexts(kb2)
+	if !strings.Contains(texts2, "➡️") {
+		t.Error("past week should have forward arrow")
+	}
+}
+
+func TestE2E_AcademicWeekLabel(t *testing.T) {
+	week := utils.WeekIndexFromDate(time.Now())
+	label := buildWeekLabelFromWeek(week)
+	if !strings.Contains(label, "Учебная неделя №") {
+		t.Errorf("week label missing academic number: %q", label)
+	}
+	if !strings.Contains(label, "(") || !strings.Contains(label, ")") {
+		t.Errorf("week label missing date range: %q", label)
+	}
+
+	d1, d2 := week.WeekRange()
+	if !strings.Contains(label, d1.Format("02.01")) {
+		t.Errorf("week label missing start date: %q", label)
+	}
+	if !strings.Contains(label, d2.Format("02.01")) {
+		t.Errorf("week label missing end date: %q", label)
 	}
 }
 
@@ -433,58 +691,6 @@ func TestE2E_CallsScheduleDisplay(t *testing.T) {
 	}
 	if !strings.Contains(textWd, "1. 08:00") {
 		t.Error("callsLines missing first lesson")
-	}
-}
-
-func TestE2E_CacheResetPreservesDB(t *testing.T) {
-	_, repo := setupE2EBot(t)
-	userID := int64(44444)
-
-	chat, _ := repo.FindOrCreate("telegram", userID)
-	chat.Mode = ModeStudent
-	chat.Group = "100"
-	chat.Formatter = 2
-	repo.Save(chat)
-
-	chat2, _ := repo.FindOrCreate("telegram", userID)
-	if chat2.Group != "100" || chat2.Formatter != 2 {
-		t.Fatal("setup failed")
-	}
-
-
-}
-
-func TestE2E_ChatSceneTransitions(t *testing.T) {
-	_, repo := setupE2EBot(t)
-	userID := int64(33333)
-
-	scenes := []struct {
-		scene string
-		mode  ChatMode
-		group string
-	}{
-		{"setup", "", ""},
-		{"set_group", ModeStudent, ""},
-		{"", ModeStudent, "100"},
-		{"set_group", ModeStudent, "100"},
-		{"", ModeStudent, "200"},
-	}
-
-	for _, s := range scenes {
-		chat, _ := repo.FindOrCreate("telegram", userID)
-		chat.Scene = s.scene
-		if s.mode != "" {
-			chat.Mode = s.mode
-		}
-		if s.group != "" {
-			chat.Group = s.group
-		}
-		repo.Save(chat)
-
-		saved, _ := repo.FindOrCreate("telegram", userID)
-		if saved.Scene != s.scene {
-			t.Errorf("scene: want %q, got %q", s.scene, saved.Scene)
-		}
 	}
 }
 
@@ -564,13 +770,165 @@ func TestE2E_FormatterOptsEdgeCases(t *testing.T) {
 	if !opts.ShowParserTime || !opts.ShowHeader {
 		t.Error("fmtOpts broken")
 	}
+}
 
-	weekDays := []map[string]any{
-		{"day": "01.09.2026"},
-		{"day": "05.09.2026"},
+func TestE2E_FormattersProduceValidOutput(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	data := b.cache.GetGroups()["100"]
+	chat := &Chat{Mode: ModeStudent, Group: "100", Formatter: 0, ShowHints: false}
+
+	for i := 0; i < 4; i++ {
+		chat.Formatter = i
+		text := b.formatGroupFull(chat, "100", data)
+		if text == "" {
+			t.Errorf("formatter %d empty", i)
+		}
+		t.Logf("formatter %d:\n%s", i, text)
 	}
-	label := buildWeekLabel(weekDays)
-	if !strings.Contains(label, "Учебная неделя") {
-		t.Errorf("week label: %q", label)
+
+	teacherData := b.cache.GetTeachers()["Иванов И.И."]
+	chat.Mode = "teacher"
+	chat.Teacher = "Иванов И.И."
+	for i := 0; i < 4; i++ {
+		chat.Formatter = i
+		text := b.formatTeacherFull(chat, "Иванов И.И.", teacherData)
+		if text == "" {
+			t.Errorf("teacher formatter %d empty", i)
+		}
 	}
+}
+
+func TestE2E_ChatSceneTransitions(t *testing.T) {
+	_, repo := setupE2EBot(t)
+	userID := int64(33333)
+
+	scenes := []struct {
+		scene string
+		mode  ChatMode
+		group string
+	}{
+		{"setup", "", ""},
+		{"set_group", ModeStudent, ""},
+		{"", ModeStudent, "100"},
+		{"set_group", ModeStudent, "100"},
+		{"", ModeStudent, "200"},
+	}
+
+	for _, s := range scenes {
+		chat, _ := repo.FindOrCreate("telegram", userID)
+		chat.Scene = s.scene
+		if s.mode != "" {
+			chat.Mode = s.mode
+		}
+		if s.group != "" {
+			chat.Group = s.group
+		}
+		repo.Save(chat)
+
+		saved, _ := repo.FindOrCreate("telegram", userID)
+		if saved.Scene != s.scene {
+			t.Errorf("scene: want %q, got %q", s.scene, saved.Scene)
+		}
+	}
+}
+
+func TestE2E_AllKeyboardBuildersWork(t *testing.T) {
+	b, _ := setupE2EBot(t)
+
+	chat := &Chat{Mode: ModeStudent, Group: "100", ShowDaily: true, ShowWeekly: true, ShowCalls: true, ShowAbout: true, ShowFastGroup: true, ShowFastTeacher: true}
+	kb := b.mainMenuKeyboard(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 3 {
+		t.Error("mainMenuKeyboard broken")
+	}
+
+	kb = b.settingsKeyboardFull(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 6 {
+		t.Error("settingsKeyboardFull broken")
+	}
+
+	kb = b.buttonsKeyboard(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 2 {
+		t.Error("buttonsKeyboard broken")
+	}
+
+	kb = b.formatterKeyboard(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 2 {
+		t.Error("formatterKeyboard broken")
+	}
+
+	kb = selectModeKeyboard(b.i18n.T)
+	if kb == nil || len(kb.InlineKeyboard) != 2 {
+		t.Error("selectModeKeyboard broken")
+	}
+
+	kb = cancelKeyboard(b.i18n.T)
+	if kb == nil || len(kb.InlineKeyboard) != 1 {
+		t.Error("cancelKeyboard broken")
+	}
+
+	kb = settingsKeyboard(b.i18n.T)
+	if kb == nil || len(kb.InlineKeyboard) != 2 {
+		t.Error("settingsKeyboard broken")
+	}
+
+	kb = b.diffKeyboard(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 2 {
+		t.Error("diffKeyboard broken")
+	}
+
+	kb = b.diffAdvancedKeyboard(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 2 {
+		t.Error("diffAdvancedKeyboard broken")
+	}
+
+	kb = b.schedulesKeyboard(chat)
+	if kb == nil || len(kb.InlineKeyboard) < 1 {
+		t.Error("schedulesKeyboard broken")
+	}
+}
+
+func TestE2E_CacheResetPreservesDB(t *testing.T) {
+	_, repo := setupE2EBot(t)
+	userID := int64(44444)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	chat.Formatter = 2
+	repo.Save(chat)
+
+	chat2, _ := repo.FindOrCreate("telegram", userID)
+	if chat2.Group != "100" || chat2.Formatter != 2 {
+		t.Fatal("setup failed")
+	}
+}
+
+func TestE2E_RemovePastDays(t *testing.T) {
+	days := []map[string]any{
+		{"day": "25.08.2026", "lessons": []any{map[string]any{"lesson": "Old"}}},
+		{"day": time.Now().Format("02.01.2006"), "lessons": []any{map[string]any{"lesson": "Today"}}},
+		{"day": "02.09.2026", "lessons": []any{map[string]any{"lesson": "Future"}}},
+	}
+	result := removePastDays(days)
+	if len(result) == 0 {
+		t.Error("removePastDays returned empty")
+	}
+	firstDate, _ := result[0]["day"].(string)
+	today := time.Now().Format("02.01.2006")
+	if firstDate != today {
+		t.Errorf("first day should be today %s, got %s", today, firstDate)
+	}
+}
+
+func flattenKeyboardTexts(kb *telego.InlineKeyboardMarkup) string {
+	if kb == nil {
+		return ""
+	}
+	var all string
+	for _, row := range kb.InlineKeyboard {
+		for _, btn := range row {
+			all += btn.Text + " "
+		}
+	}
+	return all
 }

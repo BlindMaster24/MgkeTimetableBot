@@ -2,11 +2,9 @@ package telegram
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
-	"github.com/mymmrac/telego"
 )
 
 type diffMenuCb struct{ bot *Bot }
@@ -165,101 +163,5 @@ func (cb *callsSourceResetCb) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
 	return cb.bot.showCallsSettings(u, chat)
-}
 
-func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "❌"
-	}
-
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: onOff(chat.DiffEnabled) + " Включить \"Что изменилось\"", CallbackData: "diff_toggle:diff_enabled"}},
-			{{Text: onOff(chat.DiffAutoInUpdates) + " Показывать diff в уведомлениях", CallbackData: "diff_toggle:diff_auto_in_updates"}},
-			{{Text: onOff(chat.DiffAutoInWeek) + " Показывать diff после /week", CallbackData: "diff_toggle:diff_auto_in_week"}},
-			{{Text: onOff(chat.DiffShowBeforeAfter) + " Старое → новое", CallbackData: "diff_toggle:diff_show_before_after"}},
-			{{Text: fmt.Sprintf("🧾 Лимит строк: %d", chat.DiffMaxLines), CallbackData: "diff_toggle:diff_max_lines"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки \"Что изменилось\":", kb)
-}
-
-func (b *Bot) showCallsSettings(u *Update, chat *Chat) error {
-	sourceLabel := func(s string) string {
-		switch s {
-		case "site":
-			return "сайт"
-		case "manual":
-			return "вручную"
-		case "config":
-			return "конфиг"
-		default:
-			return s
-		}
-	}
-
-	calls := b.cache.GetCalls()
-	activeSource := calls.Active.Source
-
-	var lines []string
-	lines = append(lines, "🔔 <b>Управление расписанием звонков.</b>")
-	lines = append(lines, "")
-	if calls.Active.Source != "site" || calls.Active.Hash != calls.Site.Hash {
-		lines = append(lines, fmt.Sprintf("Текущий источник: <b>%s</b>", sourceLabel(activeSource)))
-	} else {
-		lines = append(lines, fmt.Sprintf("Источник: <b>%s</b>", sourceLabel(activeSource)))
-	}
-
-	var rows [][]telego.InlineKeyboardButton
-	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: "📊 Показать", CallbackData: "calls_show"},
-	})
-	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: "✅ Обновить с сайта", CallbackData: "calls_refresh"},
-	})
-	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: sourceCheck("Сайт", activeSource == "site"), CallbackData: "calls_source:site"},
-		{Text: sourceCheck("Вручную", activeSource == "manual"), CallbackData: "calls_source:manual"},
-	})
-	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: sourceCheck("Конфиг", activeSource == "config"), CallbackData: "calls_source:config"},
-		{Text: "🔄 Авто", CallbackData: "calls_source_reset"},
-	})
-	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: "Меню настроек", CallbackData: "settings"},
-		{Text: "Главное меню", CallbackData: "main_menu"},
-	})
-
-	return u.Bot.SendTextWithKeyboard(u.ChatID, strings.Join(lines, "\n"), &telego.InlineKeyboardMarkup{
-		InlineKeyboard: rows,
-	})
-}
-
-func sourceCheck(label string, active bool) string {
-	if active {
-		return "✅ " + label
-	}
-	return label
-}
-
-func (b *Bot) sendCallsShow(u *Update) error {
-	weekdays := b.cache.GetCallsWeekdays()
-	saturday := b.cache.GetCallsSaturday()
-	if weekdays == nil {
-		weekdays = b.cfg.Timetable.Weekdays
-		saturday = b.cfg.Timetable.Saturday
-	}
-
-	var msg []string
-	msg = append(msg, "__ <b>Звонки (будни)</b> __")
-	msg = append(msg, b.callsLines(weekdays, len(weekdays)))
-
-	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
-	msg = append(msg, b.callsLines(saturday, len(saturday)))
-
-	return b.SendText(u.ChatID, strings.Join(msg, "\n"))
 }

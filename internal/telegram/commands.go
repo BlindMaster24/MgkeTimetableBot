@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
 )
@@ -620,62 +619,5 @@ func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 		})
 	}
 
-	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
-}
-
-func (b *Bot) settingsKeyboardFull(chat *Chat) *telego.InlineKeyboardMarkup {
-	return &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: b.loc("button_setup"), CallbackData: "setup"}},
-			{{Text: "⌨️ Кнопки", CallbackData: "btn_menu"}, {Text: "📃 Форматировщик", CallbackData: "fmt_menu"}},
-			{{Text: "🔊 Оповещения", CallbackData: "notice_menu"}, {Text: "🖼️ Отображение", CallbackData: "view_menu"}},
-			{{Text: "📊 Что изменилось", CallbackData: "diff_menu"}, {Text: "🔔 Звонки", CallbackData: "calls_menu"}},
-			{{Text: b.loc("button_cancel"), CallbackData: "cancel"}},
-		},
-	}
-}
-
-func (b *Bot) buttonsKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
-	onOff := func(v bool) string {
-		if v {
-			return "✅"
-		}
-		return "❌"
-	}
-	return &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{
-				{Text: onOff(chat.ShowDaily) + " \"📄 На день\"", CallbackData: "btn_toggle:show_daily"},
-				{Text: onOff(chat.ShowWeekly) + " \"📑 На неделю\"", CallbackData: "btn_toggle:show_weekly"},
-			},
-			{
-				{Text: onOff(chat.ShowCalls) + " \"🕐 Звонки\"", CallbackData: "btn_toggle:show_calls"},
-				{Text: onOff(chat.ShowAbout) + " \"💡 О боте\"", CallbackData: "btn_toggle:show_about"},
-			},
-			{
-				{Text: onOff(chat.ShowFastGroup) + " \"👩‍🎓 Группа\"", CallbackData: "btn_toggle:show_fast_group"},
-				{Text: onOff(chat.ShowFastTeacher) + " \"👩‍🏫 Преподаватель\"", CallbackData: "btn_toggle:show_fast_teacher"},
-			},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-}
-
-func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
-	var rows [][]telego.InlineKeyboardButton
-	for i, f := range formatter.AllFormatters {
-		label := f.Label()
-		if chat.Formatter == i {
-			label += " (выбран)"
-		}
-		cbData := fmt.Sprintf("fmt_select:%d", i)
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: label, CallbackData: cbData},
-		})
-	}
-	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: "Меню настроек", CallbackData: "settings"},
-		{Text: "Главное меню", CallbackData: "main_menu"},
-	})
 	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
 }

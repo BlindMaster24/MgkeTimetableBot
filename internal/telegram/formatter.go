@@ -63,32 +63,6 @@ func (b *Bot) formatTeacherDay(chat *Chat, data any) string {
 
 
 
-func buildWeekLabel(days []map[string]any) string {
-	if len(days) == 0 {
-		return ""
-	}
-
-	firstDay, _ := days[0]["day"].(string)
-	lastDay, _ := days[len(days)-1]["day"].(string)
-
-	t1, err1 := time.Parse("02.01.2006", firstDay)
-	t2, err2 := time.Parse("02.01.2006", lastDay)
-	if err1 != nil || err2 != nil {
-		return ""
-	}
-
-	_, week1 := t1.ISOWeek()
-	_, week2 := t2.ISOWeek()
-
-	weekNum := week1
-	if week2 != week1 {
-		weekNum = week1
-	}
-
-	return fmt.Sprintf("Учебная неделя №%d (%s-%s)", weekNum,
-		t1.Format("02.01"), t2.Format("02.01"))
-}
-
 func (b *Bot) formatGroupFull(chat *Chat, group string, data any) string {
 	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(group, extractDays(data), b.fmtOpts(chat, true))
 }

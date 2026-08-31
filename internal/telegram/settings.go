@@ -1,0 +1,422 @@
+package telegram
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
+	"github.com/mymmrac/telego"
+)
+
+func (b *Bot) settingsKeyboardFull(chat *Chat) *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: b.loc("button_setup"), CallbackData: "setup"}},
+			{{Text: "🗓️ Управление расписаниями", CallbackData: "schedules_menu"}},
+			{{Text: "⌨️ Кнопки", CallbackData: "btn_menu"}, {Text: "📃 Форматировщик", CallbackData: "fmt_menu"}},
+			{{Text: "🔊 Оповещения", CallbackData: "notice_menu"}, {Text: "🔔 Подписки", CallbackData: "subs_menu"}},
+			{{Text: "🖼️ Отображение", CallbackData: "view_menu"}, {Text: "📊 Сравнение", CallbackData: "diff_menu"}},
+			{{Text: "Показать текущие", CallbackData: "current_settings"}},
+			{{Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) buttonsKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{
+				{Text: noYesSmile(chat.ShowDaily, "Кнопка \"📄 На день\""), CallbackData: "btn_toggle:show_daily"},
+				{Text: noYesSmile(chat.ShowWeekly, "Кнопка \"📑 На неделю\""), CallbackData: "btn_toggle:show_weekly"},
+			},
+			{
+				{Text: noYesSmile(chat.ShowCalls, "Кнопка \"🕐 Звонки\""), CallbackData: "btn_toggle:show_calls"},
+				{Text: noYesSmile(chat.ShowAbout, "Кнопка \"💡 О боте\""), CallbackData: "btn_toggle:show_about"},
+			},
+			{
+				{Text: noYesSmile(chat.ShowFastGroup, "Кнопка \"👩‍🎓 Группа\""), CallbackData: "btn_toggle:show_fast_group"},
+				{Text: noYesSmile(chat.ShowFastTeacher, "Кнопка \"👩‍🏫 Преподаватель\""), CallbackData: "btn_toggle:show_fast_teacher"},
+			},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func noYesSmile(v bool, label string) string {
+	if v {
+		return "✅ " + label
+	}
+	return "❌ " + label
+}
+
+func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	var rows [][]telego.InlineKeyboardButton
+	for i, f := range formatter.AllFormatters {
+		label := f.Label()
+		if chat.Formatter == i {
+			label += " (выбран)"
+		}
+		cbData := fmt.Sprintf("fmt_select:%d", i)
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: label, CallbackData: cbData},
+		})
+	}
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: "Меню настроек", CallbackData: "settings"},
+		{Text: "Главное меню", CallbackData: "main_menu"},
+	})
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+func (b *Bot) showNoticeSettings(u *Update, chat *Chat) error {
+	onOff := func(v bool) string {
+		if v {
+			return "✅"
+		}
+		return "❌"
+	}
+	kb := &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
+			{{Text: onOff(chat.NoticeNextWeek) + " О новой неделе", CallbackData: "notice_toggle:notice_next_week"}},
+			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка оповещений:", kb)
+}
+
+func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
+	onOff := func(v bool) string {
+		if v {
+			return "✅"
+		}
+		return "❌"
+	}
+	kb := &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.HidePastDays) + " Скрывать прошедшие дни", CallbackData: "view_toggle:hide_past_days"}},
+			{{Text: onOff(chat.ShowParserTime) + " Время последней загрузки расписания", CallbackData: "view_toggle:show_parser_time"}},
+			{{Text: onOff(chat.ShowHints) + " Показывать подсказки", CallbackData: "view_toggle:show_hints"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", kb)
+}
+
+func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
+	onOff := func(v bool) string {
+		if v {
+			return "✅"
+		}
+		return "❌"
+	}
+	kb := &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.DiffEnabled) + " Включить раздел \"Что изменилось\"", CallbackData: "diff_toggle:diff_enabled"}},
+			{{Text: fmt.Sprintf("🧾 Лимит строк: %d", chat.DiffMaxLines), CallbackData: "diff_toggle:diff_max_lines"}},
+			{{Text: "⚙️ Расширенные", CallbackData: "diff_advanced"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки \"Что изменилось\":", kb)
+}
+
+func (b *Bot) showDiffAdvancedSettings(u *Update, chat *Chat) error {
+	onOff := func(v bool) string {
+		if v {
+			return "✅"
+		}
+		return "❌"
+	}
+	kb := &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.DiffAutoInWeek) + " Показывать diff после /week", CallbackData: "diff_toggle:diff_auto_in_week"}},
+			{{Text: onOff(chat.DiffAutoInUpdates) + " Показывать diff в уведомлениях", CallbackData: "diff_toggle:diff_auto_in_updates"}},
+			{{Text: onOff(chat.DiffShowBeforeAfter) + " Показывать \"старое -> новое\"", CallbackData: "diff_toggle:diff_show_before_after"}},
+			{{Text: "⬅️ Базовые настройки", CallbackData: "diff_menu"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Расширенные настройки \"Что изменилось\":", kb)
+}
+
+func (b *Bot) showSchedulesSettings(u *Update, chat *Chat) error {
+	kb := &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: "🕐 Звонки: управление", CallbackData: "calls_menu"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Управление расписаниями:", kb)
+}
+
+func (b *Bot) showCurrentSettings(u *Update, chat *Chat) error {
+	onOff := func(v bool) string {
+		if v {
+			return "✅"
+		}
+		return "❌"
+	}
+	mode := string(chat.Mode)
+	if mode == "" {
+		mode = "не задан"
+	}
+	group := chat.Group
+	if group == "" {
+		group = "—"
+	}
+	teacher := chat.Teacher
+	if teacher == "" {
+		teacher = "—"
+	}
+	formatterName := "Структурированный"
+	if chat.Formatter >= 0 && chat.Formatter < len(formatter.AllFormatters) {
+		formatterName = formatter.AllFormatters[chat.Formatter].Label()
+	}
+	lines := []string{
+		"<b>Текущие настройки:</b>",
+		"",
+		fmt.Sprintf("Режим: %s", mode),
+		fmt.Sprintf("Группа: %s", group),
+		fmt.Sprintf("Преподаватель: %s", teacher),
+		fmt.Sprintf("Формат: %s", formatterName),
+		"",
+		fmt.Sprintf("📄 На день: %s", onOff(chat.ShowDaily)),
+		fmt.Sprintf("📑 На неделю: %s", onOff(chat.ShowWeekly)),
+		fmt.Sprintf("🕐 Звонки: %s", onOff(chat.ShowCalls)),
+		fmt.Sprintf("💡 О боте: %s", onOff(chat.ShowAbout)),
+		fmt.Sprintf("👩‍🎓 Группа (быстрый): %s", onOff(chat.ShowFastGroup)),
+		fmt.Sprintf("👩‍🏫 Преподаватель (быстрый): %s", onOff(chat.ShowFastTeacher)),
+		"",
+		fmt.Sprintf("Скрывать прошедшие дни: %s", onOff(chat.HidePastDays)),
+		fmt.Sprintf("Показывать время загрузки: %s", onOff(chat.ShowParserTime)),
+		fmt.Sprintf("Подсказки: %s", onOff(chat.ShowHints)),
+		"",
+		fmt.Sprintf("Оповещения — Дни: %s | Неделя: %s | Звонки: %s",
+			onOff(chat.NoticeChanges), onOff(chat.NoticeNextWeek), onOff(chat.NoticeCalls)),
+		"",
+		fmt.Sprintf("Diff: %s (лимит: %d)", onOff(chat.DiffEnabled), chat.DiffMaxLines),
+	}
+
+	kb := &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, strings.Join(lines, "\n"), kb)
+}
+
+type schedulesMenuCb struct{ bot *Bot }
+
+func (cb *schedulesMenuCb) Prefix() string { return "schedules_menu" }
+func (cb *schedulesMenuCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
+	return cb.bot.showSchedulesSettings(u, chat)
+}
+
+type currentSettingsCb struct{ bot *Bot }
+
+func (cb *currentSettingsCb) Prefix() string { return "current_settings" }
+func (cb *currentSettingsCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
+	return cb.bot.showCurrentSettings(u, chat)
+}
+
+type diffAdvancedCb struct{ bot *Bot }
+
+func (cb *diffAdvancedCb) Prefix() string { return "diff_advanced" }
+func (cb *diffAdvancedCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
+	return cb.bot.showDiffAdvancedSettings(u, chat)
+}
+
+type subsMenuCb struct{ bot *Bot }
+
+func (cb *subsMenuCb) Prefix() string { return "subs_menu" }
+func (cb *subsMenuCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	return u.Bot.SendText(u.ChatID, "Подписки временно недоступны")
+}
+
+func (b *Bot) showCallsSettings(u *Update, chat *Chat) error {
+	sourceLabel := func(s string) string {
+		switch s {
+		case "site":
+			return "сайт"
+		case "manual":
+			return "вручную"
+		case "config":
+			return "конфиг"
+		default:
+			return s
+		}
+	}
+
+	calls := b.cache.GetCalls()
+	activeSource := calls.Active.Source
+
+	var lines []string
+	lines = append(lines, "🔔 <b>Управление расписанием звонков.</b>")
+	lines = append(lines, "")
+	if calls.Active.Source != "site" || calls.Active.Hash != calls.Site.Hash {
+		lines = append(lines, fmt.Sprintf("Текущий источник: <b>%s</b>", sourceLabel(activeSource)))
+	} else {
+		lines = append(lines, fmt.Sprintf("Источник: <b>%s</b>", sourceLabel(activeSource)))
+	}
+
+	var rows [][]telego.InlineKeyboardButton
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: "📊 Показать", CallbackData: "calls_show"},
+	})
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: "✅ Обновить с сайта", CallbackData: "calls_refresh"},
+	})
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: sourceCheck("Сайт", activeSource == "site"), CallbackData: "calls_source:site"},
+		{Text: sourceCheck("Вручную", activeSource == "manual"), CallbackData: "calls_source:manual"},
+	})
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: sourceCheck("Конфиг", activeSource == "config"), CallbackData: "calls_source:config"},
+		{Text: "🔄 Авто", CallbackData: "calls_source_reset"},
+	})
+	rows = append(rows, []telego.InlineKeyboardButton{
+		{Text: "Меню настроек", CallbackData: "settings"},
+		{Text: "Главное меню", CallbackData: "main_menu"},
+	})
+
+	return u.Bot.SendTextWithKeyboard(u.ChatID, strings.Join(lines, "\n"), &telego.InlineKeyboardMarkup{
+		InlineKeyboard: rows,
+	})
+}
+
+func sourceCheck(label string, active bool) string {
+	if active {
+		return "✅ " + label
+	}
+	return label
+}
+
+func (b *Bot) sendCallsShow(u *Update) error {
+	weekdays := b.cache.GetCallsWeekdays()
+	saturday := b.cache.GetCallsSaturday()
+	if weekdays == nil {
+		weekdays = b.cfg.Timetable.Weekdays
+		saturday = b.cfg.Timetable.Saturday
+	}
+
+	var msg []string
+	msg = append(msg, "__ <b>Звонки (будни)</b> __")
+	msg = append(msg, b.callsLines(weekdays, len(weekdays)))
+
+	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
+	msg = append(msg, b.callsLines(saturday, len(saturday)))
+
+	return b.SendText(u.ChatID, strings.Join(msg, "\n"))
+}
+
+func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	onOff := func(v bool) string {
+		if v { return "✅" }
+		return "❌"
+	}
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.NoticeChanges) + " О новых днях", CallbackData: "notice_toggle:notice_changes"}},
+			{{Text: onOff(chat.NoticeNextWeek) + " О новой неделе", CallbackData: "notice_toggle:notice_next_week"}},
+			{{Text: onOff(chat.NoticeCalls) + " О звонках", CallbackData: "notice_toggle:notice_calls"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) viewKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	onOff := func(v bool) string {
+		if v { return "✅" }
+		return "❌"
+	}
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.HidePastDays) + " Скрывать прошедшие дни", CallbackData: "view_toggle:hide_past_days"}},
+			{{Text: onOff(chat.ShowParserTime) + " Время последней загрузки расписания", CallbackData: "view_toggle:show_parser_time"}},
+			{{Text: onOff(chat.ShowHints) + " Показывать подсказки", CallbackData: "view_toggle:show_hints"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) diffKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	onOff := func(v bool) string {
+		if v { return "✅" }
+		return "❌"
+	}
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.DiffEnabled) + " Включить раздел \"Что изменилось\"", CallbackData: "diff_toggle:diff_enabled"}},
+			{{Text: fmt.Sprintf("🧾 Лимит строк: %d", chat.DiffMaxLines), CallbackData: "diff_toggle:diff_max_lines"}},
+			{{Text: "⚙️ Расширенные", CallbackData: "diff_advanced"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) diffAdvancedKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	onOff := func(v bool) string {
+		if v { return "✅" }
+		return "❌"
+	}
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: onOff(chat.DiffAutoInWeek) + " Показывать diff после /week", CallbackData: "diff_toggle:diff_auto_in_week"}},
+			{{Text: onOff(chat.DiffAutoInUpdates) + " Показывать diff в уведомлениях", CallbackData: "diff_toggle:diff_auto_in_updates"}},
+			{{Text: onOff(chat.DiffShowBeforeAfter) + " Показывать \"старое -> новое\"", CallbackData: "diff_toggle:diff_show_before_after"}},
+			{{Text: "⬅️ Базовые настройки", CallbackData: "diff_menu"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) schedulesKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: "🕐 Звонки: управление", CallbackData: "calls_menu"}},
+			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
+		},
+	}
+}
+
+func (b *Bot) currentSettingsText(chat *Chat) string {
+	onOff := func(v bool) string {
+		if v { return "✅" }
+		return "❌"
+	}
+	mode := string(chat.Mode)
+	if mode == "" { mode = "не задан" }
+	group := chat.Group
+	if group == "" { group = "—" }
+	formatterName := "Структурированный"
+	if chat.Formatter >= 0 && chat.Formatter < len(formatter.AllFormatters) {
+		formatterName = formatter.AllFormatters[chat.Formatter].Label()
+	}
+	lines := []string{
+		fmt.Sprintf("Режим: %s", mode),
+		fmt.Sprintf("Группа: %s", group),
+		fmt.Sprintf("Формат: %s", formatterName),
+		fmt.Sprintf("Неделя: %s", onOff(chat.NoticeNextWeek)),
+		fmt.Sprintf("Diff: %s (лимит: %d)", onOff(chat.DiffEnabled), chat.DiffMaxLines),
+	}
+	return strings.Join(lines, "\n")
+}

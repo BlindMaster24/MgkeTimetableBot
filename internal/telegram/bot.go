@@ -117,7 +117,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&sendCmd{bot: b})
 	b.RegisterCommand(&triggerCmd{bot: b})
 
-	b.RegisterCallback(&timetableCb{bot: b})
+	b.RegisterCallback(&dayCb{bot: b})
+	b.RegisterCallback(&weekCb{bot: b})
 	b.RegisterCallback(&callsCb{bot: b})
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
@@ -125,7 +126,6 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&imageTeacherCb{bot: b})
 	b.RegisterCallback(&cancelCb{bot: b})
 	b.RegisterCallback(&setupCb{bot: b})
-	b.RegisterCallback(&weekCb{bot: b})
 	b.RegisterCallback(&aboutCb{bot: b})
 	b.RegisterCallback(&groupCb{bot: b})
 	b.RegisterCallback(&teacherCb{bot: b})
@@ -141,12 +141,18 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&viewToggleCb{bot: b})
 	b.RegisterCallback(&mainMenuCb{bot: b})
 	b.RegisterCallback(&diffMenuCb{bot: b})
+	b.RegisterCallback(&diffAdvancedCb{bot: b})
 	b.RegisterCallback(&diffToggleCb{bot: b})
 	b.RegisterCallback(&callsMenuCb{bot: b})
 	b.RegisterCallback(&callsShowCb{bot: b})
 	b.RegisterCallback(&callsRefreshCb{bot: b})
 	b.RegisterCallback(&callsSourceCb{bot: b})
 	b.RegisterCallback(&callsSourceResetCb{bot: b})
+	b.RegisterCallback(&schedulesMenuCb{bot: b})
+	b.RegisterCallback(&currentSettingsCb{bot: b})
+	b.RegisterCallback(&subsMenuCb{bot: b})
+	b.RegisterCallback(&timetableGroupCb{bot: b})
+	b.RegisterCallback(&timetableTeacherCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {
@@ -334,5 +340,3 @@ func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {
 		}
 	}
 }
-
-
