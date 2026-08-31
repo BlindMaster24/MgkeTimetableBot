@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL,
 	if err != nil {
 		log.Error().Err(err).Str("url", groupURL).Msg("group parse failed")
 	} else {
+		groupData = jsonRoundTrip(groupData)
 		c.SetGroups(groupData, groupHash)
 		log.Info().Int("groups", len(groupData)).Str("hash", groupHash).Msg("groups parsed")
 	}
@@ -29,6 +31,7 @@ func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL,
 	if err != nil {
 		log.Error().Err(err).Str("url", teacherURL).Msg("teacher parse failed")
 	} else {
+		teacherData = jsonRoundTrip(teacherData)
 		c.SetTeachers(teacherData, teacherHash)
 		log.Info().Int("teachers", len(teacherData)).Str("hash", teacherHash).Msg("teachers parsed")
 	}
@@ -134,6 +137,18 @@ func truncate(s string, maxLen int) string {
 		return s[:maxLen] + "..."
 	}
 	return s
+}
+
+func jsonRoundTrip(v map[string]any) map[string]any {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return v
+	}
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return v
+	}
+	return result
 }
 func fetchAndParseCalls(client *http.Client, url string) *cache.Schedule {
 	resp, err := fetchHTML(client, url)

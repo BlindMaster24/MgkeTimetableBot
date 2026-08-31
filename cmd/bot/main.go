@@ -109,6 +109,17 @@ func main() {
 		log.Warn().Err(err).Msg("failed to set bot commands")
 	}
 
+	go func() {
+		groupURL := cfg.Parser.Endpoints.TimetableGroup
+		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
+		log.Info().Msg("initial parse starting")
+		if err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule); err != nil {
+			log.Error().Err(err).Msg("initial parse failed")
+		} else {
+			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
+		}
+	}()
+
 	log.Info().Msg("bot starting")
 	if err := bot.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("bot stopped")

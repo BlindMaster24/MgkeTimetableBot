@@ -432,7 +432,7 @@ func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
 
 type flushCacheCmd struct{ bot *Bot }
 
-func (c *flushCacheCmd) Name() string        { return "/flushCache" }
+func (c *flushCacheCmd) Name() string        { return "/flushcache" }
 func (c *flushCacheCmd) Description() string { return "Сбросить кеш в БД" }
 func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
