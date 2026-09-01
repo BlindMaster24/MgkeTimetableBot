@@ -278,21 +278,9 @@ func sourceCheck(label string, active bool) string {
 }
 
 func (b *Bot) sendCallsShow(u *Update) error {
-	weekdays := b.cache.GetCallsWeekdays()
-	saturday := b.cache.GetCallsSaturday()
-	if weekdays == nil {
-		weekdays = b.cfg.Timetable.Weekdays
-		saturday = b.cfg.Timetable.Saturday
-	}
-
-	var msg []string
-	msg = append(msg, "__ <b>Звонки (будни)</b> __")
-	msg = append(msg, b.callsLines(weekdays, len(weekdays)))
-
-	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
-	msg = append(msg, b.callsLines(saturday, len(saturday)))
-
-	return b.SendText(u.ChatID, strings.Join(msg, "\n"))
+	chat, _ := b.chatRepo.FindOrCreate("telegram", u.UserID)
+	b.displayCalls(u, chat, true)
+	return nil
 }
 
 func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {

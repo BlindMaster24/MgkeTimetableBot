@@ -530,6 +530,20 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	}
 }
 
+func findClosest(input string, candidates map[string]any) (string, bool) {
+	for key := range candidates {
+		if strings.EqualFold(key, input) {
+			return key, true
+		}
+	}
+	for key := range candidates {
+		if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
+			return key, true
+		}
+	}
+	return "", false
+}
+
 func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	groups := b.GetRaspCache().GetGroups()
 	if len(groups) == 0 {
@@ -537,22 +551,7 @@ func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-
-	var matched string
-	for key := range groups {
-		if strings.EqualFold(key, input) {
-			matched = key
-			break
-		}
-	}
-	if matched == "" {
-		for key := range groups {
-			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-				matched = key
-				break
-			}
-		}
-	}
+	matched, _ := findClosest(input, groups)
 
 	if matched == "" {
 		b.SendText(u.ChatID, b.loc("invalid_group_number"))
@@ -581,22 +580,7 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-
-	var matched string
-	for key := range teachers {
-		if strings.EqualFold(key, input) {
-			matched = key
-			break
-		}
-	}
-	if matched == "" {
-		for key := range teachers {
-			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-				matched = key
-				break
-			}
-		}
-	}
+	matched, _ := findClosest(input, teachers)
 
 	if matched == "" {
 		b.SendText(u.ChatID, b.loc("teacher_not_found"))
@@ -833,21 +817,7 @@ func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-	var matched string
-	for key := range groups {
-		if strings.EqualFold(key, input) {
-			matched = key
-			break
-		}
-	}
-	if matched == "" {
-		for key := range groups {
-			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-				matched = key
-				break
-			}
-		}
-	}
+	matched, _ := findClosest(input, groups)
 
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
@@ -874,21 +844,7 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-	var matched string
-	for key := range teachers {
-		if strings.EqualFold(key, input) {
-			matched = key
-			break
-		}
-	}
-	if matched == "" {
-		for key := range teachers {
-			if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-				matched = key
-				break
-			}
-		}
-	}
+	matched, _ := findClosest(input, teachers)
 
 	chat.Scene = ""
 	b.chatRepo.Save(chat)

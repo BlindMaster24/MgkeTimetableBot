@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
@@ -427,6 +428,14 @@ func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 }
 
 func (b *Bot) showCallsFull(u *Update, chat *Chat) {
+	b.displayCalls(u, chat, false)
+}
+
+func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
+	b.displayCalls(u, chat, true)
+}
+
+func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 	activeWeekdays := b.cache.GetCallsWeekdays()
 	activeSaturday := b.cache.GetCallsSaturday()
 	if activeWeekdays == nil {
@@ -439,48 +448,21 @@ func (b *Bot) showCallsFull(u *Update, chat *Chat) {
 		maxLessons = len(activeSaturday)
 	}
 
-	current := 0
-	if (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" {
-		groups := b.cache.GetGroups()
-		if data, ok := groups[chat.Group]; ok {
-			if daysRaw, ok := data.(map[string]any); ok {
-				if daysArr, ok := daysRaw["days"].([]any); ok && len(daysArr) > 0 {
-					if dayMap, ok := daysArr[0].(map[string]any); ok {
-						if lessons, ok := dayMap["lessons"].([]any); ok {
-							current = len(lessons)
-						}
-					}
-				}
-			}
-		}
-	} else if chat.Mode == "teacher" && chat.Teacher != "" {
-		teachers := b.cache.GetTeachers()
-		if data, ok := teachers[chat.Teacher]; ok {
-			if daysRaw, ok := data.(map[string]any); ok {
-				if daysArr, ok := daysRaw["days"].([]any); ok && len(daysArr) > 0 {
-					if dayMap, ok := daysArr[0].(map[string]any); ok {
-						if lessons, ok := dayMap["lessons"].([]any); ok {
-							current = len(lessons)
-						}
-					}
-				}
-			}
-		}
-	}
-
 	userMax := maxLessons
-	if current > 0 && current < maxLessons {
-		userMax = current
+	if !full {
+		current := countCurrentLessons(chat, b.cache)
+		if current > 0 && current < maxLessons {
+			userMax = current
+		}
 	}
 
 	var msg []string
 	msg = append(msg, "__ <b>Звонки (будни)</b> __")
 	msg = append(msg, b.callsLines(activeWeekdays, userMax))
-
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
 	msg = append(msg, b.callsLines(activeSaturday, userMax))
 
-	if userMax < maxLessons {
+	if !full && userMax < maxLessons {
 		kb := &telego.InlineKeyboardMarkup{
 			InlineKeyboard: [][]telego.InlineKeyboardButton{
 				{{Text: "Показать полностью", CallbackData: "calls_full"}},
@@ -491,6 +473,35 @@ func (b *Bot) showCallsFull(u *Update, chat *Chat) {
 	}
 
 	b.SendText(u.ChatID, strings.Join(msg, "\n"))
+}
+
+func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {
+	var data any
+	switch chat.Mode {
+	case ModeStudent, ModeParent:
+		if chat.Group == "" {
+			return 0
+		}
+		data, _ = c.GetGroups()[chat.Group]
+	case ModeTeacher:
+		if chat.Teacher == "" {
+			return 0
+		}
+		data, _ = c.GetTeachers()[chat.Teacher]
+	}
+	if data == nil {
+		return 0
+		}
+	if daysRaw, ok := data.(map[string]any); ok {
+		if daysArr, ok := daysRaw["days"].([]any); ok && len(daysArr) > 0 {
+			if dayMap, ok := daysArr[0].(map[string]any); ok {
+				if lessons, ok := dayMap["lessons"].([]any); ok {
+					return len(lessons)
+				}
+			}
+		}
+	}
+	return 0
 }
 
 func (b *Bot) callsLines(slots [][2][2]string, maxLessons int) string {
@@ -512,21 +523,6 @@ func (b *Bot) callsLines(slots [][2][2]string, maxLessons int) string {
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
-}
-
-func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
-	weekdays := b.cache.GetCallsWeekdays()
-	saturday := b.cache.GetCallsSaturday()
-	if weekdays == nil {
-		weekdays = b.cfg.Timetable.Weekdays
-		saturday = b.cfg.Timetable.Saturday
-	}
-	var msg []string
-	msg = append(msg, "__ <b>Звонки (будни)</b> __")
-	msg = append(msg, b.callsLines(weekdays, len(weekdays)))
-	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
-	msg = append(msg, b.callsLines(saturday, len(saturday)))
-	b.SendText(u.ChatID, strings.Join(msg, "\n"))
 }
 
 func isNowInSlot(weekday time.Weekday, slot [2][2]string) bool {
@@ -554,4 +550,160 @@ func isNowInSlot(weekday time.Weekday, slot [2][2]string) bool {
 	nowMin := now.Hour()*60 + now.Minute()
 
 	return nowMin >= startMin && nowMin <= endMin
+}
+
+type diffMenuCb struct{ bot *Bot }
+
+func (cb *diffMenuCb) Prefix() string { return "diff_menu" }
+func (cb *diffMenuCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showDiffSettings(u, chat)
+	})
+}
+
+type diffToggleCb struct{ bot *Bot }
+
+func (cb *diffToggleCb) Prefix() string { return "diff_toggle:" }
+func (cb *diffToggleCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		field := strings.TrimPrefix(u.Data, "diff_toggle:")
+		var msg string
+		switch field {
+		case "diff_enabled":
+			chat.DiffEnabled = !chat.DiffEnabled
+			msg = fmt.Sprintf("Включить раздел \"Что изменилось\"? Установлено: '%s'\nЕсли отключено, кнопки/блоки diff пользователю не показываются.", yesNoStr(chat.DiffEnabled))
+		case "diff_auto_in_week":
+			chat.DiffAutoInWeek = !chat.DiffAutoInWeek
+			msg = fmt.Sprintf("Показывать diff после /week? Установлено: '%s'\nЕсли включено, после недельного расписания бот сразу добавляет блок изменений.", yesNoStr(chat.DiffAutoInWeek))
+		case "diff_auto_in_updates":
+			chat.DiffAutoInUpdates = !chat.DiffAutoInUpdates
+			msg = fmt.Sprintf("Показывать diff в уведомлениях? Установлено: '%s'\nЕсли включено, в автоуведомлениях о сменах будет краткий список изменений.", yesNoStr(chat.DiffAutoInUpdates))
+		case "diff_show_before_after":
+			chat.DiffShowBeforeAfter = !chat.DiffShowBeforeAfter
+			msg = fmt.Sprintf("Показывать старое -> новое для изменённых пар? Установлено: '%s'\nЕсли включено, бот покажет обе версии пары в строках с типом \"~\".", yesNoStr(chat.DiffShowBeforeAfter))
+		case "diff_max_lines":
+			presets := [4]int{10, 20, 30, 50}
+			current := 20
+			for i, p := range presets {
+				if p == chat.DiffMaxLines {
+					current = i
+					break
+				}
+			}
+			chat.DiffMaxLines = presets[(current+1)%len(presets)]
+			msg = fmt.Sprintf("Лимит строк diff: %d\nКогда изменений больше лимита, бот покажет только первые строки и общий остаток.", chat.DiffMaxLines)
+		}
+
+		cb.bot.chatRepo.Save(chat)
+		if msg != "" {
+			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.diffKeyboard(chat))
+		}
+		return cb.bot.showDiffSettings(u, chat)
+	})
+}
+
+type callsMenuCb struct{ bot *Bot }
+
+func (cb *callsMenuCb) Prefix() string { return "calls_menu" }
+func (cb *callsMenuCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showCallsSettings(u, chat)
+	})
+}
+
+type callsShowCb struct{ bot *Bot }
+
+func (cb *callsShowCb) Prefix() string { return "calls_show" }
+func (cb *callsShowCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	return cb.bot.sendCallsShow(u)
+}
+
+type callsRefreshCb struct{ bot *Bot }
+
+func (cb *callsRefreshCb) Prefix() string { return "calls_refresh" }
+func (cb *callsRefreshCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	if cb.bot.parseFunc == nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("parse_not_available"))
+	}
+	go func() {
+		if err := cb.bot.parseFunc(); err != nil {
+			cb.bot.log.Error().Err(err).Msg("calls refresh parse error")
+			cb.bot.SendText(u.ChatID, "⚠️ Ошибка парсера")
+			return
+		}
+		cb.bot.SendText(u.ChatID, "✅ Звонки обновлены с сайта")
+	}()
+	return u.Bot.SendText(u.ChatID, "🔄 Обновление звонков...")
+}
+
+type callsSourceCb struct{ bot *Bot }
+
+func (cb *callsSourceCb) Prefix() string { return "calls_source:" }
+func (cb *callsSourceCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+
+	sourceStr := strings.TrimPrefix(u.Data, "calls_source:")
+	calls := cb.bot.cache.GetCalls()
+	calls.Active.Source = sourceStr
+
+	switch sourceStr {
+	case "site":
+		calls.Active.Schedule = calls.Site.Schedule
+	case "manual":
+		calls.Active.Schedule = calls.Manual.Schedule
+	case "config":
+		calls.Active.Schedule = cache.CallsSchedule{
+			Weekdays: cb.bot.cfg.Timetable.Weekdays,
+			Saturday: cb.bot.cfg.Timetable.Saturday,
+		}
+	}
+	calls.Active.Hash = sourceStr
+
+	cb.bot.cacheMu.Lock()
+	cb.bot.cache.SetCallsFromCache(calls)
+	cb.bot.cacheMu.Unlock()
+
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showCallsSettings(u, chat)
+	})
+}
+
+type callsSourceResetCb struct{ bot *Bot }
+
+func (cb *callsSourceResetCb) Prefix() string { return "calls_source_reset" }
+func (cb *callsSourceResetCb) Handler(ctx context.Context, u *Update) error {
+	cb.bot.AnswerCallback(u.Callback.ID, "")
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	calls := cb.bot.cache.GetCalls()
+	calls.Active = cache.CallsActive{
+		Schedule: calls.Site.Schedule,
+		Source:   "site",
+		Hash:     calls.Site.Hash,
+	}
+	cb.bot.cacheMu.Lock()
+	cb.bot.cache.SetCallsFromCache(calls)
+	cb.bot.cacheMu.Unlock()
+
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showCallsSettings(u, chat)
+	})
 }
