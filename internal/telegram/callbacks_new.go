@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
@@ -30,15 +31,20 @@ func (cb *diffToggleCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	field := strings.TrimPrefix(u.Data, "diff_toggle:")
+	var msg string
 	switch field {
 	case "diff_enabled":
 		chat.DiffEnabled = !chat.DiffEnabled
+		msg = fmt.Sprintf("Включить раздел \"Что изменилось\"? Установлено: '%s'\nЕсли отключено, кнопки/блоки diff пользователю не показываются.", yesNoStr(chat.DiffEnabled))
 	case "diff_auto_in_week":
 		chat.DiffAutoInWeek = !chat.DiffAutoInWeek
+		msg = fmt.Sprintf("Показывать diff после /week? Установлено: '%s'\nЕсли включено, после недельного расписания бот сразу добавляет блок изменений.", yesNoStr(chat.DiffAutoInWeek))
 	case "diff_auto_in_updates":
 		chat.DiffAutoInUpdates = !chat.DiffAutoInUpdates
+		msg = fmt.Sprintf("Показывать diff в уведомлениях? Установлено: '%s'\nЕсли включено, в автоуведомлениях о сменах будет краткий список изменений.", yesNoStr(chat.DiffAutoInUpdates))
 	case "diff_show_before_after":
 		chat.DiffShowBeforeAfter = !chat.DiffShowBeforeAfter
+		msg = fmt.Sprintf("Показывать старое -> новое для изменённых пар? Установлено: '%s'\nЕсли включено, бот покажет обе версии пары в строках с типом \"~\".", yesNoStr(chat.DiffShowBeforeAfter))
 	case "diff_max_lines":
 		presets := [4]int{10, 20, 30, 50}
 		current := 20
@@ -49,9 +55,13 @@ func (cb *diffToggleCb) Handler(ctx context.Context, u *Update) error {
 			}
 		}
 		chat.DiffMaxLines = presets[(current+1)%len(presets)]
+		msg = fmt.Sprintf("Лимит строк diff: %d\nКогда изменений больше лимита, бот покажет только первые строки и общий остаток.", chat.DiffMaxLines)
 	}
 
 	cb.bot.chatRepo.Save(chat)
+	if msg != "" {
+		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.diffKeyboard(chat))
+	}
 	return cb.bot.showDiffSettings(u, chat)
 }
 

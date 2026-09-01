@@ -11,6 +11,20 @@ import (
 	"github.com/mymmrac/telego"
 )
 
+func onOffStr(v bool) string {
+	if v {
+		return "включено"
+	}
+	return "выключено"
+}
+
+func yesNoStr(v bool) string {
+	if v {
+		return "да"
+	}
+	return "нет"
+}
+
 type dayCb struct{ bot *Bot }
 
 func (cb *dayCb) Prefix() string { return "day" }
@@ -380,18 +394,26 @@ func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	field := strings.TrimPrefix(u.Data, "notice_toggle:")
+	var msg string
 	switch field {
 	case "notice_changes":
 		chat.NoticeChanges = !chat.NoticeChanges
+		msg = fmt.Sprintf("Оповещение о добавлении нового дня: %s", onOffStr(chat.NoticeChanges))
 	case "notice_next_week":
 		chat.NoticeNextWeek = !chat.NoticeNextWeek
+		msg = fmt.Sprintf("Оповещение о добавлении новой недели: %s", onOffStr(chat.NoticeNextWeek))
 	case "notice_calls":
 		chat.NoticeCalls = !chat.NoticeCalls
+		msg = fmt.Sprintf("Оповещение об изменениях расписания звонков: %s", onOffStr(chat.NoticeCalls))
 	case "notice_parser_errors":
 		chat.NoticeParserErrors = !chat.NoticeParserErrors
+		msg = fmt.Sprintf("Оповещение об ошибке парсера: %s", onOffStr(chat.NoticeParserErrors))
 	}
 
 	cb.bot.chatRepo.Save(chat)
+	if msg != "" {
+		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.noticeKeyboard(chat))
+	}
 	return cb.bot.showNoticeSettings(u, chat)
 }
 
@@ -406,16 +428,23 @@ func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	field := strings.TrimPrefix(u.Data, "view_toggle:")
+	var msg string
 	switch field {
 	case "hide_past_days":
 		chat.HidePastDays = !chat.HidePastDays
+		msg = fmt.Sprintf("Скрывать прошедшие дни? Установлено: '%s'", yesNoStr(chat.HidePastDays))
 	case "show_parser_time":
 		chat.ShowParserTime = !chat.ShowParserTime
+		msg = fmt.Sprintf("Отображать в сообщении время последней загрузки расписания? Установлено: '%s'", yesNoStr(chat.ShowParserTime))
 	case "show_hints":
 		chat.ShowHints = !chat.ShowHints
+		msg = fmt.Sprintf("Показывать ли подсказки под расписанием? Установлено: '%s'", yesNoStr(chat.ShowHints))
 	}
 
 	cb.bot.chatRepo.Save(chat)
+	if msg != "" {
+		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.viewKeyboard(chat))
+	}
 	return cb.bot.showViewSettings(u, chat)
 }
 
