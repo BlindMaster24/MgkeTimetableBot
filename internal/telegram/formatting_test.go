@@ -676,8 +676,9 @@ func TestKeyboardFormatter(t *testing.T) {
 		t.Fatal("expected non-nil keyboard")
 	}
 	count := len(kb.InlineKeyboard)
-	if count < len(formatter.AllFormatters)+1 {
-		t.Errorf("expected at least %d rows, got %d", len(formatter.AllFormatters)+1, count)
+	expectedRows := (len(formatter.AllFormatters)+1)/2 + 1
+	if count != expectedRows {
+		t.Errorf("expected %d rows, got %d", expectedRows, count)
 	}
 	text := ""
 	for _, row := range kb.InlineKeyboard {

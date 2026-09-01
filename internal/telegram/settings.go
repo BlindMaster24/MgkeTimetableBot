@@ -52,15 +52,21 @@ func noYesSmile(v bool, label string) string {
 
 func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	var rows [][]telego.InlineKeyboardButton
+	var currentRow []telego.InlineKeyboardButton
 	for i, f := range formatter.AllFormatters {
 		label := f.Label()
 		if chat.Formatter == i {
 			label += " (выбран)"
 		}
 		cbData := fmt.Sprintf("fmt_select:%d", i)
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: label, CallbackData: cbData},
-		})
+		currentRow = append(currentRow, telego.InlineKeyboardButton{Text: label, CallbackData: cbData})
+		if (i+1)%2 == 0 {
+			rows = append(rows, currentRow)
+			currentRow = nil
+		}
+	}
+	if len(currentRow) > 0 {
+		rows = append(rows, currentRow)
 	}
 	rows = append(rows, []telego.InlineKeyboardButton{
 		{Text: "Меню настроек", CallbackData: "settings"},

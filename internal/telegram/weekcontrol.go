@@ -14,12 +14,16 @@ import (
 
 func removePastDays(days []map[string]any) []map[string]any {
 	now := time.Now()
-	today := now.Format("02.01.2006")
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	startIdx := -1
 	for i, day := range days {
 		dateStr, _ := day["day"].(string)
-		if dateStr >= today {
+		dayTime, err := time.Parse("02.01.2006", dateStr)
+		if err != nil {
+			continue
+		}
+		if !dayTime.Before(today) {
 			startIdx = i
 			break
 		}
@@ -33,7 +37,7 @@ func removePastDays(days []map[string]any) []map[string]any {
 
 	if len(result) > 0 {
 		firstDay, _ := result[0]["day"].(string)
-		if firstDay == today {
+		if firstDay == today.Format("02.01.2006") {
 			lessons, _ := result[0]["lessons"].([]any)
 			if len(lessons) == 0 && len(result) > 1 {
 				result = result[1:]

@@ -26,6 +26,12 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	cfg.Timetable.Saturday = [][2][2]string{
 		{{"09:00", "09:45"}, {"09:55", "10:40"}},
 	}
+	callsEnabled := true
+	cfg.Parser.Calls = &struct {
+		Enabled    bool `yaml:"enabled"`
+		PreferSite bool `yaml:"prefer_site"`
+		Notify     bool `yaml:"notify"`
+	}{Enabled: callsEnabled}
 
 	log := logger.New("error", nil)
 	loc := i18n.New("ru")
@@ -376,7 +382,7 @@ func TestE2E_MainMenuKeyboard_StudentFull(t *testing.T) {
 	if !strings.Contains(texts, "👩‍🎓 Группа") {
 		t.Error("missing fast Group button")
 	}
-	if !strings.Contains(texts, "👩‍🏫 Преподаватель") {
+	if !strings.Contains(texts, "Препод.") && !strings.Contains(texts, "Преподаватель") {
 		t.Error("missing fast Teacher button")
 	}
 }

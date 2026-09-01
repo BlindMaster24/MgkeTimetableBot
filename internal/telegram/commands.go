@@ -640,33 +640,49 @@ func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 		}
 	}
 
-	if chat.Mode != "" && chat.ShowFastGroup {
+	showFast := chat.Mode == ModeStudent || chat.Mode == ModeParent || chat.Mode == ModeTeacher
+	canShowCalls := chat.ShowCalls && b.cfg.Parser.Calls != nil && b.cfg.Parser.Calls.Enabled
+
+	if showFast && chat.ShowFastGroup {
 		rows = append(rows, []telego.InlineKeyboardButton{
 			{Text: b.loc("button_group"), CallbackData: "group"},
 		})
 	}
 
-	if chat.ShowCalls {
+	if chat.ShowAbout && canShowCalls {
 		rows = append(rows, []telego.InlineKeyboardButton{
 			{Text: b.loc("button_calls"), CallbackData: "calls"},
 		})
 	}
 
-	if chat.Mode != "" && chat.ShowFastTeacher {
+	if showFast && chat.ShowFastTeacher {
+		teacherLabel := b.loc("button_teacher")
+		if chat.ShowAbout && canShowCalls && chat.ShowFastGroup {
+			teacherLabel = "👩‍🏫 Препод."
+		}
 		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: b.loc("button_teacher"), CallbackData: "teacher"},
+			{Text: teacherLabel, CallbackData: "teacher"},
 		})
 	}
 
-	var bottomRow []telego.InlineKeyboardButton
-	if chat.ShowAbout {
-		bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: b.loc("button_about"), CallbackData: "about"})
+	var level3 []telego.InlineKeyboardButton
+	if !chat.ShowAbout && canShowCalls {
+		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_calls"), CallbackData: "calls"})
 	}
-	bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: b.loc("button_settings"), CallbackData: "settings"})
+	if b.cfg.Google.OAuth.ClientID != "" {
+		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_google_calendar"), CallbackData: "google_calendar"})
+	}
+	if b.cfg.Calendar.ICS.Enabled {
+		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_ics"), CallbackData: "ics"})
+	}
+	level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_settings"), CallbackData: "settings"})
 	if chat.Mode == ModeTeacher && chat.Teacher != "" {
-		bottomRow = append(bottomRow, telego.InlineKeyboardButton{Text: "📚 История", CallbackData: "history"})
+		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_history"), CallbackData: "history"})
 	}
-	rows = append(rows, bottomRow)
+	if chat.ShowAbout {
+		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_about"), CallbackData: "about"})
+	}
+	rows = append(rows, level3)
 
 	if len(rows) == 0 {
 		rows = append(rows, []telego.InlineKeyboardButton{
