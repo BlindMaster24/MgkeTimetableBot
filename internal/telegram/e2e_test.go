@@ -620,13 +620,13 @@ func TestE2E_CurrentSettings(t *testing.T) {
 	if !strings.Contains(text, "Режим чата: student") {
 		t.Error("missing mode")
 	}
-	if !strings.Contains(text, "Группа: 100") {
+	if !strings.Contains(text, "Выбранная группа: 100") {
 		t.Error("missing group")
 	}
 	if !strings.Contains(text, "да") && !strings.Contains(text, "нет") {
 		t.Error("missing formatter name")
 	}
-	if !strings.Contains(text, "О добавлении новой недели: нет") {
+	if !strings.Contains(text, "Оповещение о добавлении новой недели: нет") {
 		t.Error("missing notice_next_week display")
 	}
 }

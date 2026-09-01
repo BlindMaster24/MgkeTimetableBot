@@ -129,51 +129,39 @@ func (b *Bot) showSchedulesSettings(u *Update, chat *Chat) error {
 }
 
 func (b *Bot) showCurrentSettings(u *Update, chat *Chat) error {
-	onOff := func(v bool) string {
+	yesNo := func(v bool) string {
 		if v {
-			return "✅"
+			return "да"
 		}
-		return "🚫"
-	}
-	mode := string(chat.Mode)
-	if mode == "" {
-		mode = "не задан"
-	}
-	group := chat.Group
-	if group == "" {
-		group = "—"
-	}
-	teacher := chat.Teacher
-	if teacher == "" {
-		teacher = "—"
-	}
-	formatterName := "Структурированный"
-	if chat.Formatter >= 0 && chat.Formatter < len(formatter.AllFormatters) {
-		formatterName = formatter.AllFormatters[chat.Formatter].Label()
+		return "нет"
 	}
 	lines := []string{
-		"<b>Текущие настройки:</b>",
+		fmt.Sprintf(`Показывать кнопку расписания "📄 На день": %s`, yesNo(chat.ShowDaily)),
+		fmt.Sprintf(`Показывать кнопку расписания "📑 На неделю": %s`, yesNo(chat.ShowWeekly)),
+		fmt.Sprintf(`Показывать кнопку "🕐 Звонки": %s`, yesNo(chat.ShowCalls)),
+		fmt.Sprintf(`Показывать кнопку "💡 О боте": %s`, yesNo(chat.ShowAbout)),
+		fmt.Sprintf(`Показывать кнопку "👩‍🎓 Группа": %s`, yesNo(chat.ShowFastGroup)),
+		fmt.Sprintf(`Показывать кнопку "👩‍🏫 Преподаватель": %s`, yesNo(chat.ShowFastTeacher)),
 		"",
-		fmt.Sprintf("Режим: %s", mode),
-		fmt.Sprintf("Группа: %s", group),
-		fmt.Sprintf("Преподаватель: %s", teacher),
-		fmt.Sprintf("Формат: %s", formatterName),
+		fmt.Sprintf("Скрывать прошедшие дни в расписании на неделю: %s", yesNo(chat.HidePastDays)),
+		fmt.Sprintf("Отображать в сообщении время последней загрузки расписания: %s", yesNo(chat.ShowParserTime)),
+		fmt.Sprintf("Подсказки под расписанием: %s", yesNo(chat.ShowHints)),
+		fmt.Sprintf(`Раздел "Что изменилось": %s`, yesNo(chat.DiffEnabled)),
+		fmt.Sprintf("Diff после /week: %s", yesNo(chat.DiffAutoInWeek)),
+		fmt.Sprintf("Diff в уведомлениях: %s", yesNo(chat.DiffAutoInUpdates)),
+		fmt.Sprintf(`Показывать старое -> новое: %s`, yesNo(chat.DiffShowBeforeAfter)),
+		fmt.Sprintf("Лимит строк diff: %d", chat.DiffMaxLines),
 		"",
-		fmt.Sprintf("📄 На день: %s", onOff(chat.ShowDaily)),
-		fmt.Sprintf("📑 На неделю: %s", onOff(chat.ShowWeekly)),
-		fmt.Sprintf("🕐 Звонки: %s", onOff(chat.ShowCalls)),
-		fmt.Sprintf("💡 О боте: %s", onOff(chat.ShowAbout)),
-		fmt.Sprintf("👩‍🎓 Группа (быстрый): %s", onOff(chat.ShowFastGroup)),
-		fmt.Sprintf("👩‍🏫 Преподаватель (быстрый): %s", onOff(chat.ShowFastTeacher)),
+		fmt.Sprintf("Оповещение о добавлении нового дня: %s", yesNo(chat.NoticeChanges)),
+		fmt.Sprintf("Оповещение о добавлении новой недели: %s", yesNo(chat.NoticeNextWeek)),
+		fmt.Sprintf("Оповещение об изменении звонков: %s", yesNo(chat.NoticeCalls)),
+		fmt.Sprintf("Оповещение об ошибке парсера: %s", yesNo(chat.NoticeParserErrors)),
 		"",
-		fmt.Sprintf("Скрывать прошедшие дни: %s", onOff(chat.HidePastDays)),
-		fmt.Sprintf("Показывать время загрузки: %s", onOff(chat.ShowParserTime)),
-		fmt.Sprintf("Подсказки: %s", onOff(chat.ShowHints)),
-		"",
-		fmt.Sprintf("Оповещения — Дни: %s | Неделя: %s | Звонки: %s",
-			onOff(chat.NoticeChanges), onOff(chat.NoticeNextWeek), onOff(chat.NoticeCalls)),
-		"",
-		fmt.Sprintf("Diff: %s (лимит: %d)", onOff(chat.DiffEnabled), chat.DiffMaxLines),
+		"~~~ Системные (отладочная информация) ~~~",
+		fmt.Sprintf("Режим чата: %s", string(chat.Mode)),
+		fmt.Sprintf("Выбранная группа: %s", chat.Group),
+		fmt.Sprintf("Выбранный учитель: %s", chat.Teacher),
+		fmt.Sprintf("Разрешено ли отправлять боту сообщения: %s", yesNo(chat.AllowSendMess)),
 	}
 
 	kb := &telego.InlineKeyboardMarkup{
@@ -398,25 +386,25 @@ func (b *Bot) currentSettingsText(chat *Chat) string {
 		fmt.Sprintf(`Показывать кнопку "👩‍🎓 Группа": %s`, yesNo(chat.ShowFastGroup)),
 		fmt.Sprintf(`Показывать кнопку "👩‍🏫 Преподаватель": %s`, yesNo(chat.ShowFastTeacher)),
 		"",
-		fmt.Sprintf("Скрывать прошедшие дни: %s", yesNo(chat.HidePastDays)),
-		fmt.Sprintf("Время последней загрузки расписания: %s", yesNo(chat.ShowParserTime)),
+		fmt.Sprintf("Скрывать прошедшие дни в расписании на неделю: %s", yesNo(chat.HidePastDays)),
+		fmt.Sprintf("Отображать в сообщении время последней загрузки расписания: %s", yesNo(chat.ShowParserTime)),
 		fmt.Sprintf("Подсказки под расписанием: %s", yesNo(chat.ShowHints)),
 		fmt.Sprintf(`Раздел "Что изменилось": %s`, yesNo(chat.DiffEnabled)),
 		fmt.Sprintf("Diff после /week: %s", yesNo(chat.DiffAutoInWeek)),
 		fmt.Sprintf("Diff в уведомлениях: %s", yesNo(chat.DiffAutoInUpdates)),
-		fmt.Sprintf("Показывать старое -> новое: %s", yesNo(chat.DiffShowBeforeAfter)),
+		fmt.Sprintf(`Показывать старое -> новое: %s`, yesNo(chat.DiffShowBeforeAfter)),
 		fmt.Sprintf("Лимит строк diff: %d", chat.DiffMaxLines),
 		"",
-		fmt.Sprintf("О добавлении нового дня: %s", yesNo(chat.NoticeChanges)),
-		fmt.Sprintf("О добавлении новой недели: %s", yesNo(chat.NoticeNextWeek)),
-		fmt.Sprintf("Об изменении звонков: %s", yesNo(chat.NoticeCalls)),
-		fmt.Sprintf("Об ошибке парсера: %s", yesNo(chat.NoticeParserErrors)),
+		fmt.Sprintf("Оповещение о добавлении нового дня: %s", yesNo(chat.NoticeChanges)),
+		fmt.Sprintf("Оповещение о добавлении новой недели: %s", yesNo(chat.NoticeNextWeek)),
+		fmt.Sprintf("Оповещение об изменении звонков: %s", yesNo(chat.NoticeCalls)),
+		fmt.Sprintf("Оповещение об ошибке парсера: %s", yesNo(chat.NoticeParserErrors)),
 		"",
-		"~~~ Системные ~~~",
+		"~~~ Системные (отладочная информация) ~~~",
 		fmt.Sprintf("Режим чата: %s", string(chat.Mode)),
-		fmt.Sprintf("Группа: %s", chat.Group),
-		fmt.Sprintf("Преподаватель: %s", chat.Teacher),
-		fmt.Sprintf("Разрешено отправлять: %s", yesNo(chat.AllowSendMess)),
+		fmt.Sprintf("Выбранная группа: %s", chat.Group),
+		fmt.Sprintf("Выбранный учитель: %s", chat.Teacher),
+		fmt.Sprintf("Разрешено ли отправлять боту сообщения: %s", yesNo(chat.AllowSendMess)),
 	}
 	return strings.Join(lines, "\n")
 }
