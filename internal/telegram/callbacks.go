@@ -274,27 +274,33 @@ func (cb *btnToggleCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	field := strings.TrimPrefix(u.Data, "btn_toggle:")
+	var msg string
 	switch field {
 	case "show_daily":
 		chat.ShowDaily = !chat.ShowDaily
+		msg = fmt.Sprintf("Показывать кнопку \"📄 На день\"? Установлено: '%s'", yesNoStr(chat.ShowDaily))
 	case "show_weekly":
 		chat.ShowWeekly = !chat.ShowWeekly
+		msg = fmt.Sprintf("Показывать кнопку \"📑 На неделю\"? Установлено: '%s'", yesNoStr(chat.ShowWeekly))
 	case "show_calls":
 		chat.ShowCalls = !chat.ShowCalls
+		msg = fmt.Sprintf("Показывать кнопку \"🕐 Звонки\"? Установлено: '%s'", yesNoStr(chat.ShowCalls))
 	case "show_about":
 		chat.ShowAbout = !chat.ShowAbout
+		msg = fmt.Sprintf("Показывать кнопку \"💡 О боте\"? Установлено: '%s'", yesNoStr(chat.ShowAbout))
 	case "show_fast_group":
 		chat.ShowFastGroup = !chat.ShowFastGroup
+		msg = fmt.Sprintf("Показывать кнопку \"👩‍🎓 Группа\"? Установлено: '%s'", yesNoStr(chat.ShowFastGroup))
 	case "show_fast_teacher":
 		chat.ShowFastTeacher = !chat.ShowFastTeacher
+		msg = fmt.Sprintf("Показывать кнопку \"👩‍🏫 Преподаватель\"? Установлено: '%s'", yesNoStr(chat.ShowFastTeacher))
 	}
 
 	cb.bot.chatRepo.Save(chat)
-	if msg, ok := u.Callback.Message.(*telego.Message); ok && msg != nil {
-		return u.Bot.EditMessageText(u.ChatID, msg.MessageID,
-			"Настройка кнопок", cb.bot.buttonsKeyboard(chat))
+	if msg != "" {
+		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.buttonsKeyboard(chat))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка кнопок", cb.bot.buttonsKeyboard(chat))
+	return cb.bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", cb.bot.buttonsKeyboard(chat))
 }
 
 type btnMenuCb struct{ bot *Bot }
