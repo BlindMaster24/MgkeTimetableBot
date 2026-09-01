@@ -849,7 +849,7 @@ func TestE2E_AllKeyboardBuildersWork(t *testing.T) {
 	}
 
 	kb = b.settingsKeyboardFull(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 6 {
+	if kb == nil || len(kb.InlineKeyboard) < 5 {
 		t.Error("settingsKeyboardFull broken")
 	}
 

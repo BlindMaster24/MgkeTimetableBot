@@ -130,8 +130,6 @@ func (b *Bot) subscriptionsKeyboard() *telego.InlineKeyboardMarkup {
 			{
 				{Text: "📋 Мои подписки", CallbackData: "subs_list"},
 				{Text: "❌ Удалить подписку", CallbackData: "subs_remove"},
-			},
-			{
 				{Text: "🧪 Проверить", CallbackData: "subs_check"},
 			},
 			{

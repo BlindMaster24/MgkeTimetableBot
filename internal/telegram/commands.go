@@ -643,26 +643,22 @@ func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	showFast := chat.Mode == ModeStudent || chat.Mode == ModeParent || chat.Mode == ModeTeacher
 	canShowCalls := chat.ShowCalls && b.cfg.Parser.Calls != nil && b.cfg.Parser.Calls.Enabled
 
+	var level2 []telego.InlineKeyboardButton
 	if showFast && chat.ShowFastGroup {
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: b.loc("button_group"), CallbackData: "group"},
-		})
+		level2 = append(level2, telego.InlineKeyboardButton{Text: b.loc("button_group"), CallbackData: "group"})
 	}
-
 	if chat.ShowAbout && canShowCalls {
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: b.loc("button_calls"), CallbackData: "calls"},
-		})
+		level2 = append(level2, telego.InlineKeyboardButton{Text: b.loc("button_calls"), CallbackData: "calls"})
 	}
-
 	if showFast && chat.ShowFastTeacher {
 		teacherLabel := b.loc("button_teacher")
 		if chat.ShowAbout && canShowCalls && chat.ShowFastGroup {
 			teacherLabel = "👩‍🏫 Препод."
 		}
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: teacherLabel, CallbackData: "teacher"},
-		})
+		level2 = append(level2, telego.InlineKeyboardButton{Text: teacherLabel, CallbackData: "teacher"})
+	}
+	if len(level2) > 0 {
+		rows = append(rows, level2)
 	}
 
 	var level3 []telego.InlineKeyboardButton

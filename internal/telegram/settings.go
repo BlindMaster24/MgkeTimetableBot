@@ -15,10 +15,8 @@ func (b *Bot) settingsKeyboardFull(chat *Chat) *telego.InlineKeyboardMarkup {
 			{{Text: b.loc("button_setup"), CallbackData: "setup"}},
 			{{Text: "🗓️ Управление расписаниями", CallbackData: "schedules_menu"}},
 			{{Text: "⌨️ Кнопки", CallbackData: "btn_menu"}, {Text: "📃 Форматировщик", CallbackData: "fmt_menu"}},
-			{{Text: "🔊 Оповещения", CallbackData: "notice_menu"}, {Text: "🔔 Подписки", CallbackData: "subs_menu"}},
-			{{Text: "🖼️ Отображение", CallbackData: "view_menu"}, {Text: "📊 Сравнение", CallbackData: "diff_menu"}},
-			{{Text: "Показать текущие", CallbackData: "current_settings"}},
-			{{Text: "Главное меню", CallbackData: "main_menu"}},
+			{{Text: "🔊 Оповещения", CallbackData: "notice_menu"}, {Text: "🔔 Подписки", CallbackData: "subs_menu"}, {Text: "🖼️ Отображение", CallbackData: "view_menu"}, {Text: "📊 Сравнение", CallbackData: "diff_menu"}},
+			{{Text: "Показать текущие", CallbackData: "current_settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
 }
