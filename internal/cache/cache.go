@@ -123,6 +123,18 @@ func (c *RaspCache) GetCalls() CallsCache {
 	return c.Calls
 }
 
+func (c *RaspCache) GetGroupsUpdateTime() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.UnixMilli(c.Groups.Update)
+}
+
+func (c *RaspCache) GetTeachersUpdateTime() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.UnixMilli(c.Teachers.Update)
+}
+
 func (c *RaspCache) SetGroups(groups map[string]any, hash string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
