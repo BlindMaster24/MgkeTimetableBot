@@ -142,6 +142,12 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&pingCmd{bot: b})
 	b.RegisterCommand(&icsCmd{bot: b})
 	b.RegisterCommand(&subscriptionsTestCmd{bot: b})
+	b.RegisterCommand(&archiveCmd{bot: b})
+	b.RegisterCommand(&endingsCmd{bot: b})
+	b.RegisterCommand(&chatCmd{bot: b})
+	b.RegisterCommand(&idCmd{bot: b})
+	b.RegisterCommand(&errorCmd{bot: b})
+	b.RegisterCommand(&testCmd{bot: b})
 
 	b.RegisterCallback(&dayCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})

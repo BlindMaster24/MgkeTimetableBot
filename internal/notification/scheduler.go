@@ -15,16 +15,16 @@ type Sender interface {
 	SendText(chatID int64, text string) error
 }
 
-type ChatFinder interface {
-	FindAllWithNotifications(service string) ([]*ChatInfo, error)
-}
-
 type ChatInfo struct {
 	ID            int64
 	Mode          string
 	Group         string
 	Teacher       string
 	NoticeChanges bool
+}
+
+type ChatFinder interface {
+	FindAllWithNotifications(service string) ([]*ChatInfo, error)
 }
 
 type Scheduler struct {
