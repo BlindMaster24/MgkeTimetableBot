@@ -127,5 +127,10 @@ func (c *compareGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	if len(groups) == 0 {
 		return u.Bot.SendText(u.ChatID, "Данные с сервера ещё не загружены, ожидайте...")
 	}
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err == nil {
+		chat.Scene = "compare_groups_input"
+		c.bot.chatRepo.Save(chat)
+	}
 	return u.Bot.SendText(u.ChatID, "Введите номера двух групп через пробел (например: 101 102)")
 }

@@ -330,3 +330,23 @@ func (c *RaspCache) SetCallsFromCache(calls CallsCache) {
 	defer c.mu.Unlock()
 	c.Calls = calls
 }
+
+func (c *RaspCache) SetCallsManual(weekdays, saturday [][2][2]string, reason string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now().UnixMilli()
+	manuallySet := CallsSource{
+		Schedule:  CallsSchedule{Weekdays: weekdays, Saturday: saturday},
+		UpdatedAt: now,
+		Hash:      hashSchedule(Schedule{Weekdays: weekdays, Saturday: saturday}),
+	}
+	c.Calls.Manual = manuallySet
+	c.Calls.Active = CallsActive{
+		Schedule:  manuallySet.Schedule,
+		UpdatedAt: now,
+		Source:    "manual",
+		Hash:      manuallySet.Hash,
+	}
+	c.Calls.Changed = now
+}

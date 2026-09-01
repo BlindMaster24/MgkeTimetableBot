@@ -512,6 +512,10 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	case "alias_add":
 		b.handleAliasAdd(ctx, u, chat)
 		return
+	case "compare_groups_input":
+		scene := &compareGroupsInputScene{bot: b}
+		scene.Handle(ctx, u, chat)
+		return
 	}
 
 	for _, cmd := range b.commands {

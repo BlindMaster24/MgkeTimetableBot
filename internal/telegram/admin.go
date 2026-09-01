@@ -183,16 +183,25 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 	sent := 0
 	failed := 0
 	total := len(chats)
-	rateLimiter := time.NewTicker(2400 * time.Millisecond)
-	defer rateLimiter.Stop()
-
+	sentTimestamps := make([]time.Time, 0, 25)
 	lastEdit := time.Now()
 
 	for i, chat := range chats {
+		now := time.Now()
+		if len(sentTimestamps) >= 25 {
+			oldest := sentTimestamps[0]
+			waitUntil := oldest.Add(60 * time.Second)
+			if waitUntil.After(now) {
+				time.Sleep(waitUntil.Sub(now))
+			}
+			sentTimestamps = sentTimestamps[1:]
+		}
+
 		if err := c.bot.SendText(chat.PeerID, text); err != nil {
 			failed++
 		} else {
 			sent++
+			sentTimestamps = append(sentTimestamps, time.Now())
 		}
 
 		if time.Since(lastEdit) >= 1*time.Second || i == total-1 {
@@ -207,10 +216,6 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 				Text:      editText,
 			})
 			lastEdit = time.Now()
-		}
-
-		if i < total-1 {
-			<-rateLimiter.C
 		}
 	}
 

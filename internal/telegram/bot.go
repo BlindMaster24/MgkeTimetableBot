@@ -139,6 +139,9 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&getGroupsCmd{bot: b})
 	b.RegisterCommand(&getTeachersCmd{bot: b})
 	b.RegisterCommand(&compareGroupsCmd{bot: b})
+	b.RegisterCommand(&pingCmd{bot: b})
+	b.RegisterCommand(&icsCmd{bot: b})
+	b.RegisterCommand(&subscriptionsTestCmd{bot: b})
 
 	b.RegisterCallback(&dayCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})

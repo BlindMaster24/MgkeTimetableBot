@@ -3,6 +3,8 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -10,9 +12,13 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/calendar"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
+	"github.com/mymmrac/telego"
 )
+
+const TelegramRateLimitPerMinute = 25
 
 type historyCmd struct{ bot *Bot }
 
@@ -389,5 +395,246 @@ func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	chat.Scene = ""
 	s.bot.chatRepo.Save(chat)
 
+	parsed := parseCallsInput(u.Text)
+	if parsed == nil {
+		return u.Bot.SendText(u.ChatID, "Неверный формат ввода. Попробуйте ещё раз.")
+	}
+	s.bot.cache.SetCallsManual(parsed.Weekdays, parsed.Saturday, u.Text)
+
 	return u.Bot.SendText(u.ChatID, "Расписание звонков обновлено вручную.")
+}
+
+type callsParsed struct {
+	Weekdays [][2][2]string
+	Saturday [][2][2]string
+}
+
+func parseCallsInput(text string) *callsParsed {
+	var weekdays, saturday [][2][2]string
+	var target *[][2][2]string
+
+	for _, rawLine := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "суббот") || strings.Contains(lower, "saturday") {
+			target = &saturday
+			continue
+		}
+		if strings.Contains(lower, "будн") || strings.Contains(lower, "weekday") {
+			target = &weekdays
+			continue
+		}
+		if target == nil {
+			target = &weekdays
+		}
+		row := parseCallRow(line)
+		if row != nil {
+			*target = append(*target, *row)
+		}
+	}
+
+	if len(weekdays) == 0 && len(saturday) == 0 {
+		return nil
+	}
+
+	return &callsParsed{Weekdays: weekdays, Saturday: saturday}
+}
+
+func parseCallRow(line string) *[2][2]string {
+	re := regexp.MustCompile(`\b(\d{1,2})[:.](\d{2})\b`)
+	matches := re.FindAllString(line, -1)
+	if len(matches) < 4 {
+		return nil
+	}
+	var row [2][2]string
+	for i := 0; i < 4; i++ {
+		parts := strings.Split(matches[i], ":")
+		if parts[0] != matches[i] {
+			parts = strings.Split(matches[i], ".")
+		}
+		hh := parts[0]
+		if len(hh) == 1 {
+			hh = "0" + hh
+		}
+		row[i/2][i%2] = hh + ":" + parts[1]
+	}
+	return &row
+}
+
+type pingCmd struct{ bot *Bot }
+
+func (c *pingCmd) Name() string        { return "/ping" }
+func (c *pingCmd) Description() string { return "Проверка работоспособности бота" }
+func (c *pingCmd) Handler(ctx context.Context, u *Update) error {
+	return u.Bot.SendText(u.ChatID, "pong")
+}
+
+type icsCmd struct{ bot *Bot }
+
+func (c *icsCmd) Name() string        { return "/ics" }
+func (c *icsCmd) Description() string { return "Экспорт расписания в .ics" }
+func (c *icsCmd) MatchText(text string) bool {
+	return text == "📅 ICS" || text == "/ics"
+}
+func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.cfg.Calendar.ICS.Enabled {
+		return u.Bot.SendText(u.ChatID, "ICS отключен в конфиге.")
+	}
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+
+	week := utils.WeekIndexFromDate(time.Now())
+	minIdx, maxIdx := week.WeekDayIndexRange()
+
+	switch chat.Mode {
+	case ModeStudent, ModeParent:
+		if chat.Group == "" {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+		}
+		return c.bot.buildAndSendICS(u, chat, "group", chat.Group, minIdx, maxIdx, week)
+	case ModeTeacher:
+		if chat.Teacher == "" {
+			return u.Bot.SendText(u.ChatID, c.bot.loc("need_teacher"))
+		}
+		return c.bot.buildAndSendICS(u, chat, "teacher", chat.Teacher, minIdx, maxIdx, week)
+	}
+
+	return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+}
+
+func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
+	archiveRepo, ok := bot.archive.(*archive.Repository)
+	if !ok || archiveRepo == nil {
+		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+	}
+
+	builder := calendar.NewICSBuilder()
+	weekNum := week.AcademicWeekNumber()
+
+	switch typeName {
+	case "group":
+		days, err := archiveRepo.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
+		if err != nil || len(days) == 0 {
+			return u.Bot.SendText(u.ChatID, "Нет расписания за текущую неделю.")
+		}
+		for _, d := range days {
+			builder.AddGroupDay(d, value)
+		}
+	case "teacher":
+		days, err := archiveRepo.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
+		if err != nil || len(days) == 0 {
+			return u.Bot.SendText(u.ChatID, "Нет расписания за текущую неделю.")
+		}
+		for _, d := range days {
+			builder.AddTeacherDay(d, value)
+		}
+	}
+
+	ics := builder.Build()
+	var filename string
+	switch typeName {
+	case "group":
+		filename = fmt.Sprintf("schedule-group-%s-week-%02d.ics", value, weekNum)
+	case "teacher":
+		filename = fmt.Sprintf("schedule-teacher-%s-week-%02d.ics", value, weekNum)
+	}
+
+	path := filepath.Join("./cache", filename)
+	if err := os.WriteFile(path, []byte(ics), 0644); err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка создания .ics файла.")
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения .ics файла.")
+	}
+	defer f.Close()
+
+	_, err = bot.client.SendDocument(context.Background(), &telego.SendDocumentParams{
+		ChatID: telego.ChatID{ID: u.ChatID},
+		Document: telego.InputFile{File: f},
+		Caption: fmt.Sprintf("📅 Расписание %s %s, учебная неделя №%d", typeName, value, weekNum),
+	})
+	return err
+}
+
+type subscriptionsTestCmd struct{ bot *Bot }
+
+func (c *subscriptionsTestCmd) Name() string        { return "/subscriptions_test" }
+func (c *subscriptionsTestCmd) Description() string { return "Тестовое уведомление по подпискам" }
+func (c *subscriptionsTestCmd) MatchText(text string) bool {
+	return text == "🧪 Проверить" || text == "/subscriptions_test"
+}
+func (c *subscriptionsTestCmd) Handler(ctx context.Context, u *Update) error {
+	list, _ := c.bot.chatRepo.GetSubscriptions(u.UserID)
+	if len(list) == 0 {
+		return u.Bot.SendText(u.ChatID, "Подписок нет.")
+	}
+
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+
+	chat.Scene = "sub_test_pick"
+	c.bot.chatRepo.Save(chat)
+
+	prompt := "Что проверить?\n1. Оповещение об изменении дня\n2. Оповещение о новой неделе\n3. Оба варианта\n\n" + c.bot.formatSubscriptionsList(list)
+	return u.Bot.SendText(u.ChatID, prompt)
+}
+
+type compareGroupsInputScene struct{ bot *Bot }
+
+func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
+	chat.Scene = ""
+	s.bot.chatRepo.Save(chat)
+
+	input := strings.TrimSpace(u.Text)
+	parts := strings.Fields(input)
+	if len(parts) < 2 {
+		return u.Bot.SendText(u.ChatID, "Введите два номера групп через пробел.")
+	}
+
+	group1, group2 := parts[0], parts[1]
+	groups := s.bot.cache.GetGroups()
+
+	if _, ok := groups[group1]; !ok {
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf("Группа %s не найдена.", group1))
+	}
+	if _, ok := groups[group2]; !ok {
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf("Группа %s не найдена.", group2))
+	}
+
+	data1, _ := groups[group1].(map[string]any)
+	data2, _ := groups[group2].(map[string]any)
+	days1 := extractDays(data1)
+	days2 := extractDays(data2)
+
+	dateSet1 := make(map[string]bool)
+	for _, d := range days1 {
+		dateSet1[fmt.Sprint(d["day"])] = true
+	}
+	dateSet2 := make(map[string]bool)
+	for _, d := range days2 {
+		dateSet2[fmt.Sprint(d["day"])] = true
+	}
+
+	var common []string
+	for date := range dateSet1 {
+		if dateSet2[date] {
+			common = append(common, date)
+		}
+	}
+
+	msg := fmt.Sprintf("Расписание %s: %d дней\nРасписание %s: %d дней\nСовпадающих дней: %d", group1, len(days1), group2, len(days2), len(common))
+	if len(common) > 0 {
+		msg += "\n\nСовпадающие дни: " + strings.Join(common, ", ")
+	}
+
+	return u.Bot.SendText(u.ChatID, msg)
 }
