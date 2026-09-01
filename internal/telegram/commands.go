@@ -342,7 +342,7 @@ func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 type buttonsCmd struct{ bot *Bot }
 
 func (c *buttonsCmd) Name() string        { return "/buttons" }
-func (c *buttonsCmd) Description() string { return "Настройка кнопок" }
+func (c *buttonsCmd) Description() string { return "Настройки кнопок бота" }
 func (c *buttonsCmd) MatchText(text string) bool {
 	return text == "⌨️ Кнопки"
 }
@@ -351,13 +351,13 @@ func (c *buttonsCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка кнопок", c.bot.buttonsKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", c.bot.buttonsKeyboard(chat))
 }
 
 type formatterCmd struct{ bot *Bot }
 
 func (c *formatterCmd) Name() string        { return "/formatter" }
-func (c *formatterCmd) Description() string { return "Выбор формата расписания" }
+func (c *formatterCmd) Description() string { return "Настройки форматировщика" }
 func (c *formatterCmd) MatchText(text string) bool {
 	return text == "📃 Форматировщик"
 }
@@ -366,7 +366,7 @@ func (c *formatterCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите формат расписания:", c.bot.formatterKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", c.bot.formatterKeyboard(chat))
 }
 
 type forceParseCmd struct{ bot *Bot }
@@ -422,7 +422,7 @@ func (c *apiCmd) Handler(ctx context.Context, u *Update) error {
 type diffCmd struct{ bot *Bot }
 
 func (c *diffCmd) Name() string        { return "/diff" }
-func (c *diffCmd) Description() string { return "Настройки diff" }
+func (c *diffCmd) Description() string { return "Настройки отображения изменений расписания" }
 func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -449,7 +449,7 @@ func (c *noticeCmd) Handler(ctx context.Context, u *Update) error {
 type viewCmd struct{ bot *Bot }
 
 func (c *viewCmd) Name() string        { return "/view" }
-func (c *viewCmd) Description() string { return "Настройки отображения" }
+func (c *viewCmd) Description() string { return "Настройки отображения расписания" }
 func (c *viewCmd) MatchText(text string) bool {
 	return text == "🖼️ Отображение"
 }

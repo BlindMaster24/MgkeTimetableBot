@@ -74,11 +74,11 @@ func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 }
 
 func (b *Bot) showNoticeSettings(u *Update, chat *Chat) error {
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка оповещений:", b.noticeKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки оповещений.", b.noticeKeyboard(chat))
 }
 
 func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки отображения:", b.viewKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки отображения.", b.viewKeyboard(chat))
 }
 
 func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
@@ -96,7 +96,7 @@ func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройки \"Что изменилось\":", kb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настроек раздела \"Что изменилось\".", kb)
 }
 
 func (b *Bot) showDiffAdvancedSettings(u *Update, chat *Chat) error {
@@ -115,7 +115,7 @@ func (b *Bot) showDiffAdvancedSettings(u *Update, chat *Chat) error {
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Расширенные настройки \"Что изменилось\":", kb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Расширенные настройки раздела \"Что изменилось\".", kb)
 }
 
 func (b *Bot) showSchedulesSettings(u *Update, chat *Chat) error {

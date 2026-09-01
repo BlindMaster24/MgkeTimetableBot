@@ -31,7 +31,7 @@
   "multiple_teachers_found": "Найдено несколько преподавателей.\nКакой именно нужен?\n\n{{.Teachers}}",
   "no_lessons": "Пар нет",
   "no_timetable": "Нет расписания для отображения",
-  "settings_menu": "Настройки",
+  "settings_menu": "Вы перешли в меню настроек.",
   "main_menu": "Главное меню",
   "menu_settings": "Меню настроек",
   "button_day": "📄 На день",

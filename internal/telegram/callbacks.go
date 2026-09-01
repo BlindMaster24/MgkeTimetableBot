@@ -304,7 +304,7 @@ func (cb *fmtMenuCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите формат расписания:", cb.bot.formatterKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
 }
 
 type fmtSelectCb struct{ bot *Bot }
@@ -330,7 +330,7 @@ func (cb *fmtSelectCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.chatRepo.Save(chat)
 	}
 
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите формат расписания:", cb.bot.formatterKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
 }
 
 type noticeMenuCb struct{ bot *Bot }
