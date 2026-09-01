@@ -30,11 +30,9 @@ type dayCb struct{ bot *Bot }
 func (cb *dayCb) Prefix() string { return "day" }
 func (cb *dayCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return cb.bot.showDaySchedule(u, chat)
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showDaySchedule(u, chat)
+	})
 }
 
 type weekCb struct{ bot *Bot }
@@ -42,11 +40,9 @@ type weekCb struct{ bot *Bot }
 func (cb *weekCb) Prefix() string { return "week" }
 func (cb *weekCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return cb.bot.showWeekSchedule(u, chat)
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showWeekSchedule(u, chat)
+	})
 }
 
 type callsCb struct{ bot *Bot }
@@ -54,12 +50,10 @@ type callsCb struct{ bot *Bot }
 func (cb *callsCb) Prefix() string { return "calls" }
 func (cb *callsCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	cb.bot.showCallsFull(u, chat)
-	return nil
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		cb.bot.showCallsFull(u, chat)
+		return nil
+	})
 }
 
 type callsFullCb struct{ bot *Bot }
@@ -67,12 +61,10 @@ type callsFullCb struct{ bot *Bot }
 func (cb *callsFullCb) Prefix() string { return "calls_full" }
 func (cb *callsFullCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	cb.bot.showCallsFullFull(u, chat)
-	return nil
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		cb.bot.showCallsFullFull(u, chat)
+		return nil
+	})
 }
 
 type imageCb struct{ bot *Bot }
@@ -248,11 +240,9 @@ type settingsCb struct{ bot *Bot }
 func (cb *settingsCb) Prefix() string { return "settings" }
 func (cb *settingsCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("settings_menu"), cb.bot.settingsKeyboardFull(chat))
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("settings_menu"), cb.bot.settingsKeyboardFull(chat))
+	})
 }
 
 type icsCb struct{ bot *Bot }
@@ -268,10 +258,7 @@ type btnToggleCb struct{ bot *Bot }
 func (cb *btnToggleCb) Prefix() string { return "btn_toggle:" }
 func (cb *btnToggleCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
+	return withChat(cb.bot, u, func(chat *Chat) error {
 
 	field := strings.TrimPrefix(u.Data, "btn_toggle:")
 	var msg string
@@ -301,6 +288,7 @@ func (cb *btnToggleCb) Handler(ctx context.Context, u *Update) error {
 		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.buttonsKeyboard(chat))
 	}
 	return cb.bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", cb.bot.buttonsKeyboard(chat))
+	})
 }
 
 type btnMenuCb struct{ bot *Bot }
@@ -308,11 +296,9 @@ type btnMenuCb struct{ bot *Bot }
 func (cb *btnMenuCb) Prefix() string { return "btn_menu" }
 func (cb *btnMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка кнопок", cb.bot.buttonsKeyboard(chat))
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка кнопок", cb.bot.buttonsKeyboard(chat))
+	})
 }
 
 type fmtMenuCb struct{ bot *Bot }
@@ -320,11 +306,9 @@ type fmtMenuCb struct{ bot *Bot }
 func (cb *fmtMenuCb) Prefix() string { return "fmt_menu" }
 func (cb *fmtMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
+	})
 }
 
 type fmtSelectCb struct{ bot *Bot }
@@ -332,10 +316,7 @@ type fmtSelectCb struct{ bot *Bot }
 func (cb *fmtSelectCb) Prefix() string { return "fmt_select:" }
 func (cb *fmtSelectCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
+	return withChat(cb.bot, u, func(chat *Chat) error {
 
 	idxStr := strings.TrimPrefix(u.Data, "fmt_select:")
 	idx := 0
@@ -351,6 +332,7 @@ func (cb *fmtSelectCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
+	})
 }
 
 type noticeMenuCb struct{ bot *Bot }
@@ -358,11 +340,9 @@ type noticeMenuCb struct{ bot *Bot }
 func (cb *noticeMenuCb) Prefix() string { return "notice_menu" }
 func (cb *noticeMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return cb.bot.showNoticeSettings(u, chat)
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showNoticeSettings(u, chat)
+	})
 }
 
 type viewMenuCb struct{ bot *Bot }
@@ -370,11 +350,9 @@ type viewMenuCb struct{ bot *Bot }
 func (cb *viewMenuCb) Prefix() string { return "view_menu" }
 func (cb *viewMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return cb.bot.showViewSettings(u, chat)
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return cb.bot.showViewSettings(u, chat)
+	})
 }
 
 type mainMenuCb struct{ bot *Bot }
@@ -382,11 +360,9 @@ type mainMenuCb struct{ bot *Bot }
 func (cb *mainMenuCb) Prefix() string { return "main_menu" }
 func (cb *mainMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("main_menu"), cb.bot.mainMenuKeyboard(chat))
+	return withChat(cb.bot, u, func(chat *Chat) error {
+		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("main_menu"), cb.bot.mainMenuKeyboard(chat))
+	})
 }
 
 type noticeToggleCb struct{ bot *Bot }
@@ -394,10 +370,7 @@ type noticeToggleCb struct{ bot *Bot }
 func (cb *noticeToggleCb) Prefix() string { return "notice_toggle:" }
 func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
+	return withChat(cb.bot, u, func(chat *Chat) error {
 
 	field := strings.TrimPrefix(u.Data, "notice_toggle:")
 	var msg string
@@ -421,6 +394,7 @@ func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
 		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.noticeKeyboard(chat))
 	}
 	return cb.bot.showNoticeSettings(u, chat)
+	})
 }
 
 type viewToggleCb struct{ bot *Bot }
@@ -428,10 +402,7 @@ type viewToggleCb struct{ bot *Bot }
 func (cb *viewToggleCb) Prefix() string { return "view_toggle:" }
 func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
+	return withChat(cb.bot, u, func(chat *Chat) error {
 
 	field := strings.TrimPrefix(u.Data, "view_toggle:")
 	var msg string
@@ -452,6 +423,7 @@ func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.viewKeyboard(chat))
 	}
 	return cb.bot.showViewSettings(u, chat)
+	})
 }
 
 func (b *Bot) showCallsFull(u *Update, chat *Chat) {

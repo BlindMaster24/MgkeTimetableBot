@@ -18,8 +18,6 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-const TelegramRateLimitPerMinute = 25
-
 type historyCmd struct{ bot *Bot }
 
 func (c *historyCmd) Name() string        { return "/history" }

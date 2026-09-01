@@ -351,6 +351,14 @@ func (b *Bot) AnswerCallback(callbackID string, text string) error {
 	})
 }
 
+func withChat(b *Bot, u *Update, fn func(*Chat) error) error {
+	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
+	}
+	return fn(chat)
+}
+
 func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *telego.InlineKeyboardMarkup) error {
 	params := &telego.EditMessageTextParams{
 		ChatID:    telego.ChatID{ID: chatID},
