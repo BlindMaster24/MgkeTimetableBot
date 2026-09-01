@@ -14,6 +14,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	parserpkg "github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
@@ -109,6 +110,11 @@ func main() {
 		log.Warn().Err(err).Msg("failed to set bot commands")
 	}
 
+	adapter := &chatFinderAdapter{repo: chatRepo}
+	scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter)
+	scheduler.Start()
+	log.Info().Msg("notification scheduler started")
+
 	go func() {
 		groupURL := cfg.Parser.Endpoints.TimetableGroup
 		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
@@ -124,6 +130,8 @@ func main() {
 	if err := bot.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("bot stopped")
 	}
+
+	scheduler.Stop()
 
 	if err := raspCache.Save(); err != nil {
 		log.Error().Err(err).Msg("failed to save cache")
@@ -144,6 +152,28 @@ func initArchiveSchema(repo *archive.Repository) {
 	)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_group_day ON timetable_archive("group", day)`)
 	db.Exec(`CREATE INDEX IF NOT EXISTS idx_teacher_day ON timetable_archive(teacher, day)`)
+}
+
+type chatFinderAdapter struct {
+	repo *telegrambot.Repository
+}
+
+func (a *chatFinderAdapter) FindAllWithNotifications(service string) ([]*notification.ChatInfo, error) {
+	chats, err := a.repo.FindAllWithNotifications(service)
+	if err != nil {
+		return nil, err
+	}
+	var result []*notification.ChatInfo
+	for _, c := range chats {
+		result = append(result, &notification.ChatInfo{
+			ID:            c.PeerID,
+			Mode:          string(c.Mode),
+			Group:         c.Group,
+			Teacher:       c.Teacher,
+			NoticeChanges: c.NoticeChanges,
+		})
+	}
+	return result, nil
 }
 
 
