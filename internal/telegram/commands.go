@@ -486,6 +486,7 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		b.handleSetGroup(ctx, u, chat)
 		return
 	case "set_teacher":
+		b.handleSetTeacher(ctx, u, chat)
 		return
 	case "sub_add_group":
 		b.handleSubAddGroup(ctx, u, chat)
@@ -507,6 +508,9 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	case "calls_edit_input":
 		scene := &callsEditInputScene{bot: b}
 		scene.Handle(ctx, u, chat)
+		return
+	case "alias_add":
+		b.handleAliasAdd(ctx, u, chat)
 		return
 	}
 
@@ -666,7 +670,7 @@ func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_calls"), CallbackData: "calls"})
 	}
 	if b.cfg.Google.OAuth.ClientID != "" {
-		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_google_calendar"), CallbackData: "google_calendar"})
+		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_google_calendar"), CallbackData: "gcal:menu"})
 	}
 	if b.cfg.Calendar.ICS.Enabled {
 		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_ics"), CallbackData: "ics"})

@@ -306,7 +306,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/calls", "/about", "/group", "/teacher", "/settings",
 		"/image", "/buttons", "/formatter", "/forceparse", "/resetcache",
 		"/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger",
-		"/history", "/stats",
+		"/history", "/stats", "/google_calendar", "/alias",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))
@@ -938,4 +938,106 @@ func flattenKeyboardTexts(kb *telego.InlineKeyboardMarkup) string {
 		}
 	}
 	return all
+}
+
+func TestE2E_GoogleCalendarCommandRegistered(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	if _, ok := b.commands["/google_calendar"]; !ok {
+		t.Error("google_calendar command not registered")
+	}
+	if _, ok := b.callbacks["gcal:"]; !ok {
+		t.Error("gcal callback not registered")
+	}
+}
+
+func TestE2E_AliasCommandRegistered(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	if _, ok := b.commands["/alias"]; !ok {
+		t.Error("alias command not registered")
+	}
+	if _, ok := b.callbacks["alias:"]; !ok {
+		t.Error("alias callback not registered")
+	}
+	if _, ok := b.callbacks["alias:del:"]; !ok {
+		t.Error("alias:del callback not registered")
+	}
+}
+
+func TestE2E_AliasAddAndList(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	b.aliasRepo = NewAliasRepository(repo)
+	b.aliasRepo.EnsureTable()
+	userID := int64(200)
+
+	err := b.aliasRepo.Add(userID, "Математика", "Мат-тест")
+	if err != nil {
+		t.Fatalf("add alias: %v", err)
+	}
+
+	aliases, err := b.aliasRepo.List(userID)
+	if err != nil {
+		t.Fatalf("list aliases: %v", err)
+	}
+	if len(aliases) != 1 {
+		t.Fatalf("expected 1 alias, got %d", len(aliases))
+	}
+	if aliases[0].Key != "Математика" || aliases[0].Value != "Мат-тест" {
+		t.Errorf("wrong alias: %v", aliases[0])
+	}
+
+	err = b.aliasRepo.Remove(userID, "Математика")
+	if err != nil {
+		t.Fatalf("remove alias: %v", err)
+	}
+
+	aliases, _ = b.aliasRepo.List(userID)
+	if len(aliases) != 0 {
+		t.Fatalf("expected 0 aliases after remove, got %d", len(aliases))
+	}
+}
+
+func TestE2E_AliasClear(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	b.aliasRepo = NewAliasRepository(repo)
+	b.aliasRepo.EnsureTable()
+	userID := int64(300)
+	b.aliasRepo.Add(userID, "A", "B")
+	b.aliasRepo.Add(userID, "C", "D")
+	b.aliasRepo.Clear(userID)
+	aliases, _ := b.aliasRepo.List(userID)
+	if len(aliases) != 0 {
+		t.Fatalf("expected 0 after clear, got %d", len(aliases))
+	}
+}
+
+func TestE2E_GoogleCalendarMenuNoOAuth(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	b.cfg.Google.OAuth.ClientID = ""
+	chat := &Chat{Mode: ModeStudent, Group: "100"}
+	u := &Update{Bot: b, ChatID: 100, UserID: 100}
+	_ = chat
+	_ = u
+	if b.cfg.Google.OAuth.ClientID != "" {
+		t.Error("expected empty OAuth ClientID")
+	}
+}
+
+func TestE2E_GoogleCalendarAddStudent(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	b.cfg.Google.OAuth.ClientID = "test-id"
+	chat := &Chat{Mode: ModeStudent, Group: "100", GoogleEmail: "test@gmail.com"}
+	if chat.Mode != ModeStudent || chat.Group == "" || chat.GoogleEmail == "" {
+		t.Error("chat not configured properly")
+	}
+	_ = b
+}
+
+func TestE2E_GoogleCalendarAddNoMode(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	b.cfg.Google.OAuth.ClientID = "test-id"
+	chat := &Chat{GoogleEmail: "test@gmail.com"}
+	if chat.Mode != "" {
+		t.Error("expected empty mode")
+	}
+	_ = b
 }

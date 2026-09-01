@@ -29,6 +29,7 @@ type Bot struct {
 	parseFunc func() error
 	startTime time.Time
 	archive   any
+	aliasRepo *AliasRepository
 }
 
 type Update struct {
@@ -75,6 +76,8 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 		startTime: time.Now(),
 	}
 
+	b.aliasRepo = NewAliasRepository(chatRepo)
+	b.aliasRepo.EnsureTable()
 	b.registerAll()
 	return b, nil
 }
@@ -123,7 +126,9 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&sendCmd{bot: b})
 	b.RegisterCommand(&triggerCmd{bot: b})
 	b.RegisterCommand(&historyCmd{bot: b})
+	b.RegisterCommand(&aliasCmd{bot: b})
 	b.RegisterCommand(&statsCmd{bot: b})
+	b.RegisterCommand(&googleCalendarCmd{bot: b})
 
 	b.RegisterCallback(&dayCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})
@@ -168,7 +173,11 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&timetableGroupCb{bot: b})
 	b.RegisterCallback(&timetableTeacherCb{bot: b})
 	b.RegisterCallback(&historyCb{bot: b})
+	b.RegisterCallback(&googleCalCb{bot: b})
 	b.RegisterCallback(&callsEditCb{bot: b})
+	b.RegisterCallback(&aliasCb{bot: b})
+	b.RegisterCallback(&aliasDelCb{bot: b})
+	b.RegisterCallback(&aliasMenuCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {
