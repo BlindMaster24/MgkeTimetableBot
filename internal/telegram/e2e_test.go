@@ -712,7 +712,7 @@ func TestE2E_CallsScheduleDisplay(t *testing.T) {
 		t.Error("empty saturday calls")
 	}
 
-	textWd := b.callsLines(wd, 2, false)
+	textWd := b.callsLines(wd, 2, false, []int{1,2,3,4,5})
 	if textWd == "" {
 		t.Error("callsLines empty")
 	}
@@ -1230,7 +1230,7 @@ func TestE2E_CallsManualReason(t *testing.T) {
 		t.Errorf("reason: %q", calls.ManualReason)
 	}
 
-	line := b.callsLines(calls.Active.Schedule.Weekdays, 1, true)
+	line := b.callsLines(calls.Active.Schedule.Weekdays, 1, true, []int{1,2,3,4,5})
 	if !strings.Contains(line, "08:00") {
 		t.Errorf("line: %q", line)
 	}

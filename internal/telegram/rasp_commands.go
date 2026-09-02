@@ -3,10 +3,19 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 )
+
+func weekdayFromDate(date string) string {
+	t, err := time.Parse("02.01.2006", date)
+	if err != nil {
+		return ""
+	}
+	return []string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}[t.Weekday()]
+}
 
 type getCabinetCmd struct{ bot *Bot }
 
@@ -16,6 +25,9 @@ func (c *getCabinetCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return lower == "/cabinet" || strings.HasPrefix(lower, "/cabinet ") || strings.HasPrefix(lower, "/getcabinet ") || lower == "/getcabinet"
 }
+
+var cabinetRegexp = regexp.MustCompile(`^(!|\/)(get)?cabinet(\b|\s|$)`)
+
 func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
 	teachers := rasp.GetTeachers()
@@ -23,19 +35,73 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Данные с сервера ещё не загружены, ожидайте...")
 	}
 
-	input := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(u.Text, "/cabinet"), "/getcabinet"))
+	input := strings.TrimSpace(cabinetRegexp.ReplaceAllString(strings.ToLower(u.Text), ""))
 	if input == "" {
 		return u.Bot.SendText(u.ChatID, "Номер кабинета не указан")
 	}
 
-	type cabinetInfo struct {
-		day     string
-		lessons []string
+	type lessonInfo struct {
+		Index    int
+		Lesson   string
+		Type     string
+		Group    string
+		Teacher  string
+		Subgroup int
 	}
-	info := make(map[string][]cabinetInfo)
+	type dayInfo struct {
+		Date     string
+		Weekday  string
+		Lessons  []lessonInfo
+	}
+	info := make(map[string]map[string]*dayInfo)
 
-	for teacherName := range teachers {
-		_ = teacherName
+	for teacherName, teacherData := range teachers {
+		teacherMap, ok := teacherData.(map[string]any)
+		if !ok {
+			continue
+		}
+		daysRaw, _ := teacherMap["days"].([]any)
+		for _, dayRaw := range daysRaw {
+			dayMap, ok := dayRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			dayDate, _ := dayMap["day"].(string)
+			lessonsRaw, _ := dayMap["lessons"].([]any)
+			for lessonIdx, lessonRaw := range lessonsRaw {
+				lessonMap, ok := lessonRaw.(map[string]any)
+				if !ok {
+					continue
+				}
+				cab, _ := lessonMap["cabinet"].(string)
+				if cab == "" {
+					continue
+				}
+				if !strings.EqualFold(cab, input) {
+					continue
+				}
+				lessonName, _ := lessonMap["lesson"].(string)
+				lessonType, _ := lessonMap["type"].(string)
+				lessonGroup, _ := lessonMap["group"].(string)
+				subgroup := 0
+				if s, ok := lessonMap["subgroup"].(float64); ok {
+					subgroup = int(s)
+				}
+				if info[cab] == nil {
+					info[cab] = make(map[string]*dayInfo)
+				}
+					if info[cab][dayDate] == nil {
+						info[cab][dayDate] = &dayInfo{Date: dayDate, Weekday: weekdayFromDate(dayDate)}
+					}
+				info[cab][dayDate].Lessons = append(info[cab][dayDate].Lessons, lessonInfo{
+					Index:    lessonIdx,
+					Lesson:   lessonName,
+					Type:     lessonType,
+					Group:    lessonGroup,
+					Teacher:  teacherName,
+					Subgroup: subgroup,					})
+				}
+		}
 	}
 
 	if len(info) == 0 {
@@ -46,8 +112,15 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 	for cab, days := range info {
 		lines = append(lines, fmt.Sprintf("Кабинет: %s", cab))
 		for _, d := range days {
-			lines = append(lines, fmt.Sprintf("%s", d.day))
-			lines = append(lines, d.lessons...)
+			lines = append(lines, fmt.Sprintf("%s, %s", d.Weekday, d.Date))
+			for _, l := range d.Lessons {
+				subgroup := ""
+				if l.Subgroup > 0 {
+					subgroup = fmt.Sprintf("%d. ", l.Subgroup)
+				}
+				lines = append(lines, fmt.Sprintf("%d. %s (%s), %s%s, %s", l.Index+1, l.Lesson, l.Type, subgroup, l.Group, l.Teacher))
+			}
+			lines = append(lines, "")
 		}
 	}
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))

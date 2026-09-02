@@ -158,15 +158,21 @@ func TestFormatUptime(t *testing.T) {
 }
 
 func TestIsNowInSlot(t *testing.T) {
+	monday := time.Date(2025, 1, 6, 12, 0, 0, 0, time.UTC)
+	saturday := time.Date(2025, 1, 11, 12, 0, 0, 0, time.UTC)
+	sunday := time.Date(2025, 1, 12, 12, 0, 0, 0, time.UTC)
 	slot := [2][2]string{{"00:00", "23:59"}, {"00:00", "23:59"}}
-	if !isNowInSlot(time.Monday, slot) {
-		t.Error("expected Monday 00:00-23:59 to be in slot")
+	if !isNowInSlot(monday, slot, []int{1, 2, 3, 4, 5}) {
+		t.Error("expected weekday slot to match on Monday")
 	}
-	if isNowInSlot(time.Saturday, slot) {
-		t.Error("expected Saturday to not be in weekday slot")
+	if isNowInSlot(saturday, slot, []int{1, 2, 3, 4, 5}) {
+		t.Error("expected weekday slot to not match on Saturday")
 	}
-	if isNowInSlot(time.Sunday, slot) {
-		t.Error("expected Sunday to not be in weekday slot")
+	if isNowInSlot(sunday, slot, []int{1, 2, 3, 4, 5}) {
+		t.Error("expected weekday slot to not match on Sunday")
+	}
+	if !isNowInSlot(saturday, slot, []int{6}) {
+		t.Error("expected Saturday slot to match on Saturday")
 	}
 }
 
@@ -446,7 +452,7 @@ func TestCallsLines(t *testing.T) {
 		{{"08:00", "08:45"}, {"08:55", "09:40"}},
 		{{"09:50", "10:35"}, {"10:45", "11:30"}},
 	}
-	text := b.callsLines(slots, 2, false)
+	text := b.callsLines(slots, 2, false, []int{1,2,3,4,5})
 	if text == "" {
 		t.Error("expected non-empty calls lines")
 	}
@@ -460,7 +466,7 @@ func TestCallsLines(t *testing.T) {
 
 func TestCallsLinesEmpty(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
-	text := b.callsLines(nil, 0, false)
+	text := b.callsLines(nil, 0, false, []int{1,2,3,4,5})
 	if text != "" {
 		t.Errorf("expected empty for nil slots, got %q", text)
 	}

@@ -501,9 +501,9 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 		msg = append(msg, fmt.Sprintf("Причина: %s\n", calls.ManualReason))
 	}
 	msg = append(msg, "__ <b>Звонки (будни)</b> __")
-	msg = append(msg, b.callsLines(activeWeekdays, userMax, full))
+	msg = append(msg, b.callsLines(activeWeekdays, userMax, full, []int{1, 2, 3, 4, 5}))
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
-	msg = append(msg, b.callsLines(activeSaturday, userMax, full))
+	msg = append(msg, b.callsLines(activeSaturday, userMax, full, []int{6}))
 
 	if !full && userMax < maxLessons {
 		kb := &telego.InlineKeyboardMarkup{
@@ -560,9 +560,8 @@ func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {
 	return maxLessons
 }
 
-func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool) string {
+func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool, includedDays []int) string {
 	now := time.Now()
-	weekday := now.Weekday()
 
 	var lines []string
 	for i := 0; i < maxLessons; i++ {
@@ -572,7 +571,7 @@ func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool) st
 		slot := slots[i]
 		line := fmt.Sprintf("%d. %s - %s | %s - %s", i+1, slot[0][0], slot[0][1], slot[1][0], slot[1][1])
 
-		if !showFull && isNowInSlot(weekday, slot) {
+		if !showFull && isNowInSlot(now, slot, includedDays) {
 			line = "👉 " + line + " 👈"
 		}
 
@@ -581,13 +580,17 @@ func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool) st
 	return strings.Join(lines, "\n")
 }
 
-func isNowInSlot(weekday time.Weekday, slot [2][2]string) bool {
-	isWorkday := weekday >= time.Monday && weekday <= time.Friday
-	if !isWorkday {
+func isNowInSlot(now time.Time, slot [2][2]string, includedDays []int) bool {
+	dayIncluded := false
+	for _, d := range includedDays {
+		if int(now.Weekday()) == d {
+			dayIncluded = true
+			break
+		}
+	}
+	if !dayIncluded {
 		return false
 	}
-
-	now := time.Now()
 	startParts := strings.Split(slot[0][0], ":")
 	endParts := strings.Split(slot[1][1], ":")
 	if len(startParts) != 2 || len(endParts) != 2 {
