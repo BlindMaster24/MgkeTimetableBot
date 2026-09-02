@@ -9,7 +9,6 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
-	"github.com/mymmrac/telego"
 )
 
 func onOffStr(v bool) string {
@@ -153,7 +152,7 @@ func (cb *cancelCb) Handler(ctx context.Context, u *Update) error {
 		chat.Scene = ""
 		cb.bot.chatRepo.Save(chat)
 		if wasSetup {
-			return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("about_bot"), cb.bot.mainMenuKeyboard(chat))
+			return cb.bot.SendTextWithReplyKeyboard(u.ChatID, cb.bot.loc("about_bot"), replyMainMenu(cb.bot, chat))
 		}
 	}
 	return u.Bot.SendText(u.ChatID, cb.bot.loc("input_cancelled"))
@@ -505,17 +504,13 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
 	msg = append(msg, b.callsLines(activeSaturday, userMax, full, []int{6}))
 
+	replyKb := replyMainMenu(b, chat)
 	if !full && userMax < maxLessons {
-		kb := &telego.InlineKeyboardMarkup{
-			InlineKeyboard: [][]telego.InlineKeyboardButton{
-				{{Text: "Показать полностью", CallbackData: "calls_full"}},
-			},
-		}
-		b.SendTextWithKeyboard(u.ChatID, strings.Join(msg, "\n"), kb)
+		b.SendTextWithReplyKeyboard(u.ChatID, strings.Join(msg, "\n"), replyKb)
 		return
 	}
 
-	b.SendText(u.ChatID, strings.Join(msg, "\n"))
+	b.SendTextWithReplyKeyboard(u.ChatID, strings.Join(msg, "\n"), replyKb)
 }
 
 func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {

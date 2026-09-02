@@ -156,6 +156,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&idCmd{bot: b})
 	b.RegisterCommand(&errorCmd{bot: b})
 	b.RegisterCommand(&testCmd{bot: b})
+	b.RegisterCommand(&sqlCmd{bot: b})
+	b.RegisterCommand(&restartCmd{bot: b})
 
 	b.RegisterCallback(&dayCb{bot: b})
 	b.RegisterCallback(&weekCb{bot: b})
@@ -401,6 +403,27 @@ func withChat(b *Bot, u *Update, fn func(*Chat) error) error {
 	return fn(chat)
 }
 
+func (b *Bot) SendTextWithReplyKeyboard(chatID int64, text string, kb *telego.ReplyKeyboardMarkup) error {
+	_, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
+		ChatID:      telego.ChatID{ID: chatID},
+		Text:        text,
+		ParseMode:   "HTML",
+		ReplyMarkup: kb,
+	})
+	return err
+}
+
+func (b *Bot) RemoveReplyKeyboard(chatID int64) error {
+	_, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
+		ChatID: telego.ChatID{ID: chatID},
+		Text:   ".",
+		ReplyMarkup: &telego.ReplyKeyboardRemove{
+			RemoveKeyboard: true,
+		},
+	})
+	return err
+}
+
 func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *telego.InlineKeyboardMarkup) error {
 	params := &telego.EditMessageTextParams{
 		ChatID:    telego.ChatID{ID: chatID},
@@ -413,6 +436,19 @@ func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *tele
 	}
 	_, err := b.client.EditMessageText(context.Background(), params)
 	return err
+}
+
+func (b *Bot) SendTextOrEdit(chatID int64, text string, kb *telego.InlineKeyboardMarkup) (int, error) {
+	msg, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
+		ChatID:    telego.ChatID{ID: chatID},
+		Text:      text,
+		ParseMode: "HTML",
+		ReplyMarkup: kb,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return msg.MessageID, nil
 }
 
 func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {

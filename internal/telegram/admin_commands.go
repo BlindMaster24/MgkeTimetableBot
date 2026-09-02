@@ -3,7 +3,9 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 )
 
 type regexpCmd struct{ bot *Bot }
@@ -85,4 +87,75 @@ func (c *decryptKeyCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Ключ не указан")
 	}
 	return u.Bot.SendText(u.ChatID, fmt.Sprintf("Дешифровка ключа пока недоступна"))
+}
+
+type sqlCmd struct{ bot *Bot }
+
+func (c *sqlCmd) Name() string        { return "/sql" }
+func (c *sqlCmd) Description() string { return "Выполнить SQL запрос" }
+func (c *sqlCmd) MatchText(text string) bool {
+	return strings.HasPrefix(strings.ToLower(text), "/sql")
+}
+func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	query := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(u.Text, "/sql"), "/SQL"))
+	if query == "" {
+		return u.Bot.SendText(u.ChatID, "Укажите SQL запрос после /sql")
+	}
+	c.bot.chatRepo.mu.Lock()
+	defer c.bot.chatRepo.mu.Unlock()
+	rows, err := c.bot.chatRepo.db.Query(query)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+	}
+	defer rows.Close()
+	cols, _ := rows.Columns()
+	var lines []string
+	lines = append(lines, strings.Join(cols, " | "))
+	for rows.Next() {
+		vals := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		rows.Scan(ptrs...)
+		parts := make([]string, len(cols))
+		for i, v := range vals {
+			switch val := v.(type) {
+			case []byte:
+				parts[i] = string(val)
+			case nil:
+				parts[i] = "NULL"
+			default:
+				parts[i] = fmt.Sprintf("%v", val)
+			}
+		}
+		lines = append(lines, strings.Join(parts, " | "))
+	}
+	if len(lines) > 50 {
+		lines = lines[:50]
+		lines = append(lines, "... (обрезано)")
+	}
+	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
+}
+
+type restartCmd struct{ bot *Bot }
+
+func (c *restartCmd) Name() string        { return "/restart" }
+func (c *restartCmd) Description() string { return "Перезапустить бота" }
+func (c *restartCmd) MatchText(text string) bool {
+	return text == "/restart"
+}
+func (c *restartCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	u.Bot.SendText(u.ChatID, "🔄 Перезапуск...")
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		os.Exit(0)
+	}()
+	return nil
 }

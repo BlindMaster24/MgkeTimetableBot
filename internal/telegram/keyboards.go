@@ -122,3 +122,91 @@ func selectModeKeyboard(loc func(string, string, map[string]interface{}) string)
 		},
 	}
 }
+
+func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
+	t := func(key string) string { return b.loc(key) }
+	canShow := (chat.Mode == ModeStudent || chat.Mode == ModeParent || chat.Mode == ModeTeacher) &&
+		((chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" ||
+			chat.Mode == ModeTeacher && chat.Teacher != "")
+
+	var rows [][]telego.KeyboardButton
+
+	if chat.Mode == "" {
+		rows = append(rows, []telego.KeyboardButton{
+			{Text: t("button_setup")},
+		})
+	} else if chat.Mode == ModeGuest {
+		rows = append(rows, []telego.KeyboardButton{
+			{Text: t("button_group")},
+			{Text: t("button_teacher")},
+		})
+	} else {
+		if canShow {
+			var row []telego.KeyboardButton
+			if chat.ShowDaily {
+				row = append(row, telego.KeyboardButton{Text: t("button_day")})
+			}
+			if chat.ShowWeekly {
+				row = append(row, telego.KeyboardButton{Text: t("button_week")})
+			}
+			if len(row) > 0 {
+				rows = append(rows, row)
+			}
+		}
+	}
+
+	showFast := chat.Mode == ModeStudent || chat.Mode == ModeParent || chat.Mode == ModeTeacher
+	canShowCalls := chat.ShowCalls && b.cfg.Parser.Calls != nil && b.cfg.Parser.Calls.Enabled
+
+	var level2 []telego.KeyboardButton
+	if showFast && chat.ShowFastGroup {
+		level2 = append(level2, telego.KeyboardButton{Text: t("button_group")})
+	}
+	if chat.ShowAbout && canShowCalls {
+		level2 = append(level2, telego.KeyboardButton{Text: t("button_calls")})
+	}
+	if showFast && chat.ShowFastTeacher {
+		level2 = append(level2, telego.KeyboardButton{Text: t("button_teacher")})
+	}
+	if len(level2) > 0 {
+		rows = append(rows, level2)
+	}
+
+	var level3 []telego.KeyboardButton
+	if !chat.ShowAbout && canShowCalls {
+		level3 = append(level3, telego.KeyboardButton{Text: t("button_calls")})
+	}
+	if b.cfg.Google.OAuth.ClientID != "" {
+		level3 = append(level3, telego.KeyboardButton{Text: t("button_google_calendar")})
+	}
+	if b.cfg.Calendar.ICS.Enabled {
+		level3 = append(level3, telego.KeyboardButton{Text: t("button_ics")})
+	}
+	level3 = append(level3, telego.KeyboardButton{Text: t("button_settings")})
+	if chat.Mode == ModeTeacher && chat.Teacher != "" {
+		level3 = append(level3, telego.KeyboardButton{Text: t("button_history")})
+	}
+	if chat.ShowAbout {
+		level3 = append(level3, telego.KeyboardButton{Text: t("button_about")})
+	}
+	if len(level3) > 0 {
+		rows = append(rows, level3)
+	}
+
+	if len(rows) == 0 {
+		rows = append(rows, []telego.KeyboardButton{
+			{Text: t("button_settings")},
+		})
+	}
+
+	return &telego.ReplyKeyboardMarkup{
+		Keyboard:        rows,
+		IsPersistent:    true,
+		ResizeKeyboard:  true,
+	}
+}
+
+func sendReplyMainMenu(b *Bot, chatID int64, chat *Chat, text string) error {
+	kb := replyMainMenu(b, chat)
+	return b.SendTextWithReplyKeyboard(chatID, text, kb)
+}

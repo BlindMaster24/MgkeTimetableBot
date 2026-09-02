@@ -50,37 +50,41 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
 	}
 
+	var text string
 	switch chat.Mode {
 	case ModeStudent, ModeParent:
 		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, b.locData("group_not_selected", map[string]interface{}{"Group": randomKey(groups)}))
+			text = b.locData("group_not_selected", map[string]interface{}{"Group": randomKey(groups)})
+		} else {
+			data, ok := groups[chat.Group]
+			if !ok {
+				text = b.loc("group_not_exists")
+			} else {
+				text = b.formatGroupFull(chat, chat.Group, data)
+				if text == "" {
+					text = b.loc("no_timetable")
+				}
+			}
 		}
-		data, ok := groups[chat.Group]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
-		}
-		text := b.formatGroupFull(chat, chat.Group, data)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
-
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, b.locData("teacher_not_selected", map[string]interface{}{"Teacher": randomKey(teachers)}))
+			text = b.locData("teacher_not_selected", map[string]interface{}{"Teacher": randomKey(teachers)})
+		} else {
+			data, ok := teachers[chat.Teacher]
+			if !ok {
+				text = b.loc("teacher_not_exists")
+			} else {
+				text = b.formatTeacherFull(chat, chat.Teacher, data)
+				if text == "" {
+					text = b.loc("no_timetable")
+				}
+			}
 		}
-		data, ok := teachers[chat.Teacher]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
-		}
-		text := b.formatTeacherFull(chat, chat.Teacher, data)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
+	default:
+		text = b.loc("main_menu")
 	}
 
-	return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("main_menu"), b.mainMenuKeyboard(chat))
+	return b.SendTextWithReplyKeyboard(u.ChatID, text, replyMainMenu(b, chat))
 }
 
 func randomKey(m map[string]any) string {
@@ -164,37 +168,41 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
 	}
 
+	var text string
 	switch chat.Mode {
 	case ModeStudent, ModeParent:
 		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("need_group"))
+			text = b.loc("need_group")
+		} else {
+			data, ok := groups[chat.Group]
+			if !ok {
+				text = b.loc("group_not_exists")
+			} else {
+				text = b.formatGroupDay(chat, data)
+				if text == "" {
+					text = b.loc("no_timetable")
+				}
+			}
 		}
-		data, ok := groups[chat.Group]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
-		}
-		text := b.formatGroupDay(chat, data)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-		return u.Bot.SendText(u.ChatID, text)
-
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("need_teacher"))
+			text = b.loc("need_teacher")
+		} else {
+			data, ok := teachers[chat.Teacher]
+			if !ok {
+				text = b.loc("teacher_not_exists")
+			} else {
+				text = b.formatTeacherDay(chat, data)
+				if text == "" {
+					text = b.loc("no_timetable")
+				}
+			}
 		}
-		data, ok := teachers[chat.Teacher]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
-		}
-		text := b.formatTeacherDay(chat, data)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-		return u.Bot.SendText(u.ChatID, text)
+	default:
+		text = b.loc("need_group")
 	}
 
-	return u.Bot.SendText(u.ChatID, b.loc("need_group"))
+	return b.SendTextWithReplyKeyboard(u.ChatID, text, replyMainMenu(b, chat))
 }
 
 type weekCmd struct{ bot *Bot }
@@ -243,7 +251,11 @@ func (c *aboutCmd) MatchText(text string) bool {
 	return text == c.bot.loc("button_about")
 }
 func (c *aboutCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendText(u.ChatID, c.bot.loc("about_bot"))
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("about_bot"))
+	}
+	return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("about_bot"), replyMainMenu(c.bot, chat))
 }
 
 type groupCmd struct{ bot *Bot }
@@ -574,7 +586,7 @@ func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	chat.Teacher = ""
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	b.SendTextWithKeyboard(u.ChatID, b.loc("about_bot"), b.mainMenuKeyboard(chat))
+	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("about_bot"), replyMainMenu(b, chat))
 }
 
 func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
@@ -596,7 +608,7 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	chat.Group = ""
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	b.SendTextWithKeyboard(u.ChatID, b.loc("about_bot"), b.mainMenuKeyboard(chat))
+	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("about_bot"), replyMainMenu(b, chat))
 }
 
 func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
