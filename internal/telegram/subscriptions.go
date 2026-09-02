@@ -33,7 +33,22 @@ func (cb *subsAddGroupCb) Handler(ctx context.Context, u *Update) error {
 	chat.Scene = "sub_add_group"
 	cb.bot.chatRepo.Save(chat)
 
-	return u.Bot.SendText(u.ChatID, "Введите номер группы, на которую хотите подписаться:")
+	prompt := fmt.Sprintf("Введите номер группы, на которую хотите подписаться (например, %s)", randomKey(groups))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cb.bot.historyKeyboardFor(chat))
+}
+
+func (b *Bot) historyKeyboardFor(chat *Chat) *telego.InlineKeyboardMarkup {
+	var rows [][]telego.InlineKeyboardButton
+	for _, g := range chat.HistoryGroup {
+		rows = append(rows, []telego.InlineKeyboardButton{{Text: g, CallbackData: "answer:" + g}})
+	}
+	for _, t := range chat.HistoryTeacher {
+		rows = append(rows, []telego.InlineKeyboardButton{{Text: t, CallbackData: "answer:" + t}})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
 type subsAddTeacherCb struct{ bot *Bot }
@@ -59,7 +74,8 @@ func (cb *subsAddTeacherCb) Handler(ctx context.Context, u *Update) error {
 	chat.Scene = "sub_add_teacher"
 	cb.bot.chatRepo.Save(chat)
 
-	return u.Bot.SendText(u.ChatID, "Введите фамилию преподавателя:")
+	prompt := fmt.Sprintf("Введите фамилию преподавателя (например, %s)", randomKey(cb.bot.cache.GetTeachers()))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cb.bot.historyKeyboardFor(chat))
 }
 
 type subsListCb struct{ bot *Bot }

@@ -498,6 +498,10 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	case "sub_remove":
 		b.handleSubRemove(ctx, u, chat)
 		return
+	case "history_teacher":
+		scene := &historyTeacherScene{bot: b}
+		scene.Handle(ctx, u, chat)
+		return
 	case "history_week":
 		scene := &historyWeekScene{bot: b}
 		scene.Handle(ctx, u, chat)

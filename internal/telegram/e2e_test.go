@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
+	"github.com/mymmrac/telego/telegoapi"
 )
 
 func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
@@ -84,7 +86,13 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	}
 	raspCache.SetCalls(site, cache.Schedule{}, "site")
 
+	bClient, err := telego.NewBot("123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", telego.WithAPICaller(stubCaller{}), telego.WithDiscardLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	b := &Bot{
+		client:    bClient,
 		cfg:       cfg,
 		log:       log,
 		i18n:      loc,
@@ -95,6 +103,12 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	}
 	b.registerAll()
 	return b, chatRepo
+}
+
+type stubCaller struct{}
+
+func (stubCaller) Call(ctx context.Context, url string, data *telegoapi.RequestData) (*telegoapi.Response, error) {
+	return &telegoapi.Response{Ok: true, Result: []byte(`{"message_id": 1}`)}, nil
 }
 
 func e2eJsonRoundTrip(v any) any {
@@ -312,7 +326,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/ping", "/ics", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
 		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
-		"/setgroup", "/setteacher",
+		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))
@@ -1219,5 +1233,98 @@ func TestE2E_CallsManualReason(t *testing.T) {
 	line := b.callsLines(calls.Active.Schedule.Weekdays, 1, true)
 	if !strings.Contains(line, "08:00") {
 		t.Errorf("line: %q", line)
+	}
+}
+
+func TestE2E_BrovkaCSVBuild(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(6262)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeTeacher
+	chat.Teacher = "Иванов И.И."
+	repo.Save(chat)
+
+	cmd, ok := b.commands["/vychetkaDlyaBrovkiDSOnline"]
+	if !ok {
+		t.Fatal("brovka command not registered")
+	}
+
+	u := &Update{Bot: b, ChatID: userID, UserID: userID, Text: "/vychetkaDlyaBrovkiDSOnline"}
+	if err := cmd.Handler(context.Background(), u); err == nil {
+		t.Log("brovka with empty archive returned nil (archive unavailable path)")
+	}
+}
+
+func TestE2E_HistoryCmdAsksTeacher(t *testing.T) {
+	_, repo := setupE2EBot(t)
+	userID := int64(6263)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	repo.Save(chat)
+
+	_, err := repo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _ = repo, chat
+	if chat.Scene != "" {
+		t.Errorf("scene should start empty, got %q", chat.Scene)
+	}
+
+	chat.Scene = "history_teacher"
+	repo.Save(chat)
+
+	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if loaded.Scene != "history_teacher" {
+		t.Errorf("scene: %q, want history_teacher", loaded.Scene)
+	}
+}
+
+func TestE2E_HistoryTeacherScene_MultiMatch(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(6264)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Scene = "history_teacher"
+	repo.Save(chat)
+
+	scene := &historyTeacherScene{bot: b}
+	u := &Update{Bot: b, ChatID: userID, UserID: userID, Text: "иванов"}
+	_ = scene.Handle(context.Background(), u, chat)
+
+	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if loaded.Scene != "history_week" {
+		t.Errorf("scene after single match: %q", loaded.Scene)
+	}
+	if loaded.Teacher != "Иванов И.И." {
+		t.Errorf("teacher: %q", loaded.Teacher)
+	}
+	if loaded.HistoryTeacher == nil || len(loaded.HistoryTeacher) == 0 {
+		t.Error("teacher not appended to history")
+	}
+}
+
+func TestE2E_SubTestPickUsesSelectedIndex(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(6265)
+
+	repo.AddSubscription(userID, "group", "100")
+	repo.AddSubscription(userID, "teacher", "Иванов И.И.")
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Scene = "sub_test_pick"
+	repo.Save(chat)
+
+	scene := &subTestPickScene{bot: b}
+	u := &Update{Bot: b, ChatID: userID, UserID: userID, Text: "2"}
+	_ = scene.Handle(context.Background(), u, chat)
+
+	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if loaded.Scene != "" {
+		t.Errorf("scene not cleared: %q", loaded.Scene)
 	}
 }

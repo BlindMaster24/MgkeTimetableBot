@@ -52,7 +52,7 @@ func (w WeekIndex) AcademicWeekNumber() int {
 
 func (w WeekIndex) WeekDayIndexRange() (int, int) {
 	d1, d2 := w.WeekRange()
-	return dayIndexFromDate(d1), dayIndexFromDate(d2)
+	return DayIndexFromDate(d1), DayIndexFromDate(d2)
 }
 
 func (w WeekIndex) GetRelevant(maxLastGroups, maxLastTeachers int) WeekIndex {
@@ -100,7 +100,7 @@ func academicYearStartDate(date time.Time) time.Time {
 	return start.AddDate(0, 0, 8-int(day))
 }
 
-func dayIndexFromDate(date time.Time) int {
+func DayIndexFromDate(date time.Time) int {
 	ms := date.UnixMilli() - startingWeekIndexDate.UnixMilli()
 	return int(ms / oneDayMs)
 }

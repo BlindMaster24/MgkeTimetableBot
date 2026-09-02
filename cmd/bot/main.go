@@ -100,17 +100,26 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}
 
+	adapter := &chatFinderAdapter{repo: chatRepo}
+	notifier := notification.NewChangeNotifier(raspCache, log, bot, adapter)
+
 	bot.SetParseFunc(func() error {
+		oldGroupsHash := raspCache.GetGroupsHash()
+		oldTeachersHash := raspCache.GetTeachersHash()
+
 		groupURL := cfg.Parser.Endpoints.TimetableGroup
 		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
-		return parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
+		err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
+		if err == nil {
+			go notifier.NotifyChanges(oldGroupsHash, oldTeachersHash)
+		}
+		return err
 	})
 
 	if err := bot.SetMyCommands(); err != nil {
 		log.Warn().Err(err).Msg("failed to set bot commands")
 	}
 
-	adapter := &chatFinderAdapter{repo: chatRepo}
 	scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter)
 	scheduler.Start()
 	log.Info().Msg("notification scheduler started")

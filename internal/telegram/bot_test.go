@@ -33,7 +33,7 @@ func setupTestBot(t *testing.T) *Bot {
 
 func TestBotRegisterCommands(t *testing.T) {
 	b := setupTestBot(t)
-	expected := []string{"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about", "/group", "/teacher", "/settings", "/image", "/buttons", "/formatter", "/forceparse", "/resetcache", "/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger", "/history", "/stats", "/google_calendar", "/alias", "/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey", "/decryptKey", "/cabinet", "/groups", "/teachers", "/comparegroups", "/ping", "/ics", "/subscriptions_test", "/archive", "/endings", "/chat", "/id", "/error", "/test", "/groupweek", "/groupimage", "/teacherweek", "/teacherimage", "/setgroup", "/setteacher"}
+	expected := []string{"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about", "/group", "/teacher", "/settings", "/image", "/buttons", "/formatter", "/forceparse", "/resetcache", "/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger", "/history", "/stats", "/google_calendar", "/alias", "/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey", "/decryptKey", "/cabinet", "/groups", "/teachers", "/comparegroups", "/ping", "/ics", "/subscriptions_test", "/archive", "/endings", "/chat", "/id", "/error", "/test", "/groupweek", "/groupimage", "/teacherweek", "/teacherimage", "/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline"}
 	for _, name := range expected {
 		if _, ok := b.commands[name]; !ok {
 			t.Errorf("missing command %s", name)

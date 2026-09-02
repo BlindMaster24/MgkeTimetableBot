@@ -45,9 +45,10 @@ func (b *Bot) showGoogleAuth(u *Update) error {
 	if b.cfg.Google.OAuth.ClientID == "" {
 		return b.SendText(u.ChatID, "Google Calendar не настроен.")
 	}
+	redirectURI := strings.TrimRight(b.cfg.Google.RedirectDomain, "/") + b.cfg.Google.URL
 	url := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=https://www.googleapis.com/auth/calendar&access_type=offline&prompt=consent",
 		b.cfg.Google.OAuth.ClientID,
-		b.cfg.Google.OAuth.ClientID,
+		redirectURI,
 	)
 	kb := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{

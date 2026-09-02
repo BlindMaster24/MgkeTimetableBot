@@ -31,14 +31,48 @@ func (c *historyCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 
-	if chat.Mode != ModeTeacher || chat.Teacher == "" {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("need_teacher"))
+	teachers := c.bot.cache.GetTeachers()
+	if len(teachers) == 0 {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 
-	c.bot.chatRepo.SetScene(chat, "history_week")
+	c.bot.chatRepo.SetScene(chat, "history_teacher")
 	c.bot.chatRepo.Save(chat)
 
-	return u.Bot.SendText(u.ChatID, c.bot.loc("history_enter_week"))
+	prompt := fmt.Sprintf("Введите фамилию преподавателя или выберите из списка ниже (например, %s)", randomKey(teachers))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
+}
+
+type historyTeacherScene struct{ bot *Bot }
+
+func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
+	teachers := s.bot.cache.GetTeachers()
+	input := strings.TrimSpace(u.Text)
+
+	if len(input) < 3 {
+		return u.Bot.SendText(u.ChatID, "Фамилия введена некорректно")
+	}
+
+	matched, tooMany := matchTeacherList(input, teachers)
+	if len(matched) == 0 {
+		return u.Bot.SendText(u.ChatID, "Данный преподаватель не найден")
+	}
+	if tooMany {
+		return u.Bot.SendText(u.ChatID, "Слишком много результатов для выборки.")
+	}
+	if len(matched) > 1 {
+		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
+		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
+	}
+
+	teacher := matched[0]
+	chat.AppendTeacherHistory(teacher)
+	chat.Teacher = teacher
+	chat.Mode = ModeTeacher
+	chat.Scene = "history_week"
+	s.bot.chatRepo.Save(chat)
+
+	return nil
 }
 
 type historyWeekScene struct{ bot *Bot }
@@ -367,9 +401,56 @@ func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	chat.Scene = ""
 	s.bot.chatRepo.Save(chat)
 
+	var idx int
+	for _, c := range input {
+		if c >= '0' && c <= '9' {
+			idx = idx*10 + int(c-'0')
+		}
+	}
+
 	target := list[0]
-	text := fmt.Sprintf("📢 Тестовое уведомление для %s %s:\n\n(%s)", target.Type, target.Value, mode)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, text, s.bot.subscriptionsKeyboard())
+	if idx >= 1 && idx <= len(list) {
+		target = list[idx-1]
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("📢 Тестовое уведомление для %s %s:\n\n", labelForSubType(target.Type), target.Value))
+
+	cacheData := s.bot.cache.GetGroups()
+	if target.Type == "teacher" {
+		cacheData = s.bot.cache.GetTeachers()
+	}
+
+	data, ok := cacheData[target.Value]
+	if !ok {
+		sb.WriteString("Данные не найдены в кэше.")
+	} else {
+		if mode == "day" || mode == "both" {
+			text := s.bot.formatGroupFull(chat, target.Value, data)
+			if target.Type == "teacher" {
+				text = s.bot.formatTeacherFull(chat, target.Value, data)
+			}
+			if text == "" {
+				text = s.bot.loc("no_timetable")
+			}
+			sb.WriteString(text)
+		}
+		if mode == "week" || mode == "both" {
+			if mode == "both" {
+				sb.WriteString("\n\n")
+			}
+			sb.WriteString(fmt.Sprintf("🆕 %s: доступно расписание на следующую неделю", labelForSubType(target.Type)))
+		}
+	}
+
+	return u.Bot.SendTextWithKeyboard(u.ChatID, sb.String(), s.bot.subscriptionsKeyboard())
+}
+
+func labelForSubType(t string) string {
+	if t == "teacher" {
+		return "Преподаватель"
+	}
+	return "Группа"
 }
 
 type callsEditCb struct{ bot *Bot }

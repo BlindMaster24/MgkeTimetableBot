@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,6 +115,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&getTeacherImageCmd{bot: b})
 	b.RegisterCommand(&setGroupCmd{bot: b})
 	b.RegisterCommand(&setTeacherCmd{bot: b})
+	b.RegisterCommand(&brovkaCmd{bot: b})
 	b.RegisterCommand(&settingsCmd{bot: b})
 	b.RegisterCommand(&imageCmd{bot: b})
 	b.RegisterCommand(&buttonsCmd{bot: b})
@@ -330,6 +332,39 @@ func (b *Bot) SendTextWithKeyboard(chatID int64, text string, kb *telego.InlineK
 		ParseMode:   "HTML",
 		ReplyMarkup: kb,
 	})
+	return err
+}
+
+type namedBytes struct {
+	name   string
+	data   []byte
+	offset int64
+}
+
+func (n *namedBytes) Name() string { return n.name }
+func (n *namedBytes) Read(p []byte) (int, error) {
+	if n.offset >= int64(len(n.data)) {
+		return 0, io.EOF
+	}
+	c := copy(p, n.data[n.offset:])
+	n.offset += int64(c)
+	return c, nil
+}
+
+func namedBytesReader(name string, data []byte) *namedBytes {
+	return &namedBytes{name: name, data: data}
+}
+
+func (b *Bot) SendDocument(chatID int64, filename string, data []byte, caption string) error {
+	params := &telego.SendDocumentParams{
+		ChatID:   telego.ChatID{ID: chatID},
+		Document: telego.InputFile{File: namedBytesReader(filename, data)},
+	}
+	if caption != "" {
+		params.Caption = caption
+		params.ParseMode = "HTML"
+	}
+	_, err := b.client.SendDocument(context.Background(), params)
 	return err
 }
 
