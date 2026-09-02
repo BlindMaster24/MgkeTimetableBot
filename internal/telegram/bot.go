@@ -438,17 +438,35 @@ func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *tele
 	return err
 }
 
-func (b *Bot) SendTextOrEdit(chatID int64, text string, kb *telego.InlineKeyboardMarkup) (int, error) {
-	msg, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
-		ChatID:    telego.ChatID{ID: chatID},
-		Text:      text,
-		ParseMode: "HTML",
-		ReplyMarkup: kb,
-	})
-	if err != nil {
-		return 0, err
+func (b *Bot) sendOrEdit(chatID int64, text string, chat *Chat, inlineKb *telego.InlineKeyboardMarkup) error {
+	if chat.LastMsgID > 0 {
+		err := b.EditMessageText(chatID, int(chat.LastMsgID), text, inlineKb)
+		if err == nil {
+			return nil
+		}
 	}
-	return msg.MessageID, nil
+	var msg *telego.Message
+	var err error
+	if inlineKb != nil {
+		msg, err = b.client.SendMessage(context.Background(), &telego.SendMessageParams{
+			ChatID:      telego.ChatID{ID: chatID},
+			Text:        text,
+			ParseMode:   "HTML",
+			ReplyMarkup: inlineKb,
+		})
+	} else {
+		msg, err = b.client.SendMessage(context.Background(), &telego.SendMessageParams{
+			ChatID:    telego.ChatID{ID: chatID},
+			Text:      text,
+			ParseMode: "HTML",
+		})
+	}
+	if err != nil {
+		return err
+	}
+	chat.LastMsgID = int64(msg.MessageID)
+	b.chatRepo.Save(chat)
+	return nil
 }
 
 func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {

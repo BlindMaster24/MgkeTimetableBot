@@ -84,8 +84,9 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		text = b.loc("main_menu")
 	}
 
-	return b.SendTextWithReplyKeyboard(u.ChatID, text, replyMainMenu(b, chat))
+	return b.sendOrEdit(u.ChatID, text, chat, nil)
 }
+
 
 func randomKey(m map[string]any) string {
 	keys := make([]string, 0, len(m))
@@ -202,7 +203,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 		text = b.loc("need_group")
 	}
 
-	return b.SendTextWithReplyKeyboard(u.ChatID, text, replyMainMenu(b, chat))
+	return b.sendOrEdit(u.ChatID, text, chat, nil)
 }
 
 type weekCmd struct{ bot *Bot }

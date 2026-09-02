@@ -504,13 +504,13 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
 	msg = append(msg, b.callsLines(activeSaturday, userMax, full, []int{6}))
 
-	replyKb := replyMainMenu(b, chat)
+	text := strings.Join(msg, "\n")
 	if !full && userMax < maxLessons {
-		b.SendTextWithReplyKeyboard(u.ChatID, strings.Join(msg, "\n"), replyKb)
+		b.sendOrEdit(u.ChatID, text, chat, nil)
 		return
 	}
 
-	b.SendTextWithReplyKeyboard(u.ChatID, strings.Join(msg, "\n"), replyKb)
+	b.sendOrEdit(u.ChatID, text, chat, nil)
 }
 
 func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {

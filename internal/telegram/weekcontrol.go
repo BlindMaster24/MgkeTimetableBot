@@ -197,7 +197,7 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 	}
 
 	kb := b.weekControlKeyboard(typeName, p.Value, p.WeekIndex, chat.HidePastDays)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
+	return b.sendOrEdit(u.ChatID, text, chat, kb)
 }
 
 func extractDaysFromRange(data any, minIdx, maxIdx int) []map[string]any {
@@ -258,7 +258,7 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 		}
 
 		kb := b.weekControlKeyboard("group", chat.Group, week.Value(), chat.HidePastDays)
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
+		return b.sendOrEdit(u.ChatID, text, chat, kb)
 
 	case ModeTeacher:
 		if chat.Teacher == "" {
@@ -282,7 +282,7 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 		}
 
 		kb := b.weekControlKeyboard("teacher", chat.Teacher, week.Value(), chat.HidePastDays)
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
+		return b.sendOrEdit(u.ChatID, text, chat, kb)
 	}
 
 	return u.Bot.SendText(u.ChatID, b.loc("need_group"))
