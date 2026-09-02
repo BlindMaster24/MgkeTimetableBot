@@ -240,8 +240,14 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 		}
 
 		days := extractDaysFromRange(data, minIdx, maxIdx)
+		allDays := days
 		if chat.HidePastDays {
 			days = removePastDays(days)
+			if len(days) == 0 && len(allDays) > 0 {
+				week = utils.WeekIndexFromNumber(week.Value() + 1)
+				minIdx, maxIdx = week.WeekDayIndexRange()
+				days = extractDaysFromRange(data, minIdx, maxIdx)
+			}
 		}
 
 		opts := b.fmtOpts(chat, false)
