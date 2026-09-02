@@ -44,11 +44,12 @@ type CallsSchedule struct {
 }
 
 type CallsCache struct {
-	Site     CallsSource `json:"site"`
-	Manual   CallsSource `json:"manual"`
-	Active   CallsActive `json:"active"`
-	Update   int64       `json:"update"`
-	Changed  int64       `json:"changed"`
+	Site         CallsSource `json:"site"`
+	Manual       CallsSource `json:"manual"`
+	Active       CallsActive `json:"active"`
+	Update       int64       `json:"update"`
+	Changed      int64       `json:"changed"`
+	ManualReason string      `json:"manualReason"`
 }
 
 type RaspCache struct {
@@ -181,6 +182,9 @@ func (c *RaspCache) SetCalls(site Schedule, manual Schedule, source string) {
 	defer c.mu.Unlock()
 
 	now := time.Now().UnixMilli()
+	if source == "site" {
+		c.Calls.ManualReason = ""
+	}
 
 	c.Calls.Site = CallsSource{
 		Schedule:  CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
@@ -354,6 +358,7 @@ func (c *RaspCache) SetCallsManual(weekdays, saturday [][2][2]string, reason str
 		Hash:      hashSchedule(Schedule{Weekdays: weekdays, Saturday: saturday}),
 	}
 	c.Calls.Manual = manuallySet
+	c.Calls.ManualReason = reason
 	c.Calls.Active = CallsActive{
 		Schedule:  manuallySet.Schedule,
 		UpdatedAt: now,

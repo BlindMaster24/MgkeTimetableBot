@@ -24,6 +24,9 @@ type startCmd struct{ bot *Bot }
 
 func (c *startCmd) Name() string        { return "/start" }
 func (c *startCmd) Description() string { return c.bot.loc("cmd_start") }
+func (c *startCmd) MatchText(text string) bool {
+	return text == "Начать" || text == "Start" || text == "Меню" || text == "Главное меню"
+}
 func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -108,7 +111,7 @@ type cancelCmd struct{ bot *Bot }
 func (c *cancelCmd) Name() string        { return "/cancel" }
 func (c *cancelCmd) Description() string { return c.bot.loc("cmd_cancel") }
 func (c *cancelCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_cancel")
+	return text == c.bot.loc("button_cancel") || text == "Отмена"
 }
 func (c *cancelCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
@@ -251,12 +254,7 @@ func (c *groupCmd) MatchText(text string) bool {
 	return text == c.bot.loc("button_group")
 }
 func (c *groupCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err == nil {
-		chat.Scene = "set_group"
-		c.bot.chatRepo.Save(chat)
-	}
-	return u.Bot.SendText(u.ChatID, c.bot.loc("enter_group_number"))
+	return c.bot.startGetGroup(u, "day")
 }
 
 type teacherCmd struct{ bot *Bot }
@@ -267,12 +265,7 @@ func (c *teacherCmd) MatchText(text string) bool {
 	return text == c.bot.loc("button_teacher")
 }
 func (c *teacherCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err == nil {
-		chat.Scene = "set_teacher"
-		c.bot.chatRepo.Save(chat)
-	}
-	return u.Bot.SendText(u.ChatID, c.bot.loc("enter_teacher_name"))
+	return c.bot.startGetTeacher(u, "day")
 }
 
 type settingsCmd struct{ bot *Bot }
@@ -488,6 +481,14 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	case "set_teacher":
 		b.handleSetTeacher(ctx, u, chat)
 		return
+	case "get_group:day", "get_group:week", "get_group:image", "get_group:set":
+		kind := strings.TrimPrefix(chat.Scene, "get_group:")
+		b.resolveGroupInput(u, chat, strings.TrimSpace(u.Text), kind)
+		return
+	case "get_teacher:day", "get_teacher:week", "get_teacher:image", "get_teacher:set":
+		kind := strings.TrimPrefix(chat.Scene, "get_teacher:")
+		b.resolveTeacherInput(u, chat, strings.TrimSpace(u.Text), kind)
+		return
 	case "sub_add_group":
 		b.handleSubAddGroup(ctx, u, chat)
 		return
@@ -512,10 +513,16 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	case "alias_add":
 		b.handleAliasAdd(ctx, u, chat)
 		return
-	case "compare_groups_input":
-		scene := &compareGroupsInputScene{bot: b}
+	case "compare_groups_a":
+		scene := &compareGroupsStepA{bot: b}
 		scene.Handle(ctx, u, chat)
 		return
+	case "compare_groups_input", "compare_groups_b:":
+		if strings.HasPrefix(chat.Scene, "compare_groups_input") {
+			scene := &compareGroupsInputScene{bot: b}
+			scene.Handle(ctx, u, chat)
+			return
+		}
 	}
 
 	for _, cmd := range b.commands {
@@ -560,17 +567,10 @@ func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 
 	chat.Group = matched
 	chat.Mode = ModeStudent
+	chat.Teacher = ""
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": matched}))
-
-	data, ok := groups[matched]
-	if ok {
-		text := b.formatGroupFull(chat, matched, data)
-		if text != "" {
-			b.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
-		}
-	}
+	b.SendTextWithKeyboard(u.ChatID, b.loc("about_bot"), b.mainMenuKeyboard(chat))
 }
 
 func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
@@ -589,17 +589,10 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 
 	chat.Teacher = matched
 	chat.Mode = ModeTeacher
+	chat.Group = ""
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	b.SendText(u.ChatID, b.locData("keyboard_select", map[string]interface{}{"Value": matched}))
-
-	data, ok := teachers[matched]
-	if ok {
-		text := b.formatTeacherFull(chat, matched, data)
-		if text != "" {
-			b.SendTextWithKeyboard(u.ChatID, text, b.mainMenuKeyboard(chat))
-		}
-	}
+	b.SendTextWithKeyboard(u.ChatID, b.loc("about_bot"), b.mainMenuKeyboard(chat))
 }
 
 func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {

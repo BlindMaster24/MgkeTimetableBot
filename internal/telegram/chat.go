@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"database/sql"
+	"encoding/json"
 	"sync"
 
 	_ "modernc.org/sqlite"
@@ -49,6 +50,8 @@ type Chat struct {
 	DiffShowBeforeAfter   bool
 	DiffMaxLines          int
 	Ref                   string
+	HistoryGroup          []string
+	HistoryTeacher        []string
 }
 
 type Repository struct {
@@ -109,10 +112,25 @@ func (r *Repository) migrate() error {
 		diff_show_before_after INTEGER NOT NULL DEFAULT 1,
 		diff_max_lines INTEGER NOT NULL DEFAULT 20,
 		ref TEXT,
+		history_group TEXT NOT NULL DEFAULT '[]',
+		history_teacher TEXT NOT NULL DEFAULT '[]',
 		UNIQUE(service, peer_id)
 	)`)
 	if err != nil {
 		return err
+	}
+
+	for _, col := range []struct{ name, ddl string }{
+		{"history_group", "ALTER TABLE bot_chats ADD COLUMN history_group TEXT NOT NULL DEFAULT '[]'"},
+		{"history_teacher", "ALTER TABLE bot_chats ADD COLUMN history_teacher TEXT NOT NULL DEFAULT '[]'"},
+	} {
+		var count int
+		r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count)
+		if count == 0 {
+			if _, err := r.db.Exec(col.ddl); err != nil {
+				return err
+			}
+		}
 	}
 
 	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_chats_peer ON bot_chats(service, peer_id)`)
@@ -147,7 +165,8 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		        delete_last_msg, last_msg_id, allow_send_mess, notice_changes,
 		        notice_next_week, notice_calls, notice_parser_errors,
 		        show_parser_time, show_hints, diff_enabled, diff_auto_in_week,
-		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref
+		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref,
+		        history_group, history_teacher
 		 FROM bot_chats WHERE service = ? AND peer_id = ?`,
 		service, peerID,
 	)
@@ -158,6 +177,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	var showParserTime, showHints, diffEnabled, diffAutoInWeek, diffAutoInUpdates, diffShowBeforeAfter int
 
 	var nsScene, nsMode, nsGroup, nsTeacher, nsGoogleEmail, nsRef sql.NullString
+	var nsHistoryGroup, nsHistoryTeacher sql.NullString
 	err := row.Scan(
 		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &nsScene, &nsMode,
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
@@ -165,7 +185,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		&hidePastDays, &deleteLastMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
 		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &showParserTime, &showHints,
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
-		&chat.DiffMaxLines, &nsRef,
+		&chat.DiffMaxLines, &nsRef, &nsHistoryGroup, &nsHistoryTeacher,
 	)
 	if err != nil {
 		return nil, err
@@ -176,6 +196,8 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	chat.Teacher = nsTeacher.String
 	chat.GoogleEmail = nsGoogleEmail.String
 	chat.Ref = nsRef.String
+	_ = json.Unmarshal([]byte(nsHistoryGroup.String), &chat.HistoryGroup)
+	_ = json.Unmarshal([]byte(nsHistoryTeacher.String), &chat.HistoryTeacher)
 
 	chat.Accepted = accepted != 0
 	chat.ShowAbout = showAbout != 0
@@ -205,6 +227,43 @@ func (r *Repository) SetScene(chat *Chat, scene string) {
 	chat.Scene = scene
 }
 
+func marshalStringSlice(s []string) string {
+	if len(s) == 0 {
+		return "[]"
+	}
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+func (chat *Chat) AppendGroupHistory(group string) {
+	history := []string{group}
+	for _, g := range chat.HistoryGroup {
+		if g != group {
+			history = append(history, g)
+		}
+	}
+	if len(history) > 5 {
+		history = history[:5]
+	}
+	chat.HistoryGroup = history
+}
+
+func (chat *Chat) AppendTeacherHistory(teacher string) {
+	history := []string{teacher}
+	for _, t := range chat.HistoryTeacher {
+		if t != teacher {
+			history = append(history, t)
+		}
+	}
+	if len(history) > 5 {
+		history = history[:5]
+	}
+	chat.HistoryTeacher = history
+}
+
 func (r *Repository) Save(chat *Chat) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -224,7 +283,8 @@ func (r *Repository) Save(chat *Chat) error {
 			delete_last_msg=?, last_msg_id=?, allow_send_mess=?, notice_changes=?,
 			notice_next_week=?, notice_calls=?, notice_parser_errors=?,
 			show_parser_time=?, show_hints=?, diff_enabled=?, diff_auto_in_week=?,
-			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?
+			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?,
+			history_group=?, history_teacher=?
 		 WHERE id=?`,
 		toInt(chat.Accepted), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
 		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
@@ -234,7 +294,8 @@ func (r *Repository) Save(chat *Chat) error {
 		toInt(chat.NoticeNextWeek), toInt(chat.NoticeCalls), toInt(chat.NoticeParserErrors),
 		toInt(chat.ShowParserTime), toInt(chat.ShowHints), toInt(chat.DiffEnabled),
 		toInt(chat.DiffAutoInWeek), toInt(chat.DiffAutoInUpdates), toInt(chat.DiffShowBeforeAfter),
-		chat.DiffMaxLines, chat.Ref, chat.ID,
+		chat.DiffMaxLines, chat.Ref,
+		marshalStringSlice(chat.HistoryGroup), marshalStringSlice(chat.HistoryTeacher), chat.ID,
 	)
 	return err
 }

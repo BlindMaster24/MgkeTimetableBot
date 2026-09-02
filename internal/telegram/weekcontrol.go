@@ -53,6 +53,8 @@ func (b *Bot) weekControlKeyboard(typeName, value string, weekIndex int, hidePas
 	minWeek := 0
 	maxWeek := currentWeek.Value() + 2
 
+	typeLetter := string(typeName[0])
+
 	keyboard := &telego.InlineKeyboardMarkup{
 		InlineKeyboard: make([][]telego.InlineKeyboardButton, 0),
 	}
@@ -62,21 +64,21 @@ func (b *Bot) weekControlKeyboard(typeName, value string, weekIndex int, hidePas
 	if weekIndex-1 >= minWeek {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "⬅️",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%v:%v", typeName, value, weekIndex-1, boolToInt(hidePastDays), false),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%s:0", typeLetter, value, weekIndex-1, boolToInt(hidePastDays)),
 		})
 	}
 
 	if hidePastDays && weekIndex == currentWeek.Value() {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "🔼",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%v:%v", typeName, value, weekIndex, false, false),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:0:0", typeLetter, value, weekIndex),
 		})
 	}
 
 	if weekIndex+1 <= maxWeek {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "➡️",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%v:%v", typeName, value, weekIndex+1, boolToInt(hidePastDays), false),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%s:0", typeLetter, value, weekIndex+1, boolToInt(hidePastDays)),
 		})
 	}
 

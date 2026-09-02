@@ -194,11 +194,21 @@ func (cb *setupCb) Handler(ctx context.Context, u *Update) error {
 
 	switch mode {
 	case "student", "parent":
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("enter_group_number"))
+		groups := cb.bot.cache.GetGroups()
+		if len(groups) == 0 {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+		}
+		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_group_number"), randomKey(groups))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cancelKeyboard(cb.bot.i18n.T))
 	case "teacher":
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("enter_teacher_name"))
+		teachers := cb.bot.cache.GetTeachers()
+		if len(teachers) == 0 {
+			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+		}
+		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_teacher_name"), randomKey(teachers))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cancelKeyboard(cb.bot.i18n.T))
 	default:
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("mode_guest"))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("about_bot"), cb.bot.mainMenuKeyboard(chat))
 	}
 }
 
@@ -210,17 +220,37 @@ func (cb *aboutCb) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, cb.bot.loc("about_bot"))
 }
 
+type answerCb struct{ bot *Bot }
+
+func (cb *answerCb) Prefix() string { return "answer:" }
+func (cb *answerCb) Handler(ctx context.Context, u *Update) error {
+	answer := strings.TrimPrefix(u.Data, "answer:")
+	cb.bot.AnswerCallback(u.Callback.ID, fmt.Sprintf("Выбрано: \"%s\"", answer))
+	if _, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID); err != nil {
+		return nil
+	}
+	u.Text = answer
+	cb.bot.handleMessageText(ctx, u)
+	return nil
+}
+
 type groupCb struct{ bot *Bot }
 
 func (cb *groupCb) Prefix() string { return "group" }
 func (cb *groupCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err == nil {
-		chat.Scene = "set_group"
-		cb.bot.chatRepo.Save(chat)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendText(u.ChatID, cb.bot.loc("enter_group_number"))
+	chat.Scene = "get_group"
+	cb.bot.chatRepo.Save(chat)
+	groups := cb.bot.cache.GetGroups()
+	if len(groups) == 0 {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
+	prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_group_number"), randomKey(groups))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
 }
 
 type teacherCb struct{ bot *Bot }
@@ -229,11 +259,17 @@ func (cb *teacherCb) Prefix() string { return "teacher" }
 func (cb *teacherCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err == nil {
-		chat.Scene = "set_teacher"
-		cb.bot.chatRepo.Save(chat)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendText(u.ChatID, cb.bot.loc("enter_teacher_name"))
+	chat.Scene = "get_teacher"
+	cb.bot.chatRepo.Save(chat)
+	teachers := cb.bot.cache.GetTeachers()
+	if len(teachers) == 0 {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
+	prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_teacher_name"), randomKey(teachers))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
 type settingsCb struct{ bot *Bot }
@@ -330,6 +366,8 @@ func (cb *fmtSelectCb) Handler(ctx context.Context, u *Update) error {
 	if idx >= 0 && idx < len(formatter.AllFormatters) {
 		chat.Formatter = idx
 		cb.bot.chatRepo.Save(chat)
+		label := formatter.AllFormatters[idx].Label()
+		return u.Bot.SendTextWithKeyboard(u.ChatID, fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", label), cb.bot.formatterKeyboard(chat))
 	}
 
 	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
@@ -449,18 +487,23 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 	}
 
 	userMax := maxLessons
-	if !full {
-		current := countCurrentLessons(chat, b.cache)
-		if current > 0 && current < maxLessons {
-			userMax = current
-		}
+	current := countCurrentLessons(chat, b.cache)
+	if !full && current > 0 && current < maxLessons {
+		userMax = current
+	}
+	if current > 0 && current >= maxLessons {
+		full = true
 	}
 
 	var msg []string
+	calls := b.cache.GetCalls()
+	if calls.Active.Source == "manual" && calls.ManualReason != "" {
+		msg = append(msg, fmt.Sprintf("Причина: %s\n", calls.ManualReason))
+	}
 	msg = append(msg, "__ <b>Звонки (будни)</b> __")
-	msg = append(msg, b.callsLines(activeWeekdays, userMax))
+	msg = append(msg, b.callsLines(activeWeekdays, userMax, full))
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
-	msg = append(msg, b.callsLines(activeSaturday, userMax))
+	msg = append(msg, b.callsLines(activeSaturday, userMax, full))
 
 	if !full && userMax < maxLessons {
 		kb := &telego.InlineKeyboardMarkup{
@@ -491,20 +534,33 @@ func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {
 	}
 	if data == nil {
 		return 0
+	}
+	daysRaw, ok := data.(map[string]any)
+	if !ok {
+		return 0
+	}
+	daysArr, ok := daysRaw["days"].([]any)
+	if !ok {
+		return 0
+	}
+	maxLessons := 0
+	for _, d := range daysArr {
+		dayMap, ok := d.(map[string]any)
+		if !ok {
+			continue
 		}
-	if daysRaw, ok := data.(map[string]any); ok {
-		if daysArr, ok := daysRaw["days"].([]any); ok && len(daysArr) > 0 {
-			if dayMap, ok := daysArr[0].(map[string]any); ok {
-				if lessons, ok := dayMap["lessons"].([]any); ok {
-					return len(lessons)
-				}
-			}
+		lessons, ok := dayMap["lessons"].([]any)
+		if !ok {
+			continue
+		}
+		if len(lessons) > maxLessons {
+			maxLessons = len(lessons)
 		}
 	}
-	return 0
+	return maxLessons
 }
 
-func (b *Bot) callsLines(slots [][2][2]string, maxLessons int) string {
+func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool) string {
 	now := time.Now()
 	weekday := now.Weekday()
 
@@ -516,7 +572,7 @@ func (b *Bot) callsLines(slots [][2][2]string, maxLessons int) string {
 		slot := slots[i]
 		line := fmt.Sprintf("%d. %s - %s | %s - %s", i+1, slot[0][0], slot[0][1], slot[1][0], slot[1][1])
 
-		if isNowInSlot(weekday, slot) {
+		if !showFull && isNowInSlot(weekday, slot) {
 			line = "👉 " + line + " 👈"
 		}
 

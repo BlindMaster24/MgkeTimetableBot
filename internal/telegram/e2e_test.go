@@ -311,6 +311,8 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/cabinet", "/groups", "/teachers", "/comparegroups",
 		"/ping", "/ics", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
+		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
+		"/setgroup", "/setteacher",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))
@@ -333,7 +335,7 @@ func TestE2E_AllCallbacksRegistered(t *testing.T) {
 		"main_menu", "diff_menu", "diff_advanced", "diff_toggle:", "calls_menu",
 		"calls_show", "calls_refresh", "calls_source:", "calls_source_reset",
 		"schedules_menu", "current_settings", "subs_menu",
-		"timetable_g:", "timetable_t:",
+		"timetable_g:", "timetable_t:", "answer:",
 	}
 	for _, prefix := range expected {
 		found := false
@@ -696,7 +698,7 @@ func TestE2E_CallsScheduleDisplay(t *testing.T) {
 		t.Error("empty saturday calls")
 	}
 
-	textWd := b.callsLines(wd, 2)
+	textWd := b.callsLines(wd, 2, false)
 	if textWd == "" {
 		t.Error("callsLines empty")
 	}
@@ -1044,4 +1046,178 @@ func TestE2E_GoogleCalendarAddNoMode(t *testing.T) {
 		t.Error("expected empty mode")
 	}
 	_ = b
+}
+
+func TestE2E_GroupHistoryAppendAndKeyboard(t *testing.T) {
+	_, repo := setupE2EBot(t)
+	userID := int64(4242)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.AppendGroupHistory("100")
+	repo.Save(chat)
+
+	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if len(loaded.HistoryGroup) != 1 || loaded.HistoryGroup[0] != "100" {
+		t.Fatalf("history: %v", loaded.HistoryGroup)
+	}
+
+	loaded.AppendGroupHistory("100")
+	if len(loaded.HistoryGroup) != 1 {
+		t.Error("duplicate history entry added")
+	}
+
+	loaded.AppendGroupHistory("200")
+	repo.Save(loaded)
+	again, _ := repo.FindOrCreate("telegram", userID)
+	if len(again.HistoryGroup) != 2 || again.HistoryGroup[0] != "200" {
+		t.Fatalf("history after append: %v", again.HistoryGroup)
+	}
+
+	kb := groupHistoryKeyboard(again)
+	if len(kb.InlineKeyboard) != 2 {
+		t.Fatalf("keyboard rows: %d", len(kb.InlineKeyboard))
+	}
+	if kb.InlineKeyboard[0][0].Text != "200" {
+		t.Errorf("first row: %q", kb.InlineKeyboard[0][0].Text)
+	}
+
+	withCancel := withCancelButton(groupHistoryKeyboard(again))
+	if len(withCancel.InlineKeyboard) != 3 {
+		t.Errorf("cancel row missing")
+	}
+	if withCancel.InlineKeyboard[2][0].CallbackData != "cancel" {
+		t.Errorf("cancel cb: %q", withCancel.InlineKeyboard[2][0].CallbackData)
+	}
+}
+
+func TestE2E_TeacherHistoryDedup(t *testing.T) {
+	_, repo := setupE2EBot(t)
+	userID := int64(4243)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.AppendTeacherHistory("Иванов И.И.")
+	chat.AppendTeacherHistory("Петров П.П.")
+	chat.AppendTeacherHistory("Иванов И.И.")
+	repo.Save(chat)
+
+	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if len(loaded.HistoryTeacher) != 2 {
+		t.Fatalf("history: %v", loaded.HistoryTeacher)
+	}
+	if loaded.HistoryTeacher[0] != "Иванов И.И." {
+		t.Errorf("recent first: %v", loaded.HistoryTeacher)
+	}
+}
+
+func TestE2E_MatchTeacherList(t *testing.T) {
+	_, _ = setupE2EBot(t)
+
+	candidates := map[string]any{
+		"Иванов И.И.":   struct{}{},
+		"Иванова А.А.":  struct{}{},
+		"Петров П.П.":   struct{}{},
+		"Сидоров С.С.":  struct{}{},
+		"Козлов К.К.":   struct{}{},
+		"Николаев Н.Н.": struct{}{},
+	}
+
+	matched, tooMany := matchTeacherList("иванов", candidates)
+	if len(matched) != 2 || tooMany {
+		t.Fatalf("matched: %v tooMany: %v", matched, tooMany)
+	}
+
+	matched, tooMany = matchTeacherList("петров п.п.", candidates)
+	if len(matched) != 1 || tooMany {
+		t.Fatalf("exact match failed: %v %v", matched, tooMany)
+	}
+
+	matched, tooMany = matchTeacherList("ов", candidates)
+	if len(matched) != 5 || tooMany {
+		t.Errorf("broad search: %d matches, tooMany=%v", len(matched), tooMany)
+	}
+
+	matched, _ = matchTeacherList("несуществующий", candidates)
+	if len(matched) != 0 {
+		t.Errorf("expected no match, got %v", matched)
+	}
+}
+
+func TestE2E_VerticalValuesKeyboard(t *testing.T) {
+	kb := verticalValuesKeyboard([]string{"Иванов И.И.", "Петров П.П."})
+	if len(kb.InlineKeyboard) != 2 {
+		t.Fatalf("rows: %d", len(kb.InlineKeyboard))
+	}
+	if kb.InlineKeyboard[0][0].CallbackData != "answer:Иванов И.И." {
+		t.Errorf("cb data: %q", kb.InlineKeyboard[0][0].CallbackData)
+	}
+}
+
+func TestE2E_GetWeekTimetableKeyboard(t *testing.T) {
+	kb := getWeekTimetableKeyboard("group", "100")
+	if kb.InlineKeyboard[0][0].Text != "На неделю" {
+		t.Errorf("label: %q", kb.InlineKeyboard[0][0].Text)
+	}
+	if kb.InlineKeyboard[0][0].CallbackData != "timetable_g:100:0:0:1" {
+		t.Errorf("cb data: %q", kb.InlineKeyboard[0][0].CallbackData)
+	}
+}
+
+func TestE2E_WeekControlKeyboardPrefix(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	kb := b.weekControlKeyboard("group", "100", utils.WeekIndexFromDate(time.Now()).Value(), false)
+
+	for _, row := range kb.InlineKeyboard {
+		for _, btn := range row {
+			if strings.HasPrefix(btn.CallbackData, "timetable_group") || strings.HasPrefix(btn.CallbackData, "timetable_teacher") {
+				t.Errorf("long prefix in callback: %q", btn.CallbackData)
+			}
+		}
+	}
+
+	first := kb.InlineKeyboard[0][0].CallbackData
+	if !strings.HasPrefix(first, "timetable_g:") {
+		t.Errorf("first cb: %q", first)
+	}
+}
+
+func TestE2E_GroupCommandSetsScene(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(5252)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Scene = "get_group:day"
+	repo.Save(chat)
+
+	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if loaded.Scene != "get_group:day" {
+		t.Fatalf("scene: %q", loaded.Scene)
+	}
+
+	groups := b.cache.GetGroups()
+	if len(groups) == 0 {
+		t.Fatal("no groups in cache")
+	}
+}
+
+func TestE2E_CallsManualReason(t *testing.T) {
+	b, _ := setupE2EBot(t)
+
+	b.cache.SetCallsManual(
+		[][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}},
+		[][2][2]string{{{"09:00", "09:45"}}},
+		"Технический перерыв",
+	)
+
+	calls := b.cache.GetCalls()
+	if calls.Active.Source != "manual" {
+		t.Errorf("source: %q", calls.Active.Source)
+	}
+	if calls.ManualReason != "Технический перерыв" {
+		t.Errorf("reason: %q", calls.ManualReason)
+	}
+
+	line := b.callsLines(calls.Active.Schedule.Weekdays, 1, true)
+	if !strings.Contains(line, "08:00") {
+		t.Errorf("line: %q", line)
+	}
 }

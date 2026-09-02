@@ -56,6 +56,54 @@ func cancelKeyboard(loc func(string, string, map[string]interface{}) string) *te
 	}
 }
 
+func withCancelButton(kb *telego.InlineKeyboardMarkup) *telego.InlineKeyboardMarkup {
+	if kb == nil {
+		kb = &telego.InlineKeyboardMarkup{}
+	}
+	kb.InlineKeyboard = append(kb.InlineKeyboard, []telego.InlineKeyboardButton{
+		{Text: "Отмена", CallbackData: "cancel"},
+	})
+	return kb
+}
+
+func groupHistoryKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	kb := &telego.InlineKeyboardMarkup{}
+	for _, g := range chat.HistoryGroup {
+		kb.InlineKeyboard = append(kb.InlineKeyboard, []telego.InlineKeyboardButton{
+			{Text: g, CallbackData: "answer:" + g},
+		})
+	}
+	return kb
+}
+
+func teacherHistoryKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
+	kb := &telego.InlineKeyboardMarkup{}
+	for _, t := range chat.HistoryTeacher {
+		kb.InlineKeyboard = append(kb.InlineKeyboard, []telego.InlineKeyboardButton{
+			{Text: t, CallbackData: "answer:" + t},
+		})
+	}
+	return kb
+}
+
+func verticalValuesKeyboard(values []string) *telego.InlineKeyboardMarkup {
+	kb := &telego.InlineKeyboardMarkup{}
+	for _, v := range values {
+		kb.InlineKeyboard = append(kb.InlineKeyboard, []telego.InlineKeyboardButton{
+			{Text: v, CallbackData: "answer:" + v},
+		})
+	}
+	return kb
+}
+
+func getWeekTimetableKeyboard(typeName, value string) *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: "На неделю", CallbackData: "timetable_" + string(typeName[0]) + ":" + value + ":0:0:1"}},
+		},
+	}
+}
+
 func selectModeKeyboard(loc func(string, string, map[string]interface{}) string) *telego.InlineKeyboardMarkup {
 	t := func(key string) string { return loc("ru", key, nil) }
 	return &telego.InlineKeyboardMarkup{
