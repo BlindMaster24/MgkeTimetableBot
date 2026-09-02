@@ -17,6 +17,12 @@ import (
 	"github.com/mymmrac/telego"
 )
 
+type parseLogEntry struct {
+	time    time.Time
+	success bool
+	msg     string
+}
+
 type Bot struct {
 	client    *telego.Bot
 	cfg       *config.Config
@@ -31,6 +37,7 @@ type Bot struct {
 	startTime time.Time
 	archive   any
 	aliasRepo *AliasRepository
+	parseLogs []parseLogEntry
 }
 
 type Update struct {
@@ -487,4 +494,16 @@ func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {
 			os.Remove(filepath.Join(dir, entry.Name()))
 		}
 	}
+}
+
+func (b *Bot) AddParseLog(success bool, msg string) {
+	entry := parseLogEntry{time: time.Now(), success: success, msg: msg}
+	b.parseLogs = append(b.parseLogs, entry)
+	if len(b.parseLogs) > 50 {
+		b.parseLogs = b.parseLogs[len(b.parseLogs)-50:]
+	}
+}
+
+func (b *Bot) GetParseLogs() []parseLogEntry {
+	return b.parseLogs
 }

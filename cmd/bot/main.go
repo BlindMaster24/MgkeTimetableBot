@@ -110,7 +110,10 @@ func main() {
 		groupURL := cfg.Parser.Endpoints.TimetableGroup
 		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
 		err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
-		if err == nil {
+		if err != nil {
+			bot.AddParseLog(false, err.Error())
+		} else {
+			bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
 			go notifier.NotifyChanges(oldGroupsHash, oldTeachersHash)
 		}
 		return err
