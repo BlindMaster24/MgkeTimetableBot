@@ -10,8 +10,10 @@ import (
 
 type regexpCmd struct{ bot *Bot }
 
-func (c *regexpCmd) Name() string        { return "/regexp" }
-func (c *regexpCmd) Description() string { return "Отобразить все команды и регулярки" }
+func (c *regexpCmd) Name() string { return "/regexp" }
+func (c *regexpCmd) Description() string {
+	return "Отобразить все команды и регулярки"
+}
 func (c *regexpCmd) MatchText(text string) bool {
 	return text == "/regexp"
 }
@@ -39,8 +41,10 @@ func (c *vanishCmd) Handler(ctx context.Context, u *Update) error {
 
 type parserLogsCmd struct{ bot *Bot }
 
-func (c *parserLogsCmd) Name() string        { return "/parserLogs" }
-func (c *parserLogsCmd) Description() string { return "Логи последних обновлений парсера" }
+func (c *parserLogsCmd) Name() string { return "/parserLogs" }
+func (c *parserLogsCmd) Description() string {
+	return "Логи последних обновлений парсера"
+}
 func (c *parserLogsCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return lower == "/parserlogs" || lower == "/updaterlogs" || lower == "/getparserlogs" || lower == "/getupdaterlogs"
@@ -70,8 +74,10 @@ func (c *parserLogsCmd) Handler(ctx context.Context, u *Update) error {
 
 type requireNewButtonsCmd struct{ bot *Bot }
 
-func (c *requireNewButtonsCmd) Name() string        { return "/requireNewButtons" }
-func (c *requireNewButtonsCmd) Description() string { return "Обновить клавиатуру пользователям" }
+func (c *requireNewButtonsCmd) Name() string { return "/requireNewButtons" }
+func (c *requireNewButtonsCmd) Description() string {
+	return "Обновить клавиатуру пользователям"
+}
 func (c *requireNewButtonsCmd) MatchText(text string) bool {
 	return text == "/requireNewButtons"
 }

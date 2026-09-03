@@ -545,8 +545,10 @@ func parseCallRow(line string) *[2][2]string {
 
 type pingCmd struct{ bot *Bot }
 
-func (c *pingCmd) Name() string        { return "/ping" }
-func (c *pingCmd) Description() string { return "Проверка работоспособности бота" }
+func (c *pingCmd) Name() string { return "/ping" }
+func (c *pingCmd) Description() string {
+	return "Проверка работоспособности бота"
+}
 func (c *pingCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, "pong")
 }
@@ -635,17 +637,19 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 	defer f.Close()
 
 	_, err = bot.client.SendDocument(context.Background(), &telego.SendDocumentParams{
-		ChatID: telego.ChatID{ID: u.ChatID},
+		ChatID:   telego.ChatID{ID: u.ChatID},
 		Document: telego.InputFile{File: f},
-		Caption: fmt.Sprintf("📅 Расписание %s %s, учебная неделя №%d", typeName, value, weekNum),
+		Caption:  fmt.Sprintf("📅 Расписание %s %s, учебная неделя №%d", typeName, value, weekNum),
 	})
 	return err
 }
 
 type subscriptionsTestCmd struct{ bot *Bot }
 
-func (c *subscriptionsTestCmd) Name() string        { return "/subscriptions_test" }
-func (c *subscriptionsTestCmd) Description() string { return "Тестовое уведомление по подпискам" }
+func (c *subscriptionsTestCmd) Name() string { return "/subscriptions_test" }
+func (c *subscriptionsTestCmd) Description() string {
+	return "Тестовое уведомление по подпискам"
+}
 func (c *subscriptionsTestCmd) MatchText(text string) bool {
 	return text == "🧪 Проверить" || text == "/subscriptions_test"
 }
@@ -735,8 +739,10 @@ func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *C
 
 type archiveCmd struct{ bot *Bot }
 
-func (c *archiveCmd) Name() string        { return "/archive" }
-func (c *archiveCmd) Description() string { return "Архив расписания за прошедшие дни" }
+func (c *archiveCmd) Name() string { return "/archive" }
+func (c *archiveCmd) Description() string {
+	return "Архив расписания за прошедшие дни"
+}
 func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -904,8 +910,10 @@ func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
 
 type endingsCmd struct{ bot *Bot }
 
-func (c *endingsCmd) Name() string        { return "/endings" }
-func (c *endingsCmd) Description() string { return "Сколько групп заканчивают к определённой паре" }
+func (c *endingsCmd) Name() string { return "/endings" }
+func (c *endingsCmd) Description() string {
+	return "Сколько групп заканчивают к определённой паре"
+}
 func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 	groups := c.bot.cache.GetGroups()
 	if len(groups) == 0 {
@@ -937,18 +945,18 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 					continue
 				}
 				switch v := l.(type) {
-					case map[string]any:
-						if _, ok := v["lesson"]; ok {
-							lastLesson = i
-						}
-					case []any:
-						for _, sub := range v {
-							if subMap, ok := sub.(map[string]any); ok {
-								if _, ok := subMap["lesson"]; ok {
-									lastLesson = i
-								}
+				case map[string]any:
+					if _, ok := v["lesson"]; ok {
+						lastLesson = i
+					}
+				case []any:
+					for _, sub := range v {
+						if subMap, ok := sub.(map[string]any); ok {
+							if _, ok := subMap["lesson"]; ok {
+								lastLesson = i
 							}
 						}
+					}
 				}
 			}
 			if lastLesson == -1 {

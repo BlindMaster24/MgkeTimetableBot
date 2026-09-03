@@ -18,40 +18,40 @@ const (
 )
 
 type Chat struct {
-	ID                    int64
-	Service               string
-	PeerID                int64
-	Accepted              bool
-	Scene                 string
-	Mode                  ChatMode
-	Group                 string
-	Teacher               string
-	GoogleEmail           string
-	Formatter             int
-	ShowAbout             bool
-	ShowDaily             bool
-	ShowWeekly            bool
-	ShowCalls             bool
-	ShowFastGroup         bool
-	ShowFastTeacher       bool
-	HidePastDays          bool
-	DeleteLastMsg         bool
-	LastMsgID             int64
-	AllowSendMess         bool
-	NoticeChanges         bool
-	NoticeNextWeek        bool
-	NoticeCalls           bool
-	NoticeParserErrors    bool
-	ShowParserTime        bool
-	ShowHints             bool
-	DiffEnabled           bool
-	DiffAutoInWeek        bool
-	DiffAutoInUpdates     bool
-	DiffShowBeforeAfter   bool
-	DiffMaxLines          int
-	Ref                   string
-	HistoryGroup          []string
-	HistoryTeacher        []string
+	ID                  int64
+	Service             string
+	PeerID              int64
+	Accepted            bool
+	Scene               string
+	Mode                ChatMode
+	Group               string
+	Teacher             string
+	GoogleEmail         string
+	Formatter           int
+	ShowAbout           bool
+	ShowDaily           bool
+	ShowWeekly          bool
+	ShowCalls           bool
+	ShowFastGroup       bool
+	ShowFastTeacher     bool
+	HidePastDays        bool
+	DeleteLastMsg       bool
+	LastMsgID           int64
+	AllowSendMess       bool
+	NoticeChanges       bool
+	NoticeNextWeek      bool
+	NoticeCalls         bool
+	NoticeParserErrors  bool
+	ShowParserTime      bool
+	ShowHints           bool
+	DiffEnabled         bool
+	DiffAutoInWeek      bool
+	DiffAutoInUpdates   bool
+	DiffShowBeforeAfter bool
+	DiffMaxLines        int
+	Ref                 string
+	HistoryGroup        []string
+	HistoryTeacher      []string
 }
 
 type Repository struct {
@@ -490,10 +490,10 @@ func (r *Repository) CountByMode() (map[string]int, error) {
 }
 
 type Subscription struct {
-	ID    int64
+	ID     int64
 	ChatID int64
-	Type  string
-	Value string
+	Type   string
+	Value  string
 }
 
 func (r *Repository) migrateSubscriptions() error {

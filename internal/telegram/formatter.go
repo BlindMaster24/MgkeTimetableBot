@@ -65,8 +65,6 @@ func (b *Bot) formatTeacherDay(chat *Chat, data any) string {
 	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, getDayRasp(extractDays(data)), b.fmtOpts(chat, true))
 }
 
-
-
 func (b *Bot) formatGroupFull(chat *Chat, group string, data any) string {
 	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(group, extractDays(data), b.fmtOpts(chat, true))
 }

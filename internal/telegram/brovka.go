@@ -13,8 +13,10 @@ import (
 
 type brovkaCmd struct{ bot *Bot }
 
-func (c *brovkaCmd) Name() string        { return "/vychetkaDlyaBrovkiDSOnline" }
-func (c *brovkaCmd) Description() string { return "Отображает сколько групп заканчивают к определённой паре" }
+func (c *brovkaCmd) Name() string { return "/vychetkaDlyaBrovkiDSOnline" }
+func (c *brovkaCmd) Description() string {
+	return "Отображает сколько групп заканчивают к определённой паре"
+}
 func (c *brovkaCmd) MatchText(text string) bool {
 	return strings.HasPrefix(strings.ToLower(text), "/vychetkadlyabrovkidsonline")
 }
@@ -104,5 +106,3 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 
 	return u.Bot.SendDocument(u.ChatID, filename, encoded, "")
 }
-
-

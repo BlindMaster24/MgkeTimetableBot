@@ -137,7 +137,6 @@ func (b *Bot) showCurrentSettings(u *Update, chat *Chat) error {
 	return u.Bot.SendTextWithKeyboard(u.ChatID, b.currentSettingsText(chat), kb)
 }
 
-
 type schedulesMenuCb struct{ bot *Bot }
 
 func (cb *schedulesMenuCb) Prefix() string { return "schedules_menu" }
@@ -251,11 +250,15 @@ func (b *Bot) sendCallsShow(u *Update) error {
 
 func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	smile := func(v bool) string {
-		if v { return "🔈" }
+		if v {
+			return "🔈"
+		}
 		return "🔇"
 	}
 	yesNo := func(v bool) string {
-		if v { return "Да" }
+		if v {
+			return "Да"
+		}
 		return "Нет"
 	}
 	return &telego.InlineKeyboardMarkup{
@@ -270,11 +273,15 @@ func (b *Bot) noticeKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 
 func (b *Bot) viewKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
-		if v { return "✅" }
+		if v {
+			return "✅"
+		}
 		return "🚫"
 	}
 	yesNo := func(v bool) string {
-		if v { return "Да" }
+		if v {
+			return "Да"
+		}
 		return "Нет"
 	}
 	return &telego.InlineKeyboardMarkup{
@@ -289,7 +296,9 @@ func (b *Bot) viewKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 
 func (b *Bot) diffKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
-		if v { return "✅" }
+		if v {
+			return "✅"
+		}
 		return "🚫"
 	}
 	return &telego.InlineKeyboardMarkup{
@@ -304,7 +313,9 @@ func (b *Bot) diffKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 
 func (b *Bot) diffAdvancedKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	onOff := func(v bool) string {
-		if v { return "✅" }
+		if v {
+			return "✅"
+		}
 		return "🚫"
 	}
 	return &telego.InlineKeyboardMarkup{
@@ -329,7 +340,9 @@ func (b *Bot) schedulesKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 
 func (b *Bot) currentSettingsText(chat *Chat) string {
 	yesNo := func(v bool) string {
-		if v { return "да" }
+		if v {
+			return "да"
+		}
 		return "нет"
 	}
 	lines := []string{

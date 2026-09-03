@@ -19,8 +19,10 @@ func weekdayFromDate(date string) string {
 
 type getCabinetCmd struct{ bot *Bot }
 
-func (c *getCabinetCmd) Name() string        { return "/cabinet" }
-func (c *getCabinetCmd) Description() string { return "Получить информацию по кабинету" }
+func (c *getCabinetCmd) Name() string { return "/cabinet" }
+func (c *getCabinetCmd) Description() string {
+	return "Получить информацию по кабинету"
+}
 func (c *getCabinetCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return lower == "/cabinet" || strings.HasPrefix(lower, "/cabinet ") || strings.HasPrefix(lower, "/getcabinet ") || lower == "/getcabinet"
@@ -49,9 +51,9 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 		Subgroup int
 	}
 	type dayInfo struct {
-		Date     string
-		Weekday  string
-		Lessons  []lessonInfo
+		Date    string
+		Weekday string
+		Lessons []lessonInfo
 	}
 	info := make(map[string]map[string]*dayInfo)
 
@@ -90,17 +92,17 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 				if info[cab] == nil {
 					info[cab] = make(map[string]*dayInfo)
 				}
-					if info[cab][dayDate] == nil {
-						info[cab][dayDate] = &dayInfo{Date: dayDate, Weekday: weekdayFromDate(dayDate)}
-					}
+				if info[cab][dayDate] == nil {
+					info[cab][dayDate] = &dayInfo{Date: dayDate, Weekday: weekdayFromDate(dayDate)}
+				}
 				info[cab][dayDate].Lessons = append(info[cab][dayDate].Lessons, lessonInfo{
 					Index:    lessonIdx,
 					Lesson:   lessonName,
 					Type:     lessonType,
 					Group:    lessonGroup,
 					Teacher:  teacherName,
-					Subgroup: subgroup,					})
-				}
+					Subgroup: subgroup})
+			}
 		}
 	}
 
@@ -128,8 +130,10 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 
 type getGroupsCmd struct{ bot *Bot }
 
-func (c *getGroupsCmd) Name() string        { return "/groups" }
-func (c *getGroupsCmd) Description() string { return "Получить полный список групп в кэше бота" }
+func (c *getGroupsCmd) Name() string { return "/groups" }
+func (c *getGroupsCmd) Description() string {
+	return "Получить полный список групп в кэше бота"
+}
 func (c *getGroupsCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return lower == "/groups" || lower == "/getgroups"
@@ -155,8 +159,10 @@ func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 
 type getTeachersCmd struct{ bot *Bot }
 
-func (c *getTeachersCmd) Name() string        { return "/teachers" }
-func (c *getTeachersCmd) Description() string { return "Получить полный список преподавателей в кэше бота" }
+func (c *getTeachersCmd) Name() string { return "/teachers" }
+func (c *getTeachersCmd) Description() string {
+	return "Получить полный список преподавателей в кэше бота"
+}
 func (c *getTeachersCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return lower == "/teachers" || lower == "/getteachers"
@@ -188,8 +194,10 @@ func (c *getTeachersCmd) Handler(ctx context.Context, u *Update) error {
 
 type compareGroupsCmd struct{ bot *Bot }
 
-func (c *compareGroupsCmd) Name() string        { return "/comparegroups" }
-func (c *compareGroupsCmd) Description() string { return "Сравнить расписания двух групп" }
+func (c *compareGroupsCmd) Name() string { return "/comparegroups" }
+func (c *compareGroupsCmd) Description() string {
+	return "Сравнить расписания двух групп"
+}
 func (c *compareGroupsCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return lower == "/comparegroups" || lower == "/comparegroup" || lower == "/groupscompare" || strings.HasPrefix(lower, "сравнить группы")

@@ -532,10 +532,10 @@ func TestE2E_FormatterKeyboard(t *testing.T) {
 func TestE2E_NoticeSettings_ThreeToggles(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{
-		Mode:          ModeStudent,
-		NoticeChanges: true,
+		Mode:           ModeStudent,
+		NoticeChanges:  true,
 		NoticeNextWeek: false,
-		NoticeCalls:   true,
+		NoticeCalls:    true,
 	}
 
 	texts := flattenKeyboardTexts(b.noticeKeyboard(chat))
@@ -575,11 +575,11 @@ func TestE2E_ViewSettings(t *testing.T) {
 func TestE2E_DiffSettings_BasicAndAdvanced(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{
-		Mode:              ModeStudent,
-		DiffEnabled:       true,
-		DiffMaxLines:      20,
-		DiffAutoInWeek:    false,
-		DiffAutoInUpdates: true,
+		Mode:                ModeStudent,
+		DiffEnabled:         true,
+		DiffMaxLines:        20,
+		DiffAutoInWeek:      false,
+		DiffAutoInUpdates:   true,
 		DiffShowBeforeAfter: false,
 	}
 
@@ -624,17 +624,17 @@ func TestE2E_SchedulesSettings(t *testing.T) {
 func TestE2E_CurrentSettings(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{
-		Mode:       ModeStudent,
-		Group:      "100",
-		Formatter:  1,
-		ShowDaily:  true,
-		ShowWeekly: false,
-		ShowCalls:  true,
-		DiffEnabled: true,
-		DiffMaxLines: 20,
-		NoticeChanges: true,
+		Mode:           ModeStudent,
+		Group:          "100",
+		Formatter:      1,
+		ShowDaily:      true,
+		ShowWeekly:     false,
+		ShowCalls:      true,
+		DiffEnabled:    true,
+		DiffMaxLines:   20,
+		NoticeChanges:  true,
 		NoticeNextWeek: false,
-		NoticeCalls: true,
+		NoticeCalls:    true,
 	}
 	text := b.currentSettingsText(chat)
 	if !strings.Contains(text, "Режим чата: student") {
@@ -712,7 +712,7 @@ func TestE2E_CallsScheduleDisplay(t *testing.T) {
 		t.Error("empty saturday calls")
 	}
 
-	textWd := b.callsLines(wd, 2, false, []int{1,2,3,4,5})
+	textWd := b.callsLines(wd, 2, false, []int{1, 2, 3, 4, 5})
 	if textWd == "" {
 		t.Error("callsLines empty")
 	}
@@ -1230,7 +1230,7 @@ func TestE2E_CallsManualReason(t *testing.T) {
 		t.Errorf("reason: %q", calls.ManualReason)
 	}
 
-	line := b.callsLines(calls.Active.Schedule.Weekdays, 1, true, []int{1,2,3,4,5})
+	line := b.callsLines(calls.Active.Schedule.Weekdays, 1, true, []int{1, 2, 3, 4, 5})
 	if !strings.Contains(line, "08:00") {
 		t.Errorf("line: %q", line)
 	}

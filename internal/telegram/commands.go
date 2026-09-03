@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"strings"
 	"strconv"
+	"strings"
 
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
@@ -86,7 +86,6 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 
 	return b.sendOrEdit(u.ChatID, text, chat, nil)
 }
-
 
 func randomKey(m map[string]any) string {
 	keys := make([]string, 0, len(m))
@@ -427,8 +426,10 @@ func (c *apiCmd) Handler(ctx context.Context, u *Update) error {
 
 type diffCmd struct{ bot *Bot }
 
-func (c *diffCmd) Name() string        { return "/diff" }
-func (c *diffCmd) Description() string { return "Настройки отображения изменений расписания" }
+func (c *diffCmd) Name() string { return "/diff" }
+func (c *diffCmd) Description() string {
+	return "Настройки отображения изменений расписания"
+}
 func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -454,8 +455,10 @@ func (c *noticeCmd) Handler(ctx context.Context, u *Update) error {
 
 type viewCmd struct{ bot *Bot }
 
-func (c *viewCmd) Name() string        { return "/view" }
-func (c *viewCmd) Description() string { return "Настройки отображения расписания" }
+func (c *viewCmd) Name() string { return "/view" }
+func (c *viewCmd) Description() string {
+	return "Настройки отображения расписания"
+}
 func (c *viewCmd) MatchText(text string) bool {
 	return text == "🖼️ Отображение"
 }

@@ -452,7 +452,7 @@ func TestCallsLines(t *testing.T) {
 		{{"08:00", "08:45"}, {"08:55", "09:40"}},
 		{{"09:50", "10:35"}, {"10:45", "11:30"}},
 	}
-	text := b.callsLines(slots, 2, false, []int{1,2,3,4,5})
+	text := b.callsLines(slots, 2, false, []int{1, 2, 3, 4, 5})
 	if text == "" {
 		t.Error("expected non-empty calls lines")
 	}
@@ -466,7 +466,7 @@ func TestCallsLines(t *testing.T) {
 
 func TestCallsLinesEmpty(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
-	text := b.callsLines(nil, 0, false, []int{1,2,3,4,5})
+	text := b.callsLines(nil, 0, false, []int{1, 2, 3, 4, 5})
 	if text != "" {
 		t.Errorf("expected empty for nil slots, got %q", text)
 	}
@@ -530,8 +530,6 @@ func TestGetFormatterOptsHasParserError(t *testing.T) {
 		t.Error("expected HasParserError true")
 	}
 }
-
-
 
 func TestFormatCallsScheduleOnlyWeekdays(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)

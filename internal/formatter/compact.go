@@ -82,7 +82,7 @@ func (f *CompactFormatter) formatLessons(lessons []any, opts FormatOptions) stri
 		lessonsEqual := allEqual(func(p LessonPart) string { return p.Lesson }, subs)
 
 		showOpts := map[string]bool{
-			"lesson": true,
+			"lesson":  true,
 			"cabinet": true,
 		}
 		if len(subs) == 1 || lessonsEqual {

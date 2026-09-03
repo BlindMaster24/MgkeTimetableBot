@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
+	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
@@ -24,8 +24,10 @@ func (c *getGroupCmd) Handler(ctx context.Context, u *Update) error {
 
 type getGroupWeekCmd struct{ bot *Bot }
 
-func (c *getGroupWeekCmd) Name() string        { return "/groupweek" }
-func (c *getGroupWeekCmd) Description() string { return "Узнать расписание на неделю указанной группы (не зависит от текущего вашего)" }
+func (c *getGroupWeekCmd) Name() string { return "/groupweek" }
+func (c *getGroupWeekCmd) Description() string {
+	return "Узнать расписание на неделю указанной группы (не зависит от текущего вашего)"
+}
 func (c *getGroupWeekCmd) MatchText(text string) bool {
 	return text == "Группа Неделя" || text == "👩‍🎓 Группа Неделя"
 }
@@ -35,8 +37,10 @@ func (c *getGroupWeekCmd) Handler(ctx context.Context, u *Update) error {
 
 type getGroupImageCmd struct{ bot *Bot }
 
-func (c *getGroupImageCmd) Name() string        { return "/groupimage" }
-func (c *getGroupImageCmd) Description() string { return "Сгенерировать фотографию расписания группы (не зависит от текущего вашего)" }
+func (c *getGroupImageCmd) Name() string { return "/groupimage" }
+func (c *getGroupImageCmd) Description() string {
+	return "Сгенерировать фотографию расписания группы (не зависит от текущего вашего)"
+}
 func (c *getGroupImageCmd) MatchText(text string) bool {
 	return strings.HasPrefix(text, "Группафото") || strings.HasPrefix(text, "Группа таблица")
 }
@@ -57,8 +61,10 @@ func (c *getTeacherCmd) Handler(ctx context.Context, u *Update) error {
 
 type getTeacherWeekCmd struct{ bot *Bot }
 
-func (c *getTeacherWeekCmd) Name() string        { return "/teacherweek" }
-func (c *getTeacherWeekCmd) Description() string { return "Узнать расписание на неделю указанного преподавателя (не зависит от текущего вашего)" }
+func (c *getTeacherWeekCmd) Name() string { return "/teacherweek" }
+func (c *getTeacherWeekCmd) Description() string {
+	return "Узнать расписание на неделю указанного преподавателя (не зависит от текущего вашего)"
+}
 func (c *getTeacherWeekCmd) MatchText(text string) bool {
 	return text == "Преподаватель Неделя" || text == "Учитель Неделя"
 }
@@ -68,8 +74,10 @@ func (c *getTeacherWeekCmd) Handler(ctx context.Context, u *Update) error {
 
 type getTeacherImageCmd struct{ bot *Bot }
 
-func (c *getTeacherImageCmd) Name() string        { return "/teacherimage" }
-func (c *getTeacherImageCmd) Description() string { return "Сгенерировать фотографию расписания преподавателя (не зависит от текущего вашего)" }
+func (c *getTeacherImageCmd) Name() string { return "/teacherimage" }
+func (c *getTeacherImageCmd) Description() string {
+	return "Сгенерировать фотографию расписания преподавателя (не зависит от текущего вашего)"
+}
 func (c *getTeacherImageCmd) MatchText(text string) bool {
 	return strings.HasPrefix(text, "Преподавательфотография") || strings.HasPrefix(text, "Учительфотография") || strings.HasPrefix(text, "Преподаватель таблица")
 }
@@ -295,8 +303,10 @@ func (b *Bot) sendTeacherWeek(u *Update, chat *Chat, teacher string, data any) e
 
 type setGroupCmd struct{ bot *Bot }
 
-func (c *setGroupCmd) Name() string        { return "/setgroup" }
-func (c *setGroupCmd) Description() string { return "Изменить группу этого чата" }
+func (c *setGroupCmd) Name() string { return "/setgroup" }
+func (c *setGroupCmd) Description() string {
+	return "Изменить группу этого чата"
+}
 func (c *setGroupCmd) MatchText(text string) bool {
 	return strings.HasPrefix(strings.ToLower(text), "/setgroup")
 }
@@ -310,8 +320,10 @@ func (c *setGroupCmd) Handler(ctx context.Context, u *Update) error {
 
 type setTeacherCmd struct{ bot *Bot }
 
-func (c *setTeacherCmd) Name() string        { return "/setteacher" }
-func (c *setTeacherCmd) Description() string { return "Изменить преподавателя этого чата" }
+func (c *setTeacherCmd) Name() string { return "/setteacher" }
+func (c *setTeacherCmd) Description() string {
+	return "Изменить преподавателя этого чата"
+}
 func (c *setTeacherCmd) MatchText(text string) bool {
 	return strings.HasPrefix(strings.ToLower(text), "/setteacher")
 }

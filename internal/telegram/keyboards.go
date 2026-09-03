@@ -204,9 +204,9 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 	}
 
 	return &telego.ReplyKeyboardMarkup{
-		Keyboard:        rows,
-		IsPersistent:    true,
-		ResizeKeyboard:  true,
+		Keyboard:       rows,
+		IsPersistent:   true,
+		ResizeKeyboard: true,
 	}
 }
 

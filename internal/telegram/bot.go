@@ -90,12 +90,12 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	return b, nil
 }
 
-func (b *Bot) Client() *telego.Bot       { return b.client }
-func (b *Bot) Config() *config.Config    { return b.cfg }
-func (b *Bot) I18n() *i18n.Localizer     { return b.i18n }
-func (b *Bot) Log() *logger.Logger       { return b.log }
+func (b *Bot) Client() *telego.Bot            { return b.client }
+func (b *Bot) Config() *config.Config         { return b.cfg }
+func (b *Bot) I18n() *i18n.Localizer          { return b.i18n }
+func (b *Bot) Log() *logger.Logger            { return b.log }
 func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
-func (b *Bot) SetParseFunc(fn func() error) { b.parseFunc = fn }
+func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
 
 func (b *Bot) RegisterCommand(cmd Command) {
 	b.commands[cmd.Name()] = cmd

@@ -297,34 +297,34 @@ func (cb *btnToggleCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	return withChat(cb.bot, u, func(chat *Chat) error {
 
-	field := strings.TrimPrefix(u.Data, "btn_toggle:")
-	var msg string
-	switch field {
-	case "show_daily":
-		chat.ShowDaily = !chat.ShowDaily
-		msg = fmt.Sprintf("Показывать кнопку \"📄 На день\"? Установлено: '%s'", yesNoStr(chat.ShowDaily))
-	case "show_weekly":
-		chat.ShowWeekly = !chat.ShowWeekly
-		msg = fmt.Sprintf("Показывать кнопку \"📑 На неделю\"? Установлено: '%s'", yesNoStr(chat.ShowWeekly))
-	case "show_calls":
-		chat.ShowCalls = !chat.ShowCalls
-		msg = fmt.Sprintf("Показывать кнопку \"🕐 Звонки\"? Установлено: '%s'", yesNoStr(chat.ShowCalls))
-	case "show_about":
-		chat.ShowAbout = !chat.ShowAbout
-		msg = fmt.Sprintf("Показывать кнопку \"💡 О боте\"? Установлено: '%s'", yesNoStr(chat.ShowAbout))
-	case "show_fast_group":
-		chat.ShowFastGroup = !chat.ShowFastGroup
-		msg = fmt.Sprintf("Показывать кнопку \"👩‍🎓 Группа\"? Установлено: '%s'", yesNoStr(chat.ShowFastGroup))
-	case "show_fast_teacher":
-		chat.ShowFastTeacher = !chat.ShowFastTeacher
-		msg = fmt.Sprintf("Показывать кнопку \"👩‍🏫 Преподаватель\"? Установлено: '%s'", yesNoStr(chat.ShowFastTeacher))
-	}
+		field := strings.TrimPrefix(u.Data, "btn_toggle:")
+		var msg string
+		switch field {
+		case "show_daily":
+			chat.ShowDaily = !chat.ShowDaily
+			msg = fmt.Sprintf("Показывать кнопку \"📄 На день\"? Установлено: '%s'", yesNoStr(chat.ShowDaily))
+		case "show_weekly":
+			chat.ShowWeekly = !chat.ShowWeekly
+			msg = fmt.Sprintf("Показывать кнопку \"📑 На неделю\"? Установлено: '%s'", yesNoStr(chat.ShowWeekly))
+		case "show_calls":
+			chat.ShowCalls = !chat.ShowCalls
+			msg = fmt.Sprintf("Показывать кнопку \"🕐 Звонки\"? Установлено: '%s'", yesNoStr(chat.ShowCalls))
+		case "show_about":
+			chat.ShowAbout = !chat.ShowAbout
+			msg = fmt.Sprintf("Показывать кнопку \"💡 О боте\"? Установлено: '%s'", yesNoStr(chat.ShowAbout))
+		case "show_fast_group":
+			chat.ShowFastGroup = !chat.ShowFastGroup
+			msg = fmt.Sprintf("Показывать кнопку \"👩‍🎓 Группа\"? Установлено: '%s'", yesNoStr(chat.ShowFastGroup))
+		case "show_fast_teacher":
+			chat.ShowFastTeacher = !chat.ShowFastTeacher
+			msg = fmt.Sprintf("Показывать кнопку \"👩‍🏫 Преподаватель\"? Установлено: '%s'", yesNoStr(chat.ShowFastTeacher))
+		}
 
-	cb.bot.chatRepo.Save(chat)
-	if msg != "" {
-		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.buttonsKeyboard(chat))
-	}
-	return cb.bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", cb.bot.buttonsKeyboard(chat))
+		cb.bot.chatRepo.Save(chat)
+		if msg != "" {
+			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.buttonsKeyboard(chat))
+		}
+		return cb.bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", cb.bot.buttonsKeyboard(chat))
 	})
 }
 
@@ -355,22 +355,22 @@ func (cb *fmtSelectCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	return withChat(cb.bot, u, func(chat *Chat) error {
 
-	idxStr := strings.TrimPrefix(u.Data, "fmt_select:")
-	idx := 0
-	for _, c := range idxStr {
-		if c >= '0' && c <= '9' {
-			idx = idx*10 + int(c-'0')
+		idxStr := strings.TrimPrefix(u.Data, "fmt_select:")
+		idx := 0
+		for _, c := range idxStr {
+			if c >= '0' && c <= '9' {
+				idx = idx*10 + int(c-'0')
+			}
 		}
-	}
 
-	if idx >= 0 && idx < len(formatter.AllFormatters) {
-		chat.Formatter = idx
-		cb.bot.chatRepo.Save(chat)
-		label := formatter.AllFormatters[idx].Label()
-		return u.Bot.SendTextWithKeyboard(u.ChatID, fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", label), cb.bot.formatterKeyboard(chat))
-	}
+		if idx >= 0 && idx < len(formatter.AllFormatters) {
+			chat.Formatter = idx
+			cb.bot.chatRepo.Save(chat)
+			label := formatter.AllFormatters[idx].Label()
+			return u.Bot.SendTextWithKeyboard(u.ChatID, fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", label), cb.bot.formatterKeyboard(chat))
+		}
 
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
 	})
 }
 
@@ -411,28 +411,28 @@ func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	return withChat(cb.bot, u, func(chat *Chat) error {
 
-	field := strings.TrimPrefix(u.Data, "notice_toggle:")
-	var msg string
-	switch field {
-	case "notice_changes":
-		chat.NoticeChanges = !chat.NoticeChanges
-		msg = fmt.Sprintf("Оповещение о добавлении нового дня: %s", onOffStr(chat.NoticeChanges))
-	case "notice_next_week":
-		chat.NoticeNextWeek = !chat.NoticeNextWeek
-		msg = fmt.Sprintf("Оповещение о добавлении новой недели: %s", onOffStr(chat.NoticeNextWeek))
-	case "notice_calls":
-		chat.NoticeCalls = !chat.NoticeCalls
-		msg = fmt.Sprintf("Оповещение об изменениях расписания звонков: %s", onOffStr(chat.NoticeCalls))
-	case "notice_parser_errors":
-		chat.NoticeParserErrors = !chat.NoticeParserErrors
-		msg = fmt.Sprintf("Оповещение об ошибке парсера: %s", onOffStr(chat.NoticeParserErrors))
-	}
+		field := strings.TrimPrefix(u.Data, "notice_toggle:")
+		var msg string
+		switch field {
+		case "notice_changes":
+			chat.NoticeChanges = !chat.NoticeChanges
+			msg = fmt.Sprintf("Оповещение о добавлении нового дня: %s", onOffStr(chat.NoticeChanges))
+		case "notice_next_week":
+			chat.NoticeNextWeek = !chat.NoticeNextWeek
+			msg = fmt.Sprintf("Оповещение о добавлении новой недели: %s", onOffStr(chat.NoticeNextWeek))
+		case "notice_calls":
+			chat.NoticeCalls = !chat.NoticeCalls
+			msg = fmt.Sprintf("Оповещение об изменениях расписания звонков: %s", onOffStr(chat.NoticeCalls))
+		case "notice_parser_errors":
+			chat.NoticeParserErrors = !chat.NoticeParserErrors
+			msg = fmt.Sprintf("Оповещение об ошибке парсера: %s", onOffStr(chat.NoticeParserErrors))
+		}
 
-	cb.bot.chatRepo.Save(chat)
-	if msg != "" {
-		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.noticeKeyboard(chat))
-	}
-	return cb.bot.showNoticeSettings(u, chat)
+		cb.bot.chatRepo.Save(chat)
+		if msg != "" {
+			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.noticeKeyboard(chat))
+		}
+		return cb.bot.showNoticeSettings(u, chat)
 	})
 }
 
@@ -443,25 +443,25 @@ func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	return withChat(cb.bot, u, func(chat *Chat) error {
 
-	field := strings.TrimPrefix(u.Data, "view_toggle:")
-	var msg string
-	switch field {
-	case "hide_past_days":
-		chat.HidePastDays = !chat.HidePastDays
-		msg = fmt.Sprintf("Скрывать прошедшие дни? Установлено: '%s'", yesNoStr(chat.HidePastDays))
-	case "show_parser_time":
-		chat.ShowParserTime = !chat.ShowParserTime
-		msg = fmt.Sprintf("Отображать в сообщении время последней загрузки расписания? Установлено: '%s'", yesNoStr(chat.ShowParserTime))
-	case "show_hints":
-		chat.ShowHints = !chat.ShowHints
-		msg = fmt.Sprintf("Показывать ли подсказки под расписанием? Установлено: '%s'", yesNoStr(chat.ShowHints))
-	}
+		field := strings.TrimPrefix(u.Data, "view_toggle:")
+		var msg string
+		switch field {
+		case "hide_past_days":
+			chat.HidePastDays = !chat.HidePastDays
+			msg = fmt.Sprintf("Скрывать прошедшие дни? Установлено: '%s'", yesNoStr(chat.HidePastDays))
+		case "show_parser_time":
+			chat.ShowParserTime = !chat.ShowParserTime
+			msg = fmt.Sprintf("Отображать в сообщении время последней загрузки расписания? Установлено: '%s'", yesNoStr(chat.ShowParserTime))
+		case "show_hints":
+			chat.ShowHints = !chat.ShowHints
+			msg = fmt.Sprintf("Показывать ли подсказки под расписанием? Установлено: '%s'", yesNoStr(chat.ShowHints))
+		}
 
-	cb.bot.chatRepo.Save(chat)
-	if msg != "" {
-		return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.viewKeyboard(chat))
-	}
-	return cb.bot.showViewSettings(u, chat)
+		cb.bot.chatRepo.Save(chat)
+		if msg != "" {
+			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.viewKeyboard(chat))
+		}
+		return cb.bot.showViewSettings(u, chat)
 	})
 }
 
