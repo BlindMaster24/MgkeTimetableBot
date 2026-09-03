@@ -11,6 +11,8 @@ import (
 type regexpCmd struct{ bot *Bot }
 
 func (c *regexpCmd) Name() string { return "/regexp" }
+
+func (c *regexpCmd) AdminOnly() bool { return true }
 func (c *regexpCmd) Description() string {
 	return "Отобразить все команды и регулярки"
 }
@@ -42,6 +44,8 @@ func (c *vanishCmd) Handler(ctx context.Context, u *Update) error {
 type parserLogsCmd struct{ bot *Bot }
 
 func (c *parserLogsCmd) Name() string { return "/parserLogs" }
+
+func (c *parserLogsCmd) AdminOnly() bool { return true }
 func (c *parserLogsCmd) Description() string {
 	return "Логи последних обновлений парсера"
 }
@@ -75,6 +79,8 @@ func (c *parserLogsCmd) Handler(ctx context.Context, u *Update) error {
 type requireNewButtonsCmd struct{ bot *Bot }
 
 func (c *requireNewButtonsCmd) Name() string { return "/requireNewButtons" }
+
+func (c *requireNewButtonsCmd) AdminOnly() bool { return true }
 func (c *requireNewButtonsCmd) Description() string {
 	return "Обновить клавиатуру пользователям"
 }

@@ -105,6 +105,9 @@ func (c *helpCmd) Description() string { return c.bot.loc("cmd_help") }
 func (c *helpCmd) Handler(ctx context.Context, u *Update) error {
 	text := c.bot.loc("help_commands")
 	for _, cmd := range c.bot.commands {
+		if ac, ok := cmd.(AdminCommand); ok && ac.AdminOnly() {
+			continue
+		}
 		text += fmt.Sprintf("\n/%s — %s", cmd.Name(), cmd.Description())
 	}
 	return u.Bot.SendText(u.ChatID, text)

@@ -60,6 +60,10 @@ type TextMatcher interface {
 	MatchText(string) bool
 }
 
+type AdminCommand interface {
+	AdminOnly() bool
+}
+
 type Callback interface {
 	Prefix() string
 	Handler(ctx context.Context, u *Update) error
