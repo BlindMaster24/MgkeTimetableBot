@@ -358,6 +358,7 @@ func (b *Bot) currentSettingsText(chat *Chat) string {
 		fmt.Sprintf("Режим чата: %s", string(chat.Mode)),
 		fmt.Sprintf("Выбранная группа: %s", chat.Group),
 		fmt.Sprintf("Выбранный учитель: %s", chat.Teacher),
+		fmt.Sprintf("ID последнего сообщения: %d", chat.LastMsgID),
 		fmt.Sprintf("Разрешено ли отправлять боту сообщения: %s", yesNo(chat.AllowSendMess)),
 	}
 	return strings.Join(lines, "\n")

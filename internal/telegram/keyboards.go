@@ -166,7 +166,11 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 		level2 = append(level2, telego.KeyboardButton{Text: t("button_calls")})
 	}
 	if showFast && chat.ShowFastTeacher {
-		level2 = append(level2, telego.KeyboardButton{Text: t("button_teacher")})
+		label := t("button_teacher")
+		if chat.ShowAbout && canShowCalls && chat.ShowFastGroup {
+			label = t("button_teacher_short")
+		}
+		level2 = append(level2, telego.KeyboardButton{Text: label})
 	}
 	if len(level2) > 0 {
 		rows = append(rows, level2)
@@ -183,7 +187,7 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 		level3 = append(level3, telego.KeyboardButton{Text: t("button_ics")})
 	}
 	level3 = append(level3, telego.KeyboardButton{Text: t("button_settings")})
-	if chat.Mode == ModeTeacher && chat.Teacher != "" {
+	if chat.Mode == ModeTeacher {
 		level3 = append(level3, telego.KeyboardButton{Text: t("button_history")})
 	}
 	if chat.ShowAbout {

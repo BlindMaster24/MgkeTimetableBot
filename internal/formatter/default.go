@@ -9,7 +9,7 @@ import (
 type DefaultFormatter struct{}
 
 func (f *DefaultFormatter) Name() string  { return "default" }
-func (f *DefaultFormatter) Label() string { return "📝 Структурированный" }
+func (f *DefaultFormatter) Label() string { return "📝 Стуктурированный" }
 
 func (f *DefaultFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
 	return f.formatFull(group, "", parseDaysFromSlice(days), true, opts)

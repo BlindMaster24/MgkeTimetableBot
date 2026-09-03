@@ -512,7 +512,7 @@ func TestE2E_FormatterKeyboard(t *testing.T) {
 	kb := b.formatterKeyboard(chat)
 	texts := flattenKeyboardTexts(kb)
 
-	if !strings.Contains(texts, "Структурированный") {
+	if !strings.Contains(texts, "Стуктурированный") {
 		t.Error("missing Default formatter label")
 	}
 	if !strings.Contains(texts, "Визуальный") {

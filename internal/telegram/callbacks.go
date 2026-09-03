@@ -9,6 +9,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
+	"github.com/mymmrac/telego"
 )
 
 func onOffStr(v bool) string {
@@ -505,8 +506,13 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 	msg = append(msg, b.callsLines(activeSaturday, userMax, full, []int{6}))
 
 	text := strings.Join(msg, "\n")
-	if !full && userMax < maxLessons {
-		b.sendOrEdit(u.ChatID, text, chat, nil)
+	if !full {
+		kb := &telego.InlineKeyboardMarkup{
+			InlineKeyboard: [][]telego.InlineKeyboardButton{
+				{{Text: "Показать полностью", CallbackData: "calls_full"}},
+			},
+		}
+		b.sendOrEdit(u.ChatID, text, chat, kb)
 		return
 	}
 
