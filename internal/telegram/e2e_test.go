@@ -931,17 +931,22 @@ func TestE2E_CacheResetPreservesDB(t *testing.T) {
 }
 
 func TestE2E_RemovePastDays(t *testing.T) {
+	b, _ := setupE2EBot(t)
+	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+	b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+
+	today := time.Now().Format("02.01.2006")
+	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
 	days := []map[string]any{
 		{"day": "25.08.2026", "lessons": []any{map[string]any{"lesson": "Old"}}},
-		{"day": time.Now().Format("02.01.2006"), "lessons": []any{map[string]any{"lesson": "Today"}}},
-		{"day": "02.09.2026", "lessons": []any{map[string]any{"lesson": "Future"}}},
+		{"day": today, "lessons": []any{map[string]any{"lesson": "Today"}}},
+		{"day": tomorrow, "lessons": []any{map[string]any{"lesson": "Future"}}},
 	}
-	result := removePastDays(days)
+	result := b.removePastDays(days)
 	if len(result) == 0 {
-		t.Error("removePastDays returned empty")
+		t.Fatal("removePastDays returned empty")
 	}
 	firstDate, _ := result[0]["day"].(string)
-	today := time.Now().Format("02.01.2006")
 	if firstDate != today {
 		t.Errorf("first day should be today %s, got %s", today, firstDate)
 	}

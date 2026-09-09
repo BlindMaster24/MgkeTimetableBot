@@ -42,12 +42,19 @@ func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.showSchedule(u, chat)
 }
 
+func startButtonKeyboard() *telego.ReplyKeyboardMarkup {
+	return &telego.ReplyKeyboardMarkup{
+		Keyboard:       [][]telego.KeyboardButton{{{Text: "Начать"}}},
+		ResizeKeyboard: true,
+	}
+}
+
 func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 	groups := b.cache.GetGroups()
 	teachers := b.cache.GetTeachers()
 
 	if len(groups) == 0 && len(teachers) == 0 {
-		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("data_not_loaded"), replyMainMenu(b, chat))
 	}
 
 	var text string
@@ -72,7 +79,7 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		} else {
 			data, ok := teachers[chat.Teacher]
 			if !ok {
-				text = b.loc("teacher_not_exists")
+				text = b.loc("nothing_found")
 			} else {
 				text = b.formatTeacherFull(chat, chat.Teacher, data)
 				if text == "" {
@@ -84,7 +91,7 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		text = b.loc("main_menu")
 	}
 
-	return b.sendOrEdit(u.ChatID, text, chat, nil)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, text, replyMainMenu(b, chat))
 }
 
 func randomKey(m map[string]any) string {
@@ -108,7 +115,7 @@ func (c *helpCmd) Handler(ctx context.Context, u *Update) error {
 		if ac, ok := cmd.(AdminCommand); ok && ac.AdminOnly() {
 			continue
 		}
-		text += fmt.Sprintf("\n/%s — %s", cmd.Name(), cmd.Description())
+		text += fmt.Sprintf("\n/%s - %s", cmd.Name(), cmd.Description())
 	}
 	return u.Bot.SendText(u.ChatID, text)
 }
@@ -126,7 +133,7 @@ func (c *cancelCmd) Handler(ctx context.Context, u *Update) error {
 		chat.Scene = ""
 		c.bot.chatRepo.Save(chat)
 	}
-	return u.Bot.SendText(u.ChatID, c.bot.loc("input_cancelled"))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("input_cancelled"), replyMainMenu(c.bot, chat))
 }
 
 type setupCmd struct{ bot *Bot }
@@ -158,7 +165,7 @@ func (c *dayCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	if chat.Mode == "" {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("setup_needed"))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard())
 	}
 	return c.bot.showDaySchedule(u, chat)
 }
@@ -175,7 +182,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 	switch chat.Mode {
 	case ModeStudent, ModeParent:
 		if chat.Group == "" {
-			text = b.loc("need_group")
+			text = b.locData("group_not_selected", map[string]interface{}{"Group": randomKey(groups)})
 		} else {
 			data, ok := groups[chat.Group]
 			if !ok {
@@ -189,11 +196,11 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 		}
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			text = b.loc("need_teacher")
+			text = b.locData("teacher_not_selected", map[string]interface{}{"Teacher": randomKey(teachers)})
 		} else {
 			data, ok := teachers[chat.Teacher]
 			if !ok {
-				text = b.loc("teacher_not_exists")
+				text = b.loc("nothing_found")
 			} else {
 				text = b.formatTeacherDay(chat, data)
 				if text == "" {
@@ -202,7 +209,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 			}
 		}
 	default:
-		text = b.loc("need_group")
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("setup_needed"), startButtonKeyboard())
 	}
 
 	return b.sendOrEdit(u.ChatID, text, chat, nil)
@@ -221,7 +228,7 @@ func (c *weekCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	if chat.Mode == "" {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("setup_needed"))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard())
 	}
 	return c.bot.showWeekSchedule(u, chat)
 }

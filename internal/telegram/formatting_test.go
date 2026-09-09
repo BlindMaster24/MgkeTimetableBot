@@ -204,28 +204,37 @@ func TestExtractDays(t *testing.T) {
 }
 
 func TestGetDayRasp(t *testing.T) {
-	days := getDayRasp(nil)
+	b, _, _ := setupTestBotWithData(t)
+	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+
+	days := b.getDayRasp(nil)
 	if days != nil {
 		t.Error("expected nil for nil input")
 	}
 
 	today := time.Now().Format("02.01.2006")
+	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
 	daysData := []map[string]any{
 		{"day": "01.01.2006"},
 		{"day": today},
-		{"day": "03.01.2006"},
+		{"day": tomorrow},
 	}
-	days = getDayRasp(daysData)
+	days = b.getDayRasp(daysData)
 	if len(days) != 1 || days[0]["day"] != today {
 		t.Errorf("expected today %s, got %v", today, days)
 	}
 
-	daysData = []map[string]any{
+	days = b.getDayRasp(daysData, true, 2)
+	if len(days) != 2 || days[0]["day"] != today || days[1]["day"] != tomorrow {
+		t.Errorf("expected today+tomorrow, got %v", days)
+	}
+
+	pastOnly := []map[string]any{
 		{"day": "01.01.2006"},
 	}
-	days = getDayRasp(daysData)
-	if len(days) != 1 || days[0]["day"] != "01.01.2006" {
-		t.Error("expected fallback to first day")
+	days = b.getDayRasp(pastOnly)
+	if len(days) != 0 {
+		t.Errorf("expected empty for all-past days (TS semantics), got %v", days)
 	}
 }
 
@@ -247,6 +256,7 @@ func TestBuildWeekLabel(t *testing.T) {
 }
 
 func TestRemovePastDays(t *testing.T) {
+	b, _, _ := setupTestBotWithData(t)
 	today := time.Now().Format("02.01.2006")
 	yesterday := time.Now().AddDate(0, 0, -1).Format("02.01.2006")
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
@@ -257,18 +267,24 @@ func TestRemovePastDays(t *testing.T) {
 		{"day": tomorrow, "lessons": []any{map[string]any{"lesson": "Z"}}},
 	}
 
-	result := removePastDays(days)
+	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+	result := b.removePastDays(days)
 	if len(result) != 2 {
 		t.Errorf("expected 2 days (today+tomorrow), got %d", len(result))
 	}
 
-	daysEmpty := []map[string]any{
-		{"day": today, "lessons": []any{}},
-		{"day": tomorrow, "lessons": []any{map[string]any{"lesson": "Z"}}},
-	}
-	result = removePastDays(daysEmpty)
+	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "00:00"}}}
+	result = b.removePastDays(days)
 	if len(result) != 1 {
-		t.Errorf("expected 1 day (tomorrow, today empty), got %d", len(result))
+		t.Errorf("expected 1 day (today autoskipped), got %d", len(result))
+	}
+
+	pastOnly := []map[string]any{
+		{"day": yesterday, "lessons": []any{map[string]any{"lesson": "X"}}},
+	}
+	result = b.removePastDays(pastOnly)
+	if len(result) != 0 {
+		t.Errorf("expected empty for all-past days, got %d", len(result))
 	}
 }
 

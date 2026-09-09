@@ -58,19 +58,19 @@ func (b *Bot) fmtOpts(chat *Chat, showHeader bool) formatter.FormatOptions {
 }
 
 func (b *Bot) formatGroupDay(chat *Chat, data any) string {
-	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, getDayRasp(extractDays(data)), b.fmtOpts(chat, true))
+	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, b.getDayRasp(extractDays(data)), b.fmtOpts(chat, false))
 }
 
 func (b *Bot) formatTeacherDay(chat *Chat, data any) string {
-	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, getDayRasp(extractDays(data)), b.fmtOpts(chat, true))
+	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, b.getDayRasp(extractDays(data)), b.fmtOpts(chat, false))
 }
 
 func (b *Bot) formatGroupFull(chat *Chat, group string, data any) string {
-	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(group, extractDays(data), b.fmtOpts(chat, true))
+	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(group, extractDays(data), b.fmtOpts(chat, false))
 }
 
 func (b *Bot) formatTeacherFull(chat *Chat, teacher string, data any) string {
-	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(teacher, extractDays(data), b.fmtOpts(chat, true))
+	return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(teacher, extractDays(data), b.fmtOpts(chat, false))
 }
 
 func extractDays(data any) []map[string]any {
@@ -92,22 +92,126 @@ func extractDays(data any) []map[string]any {
 	return result
 }
 
-func getDayRasp(days []map[string]any) []map[string]any {
-	if len(days) == 0 {
-		return nil
-	}
-
-	now := time.Now()
-	today := now.Format("02.01.2006")
-
-	for _, day := range days {
-		dateStr, _ := day["day"].(string)
-		if dateStr == today {
-			return []map[string]any{day}
+func (b *Bot) getDayRasp(days []map[string]any, args ...any) []map[string]any {
+	autoskip := true
+	maxDays := 1
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case bool:
+			autoskip = v
+		case int:
+			maxDays = v
 		}
 	}
 
-	return []map[string]any{days[0]}
+	nextDays := b.removePastDaysArgs(days, autoskip)
+	if len(nextDays) == 0 {
+		return nil
+	}
+
+	showDays := []map[string]any{nextDays[0]}
+	for i := 1; i < maxDays; i++ {
+		if i >= len(nextDays) {
+			break
+		}
+		showDays = append(showDays, nextDays[i])
+	}
+	return showDays
+}
+
+func (b *Bot) nowInTime(includedDays []int, timeFrom, timeTo string) bool {
+	parseMin := func(s string) (int, bool) {
+		parts := strings.Split(s, ":")
+		if len(parts) != 2 {
+			return 0, false
+		}
+		var h, m int
+		if _, err := fmt.Sscanf(parts[0], "%d", &h); err != nil {
+			return 0, false
+		}
+		if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil {
+			return 0, false
+		}
+		return h*60 + m, true
+	}
+	fromMin, ok1 := parseMin(timeFrom)
+	toMin, ok2 := parseMin(timeTo)
+	if !ok1 || !ok2 {
+		return false
+	}
+	now := time.Now()
+	nowMin := now.Hour()*60 + now.Minute()
+	weekday := int(now.Weekday())
+	for _, d := range includedDays {
+		if d == weekday && nowMin >= fromMin && nowMin <= toMin {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *Bot) removePastDays(days []map[string]any) []map[string]any {
+	return b.removePastDaysArgs(days, true)
+}
+
+func (b *Bot) removePastDaysArgs(days []map[string]any, autoskip bool) []map[string]any {
+	isSaturday := time.Now().Weekday() == time.Saturday
+
+	idx := -1
+	for i, day := range days {
+		dateStr, _ := day["day"].(string)
+		t, err := time.Parse("02.01.2006", dateStr)
+		if err != nil {
+			continue
+		}
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		dayMidnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())
+		if !dayMidnight.Before(today) {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return nil
+	}
+
+	nextDays := days[idx:]
+
+	if autoskip && len(nextDays) > 0 {
+		currentDay := nextDays[0]
+		var timetable [][2][2]string
+		if isSaturday {
+			timetable = b.cfg.Timetable.Saturday
+		} else {
+			timetable = b.cfg.Timetable.Weekdays
+		}
+		if len(timetable) > 0 {
+			lessons, _ := currentDay["lessons"].([]any)
+			todayLessons := len(lessons)
+			if todayLessons == 0 || todayLessons > len(timetable) {
+				todayLessons = len(timetable)
+			}
+			lastLessonTime := timetable[todayLessons-1][1][1]
+
+			dateStr, _ := currentDay["day"].(string)
+			now := time.Now()
+			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+			t, err := time.Parse("02.01.2006", dateStr)
+			isToday := err == nil && time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location()).Equal(today)
+
+			includedDays := []int{1, 2, 3, 4, 5}
+			if isSaturday {
+				includedDays = []int{6}
+			}
+
+			if isToday && !b.nowInTime(includedDays, "00:00", lastLessonTime) {
+				nextDays = nextDays[1:]
+			}
+		}
+	}
+
+	return nextDays
 }
 
 func (b *Bot) formatCallsSchedule() string {

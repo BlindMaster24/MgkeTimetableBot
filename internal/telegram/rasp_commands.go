@@ -153,7 +153,7 @@ func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	ago := time.Since(rasp.GetGroupsUpdateTime()).Truncate(time.Second)
-	msg := fmt.Sprintf("Группы в кэше:\n%s\n\nЗагружено: %s назад", strings.Join(groupNames, ", "), ago)
+	msg := fmt.Sprintf("__ Группы в кэше __\n%s\n\nЗагружено: %s назад", strings.Join(groupNames, ", "), ago)
 	return u.Bot.SendText(u.ChatID, msg)
 }
 
@@ -182,7 +182,7 @@ func (c *getTeachersCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	var lines []string
-	lines = append(lines, "Преподаватели в кэше:")
+	lines = append(lines, "__ Преподаватели в кэше __")
 	for i, name := range teacherNames {
 		lines = append(lines, fmt.Sprintf("%d. %s", i+1, name))
 	}

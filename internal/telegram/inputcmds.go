@@ -193,7 +193,7 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 		}
 		return u.Bot.SendPhoto(u.ChatID, path, "")
 	default:
-		text := b.formatGroupFull(chat, group, data)
+		text := formatter.GetByIndex(chat.Formatter).FormatGroupFull(group, b.getDayRasp(extractDays(data), true, 2), b.fmtOpts(chat, true))
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -204,7 +204,7 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 func (b *Bot) sendGroupWeek(u *Update, chat *Chat, group string, data any) error {
 	week, days := b.relevantWeekDays(data)
 	if chat.HidePastDays {
-		days = removePastDays(days)
+		days = b.removePastDays(days)
 	}
 
 	opts := b.fmtOpts(chat, true)
@@ -276,7 +276,7 @@ func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) err
 		}
 		return u.Bot.SendPhoto(u.ChatID, path, "")
 	default:
-		text := b.formatTeacherFull(chat, teacher, data)
+		text := formatter.GetByIndex(chat.Formatter).FormatTeacherFull(teacher, b.getDayRasp(extractDays(data), true, 2), b.fmtOpts(chat, true))
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -287,7 +287,7 @@ func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) err
 func (b *Bot) sendTeacherWeek(u *Update, chat *Chat, teacher string, data any) error {
 	week, days := b.relevantWeekDays(data)
 	if chat.HidePastDays {
-		days = removePastDays(days)
+		days = b.removePastDays(days)
 	}
 
 	opts := b.fmtOpts(chat, true)

@@ -3,12 +3,14 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
 
@@ -72,6 +74,29 @@ type imageCb struct{ bot *Bot }
 
 func (cb *imageCb) Prefix() string { return "image" }
 func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
+	payload := strings.TrimPrefix(u.Data, "image")
+	payload = strings.TrimPrefix(payload, "_")
+	if idx := strings.IndexByte(payload, ':'); idx >= 0 {
+		typePart := payload[:idx]
+		value := payload[idx+1:]
+		switch typePart {
+		case "g", "group":
+			cb.bot.AnswerCallback(u.Callback.ID, "")
+			err := cb.bot.handleImagePayload(u, "g", value)
+			if err == nil {
+				cb.bot.AnswerCallback(u.Callback.ID, "Изображение было отправлено")
+			}
+			return err
+		case "t", "teacher":
+			cb.bot.AnswerCallback(u.Callback.ID, "")
+			err := cb.bot.handleImagePayload(u, "t", value)
+			if err == nil {
+				cb.bot.AnswerCallback(u.Callback.ID, "Изображение было отправлено")
+			}
+			return err
+		}
+	}
+
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -109,6 +134,49 @@ func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
 }
 
 type imageGroupCb struct{ bot *Bot }
+
+func (b *Bot) handleImagePayload(u *Update, typeLetter, value string) error {
+	weekIndex := b.relevantWeekIndex().Value()
+	if idx := strings.LastIndexByte(value, ':'); idx >= 0 {
+		if w, err := strconv.Atoi(value[idx+1:]); err == nil {
+			weekIndex = w
+			value = value[:idx]
+		}
+	}
+
+	minIdx, maxIdx := utils.WeekIndexFromNumber(weekIndex).WeekDayIndexRange()
+
+	var days []map[string]any
+	switch typeLetter {
+	case "g":
+		if _, ok := b.cache.GetGroups()[value]; !ok {
+			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
+		}
+		days = b.archiveDaysForWeek("group", value, minIdx, maxIdx)
+		if len(days) == 0 {
+			return u.Bot.SendText(u.ChatID, "Нет расписания для отображения")
+		}
+		path, err := imagepkg.RenderGroupDays(value, days, "./cache/images")
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
+		}
+		return u.Bot.SendPhoto(u.ChatID, path, "")
+	case "t":
+		if _, ok := b.cache.GetTeachers()[value]; !ok {
+			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
+		}
+		days = b.archiveDaysForWeek("teacher", value, minIdx, maxIdx)
+		if len(days) == 0 {
+			return u.Bot.SendText(u.ChatID, "Нет расписания для отображения")
+		}
+		path, err := imagepkg.RenderTeacherDays(value, days, "./cache/images")
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
+		}
+		return u.Bot.SendPhoto(u.ChatID, path, "")
+	}
+	return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
+}
 
 func (cb *imageGroupCb) Prefix() string { return "image_group:" }
 func (cb *imageGroupCb) Handler(ctx context.Context, u *Update) error {
@@ -198,7 +266,7 @@ func (cb *setupCb) Handler(ctx context.Context, u *Update) error {
 		if len(groups) == 0 {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 		}
-		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_group_number"), randomKey(groups))
+		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("setup_enter_group"), randomKey(groups))
 		return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cancelKeyboard(cb.bot.i18n.T))
 	case "teacher":
 		teachers := cb.bot.cache.GetTeachers()
@@ -488,7 +556,7 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 
 	userMax := maxLessons
 	current := countCurrentLessons(chat, b.cache)
-	if !full && current > 0 && current < maxLessons {
+	if !full && current > 0 {
 		userMax = current
 	}
 	if current > 0 && current >= maxLessons {
@@ -557,6 +625,9 @@ func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {
 		if len(lessons) > maxLessons {
 			maxLessons = len(lessons)
 		}
+	}
+	if maxLessons == 0 {
+		return 0
 	}
 	return maxLessons
 }

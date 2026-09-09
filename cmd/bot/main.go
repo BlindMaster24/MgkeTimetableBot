@@ -79,7 +79,15 @@ func main() {
 
 	initArchiveSchema(archiveRepo)
 
+	syncArchive := func(tag string) {
+		if err := archiveRepo.SyncFromCache(raspCache.GetGroups(), raspCache.GetTeachers()); err != nil {
+			log.Error().Err(err).Str("tag", tag).Msg("archive sync failed")
+		} else {
+			log.Info().Str("tag", tag).Msg("archive synced from cache")
+		}
+	}
 
+	syncArchive("startup")
 
 	apiServer := api.NewServer(raspCache, cfg.HTTP.Port)
 	go func() {
@@ -116,6 +124,7 @@ func main() {
 			bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
 			go notifier.NotifyChanges(oldGroupsHash, oldTeachersHash)
 		}
+		go syncArchive("parse")
 		return err
 	})
 
@@ -136,6 +145,7 @@ func main() {
 		} else {
 			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
 		}
+		syncArchive("initial")
 	}()
 
 	log.Info().Msg("bot starting")
@@ -187,7 +197,3 @@ func (a *chatFinderAdapter) FindAllWithNotifications(service string) ([]*notific
 	}
 	return result, nil
 }
-
-
-
-

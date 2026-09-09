@@ -78,7 +78,7 @@ func (b *Bot) showNoticeSettings(u *Update, chat *Chat) error {
 }
 
 func (b *Bot) showViewSettings(u *Update, chat *Chat) error {
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки отображения.", b.viewKeyboard(chat))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки отображения внешнего вида расписания.", b.viewKeyboard(chat))
 }
 
 func (b *Bot) showDiffSettings(u *Update, chat *Chat) error {
@@ -125,7 +125,7 @@ func (b *Bot) showSchedulesSettings(u *Update, chat *Chat) error {
 			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
 		},
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Управление расписаниями:", kb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Управление расписаниями.", kb)
 }
 
 func (b *Bot) showCurrentSettings(u *Update, chat *Chat) error {
@@ -199,7 +199,7 @@ func (b *Bot) showCallsSettings(u *Update, chat *Chat) error {
 	activeSource := calls.Active.Source
 
 	var lines []string
-	lines = append(lines, "🔔 <b>Управление расписанием звонков.</b>")
+	lines = append(lines, "Управление расписанием звонков.")
 	lines = append(lines, "")
 	if calls.Active.Source != "site" || calls.Active.Hash != calls.Site.Hash {
 		lines = append(lines, fmt.Sprintf("Текущий источник: <b>%s</b>", sourceLabel(activeSource)))
