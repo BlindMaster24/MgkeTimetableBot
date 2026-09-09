@@ -346,7 +346,7 @@ func (cb *settingsCb) Prefix() string { return "settings" }
 func (cb *settingsCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	return withChat(cb.bot, u, func(chat *Chat) error {
-		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("settings_menu"), cb.bot.settingsKeyboardFull(chat))
+		return cb.bot.sendSettingsMenu(u, chat)
 	})
 }
 
@@ -468,7 +468,9 @@ func (cb *mainMenuCb) Prefix() string { return "main_menu" }
 func (cb *mainMenuCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	return withChat(cb.bot, u, func(chat *Chat) error {
-		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("main_menu"), cb.bot.mainMenuKeyboard(chat))
+		chat.Scene = ""
+		cb.bot.chatRepo.Save(chat)
+		return cb.bot.showSchedule(u, chat)
 	})
 }
 

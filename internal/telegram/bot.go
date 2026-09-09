@@ -25,20 +25,21 @@ type parseLogEntry struct {
 }
 
 type Bot struct {
-	client    *telego.Bot
-	cfg       *config.Config
-	log       *logger.Logger
-	i18n      *i18n.Localizer
-	chatRepo  *Repository
-	cache     *cache.RaspCache
-	cacheMu   sync.Mutex
-	commands  map[string]Command
-	callbacks map[string]Callback
-	parseFunc func() error
-	startTime time.Time
-	archive   any
-	aliasRepo *AliasRepository
-	parseLogs []parseLogEntry
+	client       *telego.Bot
+	cfg          *config.Config
+	log          *logger.Logger
+	i18n         *i18n.Localizer
+	chatRepo     *Repository
+	cache        *cache.RaspCache
+	cacheMu      sync.Mutex
+	commands     map[string]Command
+	callbacks    map[string]Callback
+	parseFunc    func() error
+	startTime    time.Time
+	archive      any
+	aliasRepo    *AliasRepository
+	parseLogs    []parseLogEntry
+	textCommands []Command
 }
 
 type Update struct {
@@ -106,6 +107,10 @@ func (b *Bot) RegisterCommand(cmd Command) {
 	b.commands[cmd.Name()] = cmd
 }
 
+func (b *Bot) RegisterTextCommand(cmd Command) {
+	b.textCommands = append(b.textCommands, cmd)
+}
+
 func (b *Bot) RegisterCallback(cb Callback) {
 	b.callbacks[cb.Prefix()] = cb
 }
@@ -167,6 +172,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&archiveCmd{bot: b})
 	b.RegisterCommand(&endingsCmd{bot: b})
 	b.RegisterCommand(&chatCmd{bot: b})
+	registerSettingsTextCommands(b)
 	b.RegisterCommand(&idCmd{bot: b})
 	b.RegisterCommand(&errorCmd{bot: b})
 	b.RegisterCommand(&testCmd{bot: b})
@@ -265,37 +271,6 @@ func (b *Bot) handleMessage(ctx context.Context, msg *telego.Message) {
 	}
 
 	b.handleMessageText(ctx, u)
-
-	if cmd, ok := b.commands[text]; ok {
-		if err := cmd.Handler(ctx, u); err != nil {
-			b.log.Error().Err(err).Str("cmd", text).Msg("command error")
-		}
-		return
-	}
-
-	if len(text) > 1 && text[0] == '/' {
-		cmdName := text[1:]
-		if idx := strings.IndexByte(cmdName, ' '); idx >= 0 {
-			cmdName = cmdName[:idx]
-		}
-		if cmd, ok := b.commands["/"+cmdName]; ok {
-			if err := cmd.Handler(ctx, u); err != nil {
-				b.log.Error().Err(err).Str("cmd", cmdName).Msg("command error")
-			}
-			return
-		}
-	}
-
-	for _, cmd := range b.commands {
-		if tm, ok := cmd.(TextMatcher); ok {
-			if tm.MatchText(u.Text) {
-				if err := cmd.Handler(ctx, u); err != nil {
-					b.log.Error().Err(err).Msg("text match error")
-				}
-				return
-			}
-		}
-	}
 }
 
 func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {

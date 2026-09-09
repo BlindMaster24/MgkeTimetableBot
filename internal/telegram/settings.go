@@ -41,13 +41,6 @@ func (b *Bot) buttonsKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	}
 }
 
-func noYesSmile(v bool, label string) string {
-	if v {
-		return "✅ " + label
-	}
-	return "🚫 " + label
-}
-
 func (b *Bot) formatterKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
 	var rows [][]telego.InlineKeyboardButton
 	var currentRow []telego.InlineKeyboardButton

@@ -1475,3 +1475,189 @@ func TestE2E_NoticeDebugCommand(t *testing.T) {
 		t.Errorf("non-admin handler: %v", err)
 	}
 }
+
+func TestE2E_ReplyKeyboardSettingsMenu(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2001)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	repo.Save(chat)
+
+	u := makeUpdate(userID, "/settings")
+	u.Bot = b
+	cmd := &settingsCmd{bot: b}
+	if err := cmd.Handler(context.Background(), u); err != nil {
+		t.Fatalf("settings handler: %v", err)
+	}
+
+	saved, _ := repo.FindOrCreate("telegram", userID)
+	if saved.Scene != sceneSettings {
+		t.Errorf("scene: got %q, want settings", saved.Scene)
+	}
+
+	nav := &settingsNavTextCmd{bot: b, kind: "to_settings"}
+	if !nav.MatchText("Меню настроек") {
+		t.Error("to_settings should match «Меню настроек»")
+	}
+	mainNav := &settingsNavTextCmd{bot: b, kind: "to_main"}
+	if !mainNav.MatchText("Главное меню") {
+		t.Error("to_main should match «Главное меню»")
+	}
+}
+
+func TestE2E_ButtonToggleTextCommand(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2002)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	chat.Scene = sceneSettings
+	chat.ShowDaily = true
+	repo.Save(chat)
+
+	c := &btnToggleTextCmd{bot: b, kind: "daily"}
+	if !c.MatchText(`🚫 Кнопка "📄 На день"`) {
+		t.Fatal("should match toggle text")
+	}
+
+	chat.ShowDaily = false
+	repo.Save(chat)
+	u := makeUpdate(userID, `🚫 Кнопка "📄 На день"`)
+	u.Bot = b
+	if err := c.Handler(context.Background(), u); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	saved, _ := repo.FindOrCreate("telegram", userID)
+	if !saved.ShowDaily {
+		t.Error("ShowDaily should be toggled to true")
+	}
+	if saved.Scene != sceneSettings {
+		t.Errorf("scene should stay settings, got %q", saved.Scene)
+	}
+}
+
+func TestE2E_SceneGuardBlocksOutOfSceneText(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2003)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	chat.Scene = ""
+	chat.ShowDaily = true
+	repo.Save(chat)
+
+	c := &btnToggleTextCmd{bot: b, kind: "daily"}
+	if !c.MatchText(`🚫 Кнопка "📄 На день"`) {
+		t.Fatal("should match toggle text")
+	}
+
+	chat.ShowDaily = false
+
+	u := makeUpdate(userID, `🚫 Кнопка "📄 На день"`)
+	u.Bot = b
+
+	chat.Scene = ""
+	if b.dispatchTextCommand(context.Background(), u, chat) {
+		t.Error("toggle must NOT fire outside scene=settings")
+	}
+
+	chat.Scene = sceneSettings
+	if !b.dispatchTextCommand(context.Background(), u, chat) {
+		t.Error("toggle must fire inside scene=settings")
+	}
+}
+
+func TestE2E_NotFoundResetsScene(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2004)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	chat.Scene = sceneSettings
+	repo.Save(chat)
+
+	u := makeUpdate(userID, "абракадабра")
+	u.Bot = b
+	b.handleMessageText(context.Background(), u)
+
+	saved, _ := repo.FindOrCreate("telegram", userID)
+	if saved.Scene != "" {
+		t.Errorf("scene should be reset on notFound, got %q", saved.Scene)
+	}
+}
+
+func TestE2E_NoticeViewDiffReplyKeyboards(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2005)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	chat.Scene = sceneSettings
+	repo.Save(chat)
+
+	ntc := &noticeToggleTextCmd{bot: b, kind: "changes"}
+	if !ntc.MatchText("🔇 Оповещение о новых днях: Нет") {
+		t.Error("notice toggle text mismatch")
+	}
+	vtc := &viewToggleTextCmd{bot: b, kind: "hide_past_days"}
+	if !vtc.MatchText("✅ Скрывать прошедшие дни") {
+		t.Error("view toggle text mismatch")
+	}
+	dtc := &diffToggleTextCmd{bot: b, kind: "enabled"}
+	if !dtc.MatchText(`✅ Включить раздел "Что изменилось"`) {
+		t.Error("diff toggle text mismatch")
+	}
+}
+
+func TestE2E_SetupModeTextCommands(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2006)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Scene = "setup"
+	repo.Save(chat)
+
+	guest := &setupModeTextCmd{bot: b, kind: "guest"}
+	if !guest.MatchText("👀 Гость") {
+		t.Error("guest text mismatch")
+	}
+	u := makeUpdate(userID, "👀 Гость")
+	u.Bot = b
+	if err := guest.Handler(context.Background(), u); err != nil {
+		t.Fatalf("guest handler: %v", err)
+	}
+	saved, _ := repo.FindOrCreate("telegram", userID)
+	if saved.Mode != ModeGuest {
+		t.Errorf("mode: got %q", saved.Mode)
+	}
+	if saved.Scene != "" {
+		t.Errorf("scene should clear, got %q", saved.Scene)
+	}
+
+	student, _ := repo.FindOrCreate("telegram", int64(2007))
+	student.Scene = "setup"
+	repo.Save(student)
+	stu := &setupModeTextCmd{bot: b, kind: "student"}
+	if !stu.MatchText("👩‍🎓 Учащийся") {
+		t.Error("student text mismatch")
+	}
+	u2 := makeUpdate(int64(2007), "👩‍🎓 Учащийся")
+	u2.Bot = b
+	if err := stu.Handler(context.Background(), u2); err != nil {
+		t.Fatalf("student handler: %v", err)
+	}
+	saved2, _ := repo.FindOrCreate("telegram", int64(2007))
+	if saved2.Mode != ModeStudent {
+		t.Errorf("mode: got %q", saved2.Mode)
+	}
+	if saved2.Scene != "set_group" {
+		t.Errorf("scene should be set_group, got %q", saved2.Scene)
+	}
+}

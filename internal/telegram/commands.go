@@ -36,7 +36,7 @@ func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 	if chat.Mode == "" {
 		chat.Scene = "setup"
 		c.bot.chatRepo.Save(chat)
-		return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), selectModeKeyboard(c.bot.i18n.T))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), c.bot.replySelectMode())
 	}
 
 	return c.bot.showSchedule(u, chat)
@@ -149,7 +149,7 @@ func (c *setupCmd) Handler(ctx context.Context, u *Update) error {
 		chat.Scene = "setup"
 		c.bot.chatRepo.Save(chat)
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), selectModeKeyboard(c.bot.i18n.T))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), c.bot.replySelectMode())
 }
 
 type dayCmd struct{ bot *Bot }
@@ -295,14 +295,14 @@ type settingsCmd struct{ bot *Bot }
 func (c *settingsCmd) Name() string        { return "/settings" }
 func (c *settingsCmd) Description() string { return c.bot.loc("cmd_settings") }
 func (c *settingsCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_settings")
+	return text == c.bot.loc("button_settings") || text == "Настройки"
 }
 func (c *settingsCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.loc("settings_menu"), c.bot.settingsKeyboardFull(chat))
+	return c.bot.sendSettingsMenu(u, chat)
 }
 
 type imageCmd struct{ bot *Bot }
@@ -366,7 +366,9 @@ func (c *buttonsCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", c.bot.buttonsKeyboard(chat))
+	chat.Scene = sceneSettings
+	c.bot.chatRepo.Save(chat)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки кнопок.", c.bot.replySettingsButtons(chat))
 }
 
 type formatterCmd struct{ bot *Bot }
@@ -381,7 +383,9 @@ func (c *formatterCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", c.bot.formatterKeyboard(chat))
+	chat.Scene = sceneSettings
+	c.bot.chatRepo.Save(chat)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки форматировщика.", c.bot.replySettingsFormatters(chat))
 }
 
 type forceParseCmd struct{ bot *Bot }
@@ -445,7 +449,9 @@ func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return c.bot.showDiffSettings(u, chat)
+	chat.Scene = sceneSettings
+	c.bot.chatRepo.Save(chat)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настроек раздела \"Что изменилось\".", c.bot.replySettingsDiff(chat))
 }
 
 type noticeCmd struct{ bot *Bot }
@@ -460,7 +466,9 @@ func (c *noticeCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return c.bot.showNoticeSettings(u, chat)
+	chat.Scene = sceneSettings
+	c.bot.chatRepo.Save(chat)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки оповещений.", c.bot.replySettingsNotice(chat))
 }
 
 type viewCmd struct{ bot *Bot }
@@ -477,7 +485,9 @@ func (c *viewCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return c.bot.showViewSettings(u, chat)
+	chat.Scene = sceneSettings
+	c.bot.chatRepo.Save(chat)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки отображения внешнего вида расписания.", c.bot.replySettingsView(chat))
 }
 
 type flushCacheCmd struct{ bot *Bot }
@@ -497,6 +507,10 @@ func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
+		return
+	}
+
+	if b.dispatchTextCommand(ctx, u, chat) {
 		return
 	}
 
@@ -555,16 +569,63 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		}
 	}
 
-	for _, cmd := range b.commands {
-		if tm, ok := cmd.(TextMatcher); ok {
-			if tm.MatchText(u.Text) {
-				if err := cmd.Handler(ctx, u); err != nil {
-					b.log.Error().Err(err).Msg("text match error")
-				}
-				return
+	if b.hasInputScene(chat) {
+		return
+	}
+
+	chat.Scene = ""
+	b.chatRepo.Save(chat)
+	b.SendTextWithReplyKeyboard(u.ChatID, "Команда не найдена", replyMainMenu(b, chat))
+}
+
+func (b *Bot) hasInputScene(chat *Chat) bool {
+	switch chat.Scene {
+	case "", "setup", "settings", "settings_schedules", "settings_calls", "settings_alias":
+		return false
+	}
+	return true
+}
+
+func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bool {
+	if cmd, ok := b.commands[u.Text]; ok {
+		if sm, ok := cmd.(SceneMatcher); ok && sm.Scene() != "" && sm.Scene() != chat.Scene {
+			return false
+		}
+		if err := cmd.Handler(ctx, u); err != nil {
+			b.log.Error().Err(err).Str("cmd", u.Text).Msg("command error")
+		}
+		return true
+	}
+
+	if len(u.Text) > 1 && u.Text[0] == '/' {
+		cmdName := u.Text[1:]
+		if idx := strings.IndexByte(cmdName, ' '); idx >= 0 {
+			cmdName = cmdName[:idx]
+		}
+		if cmd, ok := b.commands["/"+cmdName]; ok {
+			if err := cmd.Handler(ctx, u); err != nil {
+				b.log.Error().Err(err).Str("cmd", cmdName).Msg("command error")
 			}
+			return true
 		}
 	}
+
+	for _, cmd := range b.textCommands {
+		tm, ok := cmd.(TextMatcher)
+		if !ok {
+			continue
+		}
+		if sm, ok := cmd.(SceneMatcher); ok && sm.Scene() != "" && sm.Scene() != chat.Scene {
+			continue
+		}
+		if tm.MatchText(u.Text) {
+			if err := cmd.Handler(ctx, u); err != nil {
+				b.log.Error().Err(err).Msg("text match error")
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func findClosest(input string, candidates map[string]any) (string, bool) {

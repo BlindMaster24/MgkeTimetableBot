@@ -105,6 +105,7 @@ func academicYearStartDate(date time.Time) time.Time {
 }
 
 func DayIndexFromDate(date time.Time) int {
-	ms := date.UnixMilli() - startingWeekIndexDate.UnixMilli()
+	d := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	ms := d.UnixMilli() - startingWeekIndexDate.UnixMilli()
 	return int(ms / oneDayMs)
 }
