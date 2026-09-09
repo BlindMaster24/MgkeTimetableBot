@@ -6,11 +6,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-
 type TimetableConfig struct {
-	Weekdays    [][2][2]string   `yaml:"weekdays"`
-	Saturday    [][2][2]string   `yaml:"saturday"`
-	Shortened1h [][2]string  `yaml:"shortened_1h"`
+	Weekdays    [][2][2]string `yaml:"weekdays"`
+	Saturday    [][2][2]string `yaml:"saturday"`
+	Shortened1h [][2]string    `yaml:"shortened_1h"`
 }
 
 type Config struct {
@@ -21,10 +20,10 @@ type Config struct {
 		Level  string `yaml:"level" env:"LOG_LEVEL"`
 		Format string `yaml:"format"`
 		File   struct {
-			Enabled    bool   `yaml:"enabled"`
-			Path       string `yaml:"path"`
-			MaxSizeMB  int    `yaml:"max_size_mb"`
-			MaxFiles   int    `yaml:"max_files"`
+			Enabled   bool   `yaml:"enabled"`
+			Path      string `yaml:"path"`
+			MaxSizeMB int    `yaml:"max_size_mb"`
+			MaxFiles  int    `yaml:"max_files"`
 		} `yaml:"file"`
 	} `yaml:"logging"`
 
@@ -69,17 +68,17 @@ type Config struct {
 	} `yaml:"accept"`
 
 	Parser struct {
-		Enabled    bool `yaml:"enabled"`
-		SyncMode   bool `yaml:"sync_mode"`
-		LocalMode  bool `yaml:"local_mode"`
-		IgnoreHash bool `yaml:"ignore_hash"`
-EndHour   int       `yaml:"end_hour"`
-		Activity  [2]int    `yaml:"activity"`
-		Endpoints struct {
-			TimetableGroup  string   `yaml:"timetable_group"`
-			TimetableTeacher string `yaml:"timetable_teacher"`
-			Team            []string `yaml:"team"`
-			BellSchedule    string   `yaml:"bell_schedule"`
+		Enabled    bool   `yaml:"enabled"`
+		SyncMode   bool   `yaml:"sync_mode"`
+		LocalMode  bool   `yaml:"local_mode"`
+		IgnoreHash bool   `yaml:"ignore_hash"`
+		EndHour    int    `yaml:"end_hour"`
+		Activity   [2]int `yaml:"activity"`
+		Endpoints  struct {
+			TimetableGroup   string   `yaml:"timetable_group"`
+			TimetableTeacher string   `yaml:"timetable_teacher"`
+			Team             []string `yaml:"team"`
+			BellSchedule     string   `yaml:"bell_schedule"`
 		} `yaml:"endpoints"`
 		UpdateInterval struct {
 			Default  int `yaml:"default"`
@@ -92,7 +91,7 @@ EndHour   int       `yaml:"end_hour"`
 			Group   []LessonFilter `yaml:"group"`
 			Teacher []LessonFilter `yaml:"teacher"`
 		} `yaml:"alertable_ignore_filter"`
-		LessonIndexIfEmpty int    `yaml:"lesson_index_if_empty"`
+		LessonIndexIfEmpty int `yaml:"lesson_index_if_empty"`
 		Calls              *struct {
 			Enabled    bool `yaml:"enabled"`
 			PreferSite bool `yaml:"prefer_site"`

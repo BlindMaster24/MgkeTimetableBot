@@ -215,8 +215,7 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 		if ov, ok := old[k]; ok {
 			oldEntryMap, _ = ov.(map[string]any)
 		}
-		_, _, changed := mergeDays(entryDays(v), entryDays(oldEntryMap))
-		if len(changed) == 0 && oldEntryMap != nil {
+		if oldEntryMap != nil {
 			lastNoticed := entryLastNoticedDayFromMap(oldEntryMap)
 			if lastNoticed > 0 {
 				if m, ok := v.(map[string]any); ok {

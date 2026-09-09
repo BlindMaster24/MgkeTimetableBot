@@ -329,6 +329,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
 		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
 		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats",
+		"/noticedebug",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))
@@ -1442,5 +1443,35 @@ func TestE2E_ArchiveStatsCommand(t *testing.T) {
 	u.Bot = b
 	if err := cmd.Handler(context.Background(), u); err != nil {
 		t.Fatalf("handler: %v", err)
+	}
+}
+
+func TestE2E_NoticeDebugCommand(t *testing.T) {
+	b, repo := setupE2EBot(t, 999)
+	userID := int64(12345)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "100"
+	chat.NoticeChanges = true
+	chat.NoticeNextWeek = true
+	chat.NoticeCalls = true
+	chat.NoticeParserErrors = true
+	repo.Save(chat)
+
+	guest, _ := repo.FindOrCreate("telegram", 555)
+	guest.Mode = ModeGuest
+	guest.NoticeParserErrors = true
+	repo.Save(guest)
+
+	cmd := &noticeDebugCmd{bot: b}
+	u := makeUpdate(999, "/noticedebug")
+	u.Bot = b
+	if err := cmd.Handler(context.Background(), u); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	if err := cmd.Handler(context.Background(), func() *Update { u := makeUpdate(12345, "/noticedebug"); u.Bot = b; return u }()); err != nil {
+		t.Errorf("non-admin handler: %v", err)
 	}
 }

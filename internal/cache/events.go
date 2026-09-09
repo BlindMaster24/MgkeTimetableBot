@@ -211,6 +211,28 @@ func (c *RaspCache) DrainEvents() []Event {
 	return evs
 }
 
+func (c *RaspCache) GroupKeys() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]string, 0, len(c.Groups.Timetable))
+	for k := range c.Groups.Timetable {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (c *RaspCache) TeacherKeys() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]string, 0, len(c.Teachers.Timetable))
+	for k := range c.Teachers.Timetable {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func collectWeekEvents(kind string, oldEntry *RaspEntry[map[string]any], data map[string]any) (events []Event, maxWeek int) {
 	maxWeek = weekOfTimetable(data)
 

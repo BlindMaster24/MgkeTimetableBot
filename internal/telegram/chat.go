@@ -714,6 +714,20 @@ func (r *Repository) FindAdminChats(service string, adminIDs []int64) ([]*Chat, 
 	return result, nil
 }
 
+func (r *Repository) CountSubscriptionsByType(service, subType string) (int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(DISTINCT s.chat_id) FROM subscriptions s
+		 JOIN bot_chats c ON c.id = s.chat_id
+		 WHERE s.type = ? AND c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1`,
+		subType, service,
+	).Scan(&count)
+	return count, err
+}
+
 type Subscription struct {
 	ID     int64
 	ChatID int64

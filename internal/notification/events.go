@@ -195,6 +195,12 @@ func (n *EventNotifier) sendDay(kind, value string, isUpdate bool, phrase string
 }
 
 func (n *EventNotifier) AddDay(ev *cache.DayEvent) {
+	dayIdx := dayIndex(dayString(ev.Day))
+	if last := n.cache.LastNoticedDay(ev.Kind, ev.Value); last != 0 && dayIdx <= int(last) {
+		return
+	}
+	n.cache.SetLastNoticedDay(ev.Kind, ev.Value, int64(dayIdx))
+
 	if !hasAlertableLessons(ev.Day, n.filtersFor(ev.Kind)) {
 		return
 	}

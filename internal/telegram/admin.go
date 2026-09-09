@@ -260,6 +260,108 @@ func (c *triggerCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("force_parse_started"))
 }
 
+type noticeDebugCmd struct{ bot *Bot }
+
+func (c *noticeDebugCmd) Name() string { return "/noticedebug" }
+func (c *noticeDebugCmd) Description() string {
+	return "Кому придут уведомления каждого типа"
+}
+func (c *noticeDebugCmd) AdminOnly() bool { return true }
+
+func (c *noticeDebugCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+
+	lines := []string{"-- Оповещения: получатели --"}
+
+	addSection := func(title string, chats []*Chat, format func(*Chat) string) {
+		lines = append(lines, "")
+		lines = append(lines, title)
+		if len(chats) == 0 {
+			lines = append(lines, "  (нет получателей)")
+			return
+		}
+		for _, chat := range chats {
+			lines = append(lines, "  "+format(chat))
+		}
+	}
+
+	describe := func(chat *Chat) string {
+		parts := []string{fmt.Sprintf("%d", chat.PeerID)}
+		if chat.Mode != "" {
+			parts = append(parts, string(chat.Mode))
+		}
+		if chat.Group != "" {
+			parts = append(parts, "группа "+chat.Group)
+		}
+		if chat.Teacher != "" {
+			parts = append(parts, "преподаватель "+chat.Teacher)
+		}
+		return strings.Join(parts, ", ")
+	}
+
+	groups, err := c.bot.chatRepo.FindChatsByGroups("telegram", c.bot.cache.GroupKeys(), true)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+	}
+	addSection("Новое расписание (day add, notice_changes):", groups, describe)
+
+	teachers, err := c.bot.chatRepo.FindChatsByTeachers("telegram", c.bot.cache.TeacherKeys(), true)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+	}
+	addSection("Новое расписание преподавателей (notice_changes):", teachers, describe)
+
+	subsG, err := c.bot.chatRepo.CountSubscriptionsByType("telegram", "group")
+	if err == nil {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("Подписки на группы: %d чат(ов)", subsG))
+	}
+	subsT, err := c.bot.chatRepo.CountSubscriptionsByType("telegram", "teacher")
+	if err == nil {
+		lines = append(lines, fmt.Sprintf("Подписки на преподавателей: %d чат(ов)", subsT))
+	}
+
+	nextWeek, err := c.bot.chatRepo.FindChatsWithNotice("telegram", "notice_next_week")
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+	}
+	addSection("Новая неделя (notice_next_week):", nextWeek, describe)
+
+	calls, err := c.bot.chatRepo.FindChatsWithNotice("telegram", "notice_calls")
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+	}
+	configured := make([]*Chat, 0, len(calls))
+	for _, chat := range calls {
+		if chat.Group != "" || chat.Teacher != "" {
+			configured = append(configured, chat)
+		}
+	}
+	addSection("Изменение звонков (notice_calls, настроен режим):", configured, describe)
+
+	errs, err := c.bot.chatRepo.FindChatsWithNotice("telegram", "notice_parser_errors")
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+	}
+	addSection("Ошибки парсера (notice_parser_errors):", errs, describe)
+
+	admins, err := c.bot.chatRepo.FindAdminChats("telegram", c.bot.cfg.Telegram.AdminIDs)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+	}
+	addSection("Админы (всегда получают ошибки парсера):", admins, describe)
+
+	cronChats, err := c.bot.chatRepo.FindAllWithNotifications("telegram")
+	if err == nil {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("Всего чатов с notice_changes: %d", len(cronChats)))
+	}
+
+	return u.Bot.SendText(u.ChatID, "<pre>"+strings.Join(lines, "\n")+"</pre>")
+}
+
 type archiveStatsCmd struct{ bot *Bot }
 
 func (c *archiveStatsCmd) Name() string { return "/archivestats" }
