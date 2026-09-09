@@ -207,11 +207,12 @@ func (a *chatFinderAdapter) toEventChats(chats []*telegrambot.Chat) []*notificat
 	result := make([]*notification.EventChat, 0, len(chats))
 	for _, c := range chats {
 		result = append(result, &notification.EventChat{
-			ID:      c.ID,
-			PeerID:  c.PeerID,
-			Mode:    string(c.Mode),
-			Group:   c.Group,
-			Teacher: c.Teacher,
+			ID:        c.ID,
+			PeerID:    c.PeerID,
+			Mode:      string(c.Mode),
+			Group:     c.Group,
+			Teacher:   c.Teacher,
+			Formatter: c.Formatter,
 		})
 	}
 	return result
