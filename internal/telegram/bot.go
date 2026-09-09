@@ -144,6 +144,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&debugCmd{bot: b})
 	b.RegisterCommand(&sendCmd{bot: b})
 	b.RegisterCommand(&triggerCmd{bot: b})
+	b.RegisterCommand(&archiveStatsCmd{bot: b})
 	b.RegisterCommand(&historyCmd{bot: b})
 	b.RegisterCommand(&aliasCmd{bot: b})
 	b.RegisterCommand(&statsCmd{bot: b})

@@ -3,10 +3,12 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
@@ -326,7 +328,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/ping", "/ics", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
 		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
-		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart",
+		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))
@@ -1331,5 +1333,114 @@ func TestE2E_SubTestPickUsesSelectedIndex(t *testing.T) {
 	loaded, _ := repo.FindOrCreate("telegram", userID)
 	if loaded.Scene != "" {
 		t.Errorf("scene not cleared: %q", loaded.Scene)
+	}
+}
+
+func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(777)
+
+	archiveRepo, err := archive.New(filepath.Join(t.TempDir(), "archive.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { archiveRepo.Close() })
+	if _, err := archiveRepo.DB().Exec(`CREATE TABLE IF NOT EXISTS timetable_archive (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		day INTEGER NOT NULL,
+		"group" TEXT,
+		teacher TEXT,
+		data TEXT NOT NULL,
+		UNIQUE(day, "group"),
+		UNIQUE(day, teacher)
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	b.archive = archiveRepo
+
+	currentWeek := utils.WeekIndexFromDate(time.Now()).Value()
+	pastWeek := currentWeek - 3
+	futureWeek := currentWeek + 3
+
+	weekLabel := func(week int) string {
+		w := utils.WeekIndexFromNumber(week)
+		d1, d2 := w.WeekRange()
+		return d1.Format("02.01.2006") + "-" + d2.Format("02.01.2006")
+	}
+
+	entries := []archive.AppendDay{
+		{Type: "group", Value: "100", Day: map[string]any{"day": weekLabel(pastWeek)[:10], "lessons": []any{
+			map[string]any{"lesson": "ПрошлаяМатематика", "cabinet": "1"},
+		}}},
+		{Type: "group", Value: "100", Day: map[string]any{"day": weekLabel(futureWeek)[:10], "lessons": []any{
+			map[string]any{"lesson": "БудущаяФизика", "cabinet": "9"},
+		}}},
+	}
+	if err := archiveRepo.AppendDays(entries); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.FindOrCreate("telegram", userID); err != nil {
+		t.Fatal(err)
+	}
+
+	minIdx, maxIdx := utils.WeekIndexFromNumber(pastWeek).WeekDayIndexRange()
+	days := b.archiveDaysForWeek("group", "100", minIdx, maxIdx)
+	if len(days) != 1 {
+		t.Fatalf("expected 1 past-week day from archive, got %d", len(days))
+	}
+	if days[0]["day"] != weekLabel(pastWeek)[:10] {
+		t.Errorf("past day: %v", days[0]["day"])
+	}
+
+	minIdx, maxIdx = utils.WeekIndexFromNumber(futureWeek).WeekDayIndexRange()
+	days = b.archiveDaysForWeek("group", "100", minIdx, maxIdx)
+	if len(days) != 1 {
+		t.Fatalf("expected 1 future-week day from archive, got %d", len(days))
+	}
+
+	lessons, _ := days[0]["lessons"].([]any)
+	if len(lessons) != 1 {
+		t.Fatalf("expected 1 lesson, got %d", len(lessons))
+	}
+	lesson, _ := lessons[0].(map[string]any)
+	if lesson["lesson"] != "БудущаяФизика" {
+		t.Errorf("lesson content mismatch: %v", lesson["lesson"])
+	}
+}
+
+func TestE2E_ArchiveStatsCommand(t *testing.T) {
+	b, _ := setupE2EBot(t, 999)
+
+	archiveRepo, err := archive.New(filepath.Join(t.TempDir(), "archive.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { archiveRepo.Close() })
+	if _, err := archiveRepo.DB().Exec(`CREATE TABLE IF NOT EXISTS timetable_archive (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		day INTEGER NOT NULL,
+		"group" TEXT,
+		teacher TEXT,
+		data TEXT NOT NULL,
+		UNIQUE(day, "group"),
+		UNIQUE(day, teacher)
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	b.archive = archiveRepo
+
+	if err := archiveRepo.AppendDays([]archive.AppendDay{
+		{Type: "group", Value: "100", Day: map[string]any{"day": "07.09.2026", "lessons": []any{}}},
+		{Type: "teacher", Value: "Иванов И.И.", Day: map[string]any{"day": "07.09.2026", "lessons": []any{}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &archiveStatsCmd{bot: b}
+	u := makeUpdate(999, "/archivestats")
+	u.Bot = b
+	if err := cmd.Handler(context.Background(), u); err != nil {
+		t.Fatalf("handler: %v", err)
 	}
 }

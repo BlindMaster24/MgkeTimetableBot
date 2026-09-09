@@ -280,6 +280,11 @@ func parseTeacherDay(dayIndex int64, data string) (*model.TeacherDay, error) {
 
 func extractDayData(v interface{}) (int64, string) {
 	switch d := v.(type) {
+	case map[string]any:
+		dateStr, _ := d["day"].(string)
+		lessons, _ := d["lessons"].([]any)
+		data, _ := json.Marshal(lessons)
+		return DateToDayIndex(dateStr), string(data)
 	case *model.GroupDay:
 		data, _ := json.Marshal(d.Lessons)
 		return dateStringToIndex(d.Day), string(data)
