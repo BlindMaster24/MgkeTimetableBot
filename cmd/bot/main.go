@@ -108,33 +108,57 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}
 
-	adapter := &chatFinderAdapter{repo: chatRepo}
-	notifier := notification.NewChangeNotifier(raspCache, log, bot, adapter)
+	adapter := &chatFinderAdapter{repo: chatRepo, adminIDs: cfg.Telegram.AdminIDs}
 
-	bot.SetParseFunc(func() error {
-		oldGroupsHash := raspCache.GetGroupsHash()
-		oldTeachersHash := raspCache.GetTeachersHash()
+	if cfg.Telegram.Noticer {
+		eventNotifier := notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
+		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter)
+		scheduler.Start()
+		defer scheduler.Stop()
+		log.Info().Msg("notification scheduler started")
 
-		groupURL := cfg.Parser.Endpoints.TimetableGroup
-		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
-		err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
-		if err != nil {
-			bot.AddParseLog(false, err.Error())
-		} else {
-			bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
-			go notifier.NotifyChanges(oldGroupsHash, oldTeachersHash)
+		drainEvents := func(tag string) {
+			events := raspCache.DrainEvents()
+			if len(events) > 0 {
+				log.Info().Int("count", len(events)).Str("tag", tag).Msg("draining cache events")
+				eventNotifier.HandleEvents(events)
+			}
 		}
-		go syncArchive("parse")
-		return err
-	})
+
+		drainEvents("startup")
+
+		bot.SetParseFunc(func() error {
+			groupURL := cfg.Parser.Endpoints.TimetableGroup
+			teacherURL := cfg.Parser.Endpoints.TimetableTeacher
+			err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
+			if err != nil {
+				bot.AddParseLog(false, err.Error())
+				go eventNotifier.ParserError(err)
+			} else {
+				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
+				drainEvents("parse")
+			}
+			go syncArchive("parse")
+			return err
+		})
+	} else {
+		bot.SetParseFunc(func() error {
+			groupURL := cfg.Parser.Endpoints.TimetableGroup
+			teacherURL := cfg.Parser.Endpoints.TimetableTeacher
+			err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
+			if err != nil {
+				bot.AddParseLog(false, err.Error())
+			} else {
+				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
+			}
+			go syncArchive("parse")
+			return err
+		})
+	}
 
 	if err := bot.SetMyCommands(); err != nil {
 		log.Warn().Err(err).Msg("failed to set bot commands")
 	}
-
-	scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter)
-	scheduler.Start()
-	log.Info().Msg("notification scheduler started")
 
 	go func() {
 		groupURL := cfg.Parser.Endpoints.TimetableGroup
@@ -152,8 +176,6 @@ func main() {
 	if err := bot.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("bot stopped")
 	}
-
-	scheduler.Stop()
 
 	if err := raspCache.Save(); err != nil {
 		log.Error().Err(err).Msg("failed to save cache")
@@ -177,23 +199,68 @@ func initArchiveSchema(repo *archive.Repository) {
 }
 
 type chatFinderAdapter struct {
-	repo *telegrambot.Repository
+	repo     *telegrambot.Repository
+	adminIDs []int64
 }
 
-func (a *chatFinderAdapter) FindAllWithNotifications(service string) ([]*notification.ChatInfo, error) {
-	chats, err := a.repo.FindAllWithNotifications(service)
+func (a *chatFinderAdapter) toEventChats(chats []*telegrambot.Chat) []*notification.EventChat {
+	result := make([]*notification.EventChat, 0, len(chats))
+	for _, c := range chats {
+		result = append(result, &notification.EventChat{
+			ID:      c.ID,
+			PeerID:  c.PeerID,
+			Mode:    string(c.Mode),
+			Group:   c.Group,
+			Teacher: c.Teacher,
+		})
+	}
+	return result
+}
+
+func (a *chatFinderAdapter) FindChatsByGroups(service string, groups []string, noticeChanges bool) ([]*notification.EventChat, error) {
+	chats, err := a.repo.FindChatsByGroups(service, groups, noticeChanges)
 	if err != nil {
 		return nil, err
 	}
-	var result []*notification.ChatInfo
-	for _, c := range chats {
-		result = append(result, &notification.ChatInfo{
-			ID:            c.PeerID,
-			Mode:          string(c.Mode),
-			Group:         c.Group,
-			Teacher:       c.Teacher,
-			NoticeChanges: c.NoticeChanges,
-		})
+	return a.toEventChats(chats), nil
+}
+
+func (a *chatFinderAdapter) FindChatsByTeachers(service string, teachers []string, noticeChanges bool) ([]*notification.EventChat, error) {
+	chats, err := a.repo.FindChatsByTeachers(service, teachers, noticeChanges)
+	if err != nil {
+		return nil, err
 	}
-	return result, nil
+	return a.toEventChats(chats), nil
+}
+
+func (a *chatFinderAdapter) FindSubscribedChatsByGroup(service, group string, noticeChanges bool) ([]*notification.EventChat, error) {
+	chats, err := a.repo.FindSubscribedChatsByGroup(service, group, noticeChanges)
+	if err != nil {
+		return nil, err
+	}
+	return a.toEventChats(chats), nil
+}
+
+func (a *chatFinderAdapter) FindSubscribedChatsByTeacher(service, teacher string, noticeChanges bool) ([]*notification.EventChat, error) {
+	chats, err := a.repo.FindSubscribedChatsByTeacher(service, teacher, noticeChanges)
+	if err != nil {
+		return nil, err
+	}
+	return a.toEventChats(chats), nil
+}
+
+func (a *chatFinderAdapter) FindChatsWithNotice(service string, notice string) ([]*notification.EventChat, error) {
+	chats, err := a.repo.FindChatsWithNotice(service, notice)
+	if err != nil {
+		return nil, err
+	}
+	return a.toEventChats(chats), nil
+}
+
+func (a *chatFinderAdapter) FindAdminChats(service string) ([]*notification.EventChat, error) {
+	chats, err := a.repo.FindAdminChats(service, a.adminIDs)
+	if err != nil {
+		return nil, err
+	}
+	return a.toEventChats(chats), nil
 }

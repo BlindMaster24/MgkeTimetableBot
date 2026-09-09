@@ -14,6 +14,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	"github.com/mymmrac/telego"
 )
 
@@ -307,12 +308,17 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 		u.ChatID = msg.Chat.ID
 	}
 
+	bestPrefix := ""
+	var bestHandler Callback
 	for prefix, handler := range b.callbacks {
-		if strings.HasPrefix(cb.Data, prefix) {
-			if err := handler.Handler(ctx, u); err != nil {
-				b.log.Error().Err(err).Str("prefix", prefix).Msg("callback error")
-			}
-			return
+		if strings.HasPrefix(cb.Data, prefix) && len(prefix) > len(bestPrefix) {
+			bestPrefix = prefix
+			bestHandler = handler
+		}
+	}
+	if bestHandler != nil {
+		if err := bestHandler.Handler(ctx, u); err != nil {
+			b.log.Error().Err(err).Str("prefix", bestPrefix).Msg("callback error")
 		}
 	}
 }
@@ -423,6 +429,20 @@ func (b *Bot) SendTextWithReplyKeyboard(chatID int64, text string, kb *telego.Re
 		ReplyMarkup: kb,
 	})
 	return err
+}
+
+func (b *Bot) SendTextWithButtons(chatID int64, text string, buttons []notification.KeyboardButton) error {
+	var kb *telego.InlineKeyboardMarkup
+	if len(buttons) > 0 {
+		rows := make([][]telego.InlineKeyboardButton, 0, len(buttons))
+		for _, btn := range buttons {
+			rows = append(rows, []telego.InlineKeyboardButton{
+				{Text: btn.Text, CallbackData: btn.Data},
+			})
+		}
+		kb = &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
+	}
+	return b.SendTextWithKeyboard(chatID, text, kb)
 }
 
 func (b *Bot) RemoveReplyKeyboard(chatID int64) error {

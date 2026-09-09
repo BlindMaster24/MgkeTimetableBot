@@ -3,6 +3,7 @@ package telegram
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"sync"
 
 	_ "modernc.org/sqlite"
@@ -487,6 +488,230 @@ func (r *Repository) CountByMode() (map[string]int, error) {
 		}
 	}
 	return result, err
+}
+
+func (r *Repository) FindChatsByGroups(service string, groups []string, noticeChanges bool) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(groups) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(groups))
+	args := make([]any, 0, len(groups)+3)
+	args = append(args, service)
+	for i, g := range groups {
+		placeholders[i] = "?"
+		args = append(args, g)
+	}
+	args = append(args, boolToIntArg(noticeChanges))
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
+		 WHERE service = ? AND "group" IN (`+strings.Join(placeholders, ",")+`)
+		 AND accepted = 1 AND allow_send_mess = 1 AND notice_changes = ?
+		 AND (mode IN ('student', 'parent') OR mode IS NULL OR mode = '')`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var mode sql.NullString
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode.String)
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func (r *Repository) FindChatsByTeachers(service string, teachers []string, noticeChanges bool) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(teachers) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(teachers))
+	args := make([]any, 0, len(teachers)+3)
+	args = append(args, service)
+	for i, t := range teachers {
+		placeholders[i] = "?"
+		args = append(args, t)
+	}
+	args = append(args, boolToIntArg(noticeChanges))
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
+		 WHERE service = ? AND teacher IN (`+strings.Join(placeholders, ",")+`)
+		 AND accepted = 1 AND allow_send_mess = 1 AND notice_changes = ?
+		 AND (mode = 'teacher' OR mode IS NULL OR mode = '')`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var mode sql.NullString
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode.String)
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func boolToIntArg(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func (r *Repository) FindSubscribedChatsByGroup(service, group string, noticeChanges bool) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT c.id, c.peer_id, c.mode, c."group", c.teacher FROM bot_chats c
+		 JOIN subscriptions s ON s.chat_id = c.id AND s.type = 'group' AND s.value = ?
+		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1 AND c.notice_changes = ?`,
+		group, service, boolToIntArg(noticeChanges),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var mode sql.NullString
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode.String)
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func (r *Repository) FindSubscribedChatsByTeacher(service, teacher string, noticeChanges bool) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	rows, err := r.db.Query(
+		`SELECT c.id, c.peer_id, c.mode, c."group", c.teacher FROM bot_chats c
+		 JOIN subscriptions s ON s.chat_id = c.id AND s.type = 'teacher' AND s.value = ?
+		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1 AND c.notice_changes = ?`,
+		teacher, service, boolToIntArg(noticeChanges),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var mode sql.NullString
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode.String)
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func (r *Repository) FindChatsWithNotice(service, notice string) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	column := "notice_calls"
+	switch notice {
+	case "notice_calls":
+		column = "notice_calls"
+	case "notice_parser_errors":
+		column = "notice_parser_errors"
+	case "notice_next_week":
+		column = "notice_next_week"
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
+		 WHERE service = ? AND accepted = 1 AND allow_send_mess = 1 AND `+column+` = 1`,
+		service,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var mode sql.NullString
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode.String)
+		result = append(result, chat)
+	}
+	return result, nil
+}
+
+func (r *Repository) FindAdminChats(service string, adminIDs []int64) ([]*Chat, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(adminIDs) == 0 {
+		return nil, nil
+	}
+
+	placeholders := make([]string, len(adminIDs))
+	args := make([]any, 0, len(adminIDs)+1)
+	args = append(args, service)
+	for i, id := range adminIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	rows, err := r.db.Query(
+		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
+		 WHERE service = ? AND peer_id IN (`+strings.Join(placeholders, ",")+`)
+		 AND accepted = 1 AND allow_send_mess = 1`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*Chat
+	for rows.Next() {
+		chat := &Chat{}
+		var mode sql.NullString
+		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode.String)
+		result = append(result, chat)
+	}
+	return result, nil
 }
 
 type Subscription struct {

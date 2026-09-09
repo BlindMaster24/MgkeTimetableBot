@@ -75,6 +75,10 @@ func (w WeekIndex) Next() WeekIndex {
 	return WeekIndexFromNumber(w.value + 1)
 }
 
+func (w WeekIndex) IsFutureWeek() bool {
+	return w.value > WeekIndexFromDate(time.Now()).Value()
+}
+
 func (w WeekIndex) Prev() WeekIndex {
 	return WeekIndexFromNumber(w.value - 1)
 }

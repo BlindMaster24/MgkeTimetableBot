@@ -8,14 +8,16 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
 type RaspEntry[T any] struct {
-	Timetable     T       `json:"timetable"`
-	Update        int64   `json:"update"`
-	Changed       int64   `json:"changed"`
-	LastWeekIndex int     `json:"lastWeekIndex"`
-	Hash          string  `json:"hash"`
+	Timetable     T      `json:"timetable"`
+	Update        int64  `json:"update"`
+	Changed       int64  `json:"changed"`
+	LastWeekIndex int    `json:"lastWeekIndex"`
+	Hash          string `json:"hash"`
 }
 
 type TeamCacheEntry struct {
@@ -61,20 +63,22 @@ type RaspCache struct {
 	Calls         CallsCache                 `json:"calls"`
 	SuccessUpdate bool                       `json:"successUpdate"`
 
+	events []Event
+
 	hits   atomic.Int64
 	misses atomic.Int64
 }
 
 type Stats struct {
-	Hits         int64 `json:"hits"`
-	Misses       int64 `json:"misses"`
-	GroupsCount  int   `json:"groupsCount"`
-	TeachersCount int  `json:"teachersCount"`
-	SuccessUpdate bool `json:"successUpdate"`
-	GroupsUpdate  int64 `json:"groupsUpdate"`
-	TeachersUpdate int64 `json:"teachersUpdate"`
-	GroupsHash   string `json:"groupsHash"`
-	TeachersHash string `json:"teachersHash"`
+	Hits           int64  `json:"hits"`
+	Misses         int64  `json:"misses"`
+	GroupsCount    int    `json:"groupsCount"`
+	TeachersCount  int    `json:"teachersCount"`
+	SuccessUpdate  bool   `json:"successUpdate"`
+	GroupsUpdate   int64  `json:"groupsUpdate"`
+	TeachersUpdate int64  `json:"teachersUpdate"`
+	GroupsHash     string `json:"groupsHash"`
+	TeachersHash   string `json:"teachersHash"`
 }
 
 func New(dir string) (*RaspCache, error) {
@@ -140,32 +144,100 @@ func (c *RaspCache) SetGroups(groups map[string]any, hash string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	now := time.Now().UnixMilli()
-	old := c.Groups.Timetable
-
-	c.Groups.Timetable = groups
-	c.Groups.Update = now
-	c.Groups.Hash = hash
-
-	if !mapsEqual(old, groups) {
-		c.Groups.Changed = now
-	}
+	c.setTimetable(KindGroups, c.Groups, groups, hash)
 }
 
 func (c *RaspCache) SetTeachers(teachers map[string]any, hash string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.setTimetable(KindTeachers, c.Teachers, teachers, hash)
+}
+
+func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], data map[string]any, hash string) {
 	now := time.Now().UnixMilli()
-	old := c.Teachers.Timetable
+	old := entry.Timetable
 
-	c.Teachers.Timetable = teachers
-	c.Teachers.Update = now
-	c.Teachers.Hash = hash
+	todayIdx := utils.DayIndexFromDate(time.Now())
 
-	if !mapsEqual(old, teachers) {
-		c.Teachers.Changed = now
+	var newEvents []Event
+	for value, v := range data {
+		vm, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		var oldEntryMap map[string]any
+		if ov, ok := old[value]; ok {
+			oldEntryMap, _ = ov.(map[string]any)
+		}
+		for _, out := range collectEntryDayEvents(kind, value, oldEntryMap, vm, todayIdx) {
+			newEvents = append(newEvents, out.ev)
+		}
 	}
+
+	previousWeekIndex := entry.LastWeekIndex
+	weekEvents, maxWeek := collectWeekEvents(kind, entry, data)
+	newEvents = append(newEvents, weekEvents...)
+
+	var withdrawnEntries []string
+	previousWeekIsFuture := previousWeekIndex > 0 && utils.WeekIndexFromNumber(previousWeekIndex).IsFutureWeek()
+	if previousWeekIsFuture {
+		previousEntries := collectWeekEntries(old, previousWeekIndex)
+		currentEntries := collectWeekEntries(data, previousWeekIndex)
+		prevSet := make(map[string]bool, len(currentEntries))
+		for _, e := range currentEntries {
+			prevSet[e] = true
+		}
+		for _, e := range previousEntries {
+			if !prevSet[e] {
+				withdrawnEntries = append(withdrawnEntries, e)
+			}
+		}
+		if len(withdrawnEntries) > 0 {
+			newEvents = append(newEvents, Event{Week: &WeekEvent{Kind: kind, Week: previousWeekIndex, Withdrawn: true, Entries: withdrawnEntries}})
+		}
+	}
+
+	mergedTimetable := make(map[string]any, len(old)+len(data))
+	for k, v := range old {
+		om, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, exists := data[k]; !exists {
+			md, _, _ := mergeDays(nil, entryDays(v))
+			om["days"] = md
+			mergedTimetable[k] = om
+		}
+	}
+	for k, v := range data {
+		var oldEntryMap map[string]any
+		if ov, ok := old[k]; ok {
+			oldEntryMap, _ = ov.(map[string]any)
+		}
+		_, _, changed := mergeDays(entryDays(v), entryDays(oldEntryMap))
+		if len(changed) == 0 && oldEntryMap != nil {
+			lastNoticed := entryLastNoticedDayFromMap(oldEntryMap)
+			if lastNoticed > 0 {
+				if m, ok := v.(map[string]any); ok {
+					m["lastNoticedDay"] = float64(lastNoticed)
+				}
+			}
+		}
+		mergedTimetable[k] = v
+	}
+
+	entry.Timetable = mergedTimetable
+	entry.Update = now
+	entry.Hash = hash
+
+	if !mapsEqual(old, mergedTimetable) {
+		entry.Changed = now
+	}
+
+	entry.LastWeekIndex = maxWeek
+
+	c.events = append(c.events, newEvents...)
 }
 
 func (c *RaspCache) SetTeam(names map[string]string, hashes []string) {
@@ -178,6 +250,14 @@ func (c *RaspCache) SetTeam(names map[string]string, hashes []string) {
 }
 
 func (c *RaspCache) SetCalls(site Schedule, manual Schedule, source string) {
+	c.setCallsInternal(site, manual, source, "", false)
+}
+
+func (c *RaspCache) SetCallsNotify(site Schedule, manual Schedule, source string, reason string) {
+	c.setCallsInternal(site, manual, source, reason, true)
+}
+
+func (c *RaspCache) setCallsInternal(site Schedule, manual Schedule, source, reason string, skipNotify bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -185,6 +265,10 @@ func (c *RaspCache) SetCalls(site Schedule, manual Schedule, source string) {
 	if source == "site" {
 		c.Calls.ManualReason = ""
 	}
+
+	prevActive := c.Calls.Active.Schedule
+	weekdaysChanged := schedulesNotEqual(prevActive.Weekdays, site.Weekdays)
+	saturdayChanged := schedulesNotEqual(prevActive.Saturday, site.Saturday)
 
 	c.Calls.Site = CallsSource{
 		Schedule:  CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
@@ -204,6 +288,19 @@ func (c *RaspCache) SetCalls(site Schedule, manual Schedule, source string) {
 	}
 	c.Calls.Update = now
 	c.Calls.Changed = now
+
+	if skipNotify {
+		return
+	}
+
+	if weekdaysChanged || saturdayChanged {
+		c.events = append(c.events, Event{Calls: &CallsEvent{
+			WeekdaysChanged: weekdaysChanged,
+			SaturdayChanged: saturdayChanged,
+			Reason:          reason,
+			Schedule:        CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
+		}})
+	}
 }
 
 type Schedule struct {
@@ -221,26 +318,27 @@ func (c *RaspCache) Stats() Stats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return Stats{
-		Hits:          c.hits.Load(),
-		Misses:        c.misses.Load(),
-		GroupsCount:   len(c.Groups.Timetable),
-		TeachersCount: len(c.Teachers.Timetable),
-		SuccessUpdate: c.SuccessUpdate,
-		GroupsUpdate:  c.Groups.Update,
+		Hits:           c.hits.Load(),
+		Misses:         c.misses.Load(),
+		GroupsCount:    len(c.Groups.Timetable),
+		TeachersCount:  len(c.Teachers.Timetable),
+		SuccessUpdate:  c.SuccessUpdate,
+		GroupsUpdate:   c.Groups.Update,
 		TeachersUpdate: c.Teachers.Update,
-		GroupsHash:    c.Groups.Hash,
-		TeachersHash:  c.Teachers.Hash,
+		GroupsHash:     c.Groups.Hash,
+		TeachersHash:   c.Teachers.Hash,
 	}
 }
 
-func (c *RaspCache) RecordHit()   { c.hits.Add(1) }
-func (c *RaspCache) RecordMiss()  { c.misses.Add(1) }
+func (c *RaspCache) RecordHit()  { c.hits.Add(1) }
+func (c *RaspCache) RecordMiss() { c.misses.Add(1) }
 func (c *RaspCache) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Groups = &RaspEntry[map[string]any]{Timetable: make(map[string]any)}
 	c.Teachers = &RaspEntry[map[string]any]{Timetable: make(map[string]any)}
 	c.Team = TeamCacheEntry{Names: make(map[string]string)}
+	c.events = nil
 }
 
 func (c *RaspCache) Save() error {
@@ -316,6 +414,25 @@ func hashSchedule(s Schedule) string {
 	return h
 }
 
+func schedulesNotEqual(a, b [][2][2]string) bool {
+	return !slicesEqual(a, b)
+}
+
+func slicesEqual(a, b [][2][2]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		for r := 0; r < 2; r++ {
+			for cIdx := 0; cIdx < 2; cIdx++ {
+				if a[i][r][cIdx] != b[i][r][cIdx] {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
 
 func (c *RaspCache) GetGroupsHash() string {
 	c.mu.RLock()
@@ -357,6 +474,9 @@ func (c *RaspCache) SetCallsManual(weekdays, saturday [][2][2]string, reason str
 		UpdatedAt: now,
 		Hash:      hashSchedule(Schedule{Weekdays: weekdays, Saturday: saturday}),
 	}
+	weekdaysChanged := schedulesNotEqual(c.Calls.Active.Schedule.Weekdays, weekdays)
+	saturdayChanged := schedulesNotEqual(c.Calls.Active.Schedule.Saturday, saturday)
+
 	c.Calls.Manual = manuallySet
 	c.Calls.ManualReason = reason
 	c.Calls.Active = CallsActive{
@@ -366,4 +486,13 @@ func (c *RaspCache) SetCallsManual(weekdays, saturday [][2][2]string, reason str
 		Hash:      manuallySet.Hash,
 	}
 	c.Calls.Changed = now
+
+	if weekdaysChanged || saturdayChanged {
+		c.events = append(c.events, Event{Calls: &CallsEvent{
+			WeekdaysChanged: weekdaysChanged,
+			SaturdayChanged: saturdayChanged,
+			Reason:          reason,
+			Schedule:        manuallySet.Schedule,
+		}})
+	}
 }

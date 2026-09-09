@@ -38,7 +38,7 @@ func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL,
 
 	if bellScheduleURL != "" {
 		if schedule := fetchAndParseCalls(client, bellScheduleURL); schedule != nil {
-			c.SetCalls(*schedule, cache.Schedule{}, "site")
+			c.SetCallsNotify(*schedule, cache.Schedule{}, "site", "")
 			log.Info().Int("weekdays", len(schedule.Weekdays)).Msg("calls parsed from site")
 		} else {
 			log.Warn().Str("url", bellScheduleURL).Msg("calls parse returned empty")
@@ -164,4 +164,3 @@ func fetchAndParseCalls(client *http.Client, url string) *cache.Schedule {
 
 	return ParseCallsSchedule(doc)
 }
-
