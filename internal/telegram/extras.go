@@ -69,7 +69,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	chat.AppendTeacherHistory(teacher)
 	chat.Teacher = teacher
 	chat.Mode = ModeTeacher
-	chat.Scene = "history_week"
+	chat.Scene = sceneHistoryWeek
 	s.bot.chatRepo.Save(chat)
 
 	return nil
@@ -353,41 +353,67 @@ func (cb *historyCb) Handler(ctx context.Context, u *Update) error {
 	return cmd.Handler(ctx, u)
 }
 
-type subsCheckFullCb struct{ bot *Bot }
-
-func (cb *subsCheckFullCb) Prefix() string { return "subs_check_full" }
-func (cb *subsCheckFullCb) Handler(ctx context.Context, u *Update) error {
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-
-	list, _ := cb.bot.chatRepo.GetSubscriptions(u.UserID)
-	if len(list) == 0 {
-		return u.Bot.SendText(u.ChatID, "Подписок нет.")
-	}
-
-	chat.Scene = "sub_test_pick"
-	cb.bot.chatRepo.Save(chat)
-
-	prompt := "Что проверить?\n1. Оповещение об изменении дня\n2. Оповещение о новой неделе\n3. Оба варианта\n\n" + cb.bot.formatSubscriptionsList(list)
-	return u.Bot.SendText(u.ChatID, prompt)
-}
-
 type subTestPickScene struct{ bot *Bot }
 
 func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
-	input := strings.TrimSpace(u.Text)
-
 	list, _ := s.bot.chatRepo.GetSubscriptions(u.UserID)
 	if len(list) == 0 {
 		chat.Scene = ""
 		s.bot.chatRepo.Save(chat)
-		return u.Bot.SendText(u.ChatID, "Подписок нет.")
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", s.bot.replySubscriptionsMenu())
 	}
 
+	input := strings.TrimSpace(u.Text)
+
+	idx := 0
+	for _, c := range input {
+		if c >= '0' && c <= '9' {
+			idx = idx*10 + int(c-'0')
+		}
+	}
+
+	var target Subscription
+	if idx >= 1 && idx <= len(list) {
+		target = list[idx-1]
+	} else {
+		found := false
+		for _, item := range list {
+			if normalizeSubValue(item.Value) == normalizeSubValue(input) {
+				target = item
+				found = true
+				break
+			}
+		}
+		if !found {
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", s.bot.replySubscriptionsMenu())
+		}
+	}
+
+	chat.Scene = "sub_test_mode:" + target.Type + ":" + target.Value
+	s.bot.chatRepo.Save(chat)
+
+	prompt := "Что проверить?\n1. Оповещение об изменении дня\n2. Оповещение о новой неделе\n3. Оба варианта"
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, s.bot.replySubscriptionsMenu())
+}
+
+func normalizeSubValue(value string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(value, ".", ""), " ", ""))
+}
+
+type subTestModeScene struct{ bot *Bot }
+
+func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
+	payload := strings.TrimPrefix(chat.Scene, "sub_test_mode:")
+	parts := strings.SplitN(payload, ":", 2)
+	if len(parts) != 2 {
+		chat.Scene = ""
+		s.bot.chatRepo.Save(chat)
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", s.bot.replySubscriptionsMenu())
+	}
+	subType, subValue := parts[0], parts[1]
+
 	mode := ""
-	switch input {
+	switch strings.TrimSpace(u.Text) {
 	case "1":
 		mode = "day"
 	case "2":
@@ -395,62 +421,88 @@ func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	case "3":
 		mode = "both"
 	default:
-		return u.Bot.SendText(u.ChatID, "Введите 1, 2 или 3")
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите 1, 2 или 3", s.bot.replySubscriptionsMenu())
 	}
 
 	chat.Scene = ""
 	s.bot.chatRepo.Save(chat)
 
-	var idx int
-	for _, c := range input {
-		if c >= '0' && c <= '9' {
-			idx = idx*10 + int(c-'0')
+	week := s.bot.relevantWeekIndex()
+	minIdx, maxIdx := week.WeekDayIndexRange()
+	days := s.bot.archiveDaysForWeek(subType, subValue, minIdx, maxIdx)
+
+	label := "Группа"
+	if subType == "teacher" {
+		label = "Преподаватель"
+	}
+
+	if mode == "day" || mode == "both" {
+		day := pickFutureDay(days)
+		phrase := "день"
+		var one []map[string]any
+		if day != nil {
+			phrase = subscriptionDayPhrase(day["day"].(string))
+			one = []map[string]any{day}
+		}
+
+		opts := s.bot.fmtOpts(chat, false)
+		var text string
+		if subType == "teacher" {
+			text = formatter.GetByIndex(chat.Formatter).FormatTeacherFull(subValue, one, opts)
+		} else {
+			text = formatter.GetByIndex(chat.Formatter).FormatGroupFull(subValue, one, opts)
+		}
+
+		message := fmt.Sprintf("📢 %s %s: расписание на %s\n%s", label, subValue, phrase, text)
+		if err := u.Bot.SendTextWithReplyKeyboard(u.ChatID, message, s.bot.replySubscriptionsMenu()); err != nil {
+			return err
+		}
+		if mode == "day" {
+			return nil
 		}
 	}
 
-	target := list[0]
-	if idx >= 1 && idx <= len(list) {
-		target = list[idx-1]
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("📢 Тестовое уведомление для %s %s:\n\n", labelForSubType(target.Type), target.Value))
-
-	cacheData := s.bot.cache.GetGroups()
-	if target.Type == "teacher" {
-		cacheData = s.bot.cache.GetTeachers()
-	}
-
-	data, ok := cacheData[target.Value]
-	if !ok {
-		sb.WriteString("Данные не найдены в кэше.")
-	} else {
-		if mode == "day" || mode == "both" {
-			text := s.bot.formatGroupFull(chat, target.Value, data)
-			if target.Type == "teacher" {
-				text = s.bot.formatTeacherFull(chat, target.Value, data)
-			}
-			if text == "" {
-				text = s.bot.loc("no_timetable")
-			}
-			sb.WriteString(text)
-		}
-		if mode == "week" || mode == "both" {
-			if mode == "both" {
-				sb.WriteString("\n\n")
-			}
-			sb.WriteString(fmt.Sprintf("🆕 %s: доступно расписание на следующую неделю", labelForSubType(target.Type)))
-		}
-	}
-
-	return u.Bot.SendTextWithKeyboard(u.ChatID, sb.String(), s.bot.subscriptionsKeyboard())
+	return u.Bot.SendTextWithKeyboard(u.ChatID,
+		fmt.Sprintf("🆕 %s %s: доступно расписание на следующую неделю", label, subValue),
+		weekTimetableButton("📃 Показать", subType, subValue, week.Value(), false))
 }
 
-func labelForSubType(t string) string {
-	if t == "teacher" {
-		return "Преподаватель"
+func pickFutureDay(days []map[string]any) map[string]any {
+	todayIdx := utils.DayIndexFromDate(time.Now())
+	for _, day := range days {
+		dateStr, _ := day["day"].(string)
+		t, err := time.Parse("02.01.2006", dateStr)
+		if err != nil {
+			continue
+		}
+		if utils.DayIndexFromDate(t) > todayIdx {
+			return day
+		}
 	}
-	return "Группа"
+	if len(days) > 0 {
+		return days[0]
+	}
+	return nil
+}
+
+func subscriptionDayPhrase(day string) string {
+	t, err := time.Parse("02.01.2006", day)
+	if err != nil {
+		return "день"
+	}
+
+	dayIdx := utils.DayIndexFromDate(t)
+	todayIdx := utils.DayIndexFromDate(time.Now())
+	if dayIdx == todayIdx {
+		return "сегодня"
+	}
+	if dayIdx == todayIdx+1 {
+		return "завтра"
+	}
+	if utils.WeekIndexFromDate(t).IsFutureWeek() {
+		return "следующую неделю"
+	}
+	return "день"
 }
 
 type callsEditCb struct{ bot *Bot }
@@ -462,7 +514,7 @@ func (cb *callsEditCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	chat.Scene = "calls_edit_input"
+	chat.Scene = sceneCallsEditInput
 	cb.bot.chatRepo.Save(chat)
 
 	return u.Bot.SendText(u.ChatID, "Введите расписание звонков.\nПример\nБудни\n1 08:30 09:15 09:25 10:10\n2 10:20 11:05 11:15 12:00\nСуббота\n1 09:00 09:45 09:55 10:40")
@@ -471,15 +523,76 @@ func (cb *callsEditCb) Handler(ctx context.Context, u *Update) error {
 type callsEditInputScene struct{ bot *Bot }
 
 func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
-	chat.Scene = ""
-	s.bot.chatRepo.Save(chat)
-
 	parsed := parseCallsInput(u.Text)
 	if parsed == nil {
-		return u.Bot.SendText(u.ChatID, "Неверный формат ввода. Попробуйте ещё раз.")
+		return u.Bot.SendText(u.ChatID, "Не удалось распознать расписание. Проверьте формат.")
 	}
-	s.bot.cache.SetCallsManual(parsed.Weekdays, parsed.Saturday, u.Text)
 
+	chat.CallsEditInput = u.Text
+	chat.Scene = sceneCallsEditReason
+	s.bot.chatRepo.Save(chat)
+
+	reasonKb := withCancelButton(&telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: "Пропустить", CallbackData: "answer:Пропустить"}},
+		},
+	})
+
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Укажите причину изменения или нажмите Пропустить", reasonKb)
+}
+
+type callsEditReasonScene struct{ bot *Bot }
+
+func (s *callsEditReasonScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
+	reasonText := strings.TrimSpace(u.Text)
+	chat.CallsEditReason = reasonText
+	chat.Scene = sceneCallsEditConfirm
+	s.bot.chatRepo.Save(chat)
+
+	confirmKb := withCancelButton(&telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{
+				{Text: "Отправить", CallbackData: "answer:Отправить"},
+				{Text: "Не отправлять", CallbackData: "answer:Не отправлять"},
+			},
+		},
+	})
+
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Отправить уведомление всем?", confirmKb)
+}
+
+type callsEditConfirmScene struct{ bot *Bot }
+
+func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
+	confirmText := strings.ToLower(u.Text)
+	notifyNow := strings.Contains(confirmText, "отправить")
+
+	reason := strings.TrimSpace(chat.CallsEditReason)
+	if reason == "" || strings.EqualFold(reason, "пропустить") || strings.EqualFold(reason, "скип") {
+		reason = ""
+	}
+
+	parsed := parseCallsInput(chat.CallsEditInput)
+	if parsed == nil {
+		chat.Scene = ""
+		chat.CallsEditInput = ""
+		chat.CallsEditReason = ""
+		s.bot.chatRepo.Save(chat)
+		return u.Bot.SendText(u.ChatID, "Не удалось распознать расписание. Проверьте формат.")
+	}
+
+	s.bot.cacheMu.Lock()
+	s.bot.cache.SetCallsManualNotify(parsed.Weekdays, parsed.Saturday, reason, notifyNow)
+	s.bot.cacheMu.Unlock()
+
+	chat.Scene = ""
+	chat.CallsEditInput = ""
+	chat.CallsEditReason = ""
+	s.bot.chatRepo.Save(chat)
+
+	if notifyNow {
+		return u.Bot.SendText(u.ChatID, "Расписание звонков обновлено и уведомление отправлено.")
+	}
 	return u.Bot.SendText(u.ChatID, "Расписание звонков обновлено вручную.")
 }
 
@@ -524,21 +637,18 @@ func parseCallsInput(text string) *callsParsed {
 
 func parseCallRow(line string) *[2][2]string {
 	re := regexp.MustCompile(`\b(\d{1,2})[:.](\d{2})\b`)
-	matches := re.FindAllString(line, -1)
+	matches := re.FindAllStringSubmatch(line, -1)
 	if len(matches) < 4 {
 		return nil
 	}
 	var row [2][2]string
 	for i := 0; i < 4; i++ {
-		parts := strings.Split(matches[i], ":")
-		if parts[0] != matches[i] {
-			parts = strings.Split(matches[i], ".")
-		}
-		hh := parts[0]
+		hh := matches[i][1]
+		mm := matches[i][2]
 		if len(hh) == 1 {
 			hh = "0" + hh
 		}
-		row[i/2][i%2] = hh + ":" + parts[1]
+		row[i/2][i%2] = hh + ":" + mm
 	}
 	return &row
 }
@@ -654,21 +764,7 @@ func (c *subscriptionsTestCmd) MatchText(text string) bool {
 	return text == "🧪 Проверить" || text == "/subscriptions_test"
 }
 func (c *subscriptionsTestCmd) Handler(ctx context.Context, u *Update) error {
-	list, _ := c.bot.chatRepo.GetSubscriptions(u.UserID)
-	if len(list) == 0 {
-		return u.Bot.SendText(u.ChatID, "Подписок нет.")
-	}
-
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-
-	chat.Scene = "sub_test_pick"
-	c.bot.chatRepo.Save(chat)
-
-	prompt := "Что проверить?\n1. Оповещение об изменении дня\n2. Оповещение о новой неделе\n3. Оба варианта\n\n" + c.bot.formatSubscriptionsList(list)
-	return u.Bot.SendText(u.ChatID, prompt)
+	return c.bot.subTestPrompt(u)
 }
 
 type compareGroupsStepA struct{ bot *Bot }
@@ -681,7 +777,7 @@ func (s *compareGroupsStepA) Handle(ctx context.Context, u *Update, chat *Chat) 
 		return u.Bot.SendText(u.ChatID, "Данной учебной группы не существует")
 	}
 
-	chat.Scene = "compare_groups_input:" + input
+	chat.Scene = sceneCompareInput + ":" + input
 	s.bot.chatRepo.Save(chat)
 	prompt := fmt.Sprintf("Введите номер второй группы (например, %s)", randomKey(groups))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
@@ -987,6 +1083,8 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 
 type chatCmd struct{ bot *Bot }
 
+func (c *chatCmd) Hidden() bool { return true }
+
 func (c *chatCmd) Name() string        { return "/chat" }
 func (c *chatCmd) Description() string { return "Просмотр информации о чате" }
 func (c *chatCmd) Handler(ctx context.Context, u *Update) error {
@@ -999,6 +1097,8 @@ func (c *chatCmd) Handler(ctx context.Context, u *Update) error {
 
 type idCmd struct{ bot *Bot }
 
+func (c *idCmd) Hidden() bool { return true }
+
 func (c *idCmd) Name() string        { return "/id" }
 func (c *idCmd) Description() string { return "ID чата и пользователя" }
 func (c *idCmd) Handler(ctx context.Context, u *Update) error {
@@ -1007,6 +1107,8 @@ func (c *idCmd) Handler(ctx context.Context, u *Update) error {
 
 type errorCmd struct{ bot *Bot }
 
+func (c *errorCmd) Hidden() bool { return true }
+
 func (c *errorCmd) Name() string        { return "/error" }
 func (c *errorCmd) Description() string { return "Тестовая ошибка" }
 func (c *errorCmd) Handler(ctx context.Context, u *Update) error {
@@ -1014,6 +1116,8 @@ func (c *errorCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type testCmd struct{ bot *Bot }
+
+func (c *testCmd) Hidden() bool { return true }
 
 func (c *testCmd) Name() string        { return "/test" }
 func (c *testCmd) Description() string { return "Тестовая команда" }

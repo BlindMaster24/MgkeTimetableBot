@@ -33,7 +33,7 @@ func setupTestBot(t *testing.T) *Bot {
 
 func TestBotRegisterCommands(t *testing.T) {
 	b := setupTestBot(t)
-	expected := []string{"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about", "/group", "/teacher", "/settings", "/image", "/buttons", "/formatter", "/forceparse", "/resetcache", "/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger", "/history", "/stats", "/google_calendar", "/alias", "/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey", "/decryptKey", "/cabinet", "/groups", "/teachers", "/comparegroups", "/ping", "/ics", "/subscriptions_test", "/archive", "/endings", "/chat", "/id", "/error", "/test", "/groupweek", "/groupimage", "/teacherweek", "/teacherimage", "/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats", "/noticedebug"}
+	expected := []string{"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about", "/group", "/teacher", "/settings", "/image", "/buttons", "/formatter", "/forceparse", "/resetcache", "/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger", "/history", "/stats", "/google_calendar", "/alias", "/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey", "/decryptKey", "/cabinet", "/groups", "/teachers", "/comparegroups", "/ping", "/ics", "/subscriptions", "/subscriptions_test", "/archive", "/endings", "/chat", "/id", "/error", "/test", "/groupweek", "/groupimage", "/teacherweek", "/teacherimage", "/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats", "/noticedebug", "/buttons_reload"}
 	for _, name := range expected {
 		if _, ok := b.commands[name]; !ok {
 			t.Errorf("missing command %s", name)
@@ -48,6 +48,65 @@ func TestBotRegisterCallbacks(t *testing.T) {
 	b := setupTestBot(t)
 	if len(b.callbacks) == 0 {
 		t.Error("expected callbacks to be registered")
+	}
+}
+
+func TestHelpListsOnlyPublicTgCommands(t *testing.T) {
+	b := setupTestBot(t)
+
+	expected := []string{
+		"/start", "/help", "/cancel", "/setup", "/day", "/week", "/calls", "/about",
+		"/group", "/groupweek", "/groupimage", "/teacher", "/teacherweek", "/teacherimage",
+		"/settings", "/buttons", "/buttons_reload", "/formatter", "/eula", "/api", "/diff",
+		"/notice", "/view", "/history", "/stats", "/alias", "/cabinet", "/groups",
+		"/teachers", "/comparegroups", "/ping", "/ics", "/subscriptions", "/subscriptions_test",
+		"/archive", "/endings", "/vychetkaDlyaBrovkiDSOnline",
+	}
+
+	var listed []string
+	for _, cmd := range b.commandOrder {
+		if ac, ok := cmd.(AdminCommand); ok && ac.AdminOnly() {
+			continue
+		}
+		if hc, ok := cmd.(HiddenCommand); ok && hc.Hidden() {
+			continue
+		}
+		listed = append(listed, cmd.Name())
+	}
+
+	found := make(map[string]bool, len(listed))
+	for _, name := range listed {
+		found[name] = true
+	}
+	for _, name := range expected {
+		if !found[name] {
+			t.Errorf("/help is missing %s", name)
+		}
+	}
+
+	allowed := make(map[string]bool, len(expected))
+	for _, name := range expected {
+		allowed[name] = true
+	}
+	for _, name := range listed {
+		if !allowed[name] {
+			t.Errorf("/help must not list %s", name)
+		}
+	}
+}
+
+func TestBotCommandOrderIsStable(t *testing.T) {
+	b := setupTestBot(t)
+	if len(b.commandOrder) != len(b.commands) {
+		t.Fatalf("commandOrder=%d, commands=%d", len(b.commandOrder), len(b.commands))
+	}
+	for i, cmd := range b.commandOrder {
+		if b.commands[cmd.Name()] != cmd {
+			t.Errorf("commandOrder[%d]=%s is not the registered instance", i, cmd.Name())
+		}
+	}
+	if b.commandOrder[0].Name() != "/start" {
+		t.Errorf("first registered command should be /start, got %s", b.commandOrder[0].Name())
 	}
 }
 

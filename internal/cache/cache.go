@@ -46,12 +46,14 @@ type CallsSchedule struct {
 }
 
 type CallsCache struct {
-	Site         CallsSource `json:"site"`
-	Manual       CallsSource `json:"manual"`
-	Active       CallsActive `json:"active"`
-	Update       int64       `json:"update"`
-	Changed      int64       `json:"changed"`
-	ManualReason string      `json:"manualReason"`
+	Site                CallsSource `json:"site"`
+	Manual              CallsSource `json:"manual"`
+	Active              CallsActive `json:"active"`
+	Update              int64       `json:"update"`
+	Changed             int64       `json:"changed"`
+	ManualReason        string      `json:"manualReason"`
+	OverrideSource      string      `json:"overrideSource"`
+	SiteEmptyNotifiedAt int64       `json:"siteEmptyNotifiedAt"`
 }
 
 type RaspCache struct {
@@ -62,6 +64,8 @@ type RaspCache struct {
 	Team          TeamCacheEntry             `json:"team"`
 	Calls         CallsCache                 `json:"calls"`
 	SuccessUpdate bool                       `json:"successUpdate"`
+
+	callsPreferSite bool
 
 	events []Event
 
@@ -97,7 +101,8 @@ func New(dir string) (*RaspCache, error) {
 		Team: TeamCacheEntry{
 			Names: make(map[string]string),
 		},
-		SuccessUpdate: true,
+		SuccessUpdate:   true,
+		callsPreferSite: true,
 	}
 
 	c.load()
@@ -265,41 +270,100 @@ func (c *RaspCache) setCallsInternal(site Schedule, manual Schedule, source, rea
 		c.Calls.ManualReason = ""
 	}
 
-	prevActive := c.Calls.Active.Schedule
-	weekdaysChanged := schedulesNotEqual(prevActive.Weekdays, site.Weekdays)
-	saturdayChanged := schedulesNotEqual(prevActive.Saturday, site.Saturday)
-
 	c.Calls.Site = CallsSource{
 		Schedule:  CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
 		UpdatedAt: now,
 		Hash:      hashSchedule(site),
 	}
-	c.Calls.Manual = CallsSource{
-		Schedule:  CallsSchedule{Weekdays: manual.Weekdays, Saturday: manual.Saturday},
-		UpdatedAt: now,
-		Hash:      hashSchedule(manual),
-	}
-	c.Calls.Active = CallsActive{
-		Schedule:  CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
-		UpdatedAt: now,
-		Source:    source,
-		Hash:      hashSchedule(site),
+	if len(manual.Weekdays) > 0 || len(manual.Saturday) > 0 {
+		c.Calls.Manual = CallsSource{
+			Schedule:  CallsSchedule{Weekdays: manual.Weekdays, Saturday: manual.Saturday},
+			UpdatedAt: now,
+			Hash:      hashSchedule(manual),
+		}
 	}
 	c.Calls.Update = now
-	c.Calls.Changed = now
 
-	if skipNotify {
+	c.selectActiveCallsLocked(skipNotify, reason)
+}
+
+func (c *RaspCache) SetCallsPreferSite(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.callsPreferSite = v
+}
+
+func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
+	configSchedule := CallsSchedule{}
+
+	activeSource := "config"
+	activeSchedule := configSchedule
+	activeUpdatedAt := time.Now().UnixMilli()
+
+	switch c.Calls.OverrideSource {
+	case "site":
+		if c.Calls.Site.UpdatedAt > 0 {
+			activeSource = "site"
+			activeSchedule = c.Calls.Site.Schedule
+			activeUpdatedAt = c.Calls.Site.UpdatedAt
+		}
+	case "manual":
+		if c.Calls.Manual.UpdatedAt > 0 {
+			activeSource = "manual"
+			activeSchedule = c.Calls.Manual.Schedule
+			activeUpdatedAt = c.Calls.Manual.UpdatedAt
+		}
+	case "config":
+		activeSource = "config"
+	default:
+		if c.callsPreferSite && c.Calls.Site.UpdatedAt > 0 {
+			activeSource = "site"
+			activeSchedule = c.Calls.Site.Schedule
+			activeUpdatedAt = c.Calls.Site.UpdatedAt
+		}
+		if c.Calls.Manual.UpdatedAt > 0 {
+			manualIsNewer := c.Calls.Manual.UpdatedAt >= c.Calls.Site.UpdatedAt
+			if !c.callsPreferSite || manualIsNewer {
+				activeSource = "manual"
+				activeSchedule = c.Calls.Manual.Schedule
+				activeUpdatedAt = c.Calls.Manual.UpdatedAt
+			}
+		}
+	}
+
+	activeHash := hashSchedule(Schedule{Weekdays: activeSchedule.Weekdays, Saturday: activeSchedule.Saturday})
+	sourceChanged := c.Calls.Active.Source != activeSource
+	updatedChanged := c.Calls.Active.UpdatedAt != activeUpdatedAt
+	if c.Calls.Active.Hash != "" && c.Calls.Active.Hash == activeHash && !sourceChanged && !updatedChanged {
 		return
 	}
 
-	if weekdaysChanged || saturdayChanged {
-		c.events = append(c.events, Event{Calls: &CallsEvent{
-			WeekdaysChanged: weekdaysChanged,
-			SaturdayChanged: saturdayChanged,
-			Reason:          reason,
-			Schedule:        CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
-		}})
+	weekdaysChanged := schedulesNotEqual(c.Calls.Active.Schedule.Weekdays, activeSchedule.Weekdays)
+	saturdayChanged := schedulesNotEqual(c.Calls.Active.Schedule.Saturday, activeSchedule.Saturday)
+
+	c.Calls.Changed = time.Now().UnixMilli()
+	c.Calls.Active = CallsActive{
+		Schedule:  activeSchedule,
+		UpdatedAt: activeUpdatedAt,
+		Source:    activeSource,
+		Hash:      activeHash,
 	}
+
+	if skipNotify || (!weekdaysChanged && !saturdayChanged) {
+		return
+	}
+
+	eventReason := reason
+	if eventReason == "" && activeSource == "manual" {
+		eventReason = c.Calls.ManualReason
+	}
+
+	c.events = append(c.events, Event{Calls: &CallsEvent{
+		WeekdaysChanged: weekdaysChanged,
+		SaturdayChanged: saturdayChanged,
+		Reason:          eventReason,
+		Schedule:        activeSchedule,
+	}})
 }
 
 type Schedule struct {
@@ -457,6 +521,22 @@ func (c *RaspCache) GetCallsSaturday() [][2][2]string {
 	return c.Calls.Active.Schedule.Saturday
 }
 
+func (c *RaspCache) SetCallsOverride(source string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Calls.OverrideSource = source
+	c.selectActiveCallsLocked(true, "")
+}
+
+func (c *RaspCache) ResetCallsOverride() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Calls.OverrideSource = ""
+	c.selectActiveCallsLocked(true, "")
+}
+
 func (c *RaspCache) SetCallsFromCache(calls CallsCache) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -464,34 +544,20 @@ func (c *RaspCache) SetCallsFromCache(calls CallsCache) {
 }
 
 func (c *RaspCache) SetCallsManual(weekdays, saturday [][2][2]string, reason string) {
+	c.SetCallsManualNotify(weekdays, saturday, reason, true)
+}
+
+func (c *RaspCache) SetCallsManualNotify(weekdays, saturday [][2][2]string, reason string, notify bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	now := time.Now().UnixMilli()
-	manuallySet := CallsSource{
+	c.Calls.Manual = CallsSource{
 		Schedule:  CallsSchedule{Weekdays: weekdays, Saturday: saturday},
 		UpdatedAt: now,
 		Hash:      hashSchedule(Schedule{Weekdays: weekdays, Saturday: saturday}),
 	}
-	weekdaysChanged := schedulesNotEqual(c.Calls.Active.Schedule.Weekdays, weekdays)
-	saturdayChanged := schedulesNotEqual(c.Calls.Active.Schedule.Saturday, saturday)
-
-	c.Calls.Manual = manuallySet
 	c.Calls.ManualReason = reason
-	c.Calls.Active = CallsActive{
-		Schedule:  manuallySet.Schedule,
-		UpdatedAt: now,
-		Source:    "manual",
-		Hash:      manuallySet.Hash,
-	}
-	c.Calls.Changed = now
-
-	if weekdaysChanged || saturdayChanged {
-		c.events = append(c.events, Event{Calls: &CallsEvent{
-			WeekdaysChanged: weekdaysChanged,
-			SaturdayChanged: saturdayChanged,
-			Reason:          reason,
-			Schedule:        manuallySet.Schedule,
-		}})
-	}
+	c.Calls.OverrideSource = "manual"
+	c.selectActiveCallsLocked(!notify, reason)
 }

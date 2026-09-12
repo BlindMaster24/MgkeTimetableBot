@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
-	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
@@ -217,7 +216,7 @@ func (cb *cancelCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
 	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err == nil {
-		wasSetup := chat.Scene == "setup"
+		wasSetup := chat.Scene == sceneSetup
 		chat.Scene = ""
 		cb.bot.chatRepo.Save(chat)
 		if wasSetup {
@@ -242,19 +241,19 @@ func (cb *setupCb) Handler(ctx context.Context, u *Update) error {
 	switch mode {
 	case "student":
 		chat.Mode = ModeStudent
-		chat.Scene = "set_group"
+		chat.Scene = sceneSetGroup
 	case "teacher":
 		chat.Mode = "teacher"
-		chat.Scene = "set_teacher"
+		chat.Scene = sceneSetTeacher
 	case "parent":
 		chat.Mode = ModeParent
-		chat.Scene = "set_group"
+		chat.Scene = sceneSetGroup
 	case "guest":
 		chat.Mode = "guest"
 		chat.Scene = ""
 	default:
 		cb.bot.AnswerCallback(u.Callback.ID, "")
-		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("setup_select_mode"), selectModeKeyboard(cb.bot.i18n.T))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, cb.bot.loc("setup_select_mode"), cb.bot.replySelectMode())
 	}
 
 	cb.bot.chatRepo.Save(chat)
@@ -267,16 +266,16 @@ func (cb *setupCb) Handler(ctx context.Context, u *Update) error {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 		}
 		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("setup_enter_group"), randomKey(groups))
-		return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cancelKeyboard(cb.bot.i18n.T))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, cb.bot.replyCancel())
 	case "teacher":
 		teachers := cb.bot.cache.GetTeachers()
 		if len(teachers) == 0 {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 		}
 		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_teacher_name"), randomKey(teachers))
-		return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, cancelKeyboard(cb.bot.i18n.T))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, cb.bot.replyCancel())
 	default:
-		return u.Bot.SendTextWithKeyboard(u.ChatID, cb.bot.loc("about_bot"), cb.bot.mainMenuKeyboard(chat))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, cb.bot.loc("about_bot"), replyMainMenu(cb.bot, chat))
 	}
 }
 
@@ -311,7 +310,7 @@ func (cb *groupCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	chat.Scene = "get_group"
+	chat.Scene = sceneGetGroup
 	cb.bot.chatRepo.Save(chat)
 	groups := cb.bot.cache.GetGroups()
 	if len(groups) == 0 {
@@ -330,7 +329,7 @@ func (cb *teacherCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	chat.Scene = "get_teacher"
+	chat.Scene = sceneGetTeacher
 	cb.bot.chatRepo.Save(chat)
 	teachers := cb.bot.cache.GetTeachers()
 	if len(teachers) == 0 {
@@ -358,110 +357,6 @@ func (cb *icsCb) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, cb.bot.loc("need_group"))
 }
 
-type btnToggleCb struct{ bot *Bot }
-
-func (cb *btnToggleCb) Prefix() string { return "btn_toggle:" }
-func (cb *btnToggleCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-
-		field := strings.TrimPrefix(u.Data, "btn_toggle:")
-		var msg string
-		switch field {
-		case "show_daily":
-			chat.ShowDaily = !chat.ShowDaily
-			msg = fmt.Sprintf("Показывать кнопку \"📄 На день\"? Установлено: '%s'", yesNoStr(chat.ShowDaily))
-		case "show_weekly":
-			chat.ShowWeekly = !chat.ShowWeekly
-			msg = fmt.Sprintf("Показывать кнопку \"📑 На неделю\"? Установлено: '%s'", yesNoStr(chat.ShowWeekly))
-		case "show_calls":
-			chat.ShowCalls = !chat.ShowCalls
-			msg = fmt.Sprintf("Показывать кнопку \"🕐 Звонки\"? Установлено: '%s'", yesNoStr(chat.ShowCalls))
-		case "show_about":
-			chat.ShowAbout = !chat.ShowAbout
-			msg = fmt.Sprintf("Показывать кнопку \"💡 О боте\"? Установлено: '%s'", yesNoStr(chat.ShowAbout))
-		case "show_fast_group":
-			chat.ShowFastGroup = !chat.ShowFastGroup
-			msg = fmt.Sprintf("Показывать кнопку \"👩‍🎓 Группа\"? Установлено: '%s'", yesNoStr(chat.ShowFastGroup))
-		case "show_fast_teacher":
-			chat.ShowFastTeacher = !chat.ShowFastTeacher
-			msg = fmt.Sprintf("Показывать кнопку \"👩‍🏫 Преподаватель\"? Установлено: '%s'", yesNoStr(chat.ShowFastTeacher))
-		}
-
-		cb.bot.chatRepo.Save(chat)
-		if msg != "" {
-			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.buttonsKeyboard(chat))
-		}
-		return cb.bot.SendTextWithKeyboard(u.ChatID, "Меню настройки кнопок.", cb.bot.buttonsKeyboard(chat))
-	})
-}
-
-type btnMenuCb struct{ bot *Bot }
-
-func (cb *btnMenuCb) Prefix() string { return "btn_menu" }
-func (cb *btnMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return u.Bot.SendTextWithKeyboard(u.ChatID, "Настройка кнопок", cb.bot.buttonsKeyboard(chat))
-	})
-}
-
-type fmtMenuCb struct{ bot *Bot }
-
-func (cb *fmtMenuCb) Prefix() string { return "fmt_menu" }
-func (cb *fmtMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
-	})
-}
-
-type fmtSelectCb struct{ bot *Bot }
-
-func (cb *fmtSelectCb) Prefix() string { return "fmt_select:" }
-func (cb *fmtSelectCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-
-		idxStr := strings.TrimPrefix(u.Data, "fmt_select:")
-		idx := 0
-		for _, c := range idxStr {
-			if c >= '0' && c <= '9' {
-				idx = idx*10 + int(c-'0')
-			}
-		}
-
-		if idx >= 0 && idx < len(formatter.AllFormatters) {
-			chat.Formatter = idx
-			cb.bot.chatRepo.Save(chat)
-			label := formatter.AllFormatters[idx].Label()
-			return u.Bot.SendTextWithKeyboard(u.ChatID, fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", label), cb.bot.formatterKeyboard(chat))
-		}
-
-		return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки форматировщика.", cb.bot.formatterKeyboard(chat))
-	})
-}
-
-type noticeMenuCb struct{ bot *Bot }
-
-func (cb *noticeMenuCb) Prefix() string { return "notice_menu" }
-func (cb *noticeMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showNoticeSettings(u, chat)
-	})
-}
-
-type viewMenuCb struct{ bot *Bot }
-
-func (cb *viewMenuCb) Prefix() string { return "view_menu" }
-func (cb *viewMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showViewSettings(u, chat)
-	})
-}
-
 type mainMenuCb struct{ bot *Bot }
 
 func (cb *mainMenuCb) Prefix() string { return "main_menu" }
@@ -471,67 +366,6 @@ func (cb *mainMenuCb) Handler(ctx context.Context, u *Update) error {
 		chat.Scene = ""
 		cb.bot.chatRepo.Save(chat)
 		return cb.bot.showSchedule(u, chat)
-	})
-}
-
-type noticeToggleCb struct{ bot *Bot }
-
-func (cb *noticeToggleCb) Prefix() string { return "notice_toggle:" }
-func (cb *noticeToggleCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-
-		field := strings.TrimPrefix(u.Data, "notice_toggle:")
-		var msg string
-		switch field {
-		case "notice_changes":
-			chat.NoticeChanges = !chat.NoticeChanges
-			msg = fmt.Sprintf("Оповещение о добавлении нового дня: %s", onOffStr(chat.NoticeChanges))
-		case "notice_next_week":
-			chat.NoticeNextWeek = !chat.NoticeNextWeek
-			msg = fmt.Sprintf("Оповещение о добавлении новой недели: %s", onOffStr(chat.NoticeNextWeek))
-		case "notice_calls":
-			chat.NoticeCalls = !chat.NoticeCalls
-			msg = fmt.Sprintf("Оповещение об изменениях расписания звонков: %s", onOffStr(chat.NoticeCalls))
-		case "notice_parser_errors":
-			chat.NoticeParserErrors = !chat.NoticeParserErrors
-			msg = fmt.Sprintf("Оповещение об ошибке парсера: %s", onOffStr(chat.NoticeParserErrors))
-		}
-
-		cb.bot.chatRepo.Save(chat)
-		if msg != "" {
-			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.noticeKeyboard(chat))
-		}
-		return cb.bot.showNoticeSettings(u, chat)
-	})
-}
-
-type viewToggleCb struct{ bot *Bot }
-
-func (cb *viewToggleCb) Prefix() string { return "view_toggle:" }
-func (cb *viewToggleCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-
-		field := strings.TrimPrefix(u.Data, "view_toggle:")
-		var msg string
-		switch field {
-		case "hide_past_days":
-			chat.HidePastDays = !chat.HidePastDays
-			msg = fmt.Sprintf("Скрывать прошедшие дни? Установлено: '%s'", yesNoStr(chat.HidePastDays))
-		case "show_parser_time":
-			chat.ShowParserTime = !chat.ShowParserTime
-			msg = fmt.Sprintf("Отображать в сообщении время последней загрузки расписания? Установлено: '%s'", yesNoStr(chat.ShowParserTime))
-		case "show_hints":
-			chat.ShowHints = !chat.ShowHints
-			msg = fmt.Sprintf("Показывать ли подсказки под расписанием? Установлено: '%s'", yesNoStr(chat.ShowHints))
-		}
-
-		cb.bot.chatRepo.Save(chat)
-		if msg != "" {
-			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.viewKeyboard(chat))
-		}
-		return cb.bot.showViewSettings(u, chat)
 	})
 }
 
@@ -683,160 +517,4 @@ func isNowInSlot(now time.Time, slot [2][2]string, includedDays []int) bool {
 	nowMin := now.Hour()*60 + now.Minute()
 
 	return nowMin >= startMin && nowMin <= endMin
-}
-
-type diffMenuCb struct{ bot *Bot }
-
-func (cb *diffMenuCb) Prefix() string { return "diff_menu" }
-func (cb *diffMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showDiffSettings(u, chat)
-	})
-}
-
-type diffToggleCb struct{ bot *Bot }
-
-func (cb *diffToggleCb) Prefix() string { return "diff_toggle:" }
-func (cb *diffToggleCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		field := strings.TrimPrefix(u.Data, "diff_toggle:")
-		var msg string
-		switch field {
-		case "diff_enabled":
-			chat.DiffEnabled = !chat.DiffEnabled
-			msg = fmt.Sprintf("Включить раздел \"Что изменилось\"? Установлено: '%s'\nЕсли отключено, кнопки/блоки diff пользователю не показываются.", yesNoStr(chat.DiffEnabled))
-		case "diff_auto_in_week":
-			chat.DiffAutoInWeek = !chat.DiffAutoInWeek
-			msg = fmt.Sprintf("Показывать diff после /week? Установлено: '%s'\nЕсли включено, после недельного расписания бот сразу добавляет блок изменений.", yesNoStr(chat.DiffAutoInWeek))
-		case "diff_auto_in_updates":
-			chat.DiffAutoInUpdates = !chat.DiffAutoInUpdates
-			msg = fmt.Sprintf("Показывать diff в уведомлениях? Установлено: '%s'\nЕсли включено, в автоуведомлениях о сменах будет краткий список изменений.", yesNoStr(chat.DiffAutoInUpdates))
-		case "diff_show_before_after":
-			chat.DiffShowBeforeAfter = !chat.DiffShowBeforeAfter
-			msg = fmt.Sprintf("Показывать старое -> новое для изменённых пар? Установлено: '%s'\nЕсли включено, бот покажет обе версии пары в строках с типом \"~\".", yesNoStr(chat.DiffShowBeforeAfter))
-		case "diff_max_lines":
-			presets := [4]int{10, 20, 30, 50}
-			current := 20
-			for i, p := range presets {
-				if p == chat.DiffMaxLines {
-					current = i
-					break
-				}
-			}
-			chat.DiffMaxLines = presets[(current+1)%len(presets)]
-			msg = fmt.Sprintf("Лимит строк diff: %d\nКогда изменений больше лимита, бот покажет только первые строки и общий остаток.", chat.DiffMaxLines)
-		}
-
-		cb.bot.chatRepo.Save(chat)
-		if msg != "" {
-			return cb.bot.SendTextWithKeyboard(u.ChatID, msg, cb.bot.diffKeyboard(chat))
-		}
-		return cb.bot.showDiffSettings(u, chat)
-	})
-}
-
-type callsMenuCb struct{ bot *Bot }
-
-func (cb *callsMenuCb) Prefix() string { return "calls_menu" }
-func (cb *callsMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
-	}
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showCallsSettings(u, chat)
-	})
-}
-
-type callsShowCb struct{ bot *Bot }
-
-func (cb *callsShowCb) Prefix() string { return "calls_show" }
-func (cb *callsShowCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
-	}
-	return cb.bot.sendCallsShow(u)
-}
-
-type callsRefreshCb struct{ bot *Bot }
-
-func (cb *callsRefreshCb) Prefix() string { return "calls_refresh" }
-func (cb *callsRefreshCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
-	}
-	if cb.bot.parseFunc == nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("parse_not_available"))
-	}
-	go func() {
-		if err := cb.bot.parseFunc(); err != nil {
-			cb.bot.log.Error().Err(err).Msg("calls refresh parse error")
-			cb.bot.SendText(u.ChatID, "⚠️ Ошибка парсера")
-			return
-		}
-		cb.bot.SendText(u.ChatID, "✅ Звонки обновлены с сайта")
-	}()
-	return u.Bot.SendText(u.ChatID, "🔄 Обновление звонков...")
-}
-
-type callsSourceCb struct{ bot *Bot }
-
-func (cb *callsSourceCb) Prefix() string { return "calls_source:" }
-func (cb *callsSourceCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
-	}
-
-	sourceStr := strings.TrimPrefix(u.Data, "calls_source:")
-	calls := cb.bot.cache.GetCalls()
-	calls.Active.Source = sourceStr
-
-	switch sourceStr {
-	case "site":
-		calls.Active.Schedule = calls.Site.Schedule
-	case "manual":
-		calls.Active.Schedule = calls.Manual.Schedule
-	case "config":
-		calls.Active.Schedule = cache.CallsSchedule{
-			Weekdays: cb.bot.cfg.Timetable.Weekdays,
-			Saturday: cb.bot.cfg.Timetable.Saturday,
-		}
-	}
-	calls.Active.Hash = sourceStr
-
-	cb.bot.cacheMu.Lock()
-	cb.bot.cache.SetCallsFromCache(calls)
-	cb.bot.cacheMu.Unlock()
-
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showCallsSettings(u, chat)
-	})
-}
-
-type callsSourceResetCb struct{ bot *Bot }
-
-func (cb *callsSourceResetCb) Prefix() string { return "calls_source_reset" }
-func (cb *callsSourceResetCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
-	}
-	calls := cb.bot.cache.GetCalls()
-	calls.Active = cache.CallsActive{
-		Schedule: calls.Site.Schedule,
-		Source:   "site",
-		Hash:     calls.Site.Hash,
-	}
-	cb.bot.cacheMu.Lock()
-	cb.bot.cache.SetCallsFromCache(calls)
-	cb.bot.cacheMu.Unlock()
-
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showCallsSettings(u, chat)
-	})
 }

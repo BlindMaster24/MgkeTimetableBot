@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	"github.com/mymmrac/telego"
 )
-
-const sceneSettings = "settings"
-const sceneSettingsSchedules = "settings_schedules"
-const sceneSettingsCalls = "settings_calls"
-const sceneSettingsAlias = "settings_alias"
 
 func (b *Bot) sendSettingsMenu(u *Update, chat *Chat) error {
 	chat.Scene = sceneSettings
@@ -455,7 +452,7 @@ func (c *aliasActionTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "list":
 		return c.bot.showAliasList(u, u.UserID)
 	case "add":
-		chat.Scene = "alias_add"
+		chat.Scene = sceneAliasAdd
 		c.bot.chatRepo.Save(chat)
 		return u.Bot.SendText(u.ChatID, "Введите алиас в формате: оригинальное_название = замена")
 	case "remove":
@@ -465,31 +462,6 @@ func (c *aliasActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки алиасов.", c.bot.replySettingsAliases())
 	}
 	return nil
-}
-
-type subsMenuTextCmd struct {
-	bot *Bot
-}
-
-func (c *subsMenuTextCmd) Name() string        { return "/subs_menu_text" }
-func (c *subsMenuTextCmd) Description() string { return "" }
-
-func (c *subsMenuTextCmd) MatchText(text string) bool {
-	return text == "🔔 Подписки" || text == "Подписки"
-}
-
-func (c *subsMenuTextCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-	return c.bot.SendTextWithReplyKeyboard(
-		u.ChatID,
-		"Подписки позволяют получать уведомления об изменениях расписания другой группы или преподавателя.",
-		c.bot.replySubscriptionsMenu(),
-	)
 }
 
 type subsActionTextCmd struct {
@@ -532,7 +504,7 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		if count >= MAX_SUBSCRIPTIONS {
 			return u.Bot.SendText(u.ChatID, fmt.Sprintf("Достигнут лимит подписок (%d).", MAX_SUBSCRIPTIONS))
 		}
-		chat.Scene = "sub_add_group"
+		chat.Scene = sceneSubAddGroup
 		c.bot.chatRepo.Save(chat)
 		prompt := fmt.Sprintf("Введите номер группы, на которую хотите подписаться (например, %s)", randomKey(groups))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
@@ -545,7 +517,7 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		if count >= MAX_SUBSCRIPTIONS {
 			return u.Bot.SendText(u.ChatID, fmt.Sprintf("Достигнут лимит подписок (%d).", MAX_SUBSCRIPTIONS))
 		}
-		chat.Scene = "sub_add_teacher"
+		chat.Scene = sceneSubAddTeacher
 		c.bot.chatRepo.Save(chat)
 		prompt := fmt.Sprintf("Введите фамилию преподавателя (например, %s)", randomKey(teachers))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
@@ -560,18 +532,11 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		if len(list) == 0 {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", c.bot.replySubscriptionsMenu())
 		}
-		chat.Scene = "sub_remove"
+		chat.Scene = sceneSubRemove
 		c.bot.chatRepo.Save(chat)
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите номер подписки для удаления:\n"+c.bot.formatSubscriptionsList(list), c.bot.replyCancel())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите номер подписки для удаления:\n"+c.bot.formatSubscriptionsList(list), c.bot.replySubscriptionsMenu())
 	case "test":
-		list, _ := c.bot.chatRepo.GetSubscriptions(u.UserID)
-		if len(list) == 0 {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", c.bot.replySubscriptionsMenu())
-		}
-		chat.Scene = "sub_test_pick"
-		c.bot.chatRepo.Save(chat)
-		prompt := "Что проверить?\n1. Оповещение об изменении дня\n2. Оповещение о новой неделе\n3. Оба варианта\n\n" + c.bot.formatSubscriptionsList(list)
-		return u.Bot.SendText(u.ChatID, prompt)
+		return c.bot.subTestPrompt(u)
 	}
 	return nil
 }
@@ -583,7 +548,7 @@ type setupModeTextCmd struct {
 
 func (c *setupModeTextCmd) Name() string        { return "/setup_mode_text_" + c.kind }
 func (c *setupModeTextCmd) Description() string { return "" }
-func (c *setupModeTextCmd) Scene() string       { return "setup" }
+func (c *setupModeTextCmd) Scene() string       { return sceneSetup }
 
 func (c *setupModeTextCmd) MatchText(text string) bool {
 	switch c.kind {
@@ -621,7 +586,7 @@ func (c *setupModeTextCmd) Handler(ctx context.Context, u *Update) error {
 		} else {
 			chat.Mode = ModeParent
 		}
-		chat.Scene = "set_group"
+		chat.Scene = sceneSetGroup
 		c.bot.chatRepo.Save(chat)
 		prompt := fmt.Sprintf("%s (например, %s)", c.bot.loc("setup_enter_group"), randomKey(groups))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
@@ -631,6 +596,143 @@ func (c *setupModeTextCmd) Handler(ctx context.Context, u *Update) error {
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("about_bot"), replyMainMenu(c.bot, chat))
 	}
 	return nil
+}
+
+type callsSettingsTextCmd struct {
+	bot  *Bot
+	kind string
+}
+
+func (c *callsSettingsTextCmd) Name() string        { return "/calls_settings_text_" + c.kind }
+func (c *callsSettingsTextCmd) Description() string { return "" }
+func (c *callsSettingsTextCmd) Scene() string       { return sceneSettingsCalls }
+
+func (c *callsSettingsTextCmd) MatchText(text string) bool {
+	switch c.kind {
+	case "show":
+		return text == "📊 Показать"
+	case "refresh":
+		return text == "✅ Обновить с сайта"
+	case "edit":
+		return text == "✏️ Изменить вручную"
+	case "source_site":
+		return text == "Источник: сайт" || text == "✅ Источник: сайт"
+	case "source_manual":
+		return text == "Источник: вручную" || text == "✅ Источник: вручную"
+	case "source_config":
+		return text == "Источник: конфиг" || text == "✅ Источник: конфиг"
+	case "source_auto":
+		return text == "Источник: авто" || text == "✅ Источник: авто"
+	}
+	return false
+}
+
+func (c *callsSettingsTextCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+
+	if c.kind == "show" {
+		return c.bot.sendCallsShow(u)
+	}
+
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+
+	switch c.kind {
+	case "refresh":
+		return c.bot.refreshCallsNow(u, chat)
+	case "edit":
+		chat.Scene = sceneCallsEditInput
+		c.bot.chatRepo.Save(chat)
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите расписание звонков. Пример\nБудни\n1 08:30 09:15 09:25 10:10\n2 10:20 11:05 11:15 12:00\nСуббота\n1 09:00 09:45 09:55 10:40", c.bot.replyCancel())
+	case "source_site", "source_manual", "source_config":
+		source := strings.TrimPrefix(c.kind, "source_")
+		c.bot.applyCallsSource(source)
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Источник звонков переключен на %s.\n\n%s", callsSourceLabel(source), c.bot.callsMenuText(chat, true)), c.bot.replyCallsSettings(chat, true))
+	case "source_auto":
+		c.bot.cache.ResetCallsOverride()
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Источник звонков переключен на авто.\n\n%s", c.bot.callsMenuText(chat, true)), c.bot.replyCallsSettings(chat, true))
+	}
+	return nil
+}
+
+func (b *Bot) applyCallsSource(source string) {
+	b.cache.SetCallsOverride(source)
+	if source != "config" {
+		return
+	}
+	calls := b.cache.GetCalls()
+	calls.Active.Schedule = cache.CallsSchedule{
+		Weekdays: b.cfg.Timetable.Weekdays,
+		Saturday: b.cfg.Timetable.Saturday,
+	}
+	b.cache.SetCallsFromCache(calls)
+}
+
+func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
+	lines := []string{"🔄 Обновление звонков"}
+
+	var err error
+	if b.parseFunc != nil {
+		err = b.parseFunc()
+	}
+
+	calls := b.cache.GetCalls()
+	siteParsed := len(calls.Site.Schedule.Weekdays) > 0
+
+	switch {
+	case err != nil:
+		lines = append(lines, "⚠️ Ошибка парсера")
+	case !siteParsed:
+		lines = append(lines, "⚠️ Сайт отдал пусто")
+	default:
+		lines = append(lines, "✅ Сайт успешно спарсен")
+	}
+
+	if siteParsed {
+		lines = append(lines, "🧪 Результат парсинга: OK")
+	} else {
+		lines = append(lines, "🧪 Результат парсинга: EMPTY")
+	}
+
+	if calls.Site.UpdatedAt > 0 {
+		lines = append(lines, fmt.Sprintf("📅 Дата на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
+	}
+
+	active := calls.Active.Source
+	if calls.OverrideSource != "" {
+		active = calls.OverrideSource
+	}
+	lines = append(lines, fmt.Sprintf("📌 Активный источник: %s", callsSourceLabel(active)))
+
+	if calls.ManualReason != "" && calls.Active.Source == "manual" {
+		lines = append(lines, fmt.Sprintf("✍️ Причина: %s", calls.ManualReason))
+	}
+
+	if err != nil {
+		lines = append(lines, "🪠 "+err.Error())
+	}
+
+	schedule := calls.Active.Schedule
+	if len(schedule.Weekdays) > 0 {
+		lines = append(lines, "\n__ Звонки (будни) __")
+		lines = append(lines, formatCallsPlain(schedule.Weekdays))
+		lines = append(lines, "\n__ Звонки (суббота) __")
+		lines = append(lines, formatCallsPlain(schedule.Saturday))
+	}
+
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, strings.Join(lines, "\n"), b.replyCallsSettings(chat, true))
+}
+
+func formatCallsPlain(slots [][2][2]string) string {
+	var lines []string
+	for i, slot := range slots {
+		lines = append(lines, fmt.Sprintf("%d. %s - %s | %s - %s", i+1, slot[0][0], slot[0][1], slot[1][0], slot[1][1]))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func registerSettingsTextCommands(b *Bot) {
@@ -664,7 +766,6 @@ func registerSettingsTextCommands(b *Bot) {
 	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "add"})
 	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "remove"})
 	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "clear"})
-	b.RegisterTextCommand(&subsMenuTextCmd{bot: b})
 	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "add_group"})
 	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "add_teacher"})
 	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "list"})
@@ -674,48 +775,55 @@ func registerSettingsTextCommands(b *Bot) {
 	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "student"})
 	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "parent"})
 	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "skip"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "show"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "refresh"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "edit"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_site"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_manual"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_config"})
+	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_auto"})
 }
 
-func (b *Bot) showCallsSettingsReply(u *Update, chat *Chat) error {
+func callsSourceLabel(source string) string {
+	switch source {
+	case "site":
+		return "сайт"
+	case "manual":
+		return "вручную"
+	default:
+		return "конфиг"
+	}
+}
+
+func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 	calls := b.cache.GetCalls()
 
-	sourceLabel := func(s string) string {
-		switch s {
-		case "site":
-			return "сайт"
-		case "manual":
-			return "вручную"
-		default:
-			return "конфиг"
+	lines := []string{"Управление расписанием звонков."}
+	if admin {
+		if calls.OverrideSource != "" {
+			lines = append(lines, fmt.Sprintf("Переопределение источника: %s", callsSourceLabel(calls.OverrideSource)))
+		} else {
+			lines = append(lines, fmt.Sprintf("Источник: авто (сейчас: %s)", callsSourceLabel(calls.Active.Source)))
 		}
 	}
 
-	var lines []string
-	lines = append(lines, "Управление расписанием звонков.")
-	if calls.Active.Source == "manual" && calls.ManualReason != "" {
+	if calls.OverrideSource == "" && calls.Active.Source != "site" && calls.SiteEmptyNotifiedAt > 0 {
+		lines = append(lines, "Сайт отдал пусто.")
+	}
+
+	switch {
+	case calls.Active.Source == "site" && calls.Site.UpdatedAt > 0:
+		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
+	case calls.Active.Source == "manual" && calls.ManualReason != "":
 		lines = append(lines, fmt.Sprintf("Причина: %s", calls.ManualReason))
-	}
-	lines = append(lines, fmt.Sprintf("Источник: %s", sourceLabel(calls.Active.Source)))
-
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "📊 Показать", CallbackData: "calls_full"}},
-		},
-	}
-	if b.isAdmin(u.UserID) {
-		kb.InlineKeyboard = append(kb.InlineKeyboard,
-			[]telego.InlineKeyboardButton{{Text: "✅ Обновить с сайта", CallbackData: "calls_refresh"}},
-			[]telego.InlineKeyboardButton{{Text: "✎ Изменить вручную", CallbackData: "calls_edit"}},
-			[]telego.InlineKeyboardButton{
-				{Text: sourceCheck("Источник: сайт", calls.Active.Source == "site"), CallbackData: "calls_source:site"},
-				{Text: sourceCheck("Источник: вручную", calls.Active.Source == "manual"), CallbackData: "calls_source:manual"},
-			},
-			[]telego.InlineKeyboardButton{
-				{Text: sourceCheck("Источник: конфиг", calls.Active.Source == "config"), CallbackData: "calls_source:config"},
-				{Text: sourceCheck("Источник: авто", true), CallbackData: "calls_source_reset"},
-			},
-		)
+	case calls.Active.Source == "config" && len(b.cfg.Timetable.Weekdays) > 0:
+		lines = append(lines, "Используются данные из конфига")
 	}
 
-	return b.SendTextWithKeyboard(u.ChatID, strings.Join(lines, "\n"), kb)
+	return strings.Join(lines, "\n")
+}
+
+func (b *Bot) showCallsSettingsReply(u *Update, chat *Chat) error {
+	admin := b.isAdmin(u.UserID)
+	return b.SendTextWithReplyKeyboard(u.ChatID, b.callsMenuText(chat, admin), b.replyCallsSettings(chat, admin))
 }

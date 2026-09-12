@@ -28,6 +28,8 @@ func (b *Bot) isAdmin(userID int64) bool {
 
 type debugCmd struct{ bot *Bot }
 
+func (c *debugCmd) AdminOnly() bool { return true }
+
 func (c *debugCmd) Name() string        { return "/debug" }
 func (c *debugCmd) Description() string { return c.bot.loc("cmd_debug") }
 
@@ -149,6 +151,8 @@ func formatUptime(start time.Time) string {
 
 type sendCmd struct{ bot *Bot }
 
+func (c *sendCmd) AdminOnly() bool { return true }
+
 func (c *sendCmd) Name() string        { return "/send" }
 func (c *sendCmd) Description() string { return c.bot.loc("cmd_send") }
 
@@ -235,6 +239,8 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type triggerCmd struct{ bot *Bot }
+
+func (c *triggerCmd) AdminOnly() bool { return true }
 
 func (c *triggerCmd) Name() string        { return "/trigger" }
 func (c *triggerCmd) Description() string { return c.bot.loc("cmd_trigger") }

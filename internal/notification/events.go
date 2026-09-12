@@ -85,10 +85,6 @@ func getDayPhrase(day string, nextDayPhrase string) string {
 		return nextDayPhrase
 	}
 
-	if utils.WeekIndexFromDate(t).IsFutureWeek() {
-		return "следующую неделю"
-	}
-
 	dayIdx := utils.DayIndexFromDate(t)
 	todayIdx := utils.DayIndexFromDate(time.Now())
 
@@ -97,6 +93,10 @@ func getDayPhrase(day string, nextDayPhrase string) string {
 	}
 	if dayIdx == todayIdx+1 {
 		return "завтра"
+	}
+
+	if utils.WeekIndexFromDate(t).IsFutureWeek() {
+		return "следующую неделю"
 	}
 
 	return nextDayPhrase

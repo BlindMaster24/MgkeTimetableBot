@@ -320,12 +320,12 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 	expected := []string{
 		"/start", "/help", "/cancel", "/setup", "/day", "/week",
 		"/calls", "/about", "/group", "/teacher", "/settings",
-		"/image", "/buttons", "/formatter", "/forceparse", "/resetcache",
+		"/image", "/buttons", "/buttons_reload", "/formatter", "/forceparse", "/resetcache",
 		"/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger",
 		"/history", "/stats", "/google_calendar", "/alias",
 		"/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey", "/decryptKey",
 		"/cabinet", "/groups", "/teachers", "/comparegroups",
-		"/ping", "/ics", "/subscriptions_test",
+		"/ping", "/ics", "/subscriptions", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
 		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
 		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats",
@@ -347,11 +347,7 @@ func TestE2E_AllCallbacksRegistered(t *testing.T) {
 		"day", "week", "calls", "calls_full", "image",
 		"image_group:", "image_teacher:", "cancel", "setup",
 		"about", "group", "teacher", "settings", "ics",
-		"btn_toggle:", "btn_menu", "fmt_menu", "fmt_select:",
-		"notice_menu", "view_menu", "notice_toggle:", "view_toggle:",
-		"main_menu", "diff_menu", "diff_advanced", "diff_toggle:", "calls_menu",
-		"calls_show", "calls_refresh", "calls_source:", "calls_source_reset",
-		"schedules_menu", "current_settings", "subs_menu",
+		"main_menu",
 		"timetable_g:", "timetable_t:", "answer:",
 	}
 	for _, prefix := range expected {
@@ -381,12 +377,12 @@ func TestE2E_AllCommandsHaveDescriptions(t *testing.T) {
 func TestE2E_MainMenuKeyboard_StudentFull(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{Mode: ModeStudent, Group: "100", ShowDaily: true, ShowWeekly: true, ShowCalls: true, ShowAbout: true, ShowFastGroup: true, ShowFastTeacher: true}
-	kb := b.mainMenuKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 3 {
-		t.Error("mainMenuKeyboard broken")
+	kb := replyMainMenu(b, chat)
+	if kb == nil || len(kb.Keyboard) < 3 {
+		t.Error("replyMainMenu broken")
 	}
 
-	texts := flattenKeyboardTexts(kb)
+	texts := flattenReplyKeyboardTexts(kb)
 	if !strings.Contains(texts, "📄 На день") {
 		t.Error("missing Day button")
 	}
@@ -413,11 +409,11 @@ func TestE2E_MainMenuKeyboard_StudentFull(t *testing.T) {
 func TestE2E_MainMenuKeyboard_GuestMode(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{Mode: ModeGuest}
-	kb := b.mainMenuKeyboard(chat)
+	kb := replyMainMenu(b, chat)
 	if kb == nil {
 		t.Fatal("nil keyboard")
 	}
-	texts := flattenKeyboardTexts(kb)
+	texts := flattenReplyKeyboardTexts(kb)
 	if !strings.Contains(texts, "👩‍🎓 Группа") {
 		t.Error("guest mode should show Group button")
 	}
@@ -429,11 +425,11 @@ func TestE2E_MainMenuKeyboard_GuestMode(t *testing.T) {
 func TestE2E_MainMenuKeyboard_NoMode(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{Mode: ""}
-	kb := b.mainMenuKeyboard(chat)
+	kb := replyMainMenu(b, chat)
 	if kb == nil {
 		t.Fatal("nil keyboard")
 	}
-	texts := flattenKeyboardTexts(kb)
+	texts := flattenReplyKeyboardTexts(kb)
 	if !strings.Contains(texts, "Первоначальная настройка") {
 		t.Error("no mode should show Setup button")
 	}
@@ -442,8 +438,8 @@ func TestE2E_MainMenuKeyboard_NoMode(t *testing.T) {
 func TestE2E_MainMenuKeyboard_TeacherMode(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{Mode: ModeTeacher, Teacher: "Иванов", ShowDaily: true, ShowAbout: true}
-	kb := b.mainMenuKeyboard(chat)
-	texts := flattenKeyboardTexts(kb)
+	kb := replyMainMenu(b, chat)
+	texts := flattenReplyKeyboardTexts(kb)
 	if !strings.Contains(texts, "📄 На день") {
 		t.Error("teacher mode should show Day button")
 	}
@@ -451,9 +447,8 @@ func TestE2E_MainMenuKeyboard_TeacherMode(t *testing.T) {
 
 func TestE2E_SettingsKeyboardFull(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	chat := &Chat{Mode: ModeStudent}
-	kb := b.settingsKeyboardFull(chat)
-	texts := flattenKeyboardTexts(kb)
+	kb := b.replySettingsMain()
+	texts := flattenReplyKeyboardTexts(kb)
 
 	if !strings.Contains(texts, "Первоначальная настройка") {
 		t.Error("missing Setup button")
@@ -498,8 +493,8 @@ func TestE2E_ButtonsKeyboard(t *testing.T) {
 		ShowFastGroup:   true,
 		ShowFastTeacher: false,
 	}
-	kb := b.buttonsKeyboard(chat)
-	texts := flattenKeyboardTexts(kb)
+	kb := b.replySettingsButtons(chat)
+	texts := flattenReplyKeyboardTexts(kb)
 
 	if !strings.Contains(texts, "📄 На день") {
 		t.Error("missing Day button text")
@@ -512,8 +507,8 @@ func TestE2E_ButtonsKeyboard(t *testing.T) {
 func TestE2E_FormatterKeyboard(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	chat := &Chat{Formatter: 1}
-	kb := b.formatterKeyboard(chat)
-	texts := flattenKeyboardTexts(kb)
+	kb := b.replySettingsFormatters(chat)
+	texts := flattenReplyKeyboardTexts(kb)
 
 	if !strings.Contains(texts, "Стуктурированный") {
 		t.Error("missing Default formatter label")
@@ -541,7 +536,7 @@ func TestE2E_NoticeSettings_ThreeToggles(t *testing.T) {
 		NoticeCalls:    true,
 	}
 
-	texts := flattenKeyboardTexts(b.noticeKeyboard(chat))
+	texts := flattenReplyKeyboardTexts(b.replySettingsNotice(chat))
 	if !strings.Contains(texts, "новых днях") {
 		t.Error("missing notice changes toggle")
 	}
@@ -561,8 +556,8 @@ func TestE2E_ViewSettings(t *testing.T) {
 		ShowParserTime: false,
 		ShowHints:      true,
 	}
-	kb := b.viewKeyboard(chat)
-	texts := flattenKeyboardTexts(kb)
+	kb := b.replySettingsView(chat)
+	texts := flattenReplyKeyboardTexts(kb)
 
 	if !strings.Contains(texts, "Скрывать прошедшие дни") {
 		t.Error("missing hide past days")
@@ -586,8 +581,8 @@ func TestE2E_DiffSettings_BasicAndAdvanced(t *testing.T) {
 		DiffShowBeforeAfter: false,
 	}
 
-	kbBasic := b.diffKeyboard(chat)
-	textsBasic := flattenKeyboardTexts(kbBasic)
+	kbBasic := b.replySettingsDiff(chat)
+	textsBasic := flattenReplyKeyboardTexts(kbBasic)
 	if !strings.Contains(textsBasic, "Что изменилось") {
 		t.Error("diff basic missing enabled toggle")
 	}
@@ -598,8 +593,8 @@ func TestE2E_DiffSettings_BasicAndAdvanced(t *testing.T) {
 		t.Error("diff basic missing advanced link (old feature)")
 	}
 
-	kbAdvanced := b.diffAdvancedKeyboard(chat)
-	textsAdvanced := flattenKeyboardTexts(kbAdvanced)
+	kbAdvanced := b.replySettingsDiffAdvanced(chat)
+	textsAdvanced := flattenReplyKeyboardTexts(kbAdvanced)
 	if !strings.Contains(textsAdvanced, "после /week") {
 		t.Error("diff advanced missing autoInWeek")
 	}
@@ -616,9 +611,8 @@ func TestE2E_DiffSettings_BasicAndAdvanced(t *testing.T) {
 
 func TestE2E_SchedulesSettings(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	chat := &Chat{Mode: ModeStudent}
-	kb := b.schedulesKeyboard(chat)
-	texts := flattenKeyboardTexts(kb)
+	kb := b.replySettingsSchedules()
+	texts := flattenReplyKeyboardTexts(kb)
 	if !strings.Contains(texts, "Звонки: управление") {
 		t.Error("schedules missing calls management")
 	}
@@ -866,54 +860,44 @@ func TestE2E_AllKeyboardBuildersWork(t *testing.T) {
 	b, _ := setupE2EBot(t)
 
 	chat := &Chat{Mode: ModeStudent, Group: "100", ShowDaily: true, ShowWeekly: true, ShowCalls: true, ShowAbout: true, ShowFastGroup: true, ShowFastTeacher: true}
-	kb := b.mainMenuKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 3 {
-		t.Error("mainMenuKeyboard broken")
+	if replay := replyMainMenu(b, chat); replay == nil || len(replay.Keyboard) < 3 {
+		t.Error("replyMainMenu broken")
 	}
 
-	kb = b.settingsKeyboardFull(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 5 {
-		t.Error("settingsKeyboardFull broken")
+	if kb := b.replySettingsMain(); kb == nil || len(kb.Keyboard) < 5 {
+		t.Error("replySettingsMain broken")
 	}
 
-	kb = b.buttonsKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 2 {
-		t.Error("buttonsKeyboard broken")
+	if kb := b.replySettingsButtons(chat); kb == nil || len(kb.Keyboard) < 2 {
+		t.Error("replySettingsButtons broken")
 	}
 
-	kb = b.formatterKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 2 {
-		t.Error("formatterKeyboard broken")
+	if kb := b.replySettingsFormatters(chat); kb == nil || len(kb.Keyboard) < 2 {
+		t.Error("replySettingsFormatters broken")
 	}
 
-	kb = selectModeKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 3 {
-		t.Error("selectModeKeyboard broken")
+	if kb := b.replySelectMode(); kb == nil || len(kb.Keyboard) != 3 {
+		t.Error("replySelectMode broken")
 	}
 
-	kb = cancelKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 1 {
-		t.Error("cancelKeyboard broken")
+	if kb := b.replyCancel(); kb == nil || len(kb.Keyboard) != 1 {
+		t.Error("replyCancel broken")
 	}
 
-	kb = settingsKeyboard(b.i18n.T)
-	if kb == nil || len(kb.InlineKeyboard) != 2 {
-		t.Error("settingsKeyboard broken")
+	if kb := b.replyStartButton(); kb == nil || len(kb.Keyboard) != 1 {
+		t.Error("replyStartButton broken")
 	}
 
-	kb = b.diffKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 2 {
-		t.Error("diffKeyboard broken")
+	if kb := b.replySettingsDiff(chat); kb == nil || len(kb.Keyboard) < 2 {
+		t.Error("replySettingsDiff broken")
 	}
 
-	kb = b.diffAdvancedKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 2 {
-		t.Error("diffAdvancedKeyboard broken")
+	if kb := b.replySettingsDiffAdvanced(chat); kb == nil || len(kb.Keyboard) < 2 {
+		t.Error("replySettingsDiffAdvanced broken")
 	}
 
-	kb = b.schedulesKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 1 {
-		t.Error("schedulesKeyboard broken")
+	if kb := b.replySettingsSchedules(); kb == nil || len(kb.Keyboard) < 1 {
+		t.Error("replySettingsSchedules broken")
 	}
 }
 
@@ -940,6 +924,10 @@ func TestE2E_RemovePastDays(t *testing.T) {
 
 	today := time.Now().Format("02.01.2006")
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	expectedFirst := today
+	if todayAutoSkipped() {
+		expectedFirst = tomorrow
+	}
 	days := []map[string]any{
 		{"day": "25.08.2026", "lessons": []any{map[string]any{"lesson": "Old"}}},
 		{"day": today, "lessons": []any{map[string]any{"lesson": "Today"}}},
@@ -950,9 +938,22 @@ func TestE2E_RemovePastDays(t *testing.T) {
 		t.Fatal("removePastDays returned empty")
 	}
 	firstDate, _ := result[0]["day"].(string)
-	if firstDate != today {
-		t.Errorf("first day should be today %s, got %s", today, firstDate)
+	if firstDate != expectedFirst {
+		t.Errorf("first day should be %s, got %s", expectedFirst, firstDate)
 	}
+}
+
+func flattenReplyKeyboardTexts(kb *telego.ReplyKeyboardMarkup) string {
+	if kb == nil {
+		return ""
+	}
+	var all string
+	for _, row := range kb.Keyboard {
+		for _, btn := range row {
+			all += btn.Text + " "
+		}
+	}
+	return all
 }
 
 func flattenKeyboardTexts(kb *telego.InlineKeyboardMarkup) string {
@@ -983,11 +984,11 @@ func TestE2E_AliasCommandRegistered(t *testing.T) {
 	if _, ok := b.commands["/alias"]; !ok {
 		t.Error("alias command not registered")
 	}
-	if _, ok := b.callbacks["alias:"]; !ok {
-		t.Error("alias callback not registered")
-	}
 	if _, ok := b.callbacks["alias:del:"]; !ok {
 		t.Error("alias:del callback not registered")
+	}
+	if _, ok := b.callbacks["alias:menu"]; !ok {
+		t.Error("alias:menu callback not registered")
 	}
 }
 
@@ -1332,6 +1333,15 @@ func TestE2E_SubTestPickUsesSelectedIndex(t *testing.T) {
 	_ = scene.Handle(context.Background(), u, chat)
 
 	loaded, _ := repo.FindOrCreate("telegram", userID)
+	if loaded.Scene != "sub_test_mode:teacher:Иванов И.И." {
+		t.Fatalf("scene after subscription pick: %q", loaded.Scene)
+	}
+
+	mode := &subTestModeScene{bot: b}
+	u = &Update{Bot: b, ChatID: userID, UserID: userID, Text: "2"}
+	_ = mode.Handle(context.Background(), u, loaded)
+
+	loaded, _ = repo.FindOrCreate("telegram", userID)
 	if loaded.Scene != "" {
 		t.Errorf("scene not cleared: %q", loaded.Scene)
 	}

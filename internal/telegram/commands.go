@@ -34,7 +34,7 @@ func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if chat.Mode == "" {
-		chat.Scene = "setup"
+		chat.Scene = sceneSetup
 		c.bot.chatRepo.Save(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), c.bot.replySelectMode())
 	}
@@ -111,11 +111,14 @@ func (c *helpCmd) Name() string        { return "/help" }
 func (c *helpCmd) Description() string { return c.bot.loc("cmd_help") }
 func (c *helpCmd) Handler(ctx context.Context, u *Update) error {
 	text := c.bot.loc("help_commands")
-	for _, cmd := range c.bot.commands {
+	for _, cmd := range c.bot.commandOrder {
 		if ac, ok := cmd.(AdminCommand); ok && ac.AdminOnly() {
 			continue
 		}
-		text += fmt.Sprintf("\n/%s - %s", cmd.Name(), cmd.Description())
+		if hc, ok := cmd.(HiddenCommand); ok && hc.Hidden() {
+			continue
+		}
+		text += fmt.Sprintf("\n%s - %s", cmd.Name(), cmd.Description())
 	}
 	return u.Bot.SendText(u.ChatID, text)
 }
@@ -146,7 +149,7 @@ func (c *setupCmd) MatchText(text string) bool {
 func (c *setupCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err == nil {
-		chat.Scene = "setup"
+		chat.Scene = sceneSetup
 		c.bot.chatRepo.Save(chat)
 	}
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), c.bot.replySelectMode())
@@ -307,6 +310,8 @@ func (c *settingsCmd) Handler(ctx context.Context, u *Update) error {
 
 type imageCmd struct{ bot *Bot }
 
+func (c *imageCmd) Hidden() bool { return true }
+
 func (c *imageCmd) Name() string        { return "/image" }
 func (c *imageCmd) Description() string { return c.bot.loc("cmd_image") }
 func (c *imageCmd) MatchText(text string) bool {
@@ -371,6 +376,23 @@ func (c *buttonsCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки кнопок.", c.bot.replySettingsButtons(chat))
 }
 
+type buttonsReloadCmd struct{ bot *Bot }
+
+func (c *buttonsReloadCmd) Name() string { return "/buttons_reload" }
+func (c *buttonsReloadCmd) Description() string {
+	return "Обновить клавиатуру бота"
+}
+func (c *buttonsReloadCmd) MatchText(text string) bool {
+	return strings.EqualFold(text, "/buttons_reload") || strings.EqualFold(text, "/button_reload")
+}
+func (c *buttonsReloadCmd) Handler(ctx context.Context, u *Update) error {
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Клавиатура обновлена", replyMainMenu(c.bot, chat))
+}
+
 type formatterCmd struct{ bot *Bot }
 
 func (c *formatterCmd) Name() string        { return "/formatter" }
@@ -389,6 +411,8 @@ func (c *formatterCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type forceParseCmd struct{ bot *Bot }
+
+func (c *forceParseCmd) AdminOnly() bool { return true }
 
 func (c *forceParseCmd) Name() string        { return "/forceparse" }
 func (c *forceParseCmd) Description() string { return c.bot.loc("cmd_forceparse") }
@@ -411,6 +435,8 @@ func (c *forceParseCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type resetCacheCmd struct{ bot *Bot }
+
+func (c *resetCacheCmd) Hidden() bool { return true }
 
 func (c *resetCacheCmd) Name() string        { return "/resetcache" }
 func (c *resetCacheCmd) Description() string { return c.bot.loc("cmd_resetcache") }
@@ -492,6 +518,8 @@ func (c *viewCmd) Handler(ctx context.Context, u *Update) error {
 
 type flushCacheCmd struct{ bot *Bot }
 
+func (c *flushCacheCmd) Hidden() bool { return true }
+
 func (c *flushCacheCmd) Name() string        { return "/flushcache" }
 func (c *flushCacheCmd) Description() string { return "Сбросить кеш в БД" }
 func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
@@ -510,80 +538,24 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		return
 	}
 
+	if chat.Accepted && chat.NeedUpdateButtons {
+		chat.NeedUpdateButtons = false
+		chat.Scene = ""
+		b.chatRepo.Save(chat)
+		b.SendTextWithReplyKeyboard(u.ChatID, "Клавиатура была принудительно пересоздана (обновлена)", replyMainMenu(b, chat))
+	}
+
 	if b.dispatchTextCommand(ctx, u, chat) {
 		return
 	}
 
-	switch chat.Scene {
-	case "set_group":
-		b.handleSetGroup(ctx, u, chat)
-		return
-	case "set_teacher":
-		b.handleSetTeacher(ctx, u, chat)
-		return
-	case "get_group:day", "get_group:week", "get_group:image", "get_group:set":
-		kind := strings.TrimPrefix(chat.Scene, "get_group:")
-		b.resolveGroupInput(u, chat, strings.TrimSpace(u.Text), kind)
-		return
-	case "get_teacher:day", "get_teacher:week", "get_teacher:image", "get_teacher:set":
-		kind := strings.TrimPrefix(chat.Scene, "get_teacher:")
-		b.resolveTeacherInput(u, chat, strings.TrimSpace(u.Text), kind)
-		return
-	case "sub_add_group":
-		b.handleSubAddGroup(ctx, u, chat)
-		return
-	case "sub_add_teacher":
-		b.handleSubAddTeacher(ctx, u, chat)
-		return
-	case "sub_remove":
-		b.handleSubRemove(ctx, u, chat)
-		return
-	case "history_teacher":
-		scene := &historyTeacherScene{bot: b}
-		scene.Handle(ctx, u, chat)
-		return
-	case "history_week":
-		scene := &historyWeekScene{bot: b}
-		scene.Handle(ctx, u, chat)
-		return
-	case "sub_test_pick":
-		scene := &subTestPickScene{bot: b}
-		scene.Handle(ctx, u, chat)
-		return
-	case "calls_edit_input":
-		scene := &callsEditInputScene{bot: b}
-		scene.Handle(ctx, u, chat)
-		return
-	case "alias_add":
-		b.handleAliasAdd(ctx, u, chat)
-		return
-	case "compare_groups_a":
-		scene := &compareGroupsStepA{bot: b}
-		scene.Handle(ctx, u, chat)
-		return
-	case "compare_groups_input", "compare_groups_b:":
-		if strings.HasPrefix(chat.Scene, "compare_groups_input") {
-			scene := &compareGroupsInputScene{bot: b}
-			scene.Handle(ctx, u, chat)
-			return
-		}
-	}
-
-	if b.hasInputScene(chat) {
+	if b.dispatchInputScene(ctx, u, chat) {
 		return
 	}
 
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
 	b.SendTextWithReplyKeyboard(u.ChatID, "Команда не найдена", replyMainMenu(b, chat))
-}
-
-func (b *Bot) hasInputScene(chat *Chat) bool {
-	switch chat.Scene {
-	case "", "setup", "settings", "settings_schedules", "settings_calls", "settings_alias":
-		return false
-	}
-	return true
 }
 
 func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bool {
@@ -686,86 +658,9 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("about_bot"), replyMainMenu(b, chat))
 }
 
-func (b *Bot) mainMenuKeyboard(chat *Chat) *telego.InlineKeyboardMarkup {
-	var rows [][]telego.InlineKeyboardButton
-
-	if chat.Mode == "" {
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: b.loc("button_setup"), CallbackData: "setup"},
-		})
-	} else if chat.Mode == ModeGuest {
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: b.loc("button_group"), CallbackData: "group"},
-			{Text: b.loc("button_teacher"), CallbackData: "teacher"},
-		})
-	} else {
-		canShow := (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" ||
-			chat.Mode == ModeTeacher && chat.Teacher != ""
-
-		if canShow {
-			var row []telego.InlineKeyboardButton
-			if chat.ShowDaily {
-				row = append(row, telego.InlineKeyboardButton{Text: b.loc("button_day"), CallbackData: "day"})
-			}
-			if chat.ShowWeekly {
-				row = append(row, telego.InlineKeyboardButton{Text: b.loc("button_week"), CallbackData: "week"})
-			}
-			if len(row) > 0 {
-				rows = append(rows, row)
-			}
-		}
-	}
-
-	showFast := chat.Mode == ModeStudent || chat.Mode == ModeParent || chat.Mode == ModeTeacher
-	canShowCalls := chat.ShowCalls && b.cfg.Parser.Calls != nil && b.cfg.Parser.Calls.Enabled
-
-	var level2 []telego.InlineKeyboardButton
-	if showFast && chat.ShowFastGroup {
-		level2 = append(level2, telego.InlineKeyboardButton{Text: b.loc("button_group"), CallbackData: "group"})
-	}
-	if chat.ShowAbout && canShowCalls {
-		level2 = append(level2, telego.InlineKeyboardButton{Text: b.loc("button_calls"), CallbackData: "calls"})
-	}
-	if showFast && chat.ShowFastTeacher {
-		teacherLabel := b.loc("button_teacher")
-		if chat.ShowAbout && canShowCalls && chat.ShowFastGroup {
-			teacherLabel = "👩‍🏫 Препод."
-		}
-		level2 = append(level2, telego.InlineKeyboardButton{Text: teacherLabel, CallbackData: "teacher"})
-	}
-	if len(level2) > 0 {
-		rows = append(rows, level2)
-	}
-
-	var level3 []telego.InlineKeyboardButton
-	if !chat.ShowAbout && canShowCalls {
-		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_calls"), CallbackData: "calls"})
-	}
-	if b.cfg.Google.OAuth.ClientID != "" {
-		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_google_calendar"), CallbackData: "gcal:menu"})
-	}
-	if b.cfg.Calendar.ICS.Enabled {
-		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_ics"), CallbackData: "ics"})
-	}
-	level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_settings"), CallbackData: "settings"})
-	if chat.Mode == ModeTeacher && chat.Teacher != "" {
-		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_history"), CallbackData: "history"})
-	}
-	if chat.ShowAbout {
-		level3 = append(level3, telego.InlineKeyboardButton{Text: b.loc("button_about"), CallbackData: "about"})
-	}
-	rows = append(rows, level3)
-
-	if len(rows) == 0 {
-		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: b.loc("button_settings"), CallbackData: "settings"},
-		})
-	}
-
-	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
-}
-
 type devCmd struct{ bot *Bot }
+
+func (c *devCmd) Hidden() bool { return true }
 
 func (c *devCmd) Name() string        { return "/dev" }
 func (c *devCmd) Description() string { return "Исходный код бота" }
@@ -774,6 +669,8 @@ func (c *devCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type mathCmd struct{ bot *Bot }
+
+func (c *mathCmd) Hidden() bool { return true }
 
 func (c *mathCmd) Name() string        { return "/math" }
 func (c *mathCmd) Description() string { return "Математический калькулятор" }
@@ -913,12 +810,10 @@ func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
 
 	added, _ := b.chatRepo.AddSubscription(u.UserID, "group", matched)
 	if added {
-		b.SendText(u.ChatID, fmt.Sprintf("Подписка на группу %s добавлена.", matched))
-	} else {
-		b.SendText(u.ChatID, "Такая подписка уже существует.")
+		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Подписка на группу %s добавлена.", matched), b.replySubscriptionsMenu())
+		return
 	}
-
-	b.SendTextWithKeyboard(u.ChatID, "Подписки:", b.subscriptionsKeyboard())
+	b.SendTextWithReplyKeyboard(u.ChatID, "Такая подписка уже существует.", b.replySubscriptionsMenu())
 }
 
 func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
@@ -940,12 +835,10 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 
 	added, _ := b.chatRepo.AddSubscription(u.UserID, "teacher", matched)
 	if added {
-		b.SendText(u.ChatID, fmt.Sprintf("Подписка на преподавателя %s добавлена.", matched))
-	} else {
-		b.SendText(u.ChatID, "Такая подписка уже существует.")
+		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Подписка на преподавателя %s добавлена.", matched), b.replySubscriptionsMenu())
+		return
 	}
-
-	b.SendTextWithKeyboard(u.ChatID, "Подписки:", b.subscriptionsKeyboard())
+	b.SendTextWithReplyKeyboard(u.ChatID, "Такая подписка уже существует.", b.replySubscriptionsMenu())
 }
 
 func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
@@ -968,13 +861,11 @@ func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	if idx < 1 || idx > len(list) {
-		b.SendText(u.ChatID, "Неверный номер подписки.")
+		b.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", b.replySubscriptionsMenu())
 		return
 	}
 
 	target := list[idx-1]
 	b.chatRepo.RemoveSubscription(u.UserID, target.ID)
-	b.SendText(u.ChatID, "Подписка удалена.")
-
-	b.SendTextWithKeyboard(u.ChatID, "Подписки:", b.subscriptionsKeyboard())
+	b.SendTextWithReplyKeyboard(u.ChatID, "Подписка удалена.", b.replySubscriptionsMenu())
 }

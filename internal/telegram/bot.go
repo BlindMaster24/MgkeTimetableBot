@@ -33,6 +33,7 @@ type Bot struct {
 	cache        *cache.RaspCache
 	cacheMu      sync.Mutex
 	commands     map[string]Command
+	commandOrder []Command
 	callbacks    map[string]Callback
 	parseFunc    func() error
 	startTime    time.Time
@@ -40,6 +41,7 @@ type Bot struct {
 	aliasRepo    *AliasRepository
 	parseLogs    []parseLogEntry
 	textCommands []Command
+	scenes       []sceneRoute
 }
 
 type Update struct {
@@ -64,6 +66,10 @@ type TextMatcher interface {
 
 type AdminCommand interface {
 	AdminOnly() bool
+}
+
+type HiddenCommand interface {
+	Hidden() bool
 }
 
 type Callback interface {
@@ -104,6 +110,9 @@ func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
 func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
 
 func (b *Bot) RegisterCommand(cmd Command) {
+	if _, exists := b.commands[cmd.Name()]; !exists {
+		b.commandOrder = append(b.commandOrder, cmd)
+	}
 	b.commands[cmd.Name()] = cmd
 }
 
@@ -116,6 +125,7 @@ func (b *Bot) RegisterCallback(cb Callback) {
 }
 
 func (b *Bot) registerAll() {
+	b.scenes = b.buildSceneRoutes()
 	b.RegisterCommand(&startCmd{bot: b})
 	b.RegisterCommand(&helpCmd{bot: b})
 	b.RegisterCommand(&cancelCmd{bot: b})
@@ -136,6 +146,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&settingsCmd{bot: b})
 	b.RegisterCommand(&imageCmd{bot: b})
 	b.RegisterCommand(&buttonsCmd{bot: b})
+	b.RegisterCommand(&buttonsReloadCmd{bot: b})
 	b.RegisterCommand(&formatterCmd{bot: b})
 	b.RegisterCommand(&forceParseCmd{bot: b})
 	b.RegisterCommand(&resetCacheCmd{bot: b})
@@ -168,6 +179,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&compareGroupsCmd{bot: b})
 	b.RegisterCommand(&pingCmd{bot: b})
 	b.RegisterCommand(&icsCmd{bot: b})
+	b.RegisterCommand(&subscriptionsCmd{bot: b})
 	b.RegisterCommand(&subscriptionsTestCmd{bot: b})
 	b.RegisterCommand(&archiveCmd{bot: b})
 	b.RegisterCommand(&endingsCmd{bot: b})
@@ -193,39 +205,12 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&teacherCb{bot: b})
 	b.RegisterCallback(&settingsCb{bot: b})
 	b.RegisterCallback(&icsCb{bot: b})
-	b.RegisterCallback(&btnToggleCb{bot: b})
-	b.RegisterCallback(&btnMenuCb{bot: b})
-	b.RegisterCallback(&fmtMenuCb{bot: b})
-	b.RegisterCallback(&fmtSelectCb{bot: b})
-	b.RegisterCallback(&noticeMenuCb{bot: b})
-	b.RegisterCallback(&viewMenuCb{bot: b})
-	b.RegisterCallback(&noticeToggleCb{bot: b})
-	b.RegisterCallback(&viewToggleCb{bot: b})
 	b.RegisterCallback(&mainMenuCb{bot: b})
-	b.RegisterCallback(&diffMenuCb{bot: b})
-	b.RegisterCallback(&diffAdvancedCb{bot: b})
-	b.RegisterCallback(&diffToggleCb{bot: b})
-	b.RegisterCallback(&callsMenuCb{bot: b})
-	b.RegisterCallback(&callsShowCb{bot: b})
-	b.RegisterCallback(&callsRefreshCb{bot: b})
-	b.RegisterCallback(&callsSourceCb{bot: b})
-	b.RegisterCallback(&callsSourceResetCb{bot: b})
-	b.RegisterCallback(&schedulesMenuCb{bot: b})
-	b.RegisterCallback(&currentSettingsCb{bot: b})
-	b.RegisterCallback(&subsMenuCb{bot: b})
-	b.RegisterCallback(&subsAddGroupCb{bot: b})
-	b.RegisterCallback(&subsAddTeacherCb{bot: b})
-	b.RegisterCallback(&subsListCb{bot: b})
-	b.RegisterCallback(&subsRemoveCb{bot: b})
-	b.RegisterCallback(&subsCheckCb{bot: b})
-	b.RegisterCallback(&subsCheckFullCb{bot: b})
 	b.RegisterCallback(&answerCb{bot: b})
 	b.RegisterCallback(&timetableGroupCb{bot: b})
 	b.RegisterCallback(&timetableTeacherCb{bot: b})
 	b.RegisterCallback(&historyCb{bot: b})
 	b.RegisterCallback(&googleCalCb{bot: b})
-	b.RegisterCallback(&callsEditCb{bot: b})
-	b.RegisterCallback(&aliasCb{bot: b})
 	b.RegisterCallback(&aliasDelCb{bot: b})
 	b.RegisterCallback(&aliasMenuCb{bot: b})
 }

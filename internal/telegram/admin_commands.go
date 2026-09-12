@@ -29,6 +29,8 @@ func (c *regexpCmd) Handler(ctx context.Context, u *Update) error {
 
 type vanishCmd struct{ bot *Bot }
 
+func (c *vanishCmd) AdminOnly() bool { return true }
+
 func (c *vanishCmd) Name() string        { return "/vanish" }
 func (c *vanishCmd) Description() string { return "Почистить базу данных" }
 func (c *vanishCmd) MatchText(text string) bool {
@@ -89,12 +91,14 @@ func (c *requireNewButtonsCmd) MatchText(text string) bool {
 }
 func (c *requireNewButtonsCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.chatRepo.mu.Lock()
-	c.bot.chatRepo.db.Exec("UPDATE chats SET accepted = accepted WHERE accepted = 1")
+	c.bot.chatRepo.db.Exec("UPDATE bot_chats SET need_update_buttons = 1 WHERE accepted = 1")
 	c.bot.chatRepo.mu.Unlock()
 	return u.Bot.SendText(u.ChatID, "ok")
 }
 
 type createApiKeyCmd struct{ bot *Bot }
+
+func (c *createApiKeyCmd) AdminOnly() bool { return true }
 
 func (c *createApiKeyCmd) Name() string        { return "/createApiKey" }
 func (c *createApiKeyCmd) Description() string { return "Создать API токен" }
@@ -106,6 +110,8 @@ func (c *createApiKeyCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type decryptKeyCmd struct{ bot *Bot }
+
+func (c *decryptKeyCmd) AdminOnly() bool { return true }
 
 func (c *decryptKeyCmd) Name() string        { return "/decryptKey" }
 func (c *decryptKeyCmd) Description() string { return "Дешифровать ключ" }
@@ -121,6 +127,8 @@ func (c *decryptKeyCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type sqlCmd struct{ bot *Bot }
+
+func (c *sqlCmd) AdminOnly() bool { return true }
 
 func (c *sqlCmd) Name() string        { return "/sql" }
 func (c *sqlCmd) Description() string { return "Выполнить SQL запрос" }
@@ -173,6 +181,8 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type restartCmd struct{ bot *Bot }
+
+func (c *restartCmd) AdminOnly() bool { return true }
 
 func (c *restartCmd) Name() string        { return "/restart" }
 func (c *restartCmd) Description() string { return "Перезапустить бота" }

@@ -19,40 +19,46 @@ const (
 )
 
 type Chat struct {
-	ID                  int64
-	Service             string
-	PeerID              int64
-	Accepted            bool
-	Scene               string
-	Mode                ChatMode
-	Group               string
-	Teacher             string
-	GoogleEmail         string
-	Formatter           int
-	ShowAbout           bool
-	ShowDaily           bool
-	ShowWeekly          bool
-	ShowCalls           bool
-	ShowFastGroup       bool
-	ShowFastTeacher     bool
-	HidePastDays        bool
-	DeleteLastMsg       bool
-	LastMsgID           int64
-	AllowSendMess       bool
-	NoticeChanges       bool
-	NoticeNextWeek      bool
-	NoticeCalls         bool
-	NoticeParserErrors  bool
-	ShowParserTime      bool
-	ShowHints           bool
-	DiffEnabled         bool
-	DiffAutoInWeek      bool
-	DiffAutoInUpdates   bool
-	DiffShowBeforeAfter bool
-	DiffMaxLines        int
-	Ref                 string
-	HistoryGroup        []string
-	HistoryTeacher      []string
+	ID                       int64
+	Service                  string
+	PeerID                   int64
+	Accepted                 bool
+	Scene                    string
+	Mode                     ChatMode
+	Group                    string
+	Teacher                  string
+	GoogleEmail              string
+	Formatter                int
+	ShowAbout                bool
+	ShowDaily                bool
+	ShowWeekly               bool
+	ShowCalls                bool
+	ShowFastGroup            bool
+	ShowFastTeacher          bool
+	HidePastDays             bool
+	DeleteLastMsg            bool
+	LastMsgID                int64
+	AllowSendMess            bool
+	NoticeChanges            bool
+	NoticeNextWeek           bool
+	NoticeCalls              bool
+	NoticeParserErrors       bool
+	ShowParserTime           bool
+	ShowHints                bool
+	DiffEnabled              bool
+	DiffAutoInWeek           bool
+	DiffAutoInUpdates        bool
+	DiffShowBeforeAfter      bool
+	DiffMaxLines             int
+	LastMsgTime              int64
+	SubscribeDistribution    bool
+	NeedUpdateButtons        bool
+	DeactivateSecondaryCheck bool
+	CallsEditInput           string
+	CallsEditReason          string
+	Ref                      string
+	HistoryGroup             []string
+	HistoryTeacher           []string
 }
 
 type Repository struct {
@@ -112,6 +118,12 @@ func (r *Repository) migrate() error {
 		diff_auto_in_updates INTEGER NOT NULL DEFAULT 1,
 		diff_show_before_after INTEGER NOT NULL DEFAULT 1,
 		diff_max_lines INTEGER NOT NULL DEFAULT 20,
+		last_msg_time INTEGER NOT NULL DEFAULT 0,
+		subscribe_distribution INTEGER NOT NULL DEFAULT 1,
+		need_update_buttons INTEGER NOT NULL DEFAULT 0,
+		deactivate_secondary_check INTEGER NOT NULL DEFAULT 0,
+		calls_edit_input TEXT,
+		calls_edit_reason TEXT,
 		ref TEXT,
 		history_group TEXT NOT NULL DEFAULT '[]',
 		history_teacher TEXT NOT NULL DEFAULT '[]',
@@ -124,6 +136,12 @@ func (r *Repository) migrate() error {
 	for _, col := range []struct{ name, ddl string }{
 		{"history_group", "ALTER TABLE bot_chats ADD COLUMN history_group TEXT NOT NULL DEFAULT '[]'"},
 		{"history_teacher", "ALTER TABLE bot_chats ADD COLUMN history_teacher TEXT NOT NULL DEFAULT '[]'"},
+		{"last_msg_time", "ALTER TABLE bot_chats ADD COLUMN last_msg_time INTEGER NOT NULL DEFAULT 0"},
+		{"subscribe_distribution", "ALTER TABLE bot_chats ADD COLUMN subscribe_distribution INTEGER NOT NULL DEFAULT 1"},
+		{"need_update_buttons", "ALTER TABLE bot_chats ADD COLUMN need_update_buttons INTEGER NOT NULL DEFAULT 0"},
+		{"deactivate_secondary_check", "ALTER TABLE bot_chats ADD COLUMN deactivate_secondary_check INTEGER NOT NULL DEFAULT 0"},
+		{"calls_edit_input", "ALTER TABLE bot_chats ADD COLUMN calls_edit_input TEXT"},
+		{"calls_edit_reason", "ALTER TABLE bot_chats ADD COLUMN calls_edit_reason TEXT"},
 	} {
 		var count int
 		r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count)
@@ -135,7 +153,11 @@ func (r *Repository) migrate() error {
 	}
 
 	_, err = r.db.Exec(`CREATE INDEX IF NOT EXISTS idx_chats_peer ON bot_chats(service, peer_id)`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return r.migrateSubscriptions()
 }
 
 func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
@@ -167,7 +189,9 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		        notice_next_week, notice_calls, notice_parser_errors,
 		        show_parser_time, show_hints, diff_enabled, diff_auto_in_week,
 		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref,
-		        history_group, history_teacher
+		        history_group, history_teacher,
+		        last_msg_time, subscribe_distribution, need_update_buttons, deactivate_secondary_check,
+		        calls_edit_input, calls_edit_reason
 		 FROM bot_chats WHERE service = ? AND peer_id = ?`,
 		service, peerID,
 	)
@@ -176,9 +200,11 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	var accepted, showAbout, showDaily, showWeekly, showCalls, showFastGroup, showFastTeacher int
 	var hidePastDays, deleteLastMsg, allowSendMess, noticeChanges, noticeNextWeek, noticeCalls, noticeParserErrors int
 	var showParserTime, showHints, diffEnabled, diffAutoInWeek, diffAutoInUpdates, diffShowBeforeAfter int
+	var subscribeDistribution, needUpdateButtons, deactivateSecondaryCheck int
 
 	var nsScene, nsMode, nsGroup, nsTeacher, nsGoogleEmail, nsRef sql.NullString
 	var nsHistoryGroup, nsHistoryTeacher sql.NullString
+	var nsCallsEditInput, nsCallsEditReason sql.NullString
 	err := row.Scan(
 		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &nsScene, &nsMode,
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
@@ -187,6 +213,8 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &showParserTime, &showHints,
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
 		&chat.DiffMaxLines, &nsRef, &nsHistoryGroup, &nsHistoryTeacher,
+		&chat.LastMsgTime, &subscribeDistribution, &needUpdateButtons, &deactivateSecondaryCheck,
+		&nsCallsEditInput, &nsCallsEditReason,
 	)
 	if err != nil {
 		return nil, err
@@ -220,6 +248,11 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	chat.DiffAutoInWeek = diffAutoInWeek != 0
 	chat.DiffAutoInUpdates = diffAutoInUpdates != 0
 	chat.DiffShowBeforeAfter = diffShowBeforeAfter != 0
+	chat.SubscribeDistribution = subscribeDistribution != 0
+	chat.NeedUpdateButtons = needUpdateButtons != 0
+	chat.DeactivateSecondaryCheck = deactivateSecondaryCheck != 0
+	chat.CallsEditInput = nsCallsEditInput.String
+	chat.CallsEditReason = nsCallsEditReason.String
 
 	return chat, nil
 }
@@ -285,7 +318,8 @@ func (r *Repository) Save(chat *Chat) error {
 			notice_next_week=?, notice_calls=?, notice_parser_errors=?,
 			show_parser_time=?, show_hints=?, diff_enabled=?, diff_auto_in_week=?,
 			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?,
-			history_group=?, history_teacher=?
+			history_group=?, history_teacher=?, last_msg_time=?, subscribe_distribution=?,
+			need_update_buttons=?, deactivate_secondary_check=?, calls_edit_input=?, calls_edit_reason=?
 		 WHERE id=?`,
 		toInt(chat.Accepted), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
 		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
@@ -296,7 +330,9 @@ func (r *Repository) Save(chat *Chat) error {
 		toInt(chat.ShowParserTime), toInt(chat.ShowHints), toInt(chat.DiffEnabled),
 		toInt(chat.DiffAutoInWeek), toInt(chat.DiffAutoInUpdates), toInt(chat.DiffShowBeforeAfter),
 		chat.DiffMaxLines, chat.Ref,
-		marshalStringSlice(chat.HistoryGroup), marshalStringSlice(chat.HistoryTeacher), chat.ID,
+		marshalStringSlice(chat.HistoryGroup), marshalStringSlice(chat.HistoryTeacher),
+		chat.LastMsgTime, toInt(chat.SubscribeDistribution), toInt(chat.NeedUpdateButtons),
+		toInt(chat.DeactivateSecondaryCheck), chat.CallsEditInput, chat.CallsEditReason, chat.ID,
 	)
 	return err
 }

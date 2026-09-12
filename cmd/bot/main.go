@@ -65,6 +65,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to init cache")
 	}
+	raspCache.SetCallsPreferSite(cfg.Parser.Calls == nil || cfg.Parser.Calls.PreferSite)
 	log.Info().
 		Int("groups", len(raspCache.GetGroups())).
 		Int("teachers", len(raspCache.GetTeachers())).

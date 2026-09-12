@@ -18,6 +18,13 @@ func noYesSmile(v bool, text string) string {
 	return "🚫 " + text
 }
 
+func sourceCheck(label string, active bool) string {
+	if active {
+		return "✅ " + label
+	}
+	return label
+}
+
 func noYesSmileVolume(v bool, text string) string {
 	if v {
 		return "🔈 " + text + ": Да"
@@ -152,6 +159,44 @@ func (b *Bot) replySettingsSchedules() *telego.ReplyKeyboardMarkup {
 			{{Text: "🕐 Звонки: управление"}},
 			settingsBotNavRow(),
 		},
+		IsPersistent:   true,
+		ResizeKeyboard: true,
+	}
+}
+
+func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMarkup {
+	var rows [][]telego.KeyboardButton
+	rows = append(rows, []telego.KeyboardButton{{Text: "📊 Показать"}})
+
+	if admin {
+		calls := b.cache.GetCalls()
+		check := func(v bool) string {
+			if v {
+				return "✅ "
+			}
+			return ""
+		}
+		activeSource := calls.Active.Source
+		if calls.OverrideSource != "" {
+			activeSource = calls.OverrideSource
+		}
+		autoActive := calls.OverrideSource == ""
+
+		rows = append(rows, []telego.KeyboardButton{{Text: "✅ Обновить с сайта"}})
+		rows = append(rows, []telego.KeyboardButton{{Text: "✏️ Изменить вручную"}})
+		rows = append(rows, []telego.KeyboardButton{
+			{Text: check(activeSource == "site") + "Источник: сайт"},
+			{Text: check(activeSource == "manual") + "Источник: вручную"},
+		})
+		rows = append(rows, []telego.KeyboardButton{
+			{Text: check(activeSource == "config") + "Источник: конфиг"},
+			{Text: check(autoActive) + "Источник: авто"},
+		})
+	}
+
+	rows = append(rows, settingsBotNavRow())
+	return &telego.ReplyKeyboardMarkup{
+		Keyboard:       rows,
 		IsPersistent:   true,
 		ResizeKeyboard: true,
 	}

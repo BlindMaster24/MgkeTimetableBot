@@ -88,50 +88,13 @@ func (c *aliasCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	chat.Scene = "settings_alias"
+	chat.Scene = sceneSettingsAlias
 	c.bot.chatRepo.Save(chat)
 	return c.bot.showAliasMenu(u)
 }
 
 func (b *Bot) showAliasMenu(u *Update) error {
-	kb := &telego.InlineKeyboardMarkup{
-		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Список", CallbackData: "alias:list"}, {Text: "Добавить", CallbackData: "alias:add"}},
-			{{Text: "Удалить", CallbackData: "alias:remove"}},
-			{{Text: "Отчистить все", CallbackData: "alias:clear"}},
-			{{Text: "Меню настроек", CallbackData: "settings"}, {Text: "Главное меню", CallbackData: "main_menu"}},
-		},
-	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Меню настройки алиасов.", kb)
-}
-
-type aliasCb struct{ bot *Bot }
-
-func (cb *aliasCb) Prefix() string { return "alias:" }
-func (cb *aliasCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-
-	action := strings.TrimPrefix(u.Data, "alias:")
-
-	switch action {
-	case "list":
-		return cb.bot.showAliasList(u, u.UserID)
-	case "add":
-		chat.Scene = "alias_add"
-		cb.bot.chatRepo.Save(chat)
-		return u.Bot.SendText(u.ChatID, "Введите алиас в формате: оригинальное_название = замена")
-	case "remove":
-		return cb.bot.showAliasRemoveList(u, u.UserID)
-	case "clear":
-		cb.bot.aliasRepo.Clear(u.UserID)
-		return cb.bot.showAliasMenu(u)
-	}
-
-	return cb.bot.showAliasMenu(u)
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки алиасов.", b.replySettingsAliases())
 }
 
 func (b *Bot) showAliasList(u *Update, userID int64) error {

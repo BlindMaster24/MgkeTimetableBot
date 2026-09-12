@@ -10,6 +10,8 @@ import (
 
 type googleCalendarCmd struct{ bot *Bot }
 
+func (c *googleCalendarCmd) Hidden() bool { return true }
+
 func (c *googleCalendarCmd) Name() string        { return "/google_calendar" }
 func (c *googleCalendarCmd) Description() string { return "Настройка Google Calendar" }
 func (c *googleCalendarCmd) MatchText(text string) bool {

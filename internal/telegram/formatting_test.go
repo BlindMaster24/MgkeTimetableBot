@@ -203,6 +203,10 @@ func TestExtractDays(t *testing.T) {
 	}
 }
 
+func todayAutoSkipped() bool {
+	return time.Now().Weekday() == time.Sunday
+}
+
 func TestGetDayRasp(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
@@ -214,19 +218,28 @@ func TestGetDayRasp(t *testing.T) {
 
 	today := time.Now().Format("02.01.2006")
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	dayAfter := time.Now().AddDate(0, 0, 2).Format("02.01.2006")
+	first := today
+	second := tomorrow
+	if todayAutoSkipped() {
+		first = tomorrow
+		second = dayAfter
+	}
+
 	daysData := []map[string]any{
 		{"day": "01.01.2006"},
 		{"day": today},
 		{"day": tomorrow},
+		{"day": dayAfter},
 	}
 	days = b.getDayRasp(daysData)
-	if len(days) != 1 || days[0]["day"] != today {
-		t.Errorf("expected today %s, got %v", today, days)
+	if len(days) != 1 || days[0]["day"] != first {
+		t.Errorf("expected %s, got %v", first, days)
 	}
 
 	days = b.getDayRasp(daysData, true, 2)
-	if len(days) != 2 || days[0]["day"] != today || days[1]["day"] != tomorrow {
-		t.Errorf("expected today+tomorrow, got %v", days)
+	if len(days) != 2 || days[0]["day"] != first || days[1]["day"] != second {
+		t.Errorf("expected %s+%s, got %v", first, second, days)
 	}
 
 	pastOnly := []map[string]any{
@@ -268,9 +281,14 @@ func TestRemovePastDays(t *testing.T) {
 	}
 
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+	b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
 	result := b.removePastDays(days)
-	if len(result) != 2 {
-		t.Errorf("expected 2 days (today+tomorrow), got %d", len(result))
+	expectedKept := 2
+	if todayAutoSkipped() {
+		expectedKept = 1
+	}
+	if len(result) != expectedKept {
+		t.Errorf("expected %d days, got %d", expectedKept, len(result))
 	}
 
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "00:00"}}}
@@ -628,8 +646,8 @@ func TestAllCommandsHaveDescriptions(t *testing.T) {
 func TestKeyboardMainNotEmpty(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	chat := &Chat{Mode: ModeStudent, Group: "100", ShowDaily: true, ShowWeekly: true}
-	kb := b.mainMenuKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) == 0 {
+	kb := replyMainMenu(b, chat)
+	if kb == nil || len(kb.Keyboard) == 0 {
 		t.Error("expected non-empty keyboard")
 	}
 }
@@ -637,8 +655,8 @@ func TestKeyboardMainNotEmpty(t *testing.T) {
 func TestKeyboardMainGuestMode(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	chat := &Chat{Mode: ModeGuest}
-	kb := b.mainMenuKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) == 0 {
+	kb := replyMainMenu(b, chat)
+	if kb == nil || len(kb.Keyboard) == 0 {
 		t.Error("expected non-empty keyboard for guest")
 	}
 }
@@ -646,8 +664,8 @@ func TestKeyboardMainGuestMode(t *testing.T) {
 func TestKeyboardMainNoMode(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	chat := &Chat{Mode: ""}
-	kb := b.mainMenuKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) == 0 {
+	kb := replyMainMenu(b, chat)
+	if kb == nil || len(kb.Keyboard) == 0 {
 		t.Error("expected non-empty keyboard for no mode")
 	}
 }
@@ -655,30 +673,29 @@ func TestKeyboardMainNoMode(t *testing.T) {
 func TestKeyboardMainAllButtonsDisabled(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	chat := &Chat{Mode: ModeStudent, Group: "100", ShowDaily: false, ShowWeekly: false, ShowCalls: false, ShowAbout: false, ShowFastGroup: false, ShowFastTeacher: false}
-	kb := b.mainMenuKeyboard(chat)
-	if kb == nil || len(kb.InlineKeyboard) == 0 {
+	kb := replyMainMenu(b, chat)
+	if kb == nil || len(kb.Keyboard) == 0 {
 		t.Error("expected at least settings button")
 	}
 }
 
 func TestKeyboardSettingsFull(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
-	chat := &Chat{Mode: ModeStudent}
-	kb := b.settingsKeyboardFull(chat)
-	if kb == nil || len(kb.InlineKeyboard) < 4 {
-		t.Errorf("expected at least 4 rows, got %d", len(kb.InlineKeyboard))
+	kb := b.replySettingsMain()
+	if kb == nil || len(kb.Keyboard) < 4 {
+		t.Errorf("expected at least 4 rows, got %d", len(kb.Keyboard))
 	}
 }
 
 func TestKeyboardButtons(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	chat := &Chat{ShowDaily: true, ShowWeekly: false, ShowCalls: true, ShowAbout: false, ShowFastGroup: true, ShowFastTeacher: false}
-	kb := b.buttonsKeyboard(chat)
+	kb := b.replySettingsButtons(chat)
 	if kb == nil {
 		t.Fatal("expected non-nil keyboard")
 	}
 	text := ""
-	for _, row := range kb.InlineKeyboard {
+	for _, row := range kb.Keyboard {
 		for _, btn := range row {
 			text += btn.Text + " "
 		}
@@ -691,17 +708,17 @@ func TestKeyboardButtons(t *testing.T) {
 func TestKeyboardFormatter(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	chat := &Chat{Formatter: 0}
-	kb := b.formatterKeyboard(chat)
+	kb := b.replySettingsFormatters(chat)
 	if kb == nil {
 		t.Fatal("expected non-nil keyboard")
 	}
-	count := len(kb.InlineKeyboard)
+	count := len(kb.Keyboard)
 	expectedRows := (len(formatter.AllFormatters)+1)/2 + 1
 	if count != expectedRows {
 		t.Errorf("expected %d rows, got %d", expectedRows, count)
 	}
 	text := ""
-	for _, row := range kb.InlineKeyboard {
+	for _, row := range kb.Keyboard {
 		for _, btn := range row {
 			text += btn.Text + " "
 		}

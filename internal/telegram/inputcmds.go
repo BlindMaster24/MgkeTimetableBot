@@ -99,7 +99,7 @@ func (b *Bot) startGetGroup(u *Update, kind string) error {
 		return b.resolveGroupInput(u, chat, arg, kind)
 	}
 
-	chat.Scene = "get_group:" + kind
+	chat.Scene = sceneGetGroup + ":" + kind
 	b.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf("%s (например, %s)", b.loc("enter_group_number"), randomKey(groups))
@@ -120,7 +120,7 @@ func (b *Bot) startGetTeacher(u *Update, kind string) error {
 		return b.resolveTeacherInput(u, chat, arg, kind)
 	}
 
-	chat.Scene = "get_teacher:" + kind
+	chat.Scene = sceneGetTeacher + ":" + kind
 	b.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf("Введите фамилию преподавателя или выберите из списка ниже (например, %s)", randomKey(teachers))
@@ -165,7 +165,7 @@ func (b *Bot) resolveGroupInput(u *Update, chat *Chat, input, kind string) error
 		chat.Teacher = ""
 		chat.Scene = ""
 		b.chatRepo.Save(chat)
-		return u.Bot.SendTextWithKeyboard(u.ChatID, fmt.Sprintf("Группа этого чата была успешно изменена на '%s'", normalized), b.mainMenuKeyboard(chat))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Группа этого чата была успешно изменена на '%s'", normalized), replyMainMenu(b, chat))
 	}
 
 	return b.sendGroupResult(u, chat, normalized, kind)
@@ -174,7 +174,7 @@ func (b *Bot) resolveGroupInput(u *Update, chat *Chat, input, kind string) error
 func (b *Bot) sendGroupError(u *Update, chat *Chat, msg string) error {
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, msg, b.mainMenuKeyboard(chat))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, msg, replyMainMenu(b, chat))
 }
 
 func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
@@ -233,7 +233,7 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 		return b.sendTeacherError(u, chat, "Слишком много результатов для выборки.")
 	}
 	if len(matched) > 1 {
-		chat.Scene = "get_teacher:" + kind
+		chat.Scene = sceneGetTeacher + ":" + kind
 		b.chatRepo.Save(chat)
 		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
 		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
@@ -248,7 +248,7 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 		chat.Group = ""
 		chat.Scene = ""
 		b.chatRepo.Save(chat)
-		return u.Bot.SendTextWithKeyboard(u.ChatID, fmt.Sprintf("Преподвателя этого чата был успешно изменен на '%s'", teacher), b.mainMenuKeyboard(chat))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Преподвателя этого чата был успешно изменен на '%s'", teacher), replyMainMenu(b, chat))
 	}
 
 	return b.sendTeacherResult(u, chat, teacher, kind)
@@ -257,7 +257,7 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 func (b *Bot) sendTeacherError(u *Update, chat *Chat, msg string) error {
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, msg, b.mainMenuKeyboard(chat))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, msg, replyMainMenu(b, chat))
 }
 
 func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) error {
@@ -303,6 +303,8 @@ func (b *Bot) sendTeacherWeek(u *Update, chat *Chat, teacher string, data any) e
 
 type setGroupCmd struct{ bot *Bot }
 
+func (c *setGroupCmd) Hidden() bool { return true }
+
 func (c *setGroupCmd) Name() string { return "/setgroup" }
 func (c *setGroupCmd) Description() string {
 	return "Изменить группу этого чата"
@@ -319,6 +321,8 @@ func (c *setGroupCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 type setTeacherCmd struct{ bot *Bot }
+
+func (c *setTeacherCmd) Hidden() bool { return true }
 
 func (c *setTeacherCmd) Name() string { return "/setteacher" }
 func (c *setTeacherCmd) Description() string {
