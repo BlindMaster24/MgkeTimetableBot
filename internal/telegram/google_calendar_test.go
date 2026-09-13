@@ -100,11 +100,12 @@ func (f *fakeGoogleAPI) SetUserRole(_ context.Context, calendarID, email, role s
 }
 
 type fakeGoogleService struct {
-	api           *fakeGoogleAPI
-	synced        []string
-	syncedLessons []google.DayLesson
-	userErr       error
-	syncDisabled  bool
+	api            *fakeGoogleAPI
+	synced         []string
+	syncedCalendar []string
+	syncedLessons  []google.DayLesson
+	userErr        error
+	syncDisabled   bool
 }
 
 func (f *fakeGoogleService) Configured() bool { return true }
@@ -124,8 +125,9 @@ func (f *fakeGoogleService) UserClient(context.Context, google.Credentials, func
 	return f.api, nil
 }
 
-func (f *fakeGoogleService) SyncDay(_ context.Context, _, date string, lessons []google.DayLesson, _ google.Schedule) error {
+func (f *fakeGoogleService) SyncDay(_ context.Context, calendarID, date string, lessons []google.DayLesson, _ google.Schedule) error {
 	f.synced = append(f.synced, date)
+	f.syncedCalendar = append(f.syncedCalendar, calendarID)
 	f.syncedLessons = append(f.syncedLessons, lessons...)
 	return nil
 }

@@ -22,6 +22,12 @@ type DayEvent struct {
 	Type  string
 }
 
+type DayChange struct {
+	Kind  string
+	Value string
+	Date  string
+}
+
 type CallsEvent struct {
 	WeekdaysChanged bool
 	SaturdayChanged bool
@@ -124,13 +130,26 @@ type dayEventOut struct {
 	evType string
 }
 
-func collectEntryDayEvents(kind, value string, oldEntry, newEntry map[string]any, todayIdx int) []dayEventOut {
+func collectEntryDayEvents(kind, value string, oldEntry, newEntry map[string]any, todayIdx int) ([]dayEventOut, []DayChange) {
 	oldDays := entryDays(oldEntry)
 	newDays := entryDays(newEntry)
 
-	_, _, changed := mergeDays(newDays, oldDays)
-	if len(changed) == 0 {
-		return nil
+	added, _, changed := mergeDays(newDays, oldDays)
+	if len(added) == 0 && len(changed) == 0 {
+		return nil, nil
+	}
+
+	changes := make([]DayChange, 0, len(added)+len(changed))
+	for _, day := range append(append([]any{}, added...), changed...) {
+		m, ok := day.(map[string]any)
+		if !ok {
+			continue
+		}
+		date, _ := m["day"].(string)
+		if date == "" {
+			continue
+		}
+		changes = append(changes, DayChange{Kind: kind, Value: value, Date: date})
 	}
 
 	lastNoticed := entryLastNoticedDayFromMap(oldEntry)
@@ -158,7 +177,7 @@ func collectEntryDayEvents(kind, value string, oldEntry, newEntry map[string]any
 			out = append(out, dayEventOut{ev: Event{Day: &DayEvent{Kind: kind, Value: value, Day: cm, Type: evType}}, evType: evType})
 		}
 	}
-	return out
+	return out, changes
 }
 
 func entryLastNoticedDayFromMap(entry map[string]any) int64 {
@@ -209,6 +228,38 @@ func (c *RaspCache) DrainEvents() []Event {
 	evs := c.events
 	c.events = nil
 	return evs
+}
+
+func (c *RaspCache) DrainDayChanges() []DayChange {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.dayChanges) == 0 {
+		return nil
+	}
+	changes := c.dayChanges
+	c.dayChanges = nil
+	return dedupeDayChanges(changes)
+}
+
+func dedupeDayChanges(changes []DayChange) []DayChange {
+	if len(changes) == 0 {
+		return nil
+	}
+
+	seen := make(map[DayChange]bool, len(changes))
+	result := make([]DayChange, 0, len(changes))
+	for _, change := range changes {
+		if change.Date == "" || change.Value == "" {
+			continue
+		}
+		if seen[change] {
+			continue
+		}
+		seen[change] = true
+		result = append(result, change)
+	}
+	return result
 }
 
 func (c *RaspCache) GroupKeys() []string {

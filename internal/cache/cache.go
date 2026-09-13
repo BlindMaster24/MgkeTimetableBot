@@ -67,7 +67,8 @@ type RaspCache struct {
 
 	callsPreferSite bool
 
-	events []Event
+	events     []Event
+	dayChanges []DayChange
 
 	hits   atomic.Int64
 	misses atomic.Int64
@@ -166,6 +167,7 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 	todayIdx := utils.DayIndexFromDate(time.Now())
 
 	var newEvents []Event
+	var newChanges []DayChange
 	for value, v := range data {
 		vm, ok := v.(map[string]any)
 		if !ok {
@@ -175,9 +177,11 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 		if ov, ok := old[value]; ok {
 			oldEntryMap, _ = ov.(map[string]any)
 		}
-		for _, out := range collectEntryDayEvents(kind, value, oldEntryMap, vm, todayIdx) {
+		events, changes := collectEntryDayEvents(kind, value, oldEntryMap, vm, todayIdx)
+		for _, out := range events {
 			newEvents = append(newEvents, out.ev)
 		}
+		newChanges = append(newChanges, changes...)
 	}
 
 	previousWeekIndex := entry.LastWeekIndex
@@ -242,6 +246,7 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 	entry.LastWeekIndex = maxWeek
 
 	c.events = append(c.events, newEvents...)
+	c.dayChanges = append(c.dayChanges, newChanges...)
 }
 
 func (c *RaspCache) SetTeam(names map[string]string, hashes []string) {
@@ -402,6 +407,7 @@ func (c *RaspCache) Reset() {
 	c.Teachers = &RaspEntry[map[string]any]{Timetable: make(map[string]any)}
 	c.Team = TeamCacheEntry{Names: make(map[string]string)}
 	c.events = nil
+	c.dayChanges = nil
 }
 
 func (c *RaspCache) Save() error {

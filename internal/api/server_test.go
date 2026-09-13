@@ -5,12 +5,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/gin-gonic/gin"
 )
 
 func setupTestServer(t *testing.T) *Server {
+	t.Helper()
+	return setupTestServerWith(t, health.NewDefaultTracker())
+}
+
+func setupTestServerWith(t *testing.T, tracker *health.Tracker) *Server {
 	t.Helper()
 	dir := t.TempDir()
 	c, err := cache.New(dir)
@@ -25,8 +32,85 @@ func setupTestServer(t *testing.T) *Server {
 		"Иванов": map[string]any{"teacher": "Иванов"},
 	}, "hash2")
 	gin.SetMode(gin.TestMode)
-	return NewServer(c, 0)
+	return NewServer(c, 0, tracker)
 }
+
+func TestHealthEndpointReportsTrackerState(t *testing.T) {
+	tracker := health.NewDefaultTracker()
+	tracker.ParserSuccess(2 * time.Second)
+	tracker.APIRequest(200, time.Millisecond)
+	srv := setupTestServerWith(t, tracker)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/health", nil)
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var body health.Snapshot
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode snapshot: %v", err)
+	}
+	if body.Parser.Runs != 1 || body.Parser.LastSuccessAt == "" {
+		t.Errorf("parser stats = %+v", body.Parser)
+	}
+	if body.API.Requests != 1 {
+		t.Errorf("the health request itself is counted after the response, got %+v", body.API)
+	}
+	if after := tracker.Snapshot().API; after.Requests != 2 || after.LastStatus != http.StatusOK {
+		t.Errorf("middleware should record the request, got %+v", after)
+	}
+	if len(body.Alerts) != 0 {
+		t.Errorf("expected no alerts, got %+v", body.Alerts)
+	}
+}
+
+func TestHealthEndpointFailsWhileAlerting(t *testing.T) {
+	thresholds := health.DefaultThresholds()
+	thresholds.ParserFailures = 1
+	tracker := health.NewTracker(thresholds)
+	tracker.ParserFailure(errTest{})
+	srv := setupTestServerWith(t, tracker)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/health", nil)
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 while alerting, got %d", w.Code)
+	}
+
+	var body health.Snapshot
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode snapshot: %v", err)
+	}
+	if len(body.Alerts) != 1 || body.Alerts[0].Key != health.AlertParserFailures {
+		t.Errorf("alerts = %+v", body.Alerts)
+	}
+}
+
+func TestHealthMiddlewareCountsServerErrors(t *testing.T) {
+	tracker := health.NewDefaultTracker()
+	srv := setupTestServerWith(t, tracker)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/group/missing", nil)
+	srv.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+
+	snapshot := tracker.Snapshot()
+	if snapshot.API.Requests != 1 || snapshot.API.Errors != 0 || snapshot.API.LastStatus != http.StatusNotFound {
+		t.Errorf("api stats = %+v", snapshot.API)
+	}
+}
+
+type errTest struct{}
+
+func (errTest) Error() string { return "test failure" }
 
 func TestHandleInfo(t *testing.T) {
 	srv := setupTestServer(t)

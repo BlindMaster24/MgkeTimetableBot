@@ -669,7 +669,7 @@ func TestScheduler_Registration(t *testing.T) {
 	sender := &mockEventSender{}
 	finder := &mockEventChatFinder{}
 
-	s := NewScheduler(cfg, c, log, sender, finder)
+	s := NewScheduler(cfg, c, log, sender, finder, nil)
 	s.Start()
 	defer s.Stop()
 
@@ -684,7 +684,7 @@ func TestScheduler_Registration_EmptyTimetable(t *testing.T) {
 	c, _ := cache.New(t.TempDir())
 	cfg := &config.Config{}
 	log := logger.New("error", nil)
-	s := NewScheduler(cfg, c, log, &mockEventSender{}, &mockEventChatFinder{})
+	s := NewScheduler(cfg, c, log, &mockEventSender{}, &mockEventChatFinder{}, nil)
 	s.Start()
 	defer s.Stop()
 

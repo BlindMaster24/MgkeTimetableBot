@@ -3,6 +3,7 @@ package google
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
@@ -21,13 +22,24 @@ var moscow = time.FixedZone(timeZoneName, 3*60*60)
 
 type CalendarService struct {
 	cfg *config.Config
+
+	mu     sync.Mutex
+	client *calendar.Service
 }
 
 func NewCalendarService(cfg *config.Config) *CalendarService {
 	return &CalendarService{cfg: cfg}
 }
 
-func (s *CalendarService) ServiceAccountClient(ctx context.Context) (*calendar.Service, error) {
+func (s *CalendarService) ServiceAccountClient(context.Context) (*calendar.Service, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.client != nil {
+		return s.client, nil
+	}
+
+	ctx := context.Background()
 	conf := &jwt.Config{
 		Email:      s.cfg.Google.ServiceAccount.ClientEmail,
 		PrivateKey: []byte(s.cfg.Google.ServiceAccount.PrivateKey),
@@ -35,8 +47,12 @@ func (s *CalendarService) ServiceAccountClient(ctx context.Context) (*calendar.S
 		TokenURL:   "https://oauth2.googleapis.com/token",
 	}
 
-	client := conf.Client(ctx)
-	return calendar.NewService(ctx, option.WithHTTPClient(client))
+	service, err := calendar.NewService(ctx, option.WithHTTPClient(conf.Client(ctx)))
+	if err != nil {
+		return nil, err
+	}
+	s.client = service
+	return service, nil
 }
 
 type OAuthConfig struct {

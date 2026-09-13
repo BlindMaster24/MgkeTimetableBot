@@ -1,0 +1,133 @@
+package notification
+
+import (
+	"sync"
+	"time"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+)
+
+const (
+	healthService  = "telegram"
+	healthCooldown = 30 * time.Minute
+)
+
+type HealthNotifier struct {
+	tracker  *health.Tracker
+	log      *logger.Logger
+	sender   EventSender
+	chats    EventChatFinder
+	cooldown time.Duration
+
+	mu     sync.Mutex
+	active map[string]time.Time
+}
+
+func NewHealthNotifier(tracker *health.Tracker, log *logger.Logger, sender EventSender, chats EventChatFinder, cooldown time.Duration) *HealthNotifier {
+	if cooldown <= 0 {
+		cooldown = healthCooldown
+	}
+	return &HealthNotifier{
+		tracker:  tracker,
+		log:      log,
+		sender:   sender,
+		chats:    chats,
+		cooldown: cooldown,
+		active:   make(map[string]time.Time),
+	}
+}
+
+func (n *HealthNotifier) Check() {
+	if n.tracker == nil {
+		return
+	}
+
+	alerts := n.tracker.Alerts()
+	now := time.Now()
+
+	pending, recovered := n.diff(alerts, now)
+	if len(pending) == 0 && len(recovered) == 0 {
+		return
+	}
+
+	chats, err := n.chats.FindAdminChats(healthService)
+	if err != nil {
+		n.log.Error().Err(err).Msg("failed to find admin chats for health alert")
+		return
+	}
+	if len(chats) == 0 {
+		n.log.Warn().Msg("no admin chats for health alert")
+		return
+	}
+
+	for _, alert := range pending {
+		n.broadcast(chats, healthAlertMessage(alert))
+	}
+	for _, key := range recovered {
+		n.broadcast(chats, healthRecoveryMessage(key))
+	}
+}
+
+func (n *HealthNotifier) diff(alerts []health.Alert, now time.Time) ([]health.Alert, []string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	seen := make(map[string]bool, len(alerts))
+	var pending []health.Alert
+
+	for _, alert := range alerts {
+		seen[alert.Key] = true
+		sentAt, exists := n.active[alert.Key]
+		if exists && now.Sub(sentAt) < n.cooldown {
+			continue
+		}
+		n.active[alert.Key] = now
+		pending = append(pending, alert)
+	}
+
+	var recovered []string
+	for key := range n.active {
+		if !seen[key] {
+			delete(n.active, key)
+			recovered = append(recovered, key)
+		}
+	}
+	return pending, recovered
+}
+
+func (n *HealthNotifier) broadcast(chats []*EventChat, message string) {
+	for _, chat := range chats {
+		id := chat.ID
+		if chat.PeerID != 0 {
+			id = chat.PeerID
+		}
+		if err := n.sender.SendText(id, message); err != nil {
+			n.log.Error().Err(err).Int64("chat", id).Msg("failed to send health alert")
+		}
+	}
+}
+
+func healthAlertMessage(alert health.Alert) string {
+	return "⚠️ " + healthAlertTitle(alert.Key) + "\n" + alert.Detail
+}
+
+func healthRecoveryMessage(key string) string {
+	return "✅ " + healthAlertTitle(key) + " — восстановлено"
+}
+
+func healthAlertTitle(key string) string {
+	switch key {
+	case health.AlertParserFailures:
+		return "Парсер расписания падает"
+	case health.AlertParserStale:
+		return "Расписание давно не обновлялось"
+	case health.AlertCalendarFailures:
+		return "Ошибки синхронизации Google Calendar"
+	case health.AlertCalendarStale:
+		return "Google Calendar давно не синхронизировался"
+	case health.AlertAPIErrors:
+		return "Ошибки HTTP API"
+	}
+	return key
+}

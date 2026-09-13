@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
@@ -452,7 +451,7 @@ func (b *Bot) showGoogleCalendarAdd(u *Update, chat *Chat) error {
 
 	if created {
 		go func() {
-			if err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
+			if _, err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
 				b.SendText(u.ChatID, "Ошибка синхронизации календаря. Сообщите разработчику!")
 			}
 		}()
@@ -469,88 +468,222 @@ func (b *Bot) showGoogleCalendarAdd(u *Update, chat *Chat) error {
 	return b.sendOrEdit(u.ChatID, text, chat, googleBackKeyboard())
 }
 
-func (b *Bot) SyncGoogleCalendars(ctx context.Context) error {
+type GoogleDayChange struct {
+	Type  string
+	Value string
+	Date  string
+}
+
+type googleTarget struct {
+	Type  string
+	Value string
+}
+
+func (b *Bot) SyncGoogleCalendars(ctx context.Context) (int, error) {
 	if b.google == nil || !b.google.SyncEnabled() {
-		return nil
+		return 0, nil
 	}
 	if !b.googleSyncMu.TryLock() {
-		return nil
+		return 0, nil
 	}
 	defer b.googleSyncMu.Unlock()
 
+	repo, ok := b.archive.(*archive.Repository)
+	if !ok || repo == nil {
+		return 0, nil
+	}
+	bounds, err := repo.DayIndexBounds()
+	if err != nil || bounds.Max < bounds.Min {
+		return 0, err
+	}
+
 	calendars, err := b.chatRepo.AllGoogleCalendars()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	synced := 0
+	var failures []error
 	for _, calendar := range calendars {
-		if err := b.resyncGoogleCalendarFrom(ctx, calendar, syncFromDay(calendar)); err != nil {
-			b.log.Error().Err(err).Str("calendar", calendar.CalendarID).Msg("google calendar sync failed")
+		if calendar.LastManualSyncedDay >= bounds.Max {
+			continue
+		}
+		from := bounds.Min
+		if calendar.LastManualSyncedDay >= bounds.Min {
+			from = calendar.LastManualSyncedDay + 1
+		}
+		days, err := b.resyncGoogleCalendarFrom(ctx, calendar, from)
+		synced += days
+		if err != nil {
+			b.log.Error().Err(err).Str("calendar", calendar.CalendarID).Msg("google calendar reconcile failed")
+			failures = append(failures, err)
 		}
 	}
-	return nil
+	return synced, errors.Join(failures...)
 }
 
-func syncFromDay(calendar *GoogleCalendar) int64 {
-	if calendar.LastManualSyncedDay <= 1 {
-		return 0
+func (b *Bot) SyncGoogleCalendarChanges(ctx context.Context, changes []GoogleDayChange) (int, error) {
+	if b.google == nil || !b.google.SyncEnabled() || len(changes) == 0 {
+		return 0, nil
 	}
-	yesterday := archive.DateToDayIndex(time.Now().Add(-24 * time.Hour).Format("02.01.2006"))
-	from := calendar.LastManualSyncedDay - 1
-	if yesterday < from {
-		from = yesterday
+	if !b.googleSyncMu.TryLock() {
+		return 0, nil
 	}
-	return from
+	defer b.googleSyncMu.Unlock()
+
+	repo, ok := b.archive.(*archive.Repository)
+	if !ok || repo == nil {
+		return 0, nil
+	}
+	bounds, err := repo.DayIndexBounds()
+	if err != nil || bounds.Max < bounds.Min {
+		return 0, err
+	}
+
+	calendars, err := b.chatRepo.AllGoogleCalendars()
+	if err != nil {
+		return 0, err
+	}
+	if len(calendars) == 0 {
+		return 0, nil
+	}
+
+	byTarget := groupGoogleChanges(changes)
+	calls := b.activeCallsSchedule()
+
+	synced := 0
+	var failures []error
+	for _, calendar := range calendars {
+		dates := byTarget[googleTarget{Type: calendar.Type, Value: calendar.Value}]
+		if len(dates) == 0 {
+			continue
+		}
+		days, err := b.syncGoogleCalendarDays(ctx, repo, calendar, dates, calls, bounds)
+		synced += days
+		if err != nil {
+			b.log.Error().Err(err).Str("calendar", calendar.CalendarID).Msg("google calendar day sync failed")
+			failures = append(failures, err)
+		}
+	}
+	return synced, errors.Join(failures...)
 }
 
-func (b *Bot) resyncGoogleCalendar(ctx context.Context, calendar *GoogleCalendar) error {
+func groupGoogleChanges(changes []GoogleDayChange) map[googleTarget][]string {
+	grouped := make(map[googleTarget][]string)
+	seen := make(map[googleTarget]map[string]bool)
+
+	for _, change := range changes {
+		if change.Type == "" || change.Value == "" || change.Date == "" {
+			continue
+		}
+		target := googleTarget{Type: change.Type, Value: change.Value}
+		if seen[target] == nil {
+			seen[target] = make(map[string]bool)
+		}
+		if seen[target][change.Date] {
+			continue
+		}
+		seen[target][change.Date] = true
+		grouped[target] = append(grouped[target], change.Date)
+	}
+	return grouped
+}
+
+func (b *Bot) syncGoogleCalendarDays(ctx context.Context, repo *archive.Repository, calendar *GoogleCalendar, dates []string, calls google.Schedule, bounds archive.Bounds) (int, error) {
+	synced := 0
+	var failures []error
+	for _, date := range dates {
+		dayIndex := archive.DateToDayIndex(date)
+		if dayIndex < bounds.Min || dayIndex > bounds.Max {
+			continue
+		}
+
+		lessons, err := archiveDayLessons(repo, calendar, dayIndex)
+		if err != nil {
+			failures = append(failures, err)
+			continue
+		}
+		if err := b.google.SyncDay(ctx, calendar.CalendarID, date, lessons, calls); err != nil {
+			failures = append(failures, fmt.Errorf("sync %s %s: %w", calendar.Value, date, err))
+			continue
+		}
+		synced++
+	}
+	return synced, errors.Join(failures...)
+}
+
+func archiveDayLessons(repo *archive.Repository, calendar *GoogleCalendar, dayIndex int64) ([]google.DayLesson, error) {
+	switch calendar.Type {
+	case "group":
+		day, err := repo.GroupDay(dayIndex, calendar.Value)
+		if err != nil || day == nil {
+			return nil, err
+		}
+		return groupDayLessons(*day), nil
+	case "teacher":
+		day, err := repo.TeacherDay(dayIndex, calendar.Value)
+		if err != nil || day == nil {
+			return nil, err
+		}
+		return teacherDayLessons(*day), nil
+	}
+	return nil, nil
+}
+
+func (b *Bot) resyncGoogleCalendar(ctx context.Context, calendar *GoogleCalendar) (int, error) {
 	return b.resyncGoogleCalendarFrom(ctx, calendar, 0)
 }
 
-func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCalendar, from int64) error {
+func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCalendar, from int64) (int, error) {
 	if b.google == nil || !b.google.SyncEnabled() {
-		return nil
+		return 0, nil
 	}
 	repo, ok := b.archive.(*archive.Repository)
 	if !ok || repo == nil {
-		return nil
+		return 0, nil
 	}
 
 	bounds, err := repo.DayIndexBounds()
 	if err != nil || bounds.Max < bounds.Min {
-		return err
+		return 0, err
 	}
 	if from < bounds.Min {
 		from = bounds.Min
 	}
 
 	calls := b.activeCallsSchedule()
+	synced := 0
 
 	switch calendar.Type {
 	case "group":
 		days, err := repo.GroupDaysByRange(from, bounds.Max, calendar.Value)
 		if err != nil {
-			return err
+			return synced, err
 		}
 		for _, day := range days {
 			if err := b.google.SyncDay(ctx, calendar.CalendarID, day.Day, groupDayLessons(day), calls); err != nil {
-				return err
+				return synced, err
 			}
+			synced++
 		}
 	case "teacher":
 		days, err := repo.TeacherDaysByRange(from, bounds.Max, calendar.Value)
 		if err != nil {
-			return err
+			return synced, err
 		}
 		for _, day := range days {
 			if err := b.google.SyncDay(ctx, calendar.CalendarID, day.Day, teacherDayLessons(day), calls); err != nil {
-				return err
+				return synced, err
 			}
+			synced++
 		}
 	}
 
 	calendar.LastManualSyncedDay = bounds.Max
-	return b.chatRepo.SaveGoogleCalendar(calendar)
+	if err := b.chatRepo.SaveGoogleCalendar(calendar); err != nil {
+		return synced, err
+	}
+	return synced, nil
 }
 
 func (b *Bot) activeCallsSchedule() google.Schedule {

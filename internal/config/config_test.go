@@ -21,9 +21,7 @@ telegram:
   admin_ids: [123, 456]
 parser:
   enabled: true
-  v2:
-    enabled: true
-    fallback_to_v1: true
+  end_hour: 18
 timetable:
   weekdays:
     - [["08:00", "08:45"], ["08:55", "09:40"]]
@@ -63,6 +61,64 @@ timetable:
 	}
 	if cfg.Timetable.Weekdays[0][0][0] != "08:00" {
 		t.Errorf("expected first weekday start 08:00, got %s", cfg.Timetable.Weekdays[0][0][0])
+	}
+}
+
+func TestLoadHealthConfig(t *testing.T) {
+	yaml := `
+health:
+  check_minutes: 5
+  cooldown_minutes: 45
+  parser_stale_minutes: 20
+  parser_failures: 4
+  calendar_stale_minutes: 120
+  calendar_failures: 2
+  api_errors: 50
+  api_window_minutes: 10
+`
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "health.yaml")
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Health == nil {
+		t.Fatal("expected the health section to be parsed")
+	}
+	if cfg.Health.CheckMinutes != 5 || cfg.Health.CooldownMinutes != 45 {
+		t.Errorf("health schedule = %+v", cfg.Health)
+	}
+	if cfg.Health.ParserStaleMinutes != 20 || cfg.Health.ParserFailures != 4 {
+		t.Errorf("parser thresholds = %+v", cfg.Health)
+	}
+	if cfg.Health.CalendarStaleMinutes != 120 || cfg.Health.CalendarFailures != 2 {
+		t.Errorf("calendar thresholds = %+v", cfg.Health)
+	}
+	if cfg.Health.APIErrors != 50 || cfg.Health.APIWindowMinutes != 10 {
+		t.Errorf("api thresholds = %+v", cfg.Health)
+	}
+	if cfg.Health.Disabled {
+		t.Error("health checks should be enabled by default")
+	}
+}
+
+func TestLoadConfigWithoutHealthSection(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "no-health.yaml")
+	if err := os.WriteFile(cfgPath, []byte("dev: false\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Health != nil {
+		t.Errorf("expected no health section, got %+v", cfg.Health)
 	}
 }
 

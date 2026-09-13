@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/gin-gonic/gin"
 )
 
@@ -11,9 +13,10 @@ type Server struct {
 	engine *gin.Engine
 	cache  *cache.RaspCache
 	port   int
+	health *health.Tracker
 }
 
-func NewServer(cache *cache.RaspCache, port int) *Server {
+func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
@@ -22,10 +25,22 @@ func NewServer(cache *cache.RaspCache, port int) *Server {
 		engine: engine,
 		cache:  cache,
 		port:   port,
+		health: tracker,
 	}
 
+	engine.Use(s.observe())
 	s.routes()
 	return s
+}
+
+func (s *Server) observe() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		if s.health != nil {
+			s.health.APIRequest(c.Writer.Status(), time.Since(start))
+		}
+	}
 }
 
 func (s *Server) routes() {
@@ -35,6 +50,7 @@ func (s *Server) routes() {
 	s.engine.GET("/api/group/:name", s.handleGroupByName)
 	s.engine.GET("/api/teacher/:name", s.handleTeacherByName)
 	s.engine.GET("/api/parser-health", s.handleParserHealth)
+	s.engine.GET("/api/health", s.handleHealth)
 }
 
 func (s *Server) HandleGoogleOAuth(path string, handler http.HandlerFunc) {
@@ -104,6 +120,20 @@ func (s *Server) handleTeacherByName(c *gin.Context) {
 func (s *Server) handleParserHealth(c *gin.Context) {
 	stats := s.cache.Stats()
 	c.JSON(http.StatusOK, stats)
+}
+
+func (s *Server) handleHealth(c *gin.Context) {
+	if s.health == nil {
+		c.JSON(http.StatusOK, gin.H{"status": "unknown"})
+		return
+	}
+
+	snapshot := s.health.Snapshot()
+	status := http.StatusOK
+	if len(snapshot.Alerts) > 0 {
+		status = http.StatusServiceUnavailable
+	}
+	c.JSON(status, snapshot)
 }
 
 func itoa(n int) string {

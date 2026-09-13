@@ -4,7 +4,6 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
@@ -109,7 +108,7 @@ func TestGoogleResyncGroupCalendarFromArchive(t *testing.T) {
 		t.Fatalf("save calendar: %v", err)
 	}
 
-	if err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
+	if _, err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
 		t.Fatalf("resync: %v", err)
 	}
 
@@ -157,7 +156,7 @@ func TestGoogleResyncTeacherCalendarFromArchive(t *testing.T) {
 		t.Fatalf("save calendar: %v", err)
 	}
 
-	if err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
+	if _, err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
 		t.Fatalf("resync: %v", err)
 	}
 
@@ -177,7 +176,7 @@ func TestGoogleResyncSkippedWithoutServiceAccount(t *testing.T) {
 	calendar := &GoogleCalendar{Type: "group", Value: "100", CalendarID: "cal-nosync"}
 	repo.SaveGoogleCalendar(calendar)
 
-	if err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
+	if _, err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
 		t.Fatalf("resync: %v", err)
 	}
 	if len(service.synced) != 0 {
@@ -208,7 +207,7 @@ func TestSyncGoogleCalendarsSyncsEveryStoredCalendar(t *testing.T) {
 		t.Fatalf("save teacher calendar: %v", err)
 	}
 
-	if err := b.SyncGoogleCalendars(context.Background()); err != nil {
+	if _, err := b.SyncGoogleCalendars(context.Background()); err != nil {
 		t.Fatalf("sync calendars: %v", err)
 	}
 
@@ -224,16 +223,166 @@ func TestSyncGoogleCalendarsSyncsEveryStoredCalendar(t *testing.T) {
 	}
 }
 
-func TestSyncFromDayLooksBackOneDay(t *testing.T) {
-	if from := syncFromDay(&GoogleCalendar{}); from != 0 {
-		t.Errorf("unsynced calendar should sync from the start, got %d", from)
+func TestSyncGoogleCalendarsSkipsReconciledCalendar(t *testing.T) {
+	b, repo, _, service := setupGoogleBot(t)
+	archiveRepo := seedTwoGroupDays(t, b)
+
+	bounds, err := archiveRepo.DayIndexBounds()
+	if err != nil {
+		t.Fatalf("bounds: %v", err)
 	}
 
-	yesterday := archive.DateToDayIndex(time.Now().Add(-24 * time.Hour).Format("02.01.2006"))
-	from := syncFromDay(&GoogleCalendar{LastManualSyncedDay: yesterday + 30})
-	if from != yesterday {
-		t.Errorf("from = %d, want %d", from, yesterday)
+	if err := repo.SaveGoogleCalendar(&GoogleCalendar{
+		Type: "group", Value: "100", CalendarID: "cal-reconciled", LastManualSyncedDay: bounds.Max,
+	}); err != nil {
+		t.Fatalf("save calendar: %v", err)
 	}
+
+	if _, err := b.SyncGoogleCalendars(context.Background()); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if len(service.synced) != 0 {
+		t.Errorf("reconciled calendar should not be resynced, got %v", service.synced)
+	}
+}
+
+func TestSyncGoogleCalendarsCatchesUpOnlyNewDays(t *testing.T) {
+	b, repo, _, service := setupGoogleBot(t)
+	seedTwoGroupDays(t, b)
+
+	first := archive.DateToDayIndex("14.09.2026")
+	if err := repo.SaveGoogleCalendar(&GoogleCalendar{
+		Type: "group", Value: "100", CalendarID: "cal-catchup", LastManualSyncedDay: first,
+	}); err != nil {
+		t.Fatalf("save calendar: %v", err)
+	}
+
+	if _, err := b.SyncGoogleCalendars(context.Background()); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	if len(service.synced) != 1 || service.synced[0] != "15.09.2026" {
+		t.Fatalf("expected only the new day to be synced, got %v", service.synced)
+	}
+}
+
+func TestSyncGoogleCalendarChangesSyncsOnlyChangedDay(t *testing.T) {
+	b, repo, _, service := setupGoogleBot(t)
+	seedTwoGroupDays(t, b)
+
+	if err := repo.SaveGoogleCalendar(&GoogleCalendar{Type: "group", Value: "100", CalendarID: "cal-changes"}); err != nil {
+		t.Fatalf("save calendar: %v", err)
+	}
+
+	synced, err := b.SyncGoogleCalendarChanges(context.Background(), []GoogleDayChange{
+		{Type: "group", Value: "100", Date: "15.09.2026"},
+	})
+	if err != nil {
+		t.Fatalf("sync changes: %v", err)
+	}
+	if synced != 1 {
+		t.Errorf("reported %d synced days, want 1", synced)
+	}
+
+	if len(service.synced) != 1 || service.synced[0] != "15.09.2026" {
+		t.Fatalf("synced days = %v, want only 15.09.2026", service.synced)
+	}
+	if service.syncedCalendar[0] != "cal-changes" {
+		t.Errorf("synced calendar = %q", service.syncedCalendar[0])
+	}
+	if len(service.syncedLessons) != 1 || service.syncedLessons[0].Title != "Информатика" {
+		t.Errorf("synced lessons = %+v", service.syncedLessons)
+	}
+}
+
+func TestSyncGoogleCalendarChangesClearsEmptiedDay(t *testing.T) {
+	b, repo, _, service := setupGoogleBot(t)
+	archiveRepo := setupArchive(t)
+	b.archive = archiveRepo
+
+	if err := archiveRepo.AppendDays([]archive.AppendDay{
+		{Type: "group", Value: "100", Day: &model.GroupDay{Day: "16.09.2026", Lessons: nil}},
+	}); err != nil {
+		t.Fatalf("append archive days: %v", err)
+	}
+
+	if err := repo.SaveGoogleCalendar(&GoogleCalendar{Type: "group", Value: "100", CalendarID: "cal-empty"}); err != nil {
+		t.Fatalf("save calendar: %v", err)
+	}
+
+	if _, err := b.SyncGoogleCalendarChanges(context.Background(), []GoogleDayChange{
+		{Type: "group", Value: "100", Date: "16.09.2026"},
+	}); err != nil {
+		t.Fatalf("sync changes: %v", err)
+	}
+
+	if len(service.synced) != 1 || service.synced[0] != "16.09.2026" {
+		t.Fatalf("expected the emptied day to be synced, got %v", service.synced)
+	}
+	if len(service.syncedLessons) != 0 {
+		t.Errorf("expected no lessons, got %+v", service.syncedLessons)
+	}
+}
+
+func TestSyncGoogleCalendarChangesIgnoresUnrelatedCalendars(t *testing.T) {
+	b, repo, _, service := setupGoogleBot(t)
+	seedTwoGroupDays(t, b)
+
+	if err := repo.SaveGoogleCalendar(&GoogleCalendar{Type: "group", Value: "100", CalendarID: "cal-100"}); err != nil {
+		t.Fatalf("save calendar: %v", err)
+	}
+
+	if _, err := b.SyncGoogleCalendarChanges(context.Background(), []GoogleDayChange{
+		{Type: "group", Value: "200", Date: "15.09.2026"},
+		{Type: "teacher", Value: "Иванов И.И.", Date: "15.09.2026"},
+	}); err != nil {
+		t.Fatalf("sync changes: %v", err)
+	}
+	if len(service.synced) != 0 {
+		t.Errorf("unrelated changes should not sync anything, got %v", service.synced)
+	}
+}
+
+func TestGroupGoogleChangesDedupes(t *testing.T) {
+	grouped := groupGoogleChanges([]GoogleDayChange{
+		{Type: "group", Value: "100", Date: "15.09.2026"},
+		{Type: "group", Value: "100", Date: "15.09.2026"},
+		{Type: "group", Value: "100", Date: "16.09.2026"},
+		{Type: "teacher", Value: "Иванов И.И.", Date: "15.09.2026"},
+		{Type: "group", Value: "", Date: "17.09.2026"},
+	})
+
+	if got := len(grouped[googleTarget{Type: "group", Value: "100"}]); got != 2 {
+		t.Errorf("group dates = %d, want 2", got)
+	}
+	if got := len(grouped[googleTarget{Type: "teacher", Value: "Иванов И.И."}]); got != 1 {
+		t.Errorf("teacher dates = %d, want 1", got)
+	}
+}
+
+func seedTwoGroupDays(t *testing.T, b *Bot) *archive.Repository {
+	t.Helper()
+
+	repo := setupArchive(t)
+	b.archive = repo
+
+	if err := repo.AppendDays([]archive.AppendDay{
+		{Type: "group", Value: "100", Day: &model.GroupDay{
+			Day: "14.09.2026",
+			Lessons: []model.GroupLesson{
+				&model.GroupLessonExplain{Lesson: "Математика", Cabinet: stringPtr("101")},
+			},
+		}},
+		{Type: "group", Value: "100", Day: &model.GroupDay{
+			Day: "15.09.2026",
+			Lessons: []model.GroupLesson{
+				&model.GroupLessonExplain{Lesson: "Информатика", Cabinet: stringPtr("303")},
+			},
+		}},
+	}); err != nil {
+		t.Fatalf("append archive days: %v", err)
+	}
+	return repo
 }
 
 func TestActiveCallsSchedulePrefersCache(t *testing.T) {

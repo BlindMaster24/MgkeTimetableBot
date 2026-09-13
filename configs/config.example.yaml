@@ -1,5 +1,7 @@
 dev: true
 db_path: "./sqlite3.db"
+chat_db_path: "./bot_chats.db"
+cache_dir: "./cache/rasp"
 
 logging:
   level: "debug"
@@ -46,28 +48,6 @@ parser:
   sync_mode: false
   local_mode: false
   ignore_hash: false
-  v2:
-    enabled: false
-    fallback_to_v1: true
-    week_policy: "preferCurrent"
-    allow_two_tables: true
-    strict: false
-    diff_log: false
-    diff_log_limit: 20
-    header_scan_rows: 5
-    min_days_in_table: 5
-    max_lessons_per_day: 6
-    validation_sample: 5
-    hash_mode: "content"
-    fetch_retry: 1
-    week_jump_threshold: 1
-    sunday_hold_current: true
-    quarantine:
-      enabled: true
-      min_lessons: 1
-    metrics:
-      enabled: true
-      dir: "./cache/rasp/metrics"
   end_hour: 17
   activity: [9, 17]
   endpoints:
@@ -122,3 +102,14 @@ timetable:
 encrypt_key: ""
 global_noticer: false
 global_adblock: false
+
+health:
+  disabled: false
+  check_minutes: 1
+  cooldown_minutes: 30
+  parser_stale_minutes: 15
+  parser_failures: 3
+  calendar_stale_minutes: 360
+  calendar_failures: 3
+  api_errors: 20
+  api_window_minutes: 5

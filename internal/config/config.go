@@ -12,9 +12,23 @@ type TimetableConfig struct {
 	Shortened1h [][2]string    `yaml:"shortened_1h"`
 }
 
+type HealthConfig struct {
+	Disabled             bool `yaml:"disabled"`
+	CheckMinutes         int  `yaml:"check_minutes"`
+	CooldownMinutes      int  `yaml:"cooldown_minutes"`
+	ParserStaleMinutes   int  `yaml:"parser_stale_minutes"`
+	ParserFailures       int  `yaml:"parser_failures"`
+	CalendarStaleMinutes int  `yaml:"calendar_stale_minutes"`
+	CalendarFailures     int  `yaml:"calendar_failures"`
+	APIErrors            int  `yaml:"api_errors"`
+	APIWindowMinutes     int  `yaml:"api_window_minutes"`
+}
+
 type Config struct {
-	Dev    bool   `yaml:"dev" env:"DEV"`
-	DBPath string `yaml:"db_path" env:"DB_PATH"`
+	Dev        bool   `yaml:"dev" env:"DEV"`
+	DBPath     string `yaml:"db_path" env:"DB_PATH"`
+	ChatDBPath string `yaml:"chat_db_path"`
+	CacheDir   string `yaml:"cache_dir"`
 
 	Logging struct {
 		Level  string `yaml:"level" env:"LOG_LEVEL"`
@@ -61,6 +75,8 @@ type Config struct {
 			Enabled bool `yaml:"enabled"`
 		} `yaml:"ics"`
 	} `yaml:"calendar"`
+
+	Health *HealthConfig `yaml:"health"`
 
 	Accept struct {
 		Room    bool `yaml:"room"`
@@ -111,6 +127,26 @@ type Config struct {
 type LessonFilter struct {
 	Lesson string `yaml:"lesson"`
 	Type   string `yaml:"type"`
+}
+
+const (
+	DefaultChatDBPath = "./bot_chats.db"
+	DefaultCacheDir   = "./cache/rasp"
+)
+
+func (c *Config) ResolvedChatDBPath() string {
+	return pathOr(c.ChatDBPath, DefaultChatDBPath)
+}
+
+func (c *Config) ResolvedCacheDir() string {
+	return pathOr(c.CacheDir, DefaultCacheDir)
+}
+
+func pathOr(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func Load(path string) (*Config, error) {

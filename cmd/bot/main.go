@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
@@ -39,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg, err := config.Load(*cfgPath)
+	cfg, err := config.LoadWithEnv(*cfgPath, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load config %s: %v\n", *cfgPath, err)
 		os.Exit(1)
@@ -60,10 +62,12 @@ func main() {
 	log := logger.New(cfg.Logging.Level, fileCfg)
 	loc := i18n.New("ru")
 
+	metrics := health.NewTracker(healthThresholds(cfg))
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	raspCache, err := cache.New("./cache/rasp")
+	raspCache, err := cache.New(cfg.ResolvedCacheDir())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to init cache")
 	}
@@ -92,9 +96,9 @@ func main() {
 
 	syncArchive("startup")
 
-	apiServer := api.NewServer(raspCache, cfg.HTTP.Port)
+	apiServer := api.NewServer(raspCache, cfg.HTTP.Port, metrics)
 
-	chatRepo, err := telegrambot.NewChatRepo("./bot_chats.db")
+	chatRepo, err := telegrambot.NewChatRepo(cfg.ResolvedChatDBPath())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to open chat DB")
 	}
@@ -107,6 +111,7 @@ func main() {
 
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)
+	calendarSyncEnabled := googleService.SyncEnabled()
 	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(cfg, googleService, chatRepo, bot, log))
 
 	go func() {
@@ -118,9 +123,32 @@ func main() {
 
 	adapter := &chatFinderAdapter{repo: chatRepo, adminIDs: cfg.Telegram.AdminIDs}
 
+	syncCalendars := func(ctx context.Context, tag string) {
+		changes := googleDayChanges(raspCache.DrainDayChanges())
+		if !calendarSyncEnabled {
+			return
+		}
+
+		synced, err := bot.SyncGoogleCalendarChanges(ctx, changes)
+		if err != nil {
+			metrics.CalendarFailure(err)
+			log.Error().Err(err).Str("tag", tag).Msg("google calendar change sync failed")
+		} else {
+			metrics.CalendarSuccess(synced)
+		}
+
+		synced, err = bot.SyncGoogleCalendars(ctx)
+		if err != nil {
+			metrics.CalendarFailure(err)
+			log.Error().Err(err).Str("tag", tag).Msg("google calendar reconcile failed")
+			return
+		}
+		metrics.CalendarSuccess(synced)
+	}
+
 	if cfg.Telegram.Noticer {
 		eventNotifier := notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
-		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter)
+		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics)
 		scheduler.Start()
 		defer scheduler.Stop()
 		log.Info().Msg("notification scheduler started")
@@ -138,19 +166,20 @@ func main() {
 		bot.SetParseFunc(func() error {
 			groupURL := cfg.Parser.Endpoints.TimetableGroup
 			teacherURL := cfg.Parser.Endpoints.TimetableTeacher
+			started := time.Now()
 			err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
 			if err != nil {
+				metrics.ParserFailure(err)
 				bot.AddParseLog(false, err.Error())
 				go eventNotifier.ParserError(err)
 			} else {
+				metrics.ParserSuccess(time.Since(started))
 				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
 				drainEvents("parse")
 			}
 			go func() {
 				syncArchive("parse")
-				if err := bot.SyncGoogleCalendars(context.Background()); err != nil {
-					log.Error().Err(err).Msg("google calendar sync failed")
-				}
+				syncCalendars(context.Background(), "parse")
 			}()
 			return err
 		})
@@ -158,13 +187,19 @@ func main() {
 		bot.SetParseFunc(func() error {
 			groupURL := cfg.Parser.Endpoints.TimetableGroup
 			teacherURL := cfg.Parser.Endpoints.TimetableTeacher
+			started := time.Now()
 			err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
 			if err != nil {
+				metrics.ParserFailure(err)
 				bot.AddParseLog(false, err.Error())
 			} else {
+				metrics.ParserSuccess(time.Since(started))
 				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
 			}
-			go syncArchive("parse")
+			go func() {
+				syncArchive("parse")
+				syncCalendars(context.Background(), "parse")
+			}()
 			return err
 		})
 	}
@@ -177,15 +212,16 @@ func main() {
 		groupURL := cfg.Parser.Endpoints.TimetableGroup
 		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
 		log.Info().Msg("initial parse starting")
+		started := time.Now()
 		if err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule); err != nil {
+			metrics.ParserFailure(err)
 			log.Error().Err(err).Msg("initial parse failed")
 		} else {
+			metrics.ParserSuccess(time.Since(started))
 			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
 		}
 		syncArchive("initial")
-		if err := bot.SyncGoogleCalendars(ctx); err != nil {
-			log.Error().Err(err).Msg("google calendar sync failed")
-		}
+		syncCalendars(ctx, "initial")
 	}()
 
 	log.Info().Msg("bot starting")
@@ -197,6 +233,34 @@ func main() {
 		log.Error().Err(err).Msg("failed to save cache")
 	}
 	log.Info().Msg("shutdown complete")
+}
+
+func healthThresholds(cfg *config.Config) health.Thresholds {
+	thresholds := health.DefaultThresholds()
+	if cfg.Health == nil {
+		return thresholds
+	}
+
+	thresholds.ParserStale = time.Duration(cfg.Health.ParserStaleMinutes) * time.Minute
+	thresholds.ParserFailures = cfg.Health.ParserFailures
+	thresholds.CalendarStale = time.Duration(cfg.Health.CalendarStaleMinutes) * time.Minute
+	thresholds.CalendarFailures = cfg.Health.CalendarFailures
+	thresholds.APIErrors = cfg.Health.APIErrors
+	thresholds.APIWindow = time.Duration(cfg.Health.APIWindowMinutes) * time.Minute
+
+	return thresholds.WithDefaults()
+}
+
+func googleDayChanges(changes []cache.DayChange) []telegrambot.GoogleDayChange {
+	result := make([]telegrambot.GoogleDayChange, 0, len(changes))
+	for _, change := range changes {
+		kind := "group"
+		if change.Kind == cache.KindTeachers {
+			kind = "teacher"
+		}
+		result = append(result, telegrambot.GoogleDayChange{Type: kind, Value: change.Value, Date: change.Date})
+	}
+	return result
 }
 
 func googleOAuthHandler(cfg *config.Config, service *google.CalendarService, chats *telegrambot.Repository, bot *telegrambot.Bot, log *logger.Logger) http.HandlerFunc {
