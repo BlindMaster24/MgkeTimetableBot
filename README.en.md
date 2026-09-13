@@ -2,7 +2,7 @@
 
 [Русская версия](README.md)
 
-[![Go CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)
+[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)
 [![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8)](https://go.dev/dl/)
 
 ## Overview
@@ -36,7 +36,7 @@ Features:
 
 ## Requirements
 
-- **Go 1.27.1 or newer** — the minimum is pinned in `go.mod` (`go 1.27.1`), an older toolchain refuses to build the module. With `GOTOOLCHAIN=auto` (the default) Go downloads the required version automatically.
+- **Minimum Go version: 1.27.1** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)).
 - No CGO: SQLite and image rendering are pure Go.
 - A writable directory for `cache/` and the database files.
 

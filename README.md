@@ -2,7 +2,7 @@
 
 [English version](README.en.md)
 
-[![Go CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)
+[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)
 [![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8)](https://go.dev/dl/)
 
 ## Описание
@@ -36,7 +36,7 @@
 
 ## Требования
 
-- **Go 1.27.1 или новее** — минимум жёстко зашит в `go.mod` (`go 1.27.1`), более старый тулчейн откажется собирать модуль. При `GOTOOLCHAIN=auto` (значение по умолчанию) Go сам скачает нужную версию, если локальная старше.
+- **Минимальная версия Go — 1.27.1** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)).
 - CGO не нужен: SQLite и рендеринг картинок работают на чистом Go.
 - Для работы нужен только записываемый каталог для `cache/` и файлов базы.
 
