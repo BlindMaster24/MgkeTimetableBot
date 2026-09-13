@@ -3,6 +3,7 @@ package telegram
 import (
 	"testing"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
@@ -18,12 +19,17 @@ func setupTestBot(t *testing.T) *Bot {
 
 	log := logger.New("error", nil)
 	loc := i18n.New("ru")
-	_, _ = cache.New(t.TempDir())
+	raspper, err := cache.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("cache: %v", err)
+	}
 
 	b := &Bot{
 		cfg:       cfg,
 		log:       log,
 		i18n:      loc,
+		cache:     raspper,
+		buildInfo: build.New("", "", ""),
 		commands:  make(map[string]Command),
 		callbacks: make(map[string]Callback),
 	}

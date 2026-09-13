@@ -63,6 +63,13 @@ func TestEnvOverridesFileValues(t *testing.T) {
 		"MGKE_PARSER_ACTIVITY":          "8,20",
 		"MGKE_PARSER_PROXY":             "http://127.0.0.1:8080",
 		"MGKE_PARSER_CALLS_PREFER_SITE": "no",
+
+		"MGKE_PARSER_GUARD_DISABLED":         "true",
+		"MGKE_PARSER_GUARD_MIN_ITEMS":        "25",
+		"MGKE_PARSER_GUARD_MAX_DROP_PERCENT": "60",
+		"MGKE_HEALTH_PARSER_GUARD_FAILURES":  "4",
+		"MGKE_HEALTH_PARSER_LAYOUT_FAILURES": "5",
+		"MGKE_HEALTH_CHECK_MINUTES":          "2",
 	}))
 	if err != nil {
 		t.Fatalf("load with env: %v", err)
@@ -97,6 +104,12 @@ func TestEnvOverridesFileValues(t *testing.T) {
 	}
 	if cfg.Parser.Calls == nil || cfg.Parser.Calls.PreferSite {
 		t.Errorf("calls = %+v", cfg.Parser.Calls)
+	}
+	if !cfg.Parser.Guard.Disabled || cfg.Parser.Guard.MinItems != 25 || cfg.Parser.Guard.MaxDropPercent != 60 {
+		t.Errorf("parser guard = %+v", cfg.Parser.Guard)
+	}
+	if cfg.Health == nil || cfg.Health.ParserGuardFailures != 4 || cfg.Health.ParserLayoutFailures != 5 {
+		t.Errorf("health thresholds = %+v", cfg.Health)
 	}
 }
 
@@ -257,6 +270,10 @@ func TestEnvNamesCoverEveryLeaf(t *testing.T) {
 		"MGKE_PARSER_ENABLED",
 		"MGKE_PARSER_ENDPOINTS_BELL_SCHEDULE",
 		"MGKE_HEALTH_PARSER_STALE_MINUTES",
+		"MGKE_HEALTH_PARSER_GUARD_FAILURES",
+		"MGKE_PARSER_GUARD_MIN_ITEMS",
+		"MGKE_PARSER_GUARD_MAX_DROP_PERCENT",
+		"MGKE_PARSER_GUARD_DISABLED",
 		"MGKE_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
 	} {
 		if !seen[expected] {

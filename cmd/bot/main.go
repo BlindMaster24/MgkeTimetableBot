@@ -13,6 +13,7 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
@@ -24,7 +25,11 @@ import (
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
 
-var version = "dev"
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
 
 func main() {
 	cfgPath := flag.String("config", "", "path to config file (default: configs/config.yaml)")
@@ -63,7 +68,8 @@ func main() {
 	}
 
 	log := logger.New(cfg.Logging.Level, fileCfg)
-	log.Info().Str("version", version).Msg("bot starting")
+	buildInfo := build.New(version, commit, date)
+	log.Info().Str("version", buildInfo.Version).Str("commit", buildInfo.ShortCommit()).Msg("bot starting")
 	loc := i18n.New("ru")
 
 	metrics := health.NewTracker(healthThresholds(cfg))
@@ -98,7 +104,7 @@ func main() {
 
 	syncArchive("startup")
 
-	apiServer := api.NewServer(raspCache, cfg.HTTP.Port, metrics)
+	apiServer := api.NewServer(raspCache, cfg.HTTP.Port, metrics, buildInfo)
 
 	chatRepo, err := telegrambot.NewChatRepo(cfg.ResolvedChatDBPath())
 	if err != nil {
@@ -120,6 +126,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}
+	bot.SetBuildInfo(buildInfo)
 
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)
@@ -186,20 +193,15 @@ func main() {
 		proxy = *cfg.Parser.Proxy
 	}
 	onParserReport := func(report parserpkg.Report) {
-		issues := make([]health.LayoutIssue, 0, len(report.Failing()))
-		for _, probe := range report.Failing() {
-			issues = append(issues, health.LayoutIssue{
-				Source:   report.Source,
-				Selector: probe.Selector,
-				Expected: probe.Expected,
-				Found:    probe.Found,
-			})
-		}
-		metrics.ParserReport(report.Source, issues, report.KeptOld)
+		metrics.ParserReport(report.Source, parserLayoutIssues(report), guardIssues(report))
 		bot.RecordParserReport(report)
 	}
 
-	fetcher := parserpkg.NewFetcher(log, raspCache, parserpkg.Options{Proxy: proxy, OnReport: onParserReport})
+	fetcher := parserpkg.NewFetcher(log, raspCache, parserpkg.Options{
+		Proxy:    proxy,
+		Guard:    parserGuard(cfg),
+		OnReport: onParserReport,
+	})
 
 	parseOnce := func(force bool) error {
 		started := time.Now()
@@ -249,14 +251,16 @@ func main() {
 			Msg("parser loop started")
 	}
 
-	go func() {
-		log.Info().Msg("initial parse starting")
-		if err := parseOnce(false); err != nil {
-			log.Error().Err(err).Msg("initial parse failed")
-			return
-		}
-		log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
-	}()
+	if cfg.Parser.Enabled {
+		go func() {
+			log.Info().Msg("initial parse starting")
+			if err := parseOnce(false); err != nil {
+				log.Error().Err(err).Msg("initial parse failed")
+				return
+			}
+			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
+		}()
+	}
 
 	log.Info().Msg("bot starting")
 	if err := bot.Run(ctx); err != nil {
@@ -280,12 +284,55 @@ func healthThresholds(cfg *config.Config) health.Thresholds {
 	thresholds.ParserStale = time.Duration(cfg.Health.ParserStaleMinutes) * time.Minute
 	thresholds.ParserFailures = cfg.Health.ParserFailures
 	thresholds.ParserLayout = cfg.Health.ParserLayoutFailures
+	thresholds.ParserGuard = cfg.Health.ParserGuardFailures
 	thresholds.CalendarStale = time.Duration(cfg.Health.CalendarStaleMinutes) * time.Minute
 	thresholds.CalendarFailures = cfg.Health.CalendarFailures
 	thresholds.APIErrors = cfg.Health.APIErrors
 	thresholds.APIWindow = time.Duration(cfg.Health.APIWindowMinutes) * time.Minute
 
 	return thresholds.WithDefaults()
+}
+
+func parserGuard(cfg *config.Config) parserpkg.Guard {
+	return parserpkg.Guard{
+		Disabled:       cfg.Parser.Guard.Disabled,
+		MinItems:       cfg.Parser.Guard.MinItems,
+		MaxDropPercent: cfg.Parser.Guard.MaxDropPercent,
+	}
+}
+
+func parserLayoutIssues(report parserpkg.Report) []health.LayoutIssue {
+	issues := make([]health.LayoutIssue, 0, len(report.Failing()))
+	for _, probe := range report.Failing() {
+		issues = append(issues, health.LayoutIssue{
+			Source:   report.Source,
+			Selector: probe.Selector,
+			Expected: probe.Expected,
+			Found:    probe.Found,
+		})
+	}
+	return issues
+}
+
+func guardIssues(report parserpkg.Report) []health.GuardIssue {
+	var issues []health.GuardIssue
+
+	if report.Keep != nil {
+		issues = append(issues, health.GuardIssue{
+			Source: report.Source,
+			Reason: report.Keep.Reason,
+			Detail: report.Keep.Summary(),
+		})
+	}
+	for _, name := range report.Fallbacks {
+		issues = append(issues, health.GuardIssue{
+			Source: report.Source,
+			Reason: "fallback",
+			Detail: name,
+		})
+	}
+
+	return issues
 }
 
 func googleDayChanges(changes []cache.DayChange) []telegrambot.GoogleDayChange {

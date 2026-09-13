@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     environment:
       CONFIG_PATH: /app/configs/config.yaml
+      TZ: "${TZ:-Europe/Minsk}"
       MGKE_DB_PATH: /data/sqlite3.db
       MGKE_CHAT_DB_PATH: /data/bot_chats.db
       MGKE_CACHE_DIR: /data/cache/rasp

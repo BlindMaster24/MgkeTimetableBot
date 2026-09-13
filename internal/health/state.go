@@ -25,6 +25,7 @@ type State struct {
 	ParserLastError      string         `json:"parserLastError,omitempty"`
 	ParserLastDurationMS int64          `json:"parserLastDurationMs"`
 	ParserLayoutFailures map[string]int `json:"parserLayoutFailures,omitempty"`
+	ParserGuardFailures  map[string]int `json:"parserGuardFailures,omitempty"`
 
 	CalendarRuns          int64  `json:"calendarRuns"`
 	CalendarErrors        int64  `json:"calendarErrors"`
@@ -120,6 +121,16 @@ func (t *Tracker) stateLocked() State {
 		state.ParserLayoutFailures[source] = layout.failures
 	}
 
+	for source, guard := range t.parserGuard {
+		if guard.failures == 0 {
+			continue
+		}
+		if state.ParserGuardFailures == nil {
+			state.ParserGuardFailures = make(map[string]int)
+		}
+		state.ParserGuardFailures[source] = guard.failures
+	}
+
 	return state
 }
 
@@ -145,6 +156,13 @@ func (t *Tracker) applyStateLocked(state State) {
 			t.parserLayout = make(map[string]layoutState)
 		}
 		t.parserLayout[source] = layoutState{failures: failures}
+	}
+
+	for source, failures := range state.ParserGuardFailures {
+		if t.parserGuard == nil {
+			t.parserGuard = make(map[string]guardState)
+		}
+		t.parserGuard[source] = guardState{failures: failures}
 	}
 }
 

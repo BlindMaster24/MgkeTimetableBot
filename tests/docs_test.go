@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
@@ -56,7 +57,7 @@ func TestDocsListEveryAPIEndpoint(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	server := api.NewServer(raspCache, 0, health.NewDefaultTracker())
+	server := api.NewServer(raspCache, 0, health.NewDefaultTracker(), build.New("test", "", ""))
 	server.HandleGoogleOAuth("/google/oauth", nil)
 
 	engine, ok := server.Handler().(*gin.Engine)

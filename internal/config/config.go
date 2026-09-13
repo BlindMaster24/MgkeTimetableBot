@@ -25,10 +25,17 @@ type HealthConfig struct {
 	ParserStaleMinutes   int  `yaml:"parser_stale_minutes"`
 	ParserFailures       int  `yaml:"parser_failures"`
 	ParserLayoutFailures int  `yaml:"parser_layout_failures"`
+	ParserGuardFailures  int  `yaml:"parser_guard_failures"`
 	CalendarStaleMinutes int  `yaml:"calendar_stale_minutes"`
 	CalendarFailures     int  `yaml:"calendar_failures"`
 	APIErrors            int  `yaml:"api_errors"`
 	APIWindowMinutes     int  `yaml:"api_window_minutes"`
+}
+
+type GuardConfig struct {
+	Disabled       bool `yaml:"disabled"`
+	MinItems       int  `yaml:"min_items"`
+	MaxDropPercent int  `yaml:"max_drop_percent"`
 }
 
 type Config struct {
@@ -109,6 +116,7 @@ type Config struct {
 		} `yaml:"alertable_ignore_filter"`
 		LessonIndexIfEmpty int          `yaml:"lesson_index_if_empty"`
 		Calls              *CallsConfig `yaml:"calls"`
+		Guard              GuardConfig  `yaml:"guard"`
 		Proxy              *string      `yaml:"proxy"`
 	} `yaml:"parser"`
 

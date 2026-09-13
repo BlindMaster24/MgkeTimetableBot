@@ -181,13 +181,13 @@ func TestParserLayoutAlertNeedsRepeatedRuns(t *testing.T) {
 	tracker := NewTracker(thresholds)
 
 	issue := LayoutIssue{Source: "groups", Selector: "td lesson cells", Expected: "groups with at least one lesson"}
-	tracker.ParserReport("groups", []LayoutIssue{issue}, false)
+	tracker.ParserReport("groups", []LayoutIssue{issue}, nil)
 
 	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert != nil {
 		t.Errorf("a single run must not alert yet: %+v", alert)
 	}
 
-	tracker.ParserReport("groups", []LayoutIssue{issue}, false)
+	tracker.ParserReport("groups", []LayoutIssue{issue}, nil)
 	alert := findAlert(tracker.Alerts(), AlertParserLayout)
 	if alert == nil {
 		t.Fatal("expected a layout alert after two runs")
@@ -204,7 +204,7 @@ func TestParserLayoutAlertNeedsRepeatedRuns(t *testing.T) {
 		t.Errorf("layout issues = %+v", snapshot.Parser.Layout)
 	}
 
-	tracker.ParserReport("groups", nil, false)
+	tracker.ParserReport("groups", nil, nil)
 	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert != nil {
 		t.Errorf("alert must clear after a clean run: %+v", alert)
 	}
@@ -213,16 +213,68 @@ func TestParserLayoutAlertNeedsRepeatedRuns(t *testing.T) {
 	}
 }
 
-func TestParserKeptOldCountsAsLayoutFailure(t *testing.T) {
+func TestParserGuardAlertsOnTheFirstTrip(t *testing.T) {
+	tracker := NewTracker(DefaultThresholds())
+
+	guard := []GuardIssue{{Source: "groups", Reason: "shrink", Detail: "35 -> 6 (dropped 82%, limit 80%)"}}
+	tracker.ParserReport("groups", nil, guard)
+
+	alert := findAlert(tracker.Alerts(), AlertParserGuard)
+	if alert == nil {
+		t.Fatal("a guard trip must alert on the first run")
+	}
+	if alert.Level != LevelCritical {
+		t.Errorf("guard alert level = %s", alert.Level)
+	}
+	if !strings.Contains(alert.Detail, "groups: shrink: 35 -> 6") {
+		t.Errorf("alert must carry the counts: %q", alert.Detail)
+	}
+	if findAlert(tracker.Alerts(), AlertParserLayout) != nil {
+		t.Error("a guard trip is not a layout failure")
+	}
+
+	snapshot := tracker.Snapshot()
+	if snapshot.Parser.GuardFailures != 1 || len(snapshot.Parser.Guard) != 1 {
+		t.Errorf("guard stats = %+v", snapshot.Parser)
+	}
+
+	tracker.ParserReport("groups", nil, nil)
+	if alert := findAlert(tracker.Alerts(), AlertParserGuard); alert != nil {
+		t.Errorf("guard alert must clear after a healthy parse: %+v", alert)
+	}
+	if snapshot := tracker.Snapshot(); snapshot.Parser.GuardFailures != 0 || len(snapshot.Parser.Guard) != 0 {
+		t.Errorf("guard state was not cleared: %+v", snapshot.Parser)
+	}
+}
+
+func TestParserGuardThresholdCountsRunsPerSource(t *testing.T) {
 	thresholds := DefaultThresholds()
-	thresholds.ParserLayout = 2
+	thresholds.ParserGuard = 3
 	tracker := NewTracker(thresholds)
 
-	tracker.ParserReport("calls", nil, true)
-	tracker.ParserReport("calls", nil, true)
+	guard := []GuardIssue{{Source: "calls", Reason: "empty", Detail: "the page produced nothing"}}
+	tracker.ParserReport("calls", nil, guard)
+	tracker.ParserReport("calls", nil, guard)
 
-	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert == nil {
-		t.Error("a kept-old run must raise the layout alert")
+	if alert := findAlert(tracker.Alerts(), AlertParserGuard); alert != nil {
+		t.Errorf("threshold is three runs: %+v", alert)
+	}
+
+	tracker.ParserReport("calls", nil, guard)
+	if alert := findAlert(tracker.Alerts(), AlertParserGuard); alert == nil {
+		t.Error("expected the third run to alert")
+	}
+}
+
+func TestParserGuardCountsAnyGuardReason(t *testing.T) {
+	tracker := NewTracker(DefaultThresholds())
+
+	tracker.ParserReport("calls", nil, []GuardIssue{{Source: "calls", Reason: "fallback", Detail: "bell schedule read from text"}})
+
+	if alert := findAlert(tracker.Alerts(), AlertParserGuard); alert == nil {
+		t.Fatal("a fallback path must reach the admins")
+	} else if !strings.Contains(alert.Detail, "calls: fallback: bell schedule read from text") {
+		t.Errorf("alert detail = %q", alert.Detail)
 	}
 }
 
@@ -232,15 +284,15 @@ func TestParserLayoutThresholdUsesWorstSource(t *testing.T) {
 	tracker := NewTracker(thresholds)
 
 	issue := []LayoutIssue{{Source: "groups", Selector: "table"}}
-	tracker.ParserReport("groups", issue, false)
-	tracker.ParserReport("groups", issue, false)
-	tracker.ParserReport("teachers", issue, false)
+	tracker.ParserReport("groups", issue, nil)
+	tracker.ParserReport("groups", issue, nil)
+	tracker.ParserReport("teachers", issue, nil)
 
 	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert != nil {
 		t.Errorf("the threshold counts runs per source: %+v", alert)
 	}
 
-	tracker.ParserReport("groups", issue, false)
+	tracker.ParserReport("groups", issue, nil)
 	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert == nil {
 		t.Error("expected the third groups run to alert")
 	}

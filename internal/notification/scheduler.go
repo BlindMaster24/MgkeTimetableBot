@@ -14,6 +14,7 @@ import (
 
 type Scheduler struct {
 	cron          *cron.Cron
+	location      *time.Location
 	cfg           *config.Config
 	cache         *cache.RaspCache
 	log           *logger.Logger
@@ -27,7 +28,8 @@ type Scheduler struct {
 
 func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, sender EventSender, chats EventChatFinder, tracker *health.Tracker, store health.StateStore) *Scheduler {
 	return &Scheduler{
-		cron:          cron.New(cron.WithSeconds()),
+		cron:          cron.New(cron.WithSeconds(), cron.WithLocation(time.Local)),
+		location:      time.Local,
 		cfg:           cfg,
 		cache:         c,
 		log:           log,
@@ -36,6 +38,10 @@ func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, se
 		healthTracker: tracker,
 		store:         store,
 	}
+}
+
+func (s *Scheduler) Location() *time.Location {
+	return s.location
 }
 
 func (s *Scheduler) Start() {
@@ -79,18 +85,11 @@ func (s *Scheduler) registerSlots(slots [][2][2]string, weekRange string) {
 	}
 
 	for index, times := range slots {
-		endTime := times[1][1]
-		if endTime == "" {
+		cronExpr, ok := slotCronExpr(times[1][1], weekRange)
+		if !ok {
 			continue
 		}
 
-		parts := strings.SplitN(endTime, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		hour, min := parts[0], parts[1]
-
-		cronExpr := "0 " + min + " " + hour + " * * " + weekRange
 		idx := index
 		_, err := s.cron.AddFunc(cronExpr, func() {
 			s.notifier.CronDay(cache.KindGroups, idx, false)
@@ -102,6 +101,26 @@ func (s *Scheduler) registerSlots(slots [][2][2]string, weekRange string) {
 		}
 		s.log.Info().Str("expr", cronExpr).Int("slot", idx).Msg("notification scheduled")
 	}
+}
+
+func slotCronExpr(endTime, weekRange string) (string, bool) {
+	parts := strings.SplitN(endTime, ":", 2)
+	if len(parts) != 2 || !isClockNumber(parts[0]) || !isClockNumber(parts[1]) {
+		return "", false
+	}
+	return "0 " + parts[1] + " " + parts[0] + " * * " + weekRange, true
+}
+
+func isClockNumber(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, symbol := range value {
+		if symbol < '0' || symbol > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Scheduler) Stop() {

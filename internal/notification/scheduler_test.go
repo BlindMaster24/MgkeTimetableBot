@@ -11,6 +11,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
+	"github.com/robfig/cron/v3"
 )
 
 type mockEventSender struct {
@@ -690,6 +691,87 @@ func TestScheduler_Registration_EmptyTimetable(t *testing.T) {
 
 	if entries := s.cron.Entries(); len(entries) != 0 {
 		t.Errorf("expected 0 entries for empty timetable, got %d", len(entries))
+	}
+}
+
+func TestSlotCronExprUsesTheBellScheduleTimes(t *testing.T) {
+	for _, testCase := range []struct {
+		endTime  string
+		weekdays string
+		want     string
+		ok       bool
+	}{
+		{endTime: "08:45", weekdays: "1-5", want: "0 45 08 * * 1-5", ok: true},
+		{endTime: "09:45", weekdays: "6", want: "0 45 09 * * 6", ok: true},
+		{endTime: "13:00", weekdays: "1-5", want: "0 00 13 * * 1-5", ok: true},
+		{endTime: "8:5", weekdays: "1-5", want: "0 5 8 * * 1-5", ok: true},
+		{endTime: "", weekdays: "1-5", ok: false},
+		{endTime: "08:45:00", weekdays: "1-5", ok: false},
+		{endTime: "08:xx", weekdays: "1-5", ok: false},
+		{endTime: "abc", weekdays: "1-5", ok: false},
+	} {
+		expr, ok := slotCronExpr(testCase.endTime, testCase.weekdays)
+		if ok != testCase.ok {
+			t.Errorf("slotCronExpr(%q) ok = %v, want %v", testCase.endTime, ok, testCase.ok)
+			continue
+		}
+		if ok && expr != testCase.want {
+			t.Errorf("slotCronExpr(%q) = %q, want %q", testCase.endTime, expr, testCase.want)
+		}
+	}
+}
+
+func TestNotificationTimeIsInterpretedInTheEvaluationZone(t *testing.T) {
+	minsk := time.FixedZone("Europe/Minsk", 3*60*60)
+	utc := time.UTC
+
+	expr, ok := slotCronExpr("08:45", "1-5")
+	if !ok {
+		t.Fatal("expected a cron expression")
+	}
+
+	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	schedule, err := parser.Parse(expr)
+	if err != nil {
+		t.Fatalf("parse %q: %v", expr, err)
+	}
+
+	monday := time.Date(2026, 9, 14, 6, 0, 0, 0, utc)
+
+	utcNext := schedule.Next(monday.In(utc))
+	localNext := schedule.Next(monday.In(minsk))
+
+	if utcNext.Hour() != 8 || utcNext.Minute() != 45 || utcNext.Location() != utc {
+		t.Errorf("a UTC process would notify at %s", utcNext)
+	}
+	if localNext.Hour() != 8 || localNext.Minute() != 45 || localNext.Location() != minsk {
+		t.Errorf("a local process would notify at %s", localNext)
+	}
+	if utcNext.Equal(localNext) {
+		t.Error("08:45 UTC and 08:45 in the local zone must be different instants")
+	}
+	if got := localNext.UTC().Hour(); got != 5 {
+		t.Errorf("08:45 in a +03:00 process is %02d:45 UTC, got %02d:45", 5, got)
+	}
+}
+
+func TestSchedulerBindsTheCronToTheProcessTimezone(t *testing.T) {
+	original := time.Local
+	minsk := time.FixedZone("Europe/Minsk", 3*60*60)
+	time.Local = minsk
+	t.Cleanup(func() { time.Local = original })
+
+	c, err := cache.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("cache: %v", err)
+	}
+	cfg := &config.Config{}
+	cfg.Timetable.Weekdays = [][2][2]string{{{"08:00", "08:45"}, {"08:50", "09:35"}}}
+
+	s := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, nil, nil)
+
+	if s.Location() != minsk {
+		t.Errorf("the scheduler must follow the process zone, got %v", s.Location())
 	}
 }
 

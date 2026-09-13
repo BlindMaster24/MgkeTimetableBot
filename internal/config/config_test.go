@@ -79,6 +79,7 @@ health:
   parser_stale_minutes: 20
   parser_failures: 4
   parser_layout_failures: 3
+  parser_guard_failures: 1
   calendar_stale_minutes: 120
   calendar_failures: 2
   api_errors: 50
@@ -106,6 +107,9 @@ health:
 	if cfg.Health.ParserLayoutFailures != 3 {
 		t.Errorf("parser layout threshold = %d", cfg.Health.ParserLayoutFailures)
 	}
+	if cfg.Health.ParserGuardFailures != 1 {
+		t.Errorf("parser guard threshold = %d", cfg.Health.ParserGuardFailures)
+	}
 	if cfg.Health.CalendarStaleMinutes != 120 || cfg.Health.CalendarFailures != 2 {
 		t.Errorf("calendar thresholds = %+v", cfg.Health)
 	}
@@ -114,6 +118,48 @@ health:
 	}
 	if cfg.Health.Disabled {
 		t.Error("health checks should be enabled by default")
+	}
+}
+
+func TestLoadParserGuardConfig(t *testing.T) {
+	yaml := `
+parser:
+  guard:
+    disabled: true
+    min_items: 30
+    max_drop_percent: 60
+`
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "guard.yaml")
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Parser.Guard.Disabled || cfg.Parser.Guard.MinItems != 30 || cfg.Parser.Guard.MaxDropPercent != 60 {
+		t.Errorf("guard config = %+v", cfg.Parser.Guard)
+	}
+}
+
+func TestLoadParserGuardDefaults(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "no-guard.yaml")
+	if err := os.WriteFile(cfgPath, []byte("parser:\n  enabled: true\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Parser.Guard.Disabled {
+		t.Error("the guard is on unless it is disabled explicitly")
+	}
+	if cfg.Parser.Guard.MinItems != 0 || cfg.Parser.Guard.MaxDropPercent != 0 {
+		t.Errorf("unset thresholds stay zero and are filled by the parser defaults: %+v", cfg.Parser.Guard)
 	}
 }
 

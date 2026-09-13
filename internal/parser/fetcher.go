@@ -19,12 +19,36 @@ import (
 const (
 	userAgent = "MGKE timetable bot (https://github.com/BlindMaster24/MgkeTimetableBot)"
 
-	shrinkFloor     = 10
-	shrinkThreshold = 5
+	defaultGuardMinItems       = 10
+	defaultGuardMaxDropPercent = 80
 )
+
+type Guard struct {
+	Disabled       bool
+	MinItems       int
+	MaxDropPercent int
+}
+
+func (g Guard) WithDefaults() Guard {
+	if g.MinItems <= 0 {
+		g.MinItems = defaultGuardMinItems
+	}
+	if g.MaxDropPercent <= 0 || g.MaxDropPercent >= 100 {
+		g.MaxDropPercent = defaultGuardMaxDropPercent
+	}
+	return g
+}
+
+func (g Guard) Trips(previous, current int) bool {
+	if g.Disabled || previous < g.MinItems {
+		return false
+	}
+	return current*100 < previous*(100-g.MaxDropPercent)
+}
 
 type Options struct {
 	Proxy    string
+	Guard    Guard
 	OnReport func(Report)
 }
 
@@ -32,6 +56,7 @@ type Fetcher struct {
 	log      *logger.Logger
 	cache    *cache.RaspCache
 	client   *http.Client
+	guard    Guard
 	onReport func(Report)
 
 	mu      sync.Mutex
@@ -53,6 +78,7 @@ func NewFetcher(log *logger.Logger, c *cache.RaspCache, opts Options) *Fetcher {
 		log:      log,
 		cache:    c,
 		client:   client,
+		guard:    opts.Guard.WithDefaults(),
 		onReport: opts.OnReport,
 		reports:  make(map[string]Report),
 	}
@@ -122,17 +148,21 @@ func (f *Fetcher) fetchGroups(groupURL string) error {
 	}
 
 	if len(groups) == 0 {
-		report.KeepOld("the page produced no groups")
+		report.KeepEmpty("the page produced no groups")
 		f.emit(report)
 		f.log.Error().Str("url", groupURL).Msg("group parse returned no groups, cache left untouched")
 		return nil
 	}
 
 	previous := len(f.cache.GetGroups())
-	if suspiciousShrink(previous, len(groups)) {
-		report.KeepOld(fmt.Sprintf("group count dropped from %d to %d", previous, len(groups)))
+	if f.guard.Trips(previous, len(groups)) {
+		report.KeepShrunk(previous, len(groups), f.guard.MaxDropPercent, fmt.Sprintf("group count dropped from %d to %d", previous, len(groups)))
 		f.emit(report)
-		f.log.Error().Int("previous", previous).Int("parsed", len(groups)).Msg("group parse looks broken, cache left untouched")
+		f.log.Error().
+			Int("previous", previous).
+			Int("parsed", len(groups)).
+			Int("limit_percent", f.guard.MaxDropPercent).
+			Msg("group parse looks broken, cache left untouched")
 		return nil
 	}
 
@@ -164,17 +194,21 @@ func (f *Fetcher) fetchTeachers(teacherURL string) error {
 	}
 
 	if len(teachers) == 0 {
-		report.KeepOld("the page produced no teachers")
+		report.KeepEmpty("the page produced no teachers")
 		f.emit(report)
 		f.log.Error().Str("url", teacherURL).Msg("teacher parse returned no teachers, cache left untouched")
 		return nil
 	}
 
 	previous := len(f.cache.GetTeachers())
-	if suspiciousShrink(previous, len(teachers)) {
-		report.KeepOld(fmt.Sprintf("teacher count dropped from %d to %d", previous, len(teachers)))
+	if f.guard.Trips(previous, len(teachers)) {
+		report.KeepShrunk(previous, len(teachers), f.guard.MaxDropPercent, fmt.Sprintf("teacher count dropped from %d to %d", previous, len(teachers)))
 		f.emit(report)
-		f.log.Error().Int("previous", previous).Int("parsed", len(teachers)).Msg("teacher parse looks broken, cache left untouched")
+		f.log.Error().
+			Int("previous", previous).
+			Int("parsed", len(teachers)).
+			Int("limit_percent", f.guard.MaxDropPercent).
+			Msg("teacher parse looks broken, cache left untouched")
 		return nil
 	}
 
@@ -201,7 +235,7 @@ func (f *Fetcher) Calls(bellScheduleURL string) error {
 	report.URL = bellScheduleURL
 
 	if len(variants) == 0 || len(variants[0].Schedule.Weekdays) == 0 {
-		report.KeepOld("the page produced no bell schedule slots")
+		report.KeepEmpty("the page produced no bell schedule slots")
 		f.emit(report)
 		f.log.Warn().Str("url", bellScheduleURL).Msg("calls parse returned empty, cache left untouched")
 		return nil
@@ -256,7 +290,7 @@ func (f *Fetcher) Team(urls []string) error {
 	merged.Items = len(team)
 
 	if len(team) == 0 {
-		merged.KeepOld("the pages produced no staff names")
+		merged.KeepEmpty("the pages produced no staff names")
 		f.emit(merged)
 		f.log.Warn().Int("pages", len(urls)).Msg("team parse returned no names, cache left untouched")
 		return errors.Join(errs...)
@@ -295,13 +329,6 @@ func failedReport(source, url string, err error) Report {
 	report := Report{Source: source, URL: url, At: time.Now()}
 	report.Warn("fetch failed: %v", err)
 	return report
-}
-
-func suspiciousShrink(previous, current int) bool {
-	if previous < shrinkFloor {
-		return false
-	}
-	return current*shrinkThreshold < previous
 }
 
 func fetchHTML(client *http.Client, url string) (*http.Response, error) {

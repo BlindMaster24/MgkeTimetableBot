@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/gin-gonic/gin"
@@ -32,7 +34,7 @@ func setupTestServerWith(t *testing.T, tracker *health.Tracker) *Server {
 		"Иванов": map[string]any{"teacher": "Иванов"},
 	}, "hash2")
 	gin.SetMode(gin.TestMode)
-	return NewServer(c, 0, tracker)
+	return NewServer(c, 0, tracker, build.New("test", "abcdef1234567890", "2026-01-02T03:04:05Z"))
 }
 
 func TestHealthEndpointReportsTrackerState(t *testing.T) {
@@ -75,7 +77,7 @@ func TestHealthEndpointExposesParserLayout(t *testing.T) {
 		Source:   "groups",
 		Selector: "td lesson cells",
 		Expected: "groups with at least one lesson",
-	}}, false)
+	}}, nil)
 	srv := setupTestServerWith(t, tracker)
 
 	w := httptest.NewRecorder()
@@ -105,6 +107,87 @@ func TestHealthEndpointExposesParserLayout(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected the parser layout alert, got %+v", body.Alerts)
+	}
+}
+
+func TestHealthEndpointCarriesTheBuildInfo(t *testing.T) {
+	srv := setupTestServer(t)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/health", nil)
+	srv.Handler().ServeHTTP(w, req)
+
+	var body health.Snapshot
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode snapshot: %v", err)
+	}
+	if body.Build == nil {
+		t.Fatal("expected the snapshot to carry the build info")
+	}
+	if body.Build.Version != "test" || body.Build.ShortCommit() != "abcdef1" {
+		t.Errorf("build info = %+v", body.Build)
+	}
+	if body.Build.Go == "" || body.Build.OS == "" {
+		t.Errorf("build info must name the toolchain: %+v", body.Build)
+	}
+}
+
+func TestInfoEndpointCarriesTheBuildInfo(t *testing.T) {
+	srv := setupTestServer(t)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/info", nil)
+	srv.Handler().ServeHTTP(w, req)
+
+	var body struct {
+		Name    string     `json:"name"`
+		Version string     `json:"version"`
+		Build   build.Info `json:"build"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode info: %v", err)
+	}
+	if body.Build.Version != "test" || body.Build.Date != "2026-01-02T03:04:05Z" {
+		t.Errorf("info build = %+v", body.Build)
+	}
+}
+
+func TestHealthEndpointExposesTheParserGuard(t *testing.T) {
+	tracker := health.NewDefaultTracker()
+	tracker.ParserReport("groups", nil, []health.GuardIssue{{
+		Source: "groups",
+		Reason: "shrink",
+		Detail: "35 -> 6 (dropped 82%, limit 80%)",
+	}})
+	srv := setupTestServerWith(t, tracker)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/health", nil)
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 while the guard alert is active, got %d", w.Code)
+	}
+
+	var body health.Snapshot
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode snapshot: %v", err)
+	}
+	if body.Parser.GuardFailures != 1 {
+		t.Errorf("guard failures = %d", body.Parser.GuardFailures)
+	}
+	if len(body.Parser.Guard) != 1 || !strings.Contains(body.Parser.Guard[0].Detail, "35 -> 6") {
+		t.Errorf("guard issues = %+v", body.Parser.Guard)
+	}
+
+	found := false
+	for _, alert := range body.Alerts {
+		if alert.Key == health.AlertParserGuard {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the parser guard alert, got %+v", body.Alerts)
 	}
 }
 

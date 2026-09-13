@@ -25,6 +25,32 @@ func (p Probe) OK() bool {
 	return !p.Required || p.Found > 0
 }
 
+const (
+	KeepReasonEmpty  = "empty"
+	KeepReasonShrink = "shrink"
+)
+
+type Keep struct {
+	Reason       string `json:"reason"`
+	Previous     int    `json:"previous,omitempty"`
+	Current      int    `json:"current,omitempty"`
+	LimitPercent int    `json:"limitPercent,omitempty"`
+}
+
+func (k Keep) Summary() string {
+	if k.Reason == KeepReasonEmpty {
+		return "the page produced nothing"
+	}
+	return fmt.Sprintf("%d -> %d (dropped %d%%, limit %d%%)", k.Previous, k.Current, k.DropPercent(), k.LimitPercent)
+}
+
+func (k Keep) DropPercent() int {
+	if k.Previous <= 0 || k.Current >= k.Previous {
+		return 0
+	}
+	return (k.Previous - k.Current) * 100 / k.Previous
+}
+
 type Report struct {
 	Source    string    `json:"source"`
 	URL       string    `json:"url,omitempty"`
@@ -35,6 +61,7 @@ type Report struct {
 	Fallbacks []string  `json:"fallbacks,omitempty"`
 	Variants  []string  `json:"variants,omitempty"`
 	KeptOld   bool      `json:"keptOld,omitempty"`
+	Keep      *Keep     `json:"keep,omitempty"`
 }
 
 func (r Report) Failing() []Probe {
@@ -81,6 +108,21 @@ func (r *Report) Warn(format string, args ...any) {
 func (r *Report) KeepOld(reason string) {
 	r.KeptOld = true
 	r.Warn("previous data kept: %s", reason)
+}
+
+func (r *Report) KeepEmpty(reason string) {
+	r.Keep = &Keep{Reason: KeepReasonEmpty}
+	r.KeepOld(reason)
+}
+
+func (r *Report) KeepShrunk(previous, current, limitPercent int, reason string) {
+	r.Keep = &Keep{
+		Reason:       KeepReasonShrink,
+		Previous:     previous,
+		Current:      current,
+		LimitPercent: limitPercent,
+	}
+	r.KeepOld(reason)
 }
 
 type reportBuilder struct {
@@ -149,6 +191,9 @@ func mergeReports(reports ...Report) Report {
 	for _, report := range reports {
 		merged.Items += report.Items
 		merged.KeptOld = merged.KeptOld || report.KeptOld
+		if merged.Keep == nil {
+			merged.Keep = report.Keep
+		}
 
 		for _, probe := range report.Probes {
 			key := probe.Source + "|" + probe.Selector

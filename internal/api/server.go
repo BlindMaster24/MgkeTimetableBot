@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/gin-gonic/gin"
@@ -14,9 +15,10 @@ type Server struct {
 	cache  *cache.RaspCache
 	port   int
 	health *health.Tracker
+	build  build.Info
 }
 
-func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker) *Server {
+func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
@@ -26,6 +28,7 @@ func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker) *Serve
 		cache:  cache,
 		port:   port,
 		health: tracker,
+		build:  info,
 	}
 
 	engine.Use(s.observe())
@@ -72,6 +75,7 @@ func (s *Server) handleInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"name":    "MgkeTimetableBot API",
 		"version": "2.0",
+		"build":   s.build,
 	})
 }
 
@@ -129,6 +133,7 @@ func (s *Server) handleHealth(c *gin.Context) {
 	}
 
 	snapshot := s.health.Snapshot()
+	snapshot.Build = &s.build
 	status := http.StatusOK
 	if len(snapshot.Alerts) > 0 {
 		status = http.StatusServiceUnavailable

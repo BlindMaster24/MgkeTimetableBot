@@ -3,6 +3,8 @@ FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine AS build
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 WORKDIR /src
 
@@ -12,15 +14,21 @@ RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
 
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/bot ./cmd/bot/
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath \
+	-ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}" \
+	-o /out/bot ./cmd/bot/
 
 FROM alpine:3.23
 
 ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 LABEL org.opencontainers.image.title="MgkeTimetableBot" \
 	org.opencontainers.image.description="Telegram timetable bot for MGKE with a REST API" \
 	org.opencontainers.image.version="${VERSION}" \
+	org.opencontainers.image.revision="${COMMIT}" \
+	org.opencontainers.image.created="${BUILD_DATE}" \
 	org.opencontainers.image.source="https://github.com/BlindMaster24/MgkeTimetableBot"
 
 RUN apk add --no-cache ca-certificates tzdata \
@@ -37,6 +45,7 @@ RUN mkdir -p /data /app/configs \
 USER bot
 
 ENV CONFIG_PATH=/app/configs/config.yaml \
+	TZ=Europe/Minsk \
 	MGKE_DB_PATH=/data/sqlite3.db \
 	MGKE_CHAT_DB_PATH=/data/bot_chats.db \
 	MGKE_CACHE_DIR=/data/cache/rasp \

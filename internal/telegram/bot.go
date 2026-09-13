@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
@@ -40,6 +41,7 @@ type Bot struct {
 	callbacks    map[string]Callback
 	parseFunc    func() error
 	startTime    time.Time
+	buildInfo    build.Info
 	archive      any
 	aliasRepo    *AliasRepository
 	parseLogs    []parseLogEntry
@@ -91,16 +93,16 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	}
 
 	b := &Bot{
-		client:    client,
-		cfg:       cfg,
-		log:       log,
-		i18n:      loc,
-		chatRepo:  chatRepo,
-		cache:     cache,
-		archive:   archive,
-		commands:  make(map[string]Command),
+		client:   client,
+		cfg:      cfg,
+		log:      log,
+		i18n:     loc,
+		chatRepo: chatRepo,
+		cache:    cache,
+		archive:  archive, commands: make(map[string]Command),
 		callbacks: make(map[string]Callback),
 		startTime: time.Now(),
+		buildInfo: build.New("", "", ""),
 	}
 
 	b.aliasRepo = NewAliasRepository(chatRepo)
@@ -109,6 +111,8 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	return b, nil
 }
 
+func (b *Bot) SetBuildInfo(info build.Info)   { b.buildInfo = info }
+func (b *Bot) BuildInfo() build.Info          { return b.buildInfo }
 func (b *Bot) Client() *telego.Bot            { return b.client }
 func (b *Bot) Config() *config.Config         { return b.cfg }
 func (b *Bot) I18n() *i18n.Localizer          { return b.i18n }

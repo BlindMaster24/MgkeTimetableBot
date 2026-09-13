@@ -174,7 +174,24 @@ The bell schedule page can hold several tables, one per campus. The parser keeps
 
 The parser does not depend on a rigid page structure: the group or teacher name comes from the nearest heading (any `h1`…`h6` or `caption`), and the day columns are derived from the table header, `colspan` included, instead of hard-coded cell numbers. If the layout collapses to a single column per day, the parser tries to read the room from the cell text.
 
-Every run collects diagnostics — which selector matched what. When the site changes and a required selector stops matching, an empty or sharply shrunken result **never overwrites the cache**: the bot keeps serving the timetable, and the problem shows up in `/parserLogs` (admins) and `GET /api/health` (`parser.layout`), and after `health.parser_layout_failures` runs in a row it arrives as a Telegram alert.
+Every run collects diagnostics — which selector matched what. When the site changes and a required selector stops matching, an empty or sharply shrunken result **never overwrites the cache**: the bot keeps serving the timetable, and the admins hear about it right away — as a Telegram alert, plus in `/parserLogs` and `GET /api/health`:
+
+- `parser_layout` — a required selector stopped matching (`health.parser_layout_failures` runs in a row, 2 by default);
+- `parser_guard` — the data-loss guard engaged: the page came back empty, the group or teacher count dropped past the limit, or the parser had to take a fallback path (1 run by default, `health.parser_guard_failures: 1`).
+
+The guard limits themselves live in `parser.guard`:
+
+```yaml
+parser:
+  guard:
+    disabled: false        # turn the guard off entirely
+    min_items: 10          # do not check caches smaller than this
+    max_drop_percent: 80   # losing more than 80% means broken markup
+```
+
+With `max_drop_percent: 80`, a parse that returns 6 groups instead of 35 leaves the cache alone and wakes the admins with `groups: shrink 35 -> 6 (dropped 82%, limit 80%)`. When the drop is real (holidays, merged groups), the guard can be lifted with `parser.guard.disabled: true`.
+
+Every field is also available as an environment variable: `MGKE_PARSER_GUARD_MIN_ITEMS`, `MGKE_PARSER_GUARD_MAX_DROP_PERCENT`, `MGKE_PARSER_GUARD_DISABLED`, `MGKE_HEALTH_PARSER_GUARD_FAILURES`.
 
 
 ## Bot commands
@@ -230,7 +247,7 @@ The server listens on `0.0.0.0:http.port`:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/info` | Service information and version |
+| GET | `/api/info` | Service information, version and build metadata (commit, date, toolchain) |
 | GET | `/api/groups` | Group list |
 | GET | `/api/teachers` | Teacher list |
 | GET | `/api/group/:name` | Group timetable |
@@ -242,7 +259,12 @@ The server listens on `0.0.0.0:http.port`:
 
 ## Metrics and health
 
-Counters are kept in memory (`internal/health`) and served by `GET /api/health`. The endpoint returns metrics plus active alerts, and answers with `503` whenever an alert is active, so it can be wired straight into monitoring.
+Counters are kept in memory (`internal/health`) and served by `GET /api/health`. The endpoint returns metrics, active alerts and a `build` block (version, commit, build date, Go version and platform), and answers with `503` whenever an alert is active, so it can be wired straight into monitoring. The same block is returned by `/api/info`, and the admin command `/debug` shows it in Telegram (“Версия / Коммит / Собрано”), so a running release can be identified without server access or logs.
+
+```bash
+curl -s localhost:8081/api/health | jq .build
+# { "version": "1.2.3", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.1", "os": "linux", "arch": "amd64" }
+```
 
 Metrics and the alert state are persisted to the chat database (the `bot_state` table) after every parse cycle and on shutdown, and read back on startup. A restart therefore never hides a problem: if the timetable has not refreshed for an hour, the `parser_stale` alert fires right after the start, and alerts that were already sent are not repeated until `cooldown_minutes` expires.
 
@@ -262,6 +284,7 @@ health:
   parser_stale_minutes: 15     # the timetable has not been refreshed for so long
   parser_failures: 3           # consecutive failed parses
   parser_layout_failures: 2    # consecutive parses where a selector stopped matching
+  parser_guard_failures: 1     # data-loss guard trips (1 sends the alert immediately)
   calendar_stale_minutes: 360
   calendar_failures: 3
   api_errors: 20               # 5xx responses inside the window
@@ -313,7 +336,8 @@ What to know about the image:
 - the process runs as an unprivileged user, CGO is not needed (SQLite and image rendering are pure Go);
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
 - only the HTTP port (`http.port`) is published — Telegram works over long polling, so no inbound ports are required;
-- state lives in the `/data` volume, and the config can be replaced through `CONFIG_PATH`.
+- the image installs `tzdata` and sets `TZ=Europe/Minsk`, and `docker-compose.yml` passes `TZ` through (same Minsk default) — “today”, the academic week number and the notification times all depend on the timezone, so the container must not run in UTC;
+- state lives in the `/data` volume, and the config can be replaced through `CONFIG_PATH`; the version, commit and build date are injected by the linker (`-X main.*`) and surfaced in `/api/health` and `/debug`.
 
 The image is published to GHCR, so a local build is optional:
 
@@ -395,7 +419,7 @@ CI runs the same checks — see “CI and releases” below.
 | `test` | the full suite with coverage: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days |
 | `race` | the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
-| `docker` | the image build plus a check that the binary inside it starts |
+| `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata and the container timezone (`date +%z` → `+0300`) |
 | `workflow-lint` | `actionlint` over the workflow files themselves |
 
 `.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision before anything is published, so a broken tag or `main` push never ships:

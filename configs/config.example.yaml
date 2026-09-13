@@ -70,6 +70,10 @@ parser:
     prefer_site: true
     notify: true
     campus: ""
+  guard:
+    disabled: false
+    min_items: 10
+    max_drop_percent: 80
 
 timetable:
   weekdays:
@@ -96,6 +100,7 @@ health:
   parser_stale_minutes: 15
   parser_failures: 3
   parser_layout_failures: 2
+  parser_guard_failures: 1
   calendar_stale_minutes: 360
   calendar_failures: 3
   api_errors: 20

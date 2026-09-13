@@ -38,6 +38,10 @@ func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
 
+	return u.Bot.SendText(u.ChatID, "<pre>"+strings.Join(c.bot.debugLines(), "\n")+"</pre>")
+}
+
+func (b *Bot) debugLines() []string {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
@@ -46,6 +50,16 @@ func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 
 	var lines []string
 
+	info := b.buildInfo
+	lines = append(lines, "-- Сборка --")
+	lines = append(lines, fmt.Sprintf("Версия: %s", info.Version))
+	lines = append(lines, fmt.Sprintf("Коммит: %s", info.ShortCommit()))
+	lines = append(lines, fmt.Sprintf("Собрано: %s", info.Date))
+	if info.Go != "" {
+		lines = append(lines, fmt.Sprintf("Toolchain: %s %s/%s", info.Go, info.OS, info.Arch))
+	}
+
+	lines = append(lines, "")
 	lines = append(lines, "-- Система --")
 	lines = append(lines, fmt.Sprintf("ОС: %s (%s)", runtime.GOOS, runtime.GOARCH))
 	lines = append(lines, fmt.Sprintf("Go: %s", runtime.Version()))
@@ -70,13 +84,13 @@ func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 	lines = append(lines, "")
 	lines = append(lines, "-- Бот --")
 	lines = append(lines, fmt.Sprintf("PID: %d", os.Getpid()))
-	lines = append(lines, fmt.Sprintf("Uptime: %s", formatUptime(c.bot.startTime)))
-	lines = append(lines, fmt.Sprintf("Команд: %d", len(c.bot.commands)))
-	lines = append(lines, fmt.Sprintf("Callback'ов: %d", len(c.bot.callbacks)))
+	lines = append(lines, fmt.Sprintf("Uptime: %s", formatUptime(b.startTime)))
+	lines = append(lines, fmt.Sprintf("Команд: %d", len(b.commands)))
+	lines = append(lines, fmt.Sprintf("Callback'ов: %d", len(b.callbacks)))
 
 	lines = append(lines, "")
 	lines = append(lines, "-- Кеш --")
-	stats := c.bot.cache.Stats()
+	stats := b.cache.Stats()
 	lines = append(lines, fmt.Sprintf("Групп: %d", stats.GroupsCount))
 	lines = append(lines, fmt.Sprintf("Преподавателей: %d", stats.TeachersCount))
 	lines = append(lines, fmt.Sprintf("Хиты/Промахи: %d/%d", stats.Hits, stats.Misses))
@@ -90,17 +104,17 @@ func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 
 	lines = append(lines, "")
 	lines = append(lines, "-- База данных --")
-	total, err := c.bot.chatRepo.CountAll()
+	total, err := b.chatRepo.CountAll()
 	if err == nil {
 		lines = append(lines, fmt.Sprintf("Всего чатов: %d", total))
 	}
 	notifyCount := 0
-	notifyChats, err := c.bot.chatRepo.FindAllWithNotifications("telegram")
+	notifyChats, err := b.chatRepo.FindAllWithNotifications("telegram")
 	if err == nil {
 		notifyCount = len(notifyChats)
 	}
 	lines = append(lines, fmt.Sprintf("С уведомлениями: %d", notifyCount))
-	modes, err := c.bot.chatRepo.CountByMode()
+	modes, err := b.chatRepo.CountByMode()
 	if err == nil {
 		modeOrder := []string{"student", "teacher", "parent", "guest", "none"}
 		for _, mode := range modeOrder {
@@ -112,9 +126,9 @@ func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 
 	lines = append(lines, "")
 	lines = append(lines, "-- Конфиг --")
-	lines = append(lines, fmt.Sprintf("Telegram noticer: %v", c.bot.cfg.Telegram.Noticer))
+	lines = append(lines, fmt.Sprintf("Telegram noticer: %v", b.cfg.Telegram.Noticer))
 
-	return u.Bot.SendText(u.ChatID, "<pre>"+strings.Join(lines, "\n")+"</pre>")
+	return lines
 }
 
 func formatBytes(b uint64) string {

@@ -16,11 +16,11 @@ type WeekIndex struct {
 }
 
 func WeekIndexFromDate(date time.Time) WeekIndex {
-	dayOfWeek := date.Weekday()
-	if dayOfWeek == time.Sunday {
-		date = date.AddDate(0, 0, -1)
+	day := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	if day.Weekday() == time.Sunday {
+		day = day.AddDate(0, 0, -1)
 	}
-	ms := date.UnixMilli() - startingWeekIndexDate.UnixMilli()
+	ms := day.UnixMilli() - startingWeekIndexDate.UnixMilli()
 	return WeekIndex{value: int(ms / oneWeekMs)}
 }
 

@@ -37,7 +37,8 @@ func TestTrackerRoundTripsThroughTheStore(t *testing.T) {
 	tracker.CalendarSuccess(3)
 	tracker.CalendarFailure(errors.New("quota exceeded"))
 	tracker.APIRequest(500, 10*time.Millisecond)
-	tracker.ParserReport("groups", []LayoutIssue{{Source: "groups", Selector: "table"}}, false)
+	tracker.ParserReport("groups", []LayoutIssue{{Source: "groups", Selector: "table"}}, nil)
+	tracker.ParserReport("teachers", nil, []GuardIssue{{Source: "teachers", Reason: "shrink", Detail: "81 -> 4 (dropped 95%, limit 80%)"}})
 
 	if err := tracker.Flush(store); err != nil {
 		t.Fatalf("flush: %v", err)
@@ -65,6 +66,12 @@ func TestTrackerRoundTripsThroughTheStore(t *testing.T) {
 	}
 	if after.Parser.LayoutFailures != 1 {
 		t.Errorf("layout failures = %d, want 1", after.Parser.LayoutFailures)
+	}
+	if after.Parser.GuardFailures != 1 {
+		t.Errorf("guard failures = %d, want 1", after.Parser.GuardFailures)
+	}
+	if alerts := alertKeys(restored.Alerts()); alerts[AlertParserGuard] != LevelCritical {
+		t.Errorf("a guard trip must survive a restart, got %+v", alerts)
 	}
 	if after.Calendar.DaysSynced != before.Calendar.DaysSynced || after.Calendar.Errors != before.Calendar.Errors {
 		t.Errorf("calendar counters: %+v vs %+v", before.Calendar, after.Calendar)

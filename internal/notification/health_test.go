@@ -66,6 +66,38 @@ func TestHealthNotifierAlertsAdmins(t *testing.T) {
 	}
 }
 
+func TestHealthNotifierReportsTheParserGuard(t *testing.T) {
+	tracker := health.NewDefaultTracker()
+	tracker.ParserReport("groups", nil, []health.GuardIssue{{
+		Source: "groups",
+		Reason: "shrink",
+		Detail: "35 -> 6 (dropped 82%, limit 80%)",
+	}})
+
+	notifier, sender, _ := newTestHealthNotifier(t, tracker, time.Minute)
+	notifier.Check()
+
+	if len(sender.sent) != 1 {
+		t.Fatalf("expected one guard alert, got %+v", sender.sent)
+	}
+	if !strings.Contains(sender.sent[0].text, "Парсер резко потерял данные") {
+		t.Errorf("alert text = %q", sender.sent[0].text)
+	}
+	if !strings.Contains(sender.sent[0].text, "groups: shrink: 35 -> 6") {
+		t.Errorf("alert must carry the counts: %q", sender.sent[0].text)
+	}
+
+	tracker.ParserReport("groups", nil, nil)
+	notifier.Check()
+
+	if len(sender.sent) != 2 {
+		t.Fatalf("expected a recovery message, got %+v", sender.sent)
+	}
+	if !strings.Contains(sender.sent[1].text, "восстановлено") {
+		t.Errorf("recovery text = %q", sender.sent[1].text)
+	}
+}
+
 func TestHealthNotifierRespectsCooldown(t *testing.T) {
 	notifier, sender, _ := newTestHealthNotifier(t, failingTracker(), time.Hour)
 
