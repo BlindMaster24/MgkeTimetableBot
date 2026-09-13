@@ -452,17 +452,6 @@ func (b *Bot) SendTextWithButtons(chatID int64, text string, buttons []notificat
 	return b.SendTextWithKeyboard(chatID, text, kb)
 }
 
-func (b *Bot) RemoveReplyKeyboard(chatID int64) error {
-	_, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
-		ChatID: telego.ChatID{ID: chatID},
-		Text:   ".",
-		ReplyMarkup: &telego.ReplyKeyboardRemove{
-			RemoveKeyboard: true,
-		},
-	})
-	return err
-}
-
 func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *telego.InlineKeyboardMarkup) error {
 	params := &telego.EditMessageTextParams{
 		ChatID:    telego.ChatID{ID: chatID},

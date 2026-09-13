@@ -12,14 +12,6 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-type SurfaceEntry struct {
-	Name        string
-	Description string
-	TextOnly    bool
-	Admin       bool
-	Hidden      bool
-}
-
 type Layout struct {
 	Builder string
 	Rows    [][]string
@@ -61,18 +53,6 @@ func SurfaceOfCallbacks() []string {
 		out = append(out, prefix)
 	}
 	sort.Strings(out)
-	return out
-}
-
-func SurfaceEntries() []SurfaceEntry {
-	b := newSurfaceBot()
-	out := make([]SurfaceEntry, 0, len(b.commandOrder)+len(b.textCommands))
-	for _, cmd := range b.commandOrder {
-		out = append(out, surfaceEntry(cmd, false))
-	}
-	for _, cmd := range b.textCommands {
-		out = append(out, surfaceEntry(cmd, true))
-	}
 	return out
 }
 
@@ -144,21 +124,6 @@ func SurfaceCallbackLayouts() []CallbackLayout {
 		}
 	}
 	return out
-}
-
-func surfaceEntry(cmd Command, textOnly bool) SurfaceEntry {
-	entry := SurfaceEntry{
-		Name:        cmd.Name(),
-		Description: cmd.Description(),
-		TextOnly:    textOnly,
-	}
-	if admin, ok := cmd.(AdminCommand); ok {
-		entry.Admin = admin.AdminOnly()
-	}
-	if hidden, ok := cmd.(HiddenCommand); ok {
-		entry.Hidden = hidden.Hidden()
-	}
-	return entry
 }
 
 func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {

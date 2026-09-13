@@ -144,8 +144,3 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 		ResizeKeyboard: true,
 	}
 }
-
-func sendReplyMainMenu(b *Bot, chatID int64, chat *Chat, text string) error {
-	kb := replyMainMenu(b, chat)
-	return b.SendTextWithReplyKeyboard(chatID, text, kb)
-}

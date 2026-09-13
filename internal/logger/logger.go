@@ -76,7 +76,3 @@ func (l *Logger) Fatal() *zerolog.Event {
 func (l *Logger) Sub(name string) *Logger {
 	return &Logger{z: l.z.With().Str("component", name).Logger()}
 }
-
-func (l *Logger) Raw() zerolog.Logger {
-	return l.z
-}

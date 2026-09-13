@@ -91,13 +91,6 @@ func (r *Repository) GoogleCalendarByLocalID(id int64) (*GoogleCalendar, error) 
 	))
 }
 
-func (r *Repository) GoogleCalendarByID(calendarID string) (*GoogleCalendar, error) {
-	return r.scanGoogleCalendar(r.db.QueryRow(
-		`SELECT id, type, value, calendar_id, last_manual_synced_day FROM google_calendars WHERE calendar_id = ?`,
-		calendarID,
-	))
-}
-
 func (r *Repository) scanGoogleCalendar(row *sql.Row) (*GoogleCalendar, error) {
 	calendar := &GoogleCalendar{}
 	err := row.Scan(&calendar.ID, &calendar.Type, &calendar.Value, &calendar.CalendarID, &calendar.LastManualSyncedDay)

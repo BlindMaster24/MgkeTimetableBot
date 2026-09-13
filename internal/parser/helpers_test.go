@@ -25,25 +25,6 @@ func TestExtractDayString(t *testing.T) {
 	}
 }
 
-func TestTrimSpaces(t *testing.T) {
-	cases := []struct {
-		input string
-		want  string
-	}{
-		{"  hello  ", "hello"},
-		{"hello", "hello"},
-		{"", ""},
-		{"  ", ""},
-		{"\thello\n", "hello"},
-	}
-	for _, c := range cases {
-		got := trimSpaces(c.input)
-		if got != c.want {
-			t.Errorf("trimSpaces(%q) = %q, want %q", c.input, got, c.want)
-		}
-	}
-}
-
 func TestPtrString(t *testing.T) {
 	got := ptrString("hello")
 	if got == nil || *got != "hello" {

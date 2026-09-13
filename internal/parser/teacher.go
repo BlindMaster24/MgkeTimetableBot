@@ -299,65 +299,6 @@ func buildTeacherSubgroups(chunks [][]string, cabLines []string) []model.Teacher
 	return result
 }
 
-func extractTeacherGroup(text string) string {
-	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, "1.") || strings.HasPrefix(text, "2.") {
-		parts := strings.SplitN(text, ".", 2)
-		if len(parts) > 1 {
-			text = strings.TrimSpace(parts[1])
-		}
-	}
-
-	lines := strings.Split(text, "\n")
-	if len(lines) > 0 {
-		firstLine := strings.TrimSpace(lines[0])
-		if typeRe.FindStringSubmatch(firstLine) == nil {
-			parts := strings.Fields(firstLine)
-			if len(parts) > 0 {
-				return parts[0]
-			}
-		}
-	}
-
-	return ""
-}
-
-func extractTeacherLessonName(text string) string {
-	lines := strings.Split(text, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		if typeRe.MatchString(line) {
-			parts := typeRe.Split(line, 2)
-			name := strings.TrimSpace(parts[0])
-
-			if strings.HasPrefix(name, "1.") || strings.HasPrefix(name, "2.") {
-				dotIdx := strings.Index(name, ".")
-				name = strings.TrimSpace(name[dotIdx+1:])
-			}
-
-			fields := strings.Fields(name)
-			if len(fields) > 1 {
-				return strings.Join(fields[1:], " ")
-			}
-			return name
-		}
-	}
-
-	if len(lines) > 0 {
-		first := strings.TrimSpace(lines[0])
-		parts := strings.Fields(first)
-		if len(parts) > 1 {
-			return strings.Join(parts[1:], " ")
-		}
-	}
-
-	return ""
-}
-
 func clearEndingTeacherNulls(lessons *[]model.TeacherLesson) {
 	for len(*lessons) > 0 && (*lessons)[len(*lessons)-1] == nil {
 		*lessons = (*lessons)[:len(*lessons)-1]

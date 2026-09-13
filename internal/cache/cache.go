@@ -560,18 +560,6 @@ func slicesEqual(a, b [][2][2]string) bool {
 	return true
 }
 
-func (c *RaspCache) GetGroupsHash() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.Groups.Hash
-}
-
-func (c *RaspCache) GetTeachersHash() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.Teachers.Hash
-}
-
 func (c *RaspCache) GetCallsWeekdays() [][2][2]string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

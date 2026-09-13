@@ -96,7 +96,7 @@ func cardName(card *goquery.Selection, builder *reportBuilder) string {
 }
 
 func addTeamMember(team map[string]string, rawName string) {
-	fullName := trimSpaces(rawName)
+	fullName := strings.TrimSpace(rawName)
 	if fullName == "" {
 		return
 	}

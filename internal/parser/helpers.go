@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -69,4 +72,25 @@ func extractDayString(text string) string {
 		return ""
 	}
 	return strings.TrimSpace(match)
+}
+
+func hashDocument(doc *goquery.Document) string {
+	return hashBytes([]byte(doc.Text()))
+}
+
+func hashJSON(v any) string {
+	data, _ := json.Marshal(v)
+	return hashBytes(data)
+}
+
+func hashBytes(data []byte) string {
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%x", sum)
+}
+
+func ptrString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

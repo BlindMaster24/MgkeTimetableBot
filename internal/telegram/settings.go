@@ -7,7 +7,7 @@ import (
 
 func (b *Bot) sendCallsShow(u *Update) error {
 	chat, _ := b.chatRepo.FindOrCreate("telegram", u.UserID)
-	b.displayCalls(u, chat, true)
+	b.showCalls(u, chat, true)
 	return nil
 }
 

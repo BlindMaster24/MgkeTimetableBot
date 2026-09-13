@@ -13,20 +13,6 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-func onOffStr(v bool) string {
-	if v {
-		return "включено"
-	}
-	return "выключено"
-}
-
-func yesNoStr(v bool) string {
-	if v {
-		return "да"
-	}
-	return "нет"
-}
-
 type callsFullCb struct{ bot *Bot }
 
 func (cb *callsFullCb) Prefix() string { return "calls_full" }
@@ -186,14 +172,14 @@ func callsFullKeyboard() *telego.InlineKeyboardMarkup {
 }
 
 func (b *Bot) showCallsFull(u *Update, chat *Chat) {
-	b.displayCalls(u, chat, false)
+	b.showCalls(u, chat, false)
 }
 
 func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
-	b.displayCalls(u, chat, true)
+	b.showCalls(u, chat, true)
 }
 
-func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
+func (b *Bot) showCalls(u *Update, chat *Chat, full bool) {
 	schedule := b.callsScheduleFor(chat)
 	activeWeekdays := schedule.Weekdays
 	activeSaturday := schedule.Saturday

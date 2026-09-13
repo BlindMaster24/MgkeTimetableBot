@@ -110,10 +110,6 @@ func NormalizeCallback(prefix string) string {
 	return prefix
 }
 
-func normalizeSet(values []string) []string {
-	return normalizeWith(values, nil)
-}
-
 func normalizeCommands(values []string) []string {
 	return normalizeWith(values, NormalizeCommand)
 }

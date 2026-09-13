@@ -58,8 +58,6 @@ func NewFetcher(log *logger.Logger, c *cache.RaspCache, opts Options) *Fetcher {
 	}
 }
 
-func (f *Fetcher) Cache() *cache.RaspCache { return f.cache }
-
 func (f *Fetcher) Reports() map[string]Report {
 	f.mu.Lock()
 	defer f.mu.Unlock()

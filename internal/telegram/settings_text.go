@@ -8,19 +8,12 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
-	"github.com/mymmrac/telego"
 )
 
 func (b *Bot) sendSettingsMenu(u *Update, chat *Chat) error {
 	chat.Scene = sceneSettings
 	b.chatRepo.Save(chat)
 	return b.SendTextWithReplyKeyboard(u.ChatID, b.loc("settings_menu"), b.replySettingsMain())
-}
-
-func (b *Bot) toggleAndReply(u *Update, chat *Chat, flip func(*Chat), text string, kb *telego.ReplyKeyboardMarkup) error {
-	flip(chat)
-	b.chatRepo.Save(chat)
-	return b.SendTextWithReplyKeyboard(u.ChatID, text, kb)
 }
 
 type btnToggleTextCmd struct {
