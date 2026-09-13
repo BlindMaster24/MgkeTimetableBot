@@ -134,6 +134,30 @@ func (c *RaspCache) GetCalls() CallsCache {
 	return c.Calls
 }
 
+func (c *RaspCache) CallsDue(now time.Time, interval time.Duration) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return dueAt(now, c.Calls.Update, interval)
+}
+
+func (c *RaspCache) TeamDue(now time.Time, interval time.Duration) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return dueAt(now, c.Team.Update, interval)
+}
+
+func dueAt(now time.Time, updatedAt int64, interval time.Duration) bool {
+	if interval <= 0 {
+		return true
+	}
+	if updatedAt <= 0 {
+		return true
+	}
+	return now.Sub(time.UnixMilli(updatedAt)) >= interval
+}
+
 func (c *RaspCache) GetGroupsUpdateTime() time.Time {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

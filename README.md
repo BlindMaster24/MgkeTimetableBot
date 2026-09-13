@@ -91,22 +91,20 @@ go version   # ожидается go1.27.1 или новее
 
 | Секция | Назначение |
 |--------|------------|
-| `dev` | Режим разработки (подробные логи, dev-команды) |
 | `db_path` | Путь к SQLite с архивом расписания (по умолчанию `./sqlite3.db`) |
 | `chat_db_path` | Путь к SQLite с чатами, алиасами, подписками, аккаунтами Google (по умолчанию `./bot_chats.db`) |
 | `cache_dir` | Каталог файлового кэша расписания (по умолчанию `./cache/rasp`) |
 | `logging` | Уровень, файл лога, параметры ротации |
-| `http` | Имя сервера и порт HTTP (API и Google OAuth) |
+| `http` | Порт HTTP-сервера (API и Google OAuth) |
 | `telegram` | Токен бота, ID администраторов, флаг `noticer` |
 | `api` | Базовый путь REST API |
-| `google` | OAuth-клиент, service account, `calendar_owners` |
+| `google` | OAuth-клиент и service account для Google Calendar |
 | `calendar.ics.enabled` | Включить экспорт ICS и кнопку в меню |
 | `accept` | Что показывать в расписании (аудитории, приватные записи) |
 | `parser` | Интервал опроса, источники, расписание звонков, прокси |
-| `timetable` | Резервное расписание звонков: `weekdays`, `saturday`, `shortened_1h` (используется, когда сайт недоступен) |
+| `timetable` | Резервное расписание звонков: `weekdays`, `saturday` (используется, когда сайт недоступен) |
 | `health` | Пороги алертов по здоровью: парсер, синхронизация календарей, ошибки API |
 | `encrypt_key` | Ключ шифрования (для `createApiKey` / `decryptKey`) |
-| `global_noticer` / `global_adblock` | Глобальные переключатели оповещений и рекламы |
 
 Кэш расписания лежит в `cache/rasp/` в виде JSON, архив — в SQLite (см. `db_path` и `migrations/001_init.up.sql`).
 
@@ -115,10 +113,10 @@ go version   # ожидается go1.27.1 или новее
 Любое поле конфига можно переопределить переменной окружения — это удобно в Docker и CI, где секреты не хочется класть в файл.
 
 - имя по умолчанию — префикс `MGKE_` плюс путь поля через `_`: `MGKE_HTTP_PORT`, `MGKE_DB_PATH`, `MGKE_PARSER_ENABLED`, `MGKE_TELEGRAM_TOKEN`, `MGKE_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`;
-- у части полей есть короткие исторические алиасы: `DEV`, `DB_PATH`, `LOG_LEVEL`, `HTTP_SERVER_NAME`, `HTTP_PORT`, `TG_TOKEN`, `ENCRYPT_KEY`. Если заданы оба имени, побеждает `MGKE_*`;
+- у части полей есть короткие исторические алиасы: `DB_PATH`, `LOG_LEVEL`, `HTTP_PORT`, `TG_TOKEN`, `ENCRYPT_KEY`. Если заданы оба имени, побеждает `MGKE_*`;
 - приоритет: аргумент `-config` → переменные окружения → файл конфига. Исключение — `CONFIG_PATH`: он только задаёт путь к файлу и используется, когда флаг не передан;
 - `MGKE_` перекрывает любое значение из YAML, пустая строка считается явным значением (например, `MGKE_ENCRYPT_KEY=`);
-- списки задаются через запятую: `MGKE_TELEGRAM_ADMIN_IDS=1,2,3`;
+- списки и таблицы фиксированной длины — через запятую: `MGKE_TELEGRAM_ADMIN_IDS=1,2,3`, `MGKE_PARSER_ACTIVITY=8,20`;
 - булевы значения понимают `true/false`, `1/0`, `yes/no`, `on/off`;
 - сложные структуры (например, таблицы звонков `timetable.weekdays`) переменными не задаются — их место в YAML; если такую переменную всё же задать, бот упадёт с явной ошибкой вместо тихого игнорирования;
 - некорректное значение (например, `MGKE_HTTP_PORT=abc`) — тоже ошибка запуска с указанием имени переменной.
@@ -141,7 +139,9 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 - `parser.update_interval.*` — интервалы опроса: обычный, в часы активности, после ошибки, для списка преподавателей, для звонков;
 - `parser.alertable_ignore_filter` и `parser.lesson_index_if_empty` — какие пары считаются значимыми при уведомлениях об изменениях;
 - `parser.calls.enabled`, `parser.calls.prefer_site`, `parser.calls.notify` — звонки: включены ли, что приоритетнее — сайт или ручная правка, уведомлять ли об изменениях;
-- `parser.proxy` — HTTP(S)-прокси для запросов к сайту.
+- `parser.proxy` — HTTP(S)-прокси для запросов к сайту: `http://user:pass@host:port`. Если сайт колледжа не открывается напрямую (домен `.by` заблокирован или недоступен без VPN), укажите прокси или локальный адрес VPN-клиента — например `socks5`-порт Throne; при некорректном URL бот пишет предупреждение и продолжает работать напрямую.
+
+Планировщик учитывает расписание занятий: днём (по умолчанию 9:00–17:00, ключ `parser.activity`) опрос идёт часто, в остальное время — с обычным интервалом, по воскресеньям активное окно отключено, а после ошибки бот возвращается к опросу через `parser.update_interval.error`. Список преподавателей (страницы `parser.endpoints.team`) обновляется раз в сутки, звонки — по своему интервалу.
 
 Врезка расписания звонков обновляется автоматически со страницы сайта; при необходимости его можно править вручную из меню звонков.
 
@@ -188,7 +188,7 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 
 ### Административные
 
-Доступны только ID из `telegram.admin_ids`:
+Доступны только ID из `telegram.admin_ids` — в меню команд Telegram они показываются только им и с пометкой `[адм]`:
 
 `/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
@@ -196,7 +196,7 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 
 ## HTTP API
 
-Сервер поднимается на `http.server_name:http.port`:
+Сервер поднимается на `0.0.0.0:http.port`:
 
 | Метод | Путь | Описание |
 |-------|------|----------|

@@ -208,10 +208,10 @@ func TestIntegrationParseToCacheToDisplay(t *testing.T) {
 
 func TestIntegrationGroupScheduleVariants(t *testing.T) {
 	variants := []struct {
-		name  string
-		html  string
-		must  string
-		minN  int
+		name string
+		html string
+		must string
+		minN int
 	}{
 		{"standard", testGroupHTML, "100", 1},
 		{"multi_line", `<html><body>

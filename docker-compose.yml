@@ -14,6 +14,7 @@ services:
       MGKE_TELEGRAM_TOKEN: "${MGKE_TELEGRAM_TOKEN:?set MGKE_TELEGRAM_TOKEN in .env or the environment}"
       MGKE_TELEGRAM_ADMIN_IDS: "${MGKE_TELEGRAM_ADMIN_IDS:-}"
       MGKE_PARSER_ENABLED: "${MGKE_PARSER_ENABLED:-true}"
+      MGKE_PARSER_PROXY: "${MGKE_PARSER_PROXY:-}"
       MGKE_CALENDAR_ICS_ENABLED: "${MGKE_CALENDAR_ICS_ENABLED:-false}"
     volumes:
       - bot-data:/data

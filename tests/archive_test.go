@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
-	
 )
 
 func TestDayIndexConversion(t *testing.T) {

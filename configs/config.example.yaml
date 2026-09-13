@@ -1,4 +1,3 @@
-dev: true
 db_path: "./sqlite3.db"
 chat_db_path: "./bot_chats.db"
 cache_dir: "./cache/rasp"
@@ -13,7 +12,6 @@ logging:
     max_files: 5
 
 http:
-  server_name: "localhost"
   port: 8081
 
 telegram:
@@ -33,7 +31,6 @@ google:
   service_account:
     client_email: "calendar@mgkct-timetable.iam.gserviceaccount.com"
     private_key: ""
-  calendar_owners: []
 
 calendar:
   ics:
@@ -45,19 +42,16 @@ accept:
 
 parser:
   enabled: true
-  sync_mode: false
-  local_mode: false
-  ignore_hash: false
-  end_hour: 17
+  proxy: ""
   activity: [9, 17]
   endpoints:
     timetable_group: "https://mgkct.minskedu.gov.by/personnel/for-students/weekly-timetable"
     timetable_teacher: "https://mgkct.minskedu.gov.by/personnel/for-teachers/weekly-timetable"
     team:
-      - "https://mgkct.minskedu.gov.by/about/administration"
-      - "https://mgkct.minskedu.gov.by/about/teachers"
-      - "https://mgkct.minskedu.gov.by/about/employees"
-      - "https://mgkct.minskedu.gov.by/about/maintenance"
+      - "https://mgkct.minskedu.gov.by/about/collective/administration"
+      - "https://mgkct.minskedu.gov.by/about/collective/teachers"
+      - "https://mgkct.minskedu.gov.by/about/collective/employees"
+      - "https://mgkct.minskedu.gov.by/about/collective/maintenance"
     bell_schedule: "https://mgkct.minskedu.gov.by/personnel/for-teachers/bell-schedule"
   update_interval:
     default: 3600
@@ -91,17 +85,8 @@ timetable:
     - [["14:40", "15:25"], ["15:35", "16:20"]]
     - [["16:30", "17:15"], ["17:25", "18:10"]]
     - [["18:20", "19:05"], ["19:15", "20:00"]]
-  shortened_1h:
-    - ["09:00", "10:00"]
-    - ["10:10", "11:10"]
-    - ["11:20", "12:20"]
-    - ["12:30", "13:30"]
-    - ["13:40", "14:40"]
-    - ["14:50", "15:50"]
 
 encrypt_key: ""
-global_noticer: false
-global_adblock: false
 
 health:
   disabled: false

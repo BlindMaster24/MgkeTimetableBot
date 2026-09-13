@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -272,19 +273,69 @@ func (b *Bot) findCallback(data string) (string, Callback) {
 }
 
 func (b *Bot) SetMyCommands() error {
-	var cmds []telego.BotCommand
-	for _, cmd := range b.commands {
+	params := &telego.SetMyCommandsParams{
+		Commands: b.botCommands(false),
+		Scope:    &telego.BotCommandScopeDefault{Type: "default"},
+	}
+
+	var errs []error
+	if err := b.client.SetMyCommands(context.Background(), params); err != nil {
+		errs = append(errs, err)
+	}
+
+	adminCommands := b.botCommands(true)
+	for _, adminID := range b.cfg.Telegram.AdminIDs {
+		scope := &telego.BotCommandScopeChat{
+			Type:   "chat",
+			ChatID: telego.ChatID{ID: adminID},
+		}
+		if err := b.client.SetMyCommands(context.Background(), &telego.SetMyCommandsParams{
+			Commands: adminCommands,
+			Scope:    scope,
+		}); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func (b *Bot) commandByName(name string) Command {
+	name = strings.ToLower(strings.TrimPrefix(name, "/"))
+	for _, cmd := range b.commandOrder {
+		if strings.ToLower(strings.TrimPrefix(cmd.Name(), "/")) == name {
+			return cmd
+		}
+	}
+	return nil
+}
+
+func (b *Bot) botCommands(includeAdmin bool) []telego.BotCommand {
+	cmds := make([]telego.BotCommand, 0, len(b.commandOrder))
+	for _, cmd := range b.commandOrder {
 		if hidden, ok := cmd.(HiddenCommand); ok && hidden.Hidden() {
 			continue
 		}
+
+		admin := false
+		if ac, ok := cmd.(AdminCommand); ok {
+			admin = ac.AdminOnly()
+		}
+		if admin && !includeAdmin {
+			continue
+		}
+
+		description := cmd.Description()
+		if admin {
+			description = "[адм] " + description
+		}
+
 		cmds = append(cmds, telego.BotCommand{
-			Command:     strings.TrimPrefix(cmd.Name(), "/"),
-			Description: cmd.Description(),
+			Command:     strings.ToLower(strings.TrimPrefix(cmd.Name(), "/")),
+			Description: description,
 		})
 	}
-	return b.client.SetMyCommands(context.Background(), &telego.SetMyCommandsParams{
-		Commands: cmds,
-	})
+	return cmds
 }
 
 func (b *Bot) SendText(chatID int64, text string) error {

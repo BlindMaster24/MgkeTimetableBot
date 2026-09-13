@@ -35,12 +35,7 @@ func setupE2EBotWithCaller(t *testing.T, caller telegoapi.Caller, adminIDs ...in
 	cfg.Timetable.Saturday = [][2][2]string{
 		{{"09:00", "09:45"}, {"09:55", "10:40"}},
 	}
-	callsEnabled := true
-	cfg.Parser.Calls = &struct {
-		Enabled    bool `yaml:"enabled"`
-		PreferSite bool `yaml:"prefer_site"`
-		Notify     bool `yaml:"notify"`
-	}{Enabled: callsEnabled}
+	cfg.Parser.Calls = &config.CallsConfig{Enabled: true}
 
 	log := logger.New("error", nil)
 	loc := i18n.New("ru")

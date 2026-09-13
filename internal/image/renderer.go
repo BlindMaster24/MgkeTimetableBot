@@ -41,14 +41,14 @@ type TimetableImage struct {
 }
 
 type DayData struct {
-	Date     string
-	Weekday  string
-	Lessons  []LessonRow
+	Date    string
+	Weekday string
+	Lessons []LessonRow
 }
 
 type LessonRow struct {
-	Number  int
-	Cells   []string
+	Number int
+	Cells  []string
 }
 
 var groupColumns = []Column{
@@ -86,13 +86,13 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	}
 
 	const (
-		padding      = 20
-		headerH      = 36
-		rowH         = 28
-		titleH       = 60
-		footerH      = 40
-		cellPadX     = 5
-		dpr          = 1
+		padding  = 20
+		headerH  = 36
+		rowH     = 28
+		titleH   = 60
+		footerH  = 40
+		cellPadX = 5
+		dpr      = 1
 	)
 
 	colsWidth := 0
@@ -172,7 +172,7 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 			dc.LoadFontFace(fontPath, float64(12*dpr))
 			for i := 0; i < maxLessons; i++ {
 				if i < len(day.Lessons) {
-				lesson := day.Lessons[i]
+					lesson := day.Lessons[i]
 					cx := tx
 					for ci, c := range cols {
 						if ci < len(lesson.Cells) {

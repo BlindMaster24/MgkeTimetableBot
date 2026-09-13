@@ -2,9 +2,11 @@ package parser
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,41 +17,124 @@ import (
 
 const userAgent = "MGKE timetable bot (https://github.com/BlindMaster24/MgkeTimetableBot)"
 
-func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL, bellScheduleURL string) error {
+type Options struct {
+	Proxy string
+}
+
+type Fetcher struct {
+	log    *logger.Logger
+	cache  *cache.RaspCache
+	client *http.Client
+}
+
+func NewFetcher(log *logger.Logger, c *cache.RaspCache, opts Options) *Fetcher {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	groupData, groupHash, err := fetchAndParseGroups(client, groupURL)
-	if err != nil {
-		log.Error().Err(err).Str("url", groupURL).Msg("group parse failed")
-	} else {
-		groupData = jsonRoundTrip(groupData)
-		c.SetGroups(groupData, groupHash)
-		log.Info().Int("groups", len(groupData)).Str("hash", groupHash).Msg("groups parsed")
-	}
-
-	teacherData, teacherHash, err := fetchAndParseTeachers(client, teacherURL)
-	if err != nil {
-		log.Error().Err(err).Str("url", teacherURL).Msg("teacher parse failed")
-	} else {
-		teacherData = jsonRoundTrip(teacherData)
-		c.SetTeachers(teacherData, teacherHash)
-		log.Info().Int("teachers", len(teacherData)).Str("hash", teacherHash).Msg("teachers parsed")
-	}
-
-	if bellScheduleURL != "" {
-		if schedule := fetchAndParseCalls(client, bellScheduleURL); schedule != nil {
-			c.SetCallsNotify(*schedule, cache.Schedule{}, "site", "")
-			log.Info().Int("weekdays", len(schedule.Weekdays)).Msg("calls parsed from site")
+	if proxy := strings.TrimSpace(opts.Proxy); proxy != "" {
+		if parsed, err := url.Parse(proxy); err == nil {
+			client.Transport = &http.Transport{Proxy: http.ProxyURL(parsed)}
 		} else {
-			log.Warn().Str("url", bellScheduleURL).Msg("calls parse returned empty")
+			log.Error().Err(err).Str("proxy", proxy).Msg("invalid proxy url, using a direct connection")
 		}
 	}
 
-	if err := c.Save(); err != nil {
-		return fmt.Errorf("save cache: %w", err)
+	return &Fetcher{log: log, cache: c, client: client}
+}
+
+func (f *Fetcher) Cache() *cache.RaspCache { return f.cache }
+
+func (f *Fetcher) Timetable(groupURL, teacherURL string) error {
+	var errs []error
+
+	if groupData, groupHash, err := fetchAndParseGroups(f.client, groupURL); err != nil {
+		f.log.Error().Err(err).Str("url", groupURL).Msg("group parse failed")
+		errs = append(errs, err)
+	} else {
+		groupData = jsonRoundTrip(groupData)
+		f.cache.SetGroups(groupData, groupHash)
+		f.log.Info().Int("groups", len(groupData)).Str("hash", groupHash).Msg("groups parsed")
 	}
 
+	if teacherData, teacherHash, err := fetchAndParseTeachers(f.client, teacherURL); err != nil {
+		f.log.Error().Err(err).Str("url", teacherURL).Msg("teacher parse failed")
+		errs = append(errs, err)
+	} else {
+		teacherData = jsonRoundTrip(teacherData)
+		f.cache.SetTeachers(teacherData, teacherHash)
+		f.log.Info().Int("teachers", len(teacherData)).Str("hash", teacherHash).Msg("teachers parsed")
+	}
+
+	if err := f.cache.Save(); err != nil {
+		errs = append(errs, fmt.Errorf("save cache: %w", err))
+	}
+	return errors.Join(errs...)
+}
+
+func (f *Fetcher) Calls(bellScheduleURL string) error {
+	if bellScheduleURL == "" {
+		return nil
+	}
+
+	schedule := fetchAndParseCalls(f.client, bellScheduleURL)
+	if schedule == nil {
+		f.log.Warn().Str("url", bellScheduleURL).Msg("calls parse returned empty")
+		return nil
+	}
+
+	f.cache.SetCallsNotify(*schedule, cache.Schedule{}, "site", "")
+	f.log.Info().Int("weekdays", len(schedule.Weekdays)).Msg("calls parsed from site")
+
+	if err := f.cache.Save(); err != nil {
+		return fmt.Errorf("save cache: %w", err)
+	}
 	return nil
+}
+
+func (f *Fetcher) Team(urls []string) error {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	team := f.cache.GetTeamNames()
+	if team == nil {
+		team = make(map[string]string)
+	}
+
+	hashes := make([]string, 0, len(urls))
+	var errs []error
+
+	for _, rawURL := range urls {
+		resp, err := fetchHTML(f.client, rawURL)
+		if err != nil {
+			f.log.Error().Err(err).Str("url", rawURL).Msg("team parse failed")
+			errs = append(errs, err)
+			continue
+		}
+
+		doc, err := goquery.NewDocumentFromReader(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			f.log.Error().Err(err).Str("url", rawURL).Msg("team parse failed")
+			errs = append(errs, err)
+			continue
+		}
+
+		team = ParseTeam(doc, team)
+		hashes = append(hashes, hashDocument(doc))
+	}
+
+	f.cache.SetTeam(team, hashes)
+	f.log.Info().Int("names", len(team)).Int("pages", len(urls)).Msg("team parsed")
+
+	if err := f.cache.Save(); err != nil {
+		errs = append(errs, fmt.Errorf("save cache: %w", err))
+	}
+	return errors.Join(errs...)
+}
+
+func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL, bellScheduleURL string) error {
+	fetcher := NewFetcher(log, c, Options{})
+	return errors.Join(fetcher.Timetable(groupURL, teacherURL), fetcher.Calls(bellScheduleURL))
 }
 
 func fetchAndParseGroups(client *http.Client, url string) (map[string]any, string, error) {
@@ -150,6 +235,7 @@ func jsonRoundTrip(v map[string]any) map[string]any {
 	}
 	return result
 }
+
 func fetchAndParseCalls(client *http.Client, url string) *cache.Schedule {
 	resp, err := fetchHTML(client, url)
 	if err != nil {

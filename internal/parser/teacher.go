@@ -204,10 +204,10 @@ func buildTeacherSingle(chunks [][]string, cabinet string) []model.TeacherLesson
 	}
 
 	return []model.TeacherLesson{{
-		Group:    group,
-		Lesson:   name,
-		Type:     ptrString(lessonType),
-		Cabinet:  ptrString(cabinet),
+		Group:   group,
+		Lesson:  name,
+		Type:    ptrString(lessonType),
+		Cabinet: ptrString(cabinet),
 	}}
 }
 
@@ -246,10 +246,10 @@ func buildTeacherSubgroups(chunks [][]string, cabLines []string) []model.Teacher
 		}
 
 		result = append(result, &model.TeacherLessonExplain{
-			Group:    group,
-			Lesson:   name,
-			Type:     ptrString(lessonType),
-			Cabinet:  ptrString(cab),
+			Group:   group,
+			Lesson:  name,
+			Type:    ptrString(lessonType),
+			Cabinet: ptrString(cab),
 		})
 	}
 

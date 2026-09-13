@@ -3,9 +3,9 @@ package model
 type Teachers map[string]*Teacher
 
 type Teacher struct {
-	Teacher      string      `json:"teacher"`
-	Days         []TeacherDay `json:"days"`
-	LastNoticed  int64       `json:"lastNoticedDay,omitempty"`
+	Teacher     string       `json:"teacher"`
+	Days        []TeacherDay `json:"days"`
+	LastNoticed int64        `json:"lastNoticedDay,omitempty"`
 }
 
 type TeacherDay struct {

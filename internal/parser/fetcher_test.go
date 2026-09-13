@@ -107,6 +107,62 @@ func TestFetchAndParseTeachers(t *testing.T) {
 	}
 }
 
+func TestFetcherUsesProxy(t *testing.T) {
+	var proxiedHosts []string
+
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxiedHosts = append(proxiedHosts, r.URL.Host)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(testGroupHTML))
+	}))
+	defer proxy.Close()
+
+	log := logger.New("error", nil)
+	c, err := cache.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fetcher := NewFetcher(log, c, Options{Proxy: proxy.URL})
+	if err := fetcher.Timetable("http://blocked.example.by/groups", "http://blocked.example.by/teachers"); err != nil {
+		t.Fatalf("fetch through the proxy: %v", err)
+	}
+
+	if len(proxiedHosts) != 2 {
+		t.Fatalf("expected 2 requests through the proxy, got %d: %v", len(proxiedHosts), proxiedHosts)
+	}
+	for _, host := range proxiedHosts {
+		if host != "blocked.example.by" {
+			t.Errorf("request went to %q, expected the proxy to receive the target host", host)
+		}
+	}
+	if len(c.GetGroups()) == 0 {
+		t.Error("expected the proxied response to be parsed")
+	}
+}
+
+func TestFetcherFallsBackOnBrokenProxy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(testGroupHTML))
+	}))
+	defer srv.Close()
+
+	log := logger.New("error", nil)
+	c, err := cache.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fetcher := NewFetcher(log, c, Options{Proxy: "://%%not-a-url"})
+	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+		t.Fatalf("a broken proxy must not break parsing: %v", err)
+	}
+	if len(c.GetGroups()) == 0 {
+		t.Error("expected a direct fetch after the proxy was rejected")
+	}
+}
+
 func TestFetchHTMLStatusError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

@@ -96,17 +96,16 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `chat_db_path` | SQLite file with chats, aliases, subscriptions and Google accounts (default `./bot_chats.db`) |
 | `cache_dir` | Directory of the file-backed timetable cache (default `./cache/rasp`) |
 | `logging` | Level, log file, rotation settings |
-| `http` | Server name and HTTP port (API and Google OAuth) |
+| `http` | HTTP port of the server (API and Google OAuth) |
 | `telegram` | Bot token, admin IDs, the `noticer` flag |
 | `api` | Base path of the REST API |
-| `google` | OAuth client, service account, `calendar_owners` |
+| `google` | OAuth client and service account for Google Calendar |
 | `calendar.ics.enabled` | Enable the ICS export and its menu button |
 | `accept` | What to show in the timetable (rooms, private entries) |
 | `parser` | Poll intervals, sources, bell schedule, proxy |
-| `timetable` | Fallback bell schedule: `weekdays`, `saturday`, `shortened_1h` (used when the site is unreachable) |
+| `timetable` | Fallback bell schedule: `weekdays`, `saturday` (used when the site is unreachable) |
 | `health` | Alert thresholds: parser, calendar sync, API errors |
 | `encrypt_key` | Encryption key (for `createApiKey` / `decryptKey`) |
-| `global_noticer` / `global_adblock` | Global notification and advertising switches |
 
 The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQLite (see `db_path` and `migrations/001_init.up.sql`).
 
@@ -115,10 +114,10 @@ The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQL
 Every config field can be overridden by an environment variable — handy for Docker and CI, where secrets do not belong in a file.
 
 - the default name is the `MGKE_` prefix plus the field path joined with `_`: `MGKE_HTTP_PORT`, `MGKE_DB_PATH`, `MGKE_PARSER_ENABLED`, `MGKE_TELEGRAM_TOKEN`, `MGKE_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`;
-- a few fields keep short historical aliases: `DEV`, `DB_PATH`, `LOG_LEVEL`, `HTTP_SERVER_NAME`, `HTTP_PORT`, `TG_TOKEN`, `ENCRYPT_KEY`. When both names are set, `MGKE_*` wins;
+- a few fields keep short historical aliases: `DB_PATH`, `LOG_LEVEL`, `HTTP_PORT`, `TG_TOKEN`, `ENCRYPT_KEY`. When both names are set, `MGKE_*` wins;
 - precedence: the `-config` flag, then environment variables, then the config file. The only exception is `CONFIG_PATH`, which merely selects the file when the flag is absent;
 - `MGKE_*` overrides any YAML value, and an empty string counts as an explicit value (`MGKE_ENCRYPT_KEY=`);
-- lists are comma-separated: `MGKE_TELEGRAM_ADMIN_IDS=1,2,3`;
+- lists and fixed-size tables are comma-separated: `MGKE_TELEGRAM_ADMIN_IDS=1,2,3`, `MGKE_PARSER_ACTIVITY=8,20`;
 - booleans accept `true/false`, `1/0`, `yes/no`, `on/off`;
 - complex structures (for example the bell schedule tables in `timetable.weekdays`) stay in YAML; setting such a variable fails loudly instead of being ignored;
 - an invalid value (for example `MGKE_HTTP_PORT=abc`) also fails at startup and names the variable.
@@ -141,7 +140,9 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 - `parser.update_interval.*` — poll intervals: regular, during activity hours, after an error, for the teacher list, for the bell schedule;
 - `parser.alertable_ignore_filter` and `parser.lesson_index_if_empty` — which lessons count as meaningful in change notifications;
 - `parser.calls.enabled`, `parser.calls.prefer_site`, `parser.calls.notify` — bell schedule: enabled, site versus manual edits, notify on changes;
-- `parser.proxy` — HTTP(S) proxy for site requests.
+- `parser.proxy` — HTTP(S) proxy for site requests: `http://user:pass@host:port`. When the college site is unreachable directly (a blocked `.by` domain, or a VPN-only network), point this at a proxy or at the local address of your VPN client — for example a Throne SOCKS port; an invalid URL is logged and the bot keeps working over a direct connection.
+
+The scheduler follows the college day: during activity hours (9:00–17:00 by default, the `parser.activity` key) it polls often, outside them it uses the regular interval, Sunday has no activity window at all, and after a failure it retries in `parser.update_interval.error`. The teacher list (`parser.endpoints.team` pages) refreshes once a day and the bell schedule on its own interval.
 
 The bell schedule refreshes itself from the college site; it can still be edited by hand from the calls menu.
 
@@ -188,7 +189,7 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 ### Admin
 
-Available to the IDs listed in `telegram.admin_ids`:
+Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
 `/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
@@ -196,7 +197,7 @@ Available to the IDs listed in `telegram.admin_ids`:
 
 ## HTTP API
 
-The server listens on `http.server_name:http.port`:
+The server listens on `0.0.0.0:http.port`:
 
 | Method | Path | Description |
 |--------|------|-------------|

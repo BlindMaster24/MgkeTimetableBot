@@ -7,9 +7,14 @@ import (
 )
 
 type TimetableConfig struct {
-	Weekdays    [][2][2]string `yaml:"weekdays"`
-	Saturday    [][2][2]string `yaml:"saturday"`
-	Shortened1h [][2]string    `yaml:"shortened_1h"`
+	Weekdays [][2][2]string `yaml:"weekdays"`
+	Saturday [][2][2]string `yaml:"saturday"`
+}
+
+type CallsConfig struct {
+	Enabled    bool `yaml:"enabled"`
+	PreferSite bool `yaml:"prefer_site"`
+	Notify     bool `yaml:"notify"`
 }
 
 type HealthConfig struct {
@@ -25,7 +30,6 @@ type HealthConfig struct {
 }
 
 type Config struct {
-	Dev        bool   `yaml:"dev" env:"DEV"`
 	DBPath     string `yaml:"db_path" env:"DB_PATH"`
 	ChatDBPath string `yaml:"chat_db_path"`
 	CacheDir   string `yaml:"cache_dir"`
@@ -42,8 +46,7 @@ type Config struct {
 	} `yaml:"logging"`
 
 	HTTP struct {
-		ServerName string `yaml:"server_name" env:"HTTP_SERVER_NAME"`
-		Port       int    `yaml:"port" env:"HTTP_PORT"`
+		Port int `yaml:"port" env:"HTTP_PORT"`
 	} `yaml:"http"`
 
 	Telegram struct {
@@ -67,7 +70,6 @@ type Config struct {
 			ClientEmail string `yaml:"client_email"`
 			PrivateKey  string `yaml:"private_key"`
 		} `yaml:"service_account"`
-		CalendarOwners []string `yaml:"calendar_owners"`
 	} `yaml:"google"`
 
 	Calendar struct {
@@ -84,13 +86,9 @@ type Config struct {
 	} `yaml:"accept"`
 
 	Parser struct {
-		Enabled    bool   `yaml:"enabled"`
-		SyncMode   bool   `yaml:"sync_mode"`
-		LocalMode  bool   `yaml:"local_mode"`
-		IgnoreHash bool   `yaml:"ignore_hash"`
-		EndHour    int    `yaml:"end_hour"`
-		Activity   [2]int `yaml:"activity"`
-		Endpoints  struct {
+		Enabled   bool   `yaml:"enabled"`
+		Activity  [2]int `yaml:"activity"`
+		Endpoints struct {
 			TimetableGroup   string   `yaml:"timetable_group"`
 			TimetableTeacher string   `yaml:"timetable_teacher"`
 			Team             []string `yaml:"team"`
@@ -107,21 +105,14 @@ type Config struct {
 			Group   []LessonFilter `yaml:"group"`
 			Teacher []LessonFilter `yaml:"teacher"`
 		} `yaml:"alertable_ignore_filter"`
-		LessonIndexIfEmpty int `yaml:"lesson_index_if_empty"`
-		Calls              *struct {
-			Enabled    bool `yaml:"enabled"`
-			PreferSite bool `yaml:"prefer_site"`
-			Notify     bool `yaml:"notify"`
-		} `yaml:"calls"`
-		Proxy *string `yaml:"proxy"`
+		LessonIndexIfEmpty int          `yaml:"lesson_index_if_empty"`
+		Calls              *CallsConfig `yaml:"calls"`
+		Proxy              *string      `yaml:"proxy"`
 	} `yaml:"parser"`
 
 	Timetable TimetableConfig `yaml:"timetable"`
 
 	EncryptKey string `yaml:"encrypt_key" env:"ENCRYPT_KEY"`
-
-	GlobalNoticer bool `yaml:"global_noticer"`
-	GlobalAdblock bool `yaml:"global_adblock"`
 }
 
 type LessonFilter struct {

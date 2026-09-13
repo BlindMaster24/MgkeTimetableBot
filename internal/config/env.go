@@ -148,8 +148,24 @@ func setEnvValue(value reflect.Value, raw string) error {
 		value.SetFloat(parsed)
 	case reflect.Slice:
 		return setEnvSlice(value, raw)
+	case reflect.Array:
+		return setEnvArray(value, raw)
 	default:
 		return fmt.Errorf("type %s cannot be set from the environment", value.Type())
+	}
+	return nil
+}
+
+func setEnvArray(value reflect.Value, raw string) error {
+	parts := strings.Split(raw, ",")
+	if len(parts) != value.Len() {
+		return fmt.Errorf("expected %d comma-separated values, got %d", value.Len(), len(parts))
+	}
+
+	for i, part := range parts {
+		if err := setEnvValue(value.Index(i), strings.TrimSpace(part)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -245,12 +261,28 @@ func collectEnvNames(structType reflect.Type, prefix string, names *[]string) {
 				continue
 			}
 			*names = append(*names, envNames(field, prefix)...)
-		case reflect.Array, reflect.Map:
+		case reflect.Array:
+			if isScalarKind(field.Type.Elem().Kind()) {
+				*names = append(*names, envNames(field, prefix)...)
+			}
+			continue
+		case reflect.Map:
 			continue
 		default:
 			*names = append(*names, envNames(field, prefix)...)
 		}
 	}
+}
+
+func isScalarKind(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	}
+	return false
 }
 
 func yamlName(field reflect.StructField) string {

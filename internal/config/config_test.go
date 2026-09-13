@@ -8,8 +8,9 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	yaml := `
-dev: true
 db_path: "./test.db"
+chat_db_path: "./test-chats.db"
+cache_dir: "./test-cache"
 logging:
   level: "debug"
   file:
@@ -21,7 +22,7 @@ telegram:
   admin_ids: [123, 456]
 parser:
   enabled: true
-  end_hour: 18
+  activity: [9, 17]
 timetable:
   weekdays:
     - [["08:00", "08:45"], ["08:55", "09:40"]]
@@ -38,11 +39,17 @@ timetable:
 		t.Fatal(err)
 	}
 
-	if !cfg.Dev {
-		t.Error("expected dev=true")
-	}
 	if cfg.DBPath != "./test.db" {
 		t.Errorf("expected db_path ./test.db, got %s", cfg.DBPath)
+	}
+	if cfg.ChatDBPath != "./test-chats.db" || cfg.CacheDir != "./test-cache" {
+		t.Errorf("expected storage paths, got %q %q", cfg.ChatDBPath, cfg.CacheDir)
+	}
+	if cfg.ResolvedChatDBPath() != "./test-chats.db" || cfg.ResolvedCacheDir() != "./test-cache" {
+		t.Errorf("resolved paths = %q %q", cfg.ResolvedChatDBPath(), cfg.ResolvedCacheDir())
+	}
+	if !cfg.Parser.Enabled || cfg.Parser.Activity[0] != 9 || cfg.Parser.Activity[1] != 17 {
+		t.Errorf("parser config = %+v", cfg.Parser)
 	}
 	if cfg.HTTP.Port != 8080 {
 		t.Errorf("expected port 8080, got %d", cfg.HTTP.Port)

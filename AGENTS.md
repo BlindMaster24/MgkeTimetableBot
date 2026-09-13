@@ -94,9 +94,9 @@
 
 ## Environment Configuration
 - `config.LoadWithEnv` reads the YAML file and then applies `MGKE_*` environment overrides (`config.ApplyEnv`).
-- Names are derived from `yaml` tags: section path joined with `_`, uppercased, prefixed with `MGKE_`. A handful of fields also keep legacy aliases from their `env` tags (`TG_TOKEN`, `DB_PATH`, `HTTP_PORT`, `LOG_LEVEL`, `HTTP_SERVER_NAME`, `ENCRYPT_KEY`, `DEV`); the `MGKE_*` name wins when both are set.
+- Names are derived from `yaml` tags: section path joined with `_`, uppercased, prefixed with `MGKE_`. A handful of fields also keep legacy aliases from their `env` tags (`TG_TOKEN`, `DB_PATH`, `HTTP_PORT`, `LOG_LEVEL`, `ENCRYPT_KEY`); the `MGKE_*` name wins when both are set.
 - Precedence: `-config` flag, then environment variables, then the file. `CONFIG_PATH` only selects the file.
-- Scalars and `[]string` / `[]int64` are supported; an env override for a complex field (arrays, maps, slices of structs) is a startup error, keep those in YAML.
+- Scalars, `[]string` / `[]int64` and fixed-size scalar arrays (`[2]int`) are supported; an env override for a complex field (maps, slices of structs, nested tables like `timetable.weekdays`) is a startup error, keep those in YAML.
 - `config.EnvNames()` lists every supported variable; `tests/docs_test.go` fails if a config key disappears from the READMEs.
 
 ## Health Metrics and Alerts

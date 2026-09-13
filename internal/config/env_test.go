@@ -8,12 +8,11 @@ import (
 )
 
 const envTestYAML = `
-dev: false
 db_path: "./from-file.db"
+chat_db_path: "./from-file-chats.db"
 logging:
   level: "info"
 http:
-  server_name: "localhost"
   port: 8081
 telegram:
   token: "file-token"
@@ -52,29 +51,27 @@ func envLookup(values map[string]string) Lookup {
 }
 
 func TestEnvOverridesFileValues(t *testing.T) {
-	cfg, err := LoadWithEnv(writeEnvConfig(t), envLookup(map[string]string{
-		"MGKE_DEV":       "true",
-		"MGKE_DB_PATH":   "./from-env.db",
+	cfg, err := LoadWithEnv(writeEnvConfig(t), envLookup(map[string]string{"MGKE_DB_PATH": "./from-env.db",
+		"MGKE_CHAT_DB_PATH": "./from-env-chats.db",
+
 		"MGKE_HTTP_PORT": "9090", "MGKE_LOGGING_LEVEL": "debug", "MGKE_TELEGRAM_TOKEN": "env-token",
 		"TG_TOKEN": "legacy-token",
 
 		"MGKE_TELEGRAM_ADMIN_IDS":     "7,8,9",
 		"MGKE_TELEGRAM_NOTICER":       "yes",
 		"MGKE_GOOGLE_OAUTH_CLIENT_ID": "env-client", "MGKE_PARSER_ENABLED": "on",
-		"MGKE_PARSER_END_HOUR":          "20",
+		"MGKE_PARSER_ACTIVITY":          "8,20",
+		"MGKE_PARSER_PROXY":             "http://127.0.0.1:8080",
 		"MGKE_PARSER_CALLS_PREFER_SITE": "no",
 	}))
 	if err != nil {
 		t.Fatalf("load with env: %v", err)
 	}
 
-	if !cfg.Dev {
-		t.Error("MGKE_DEV should enable dev mode")
+	if cfg.DBPath != "./from-env.db" || cfg.ChatDBPath != "./from-env-chats.db" {
+		t.Errorf("storage paths = %q %q", cfg.DBPath, cfg.ChatDBPath)
 	}
-	if cfg.DBPath != "./from-env.db" {
-		t.Errorf("db path = %q", cfg.DBPath)
-	}
-	if cfg.HTTP.Port != 9090 || cfg.HTTP.ServerName != "localhost" {
+	if cfg.HTTP.Port != 9090 {
 		t.Errorf("http = %+v", cfg.HTTP)
 	}
 	if cfg.Logging.Level != "debug" {
@@ -92,8 +89,11 @@ func TestEnvOverridesFileValues(t *testing.T) {
 	if cfg.Google.OAuth.ClientID != "env-client" {
 		t.Errorf("google client id = %q", cfg.Google.OAuth.ClientID)
 	}
-	if !cfg.Parser.Enabled || cfg.Parser.EndHour != 20 {
+	if !cfg.Parser.Enabled || cfg.Parser.Activity != [2]int{8, 20} {
 		t.Errorf("parser settings = %+v", cfg.Parser)
+	}
+	if cfg.Parser.Proxy == nil || *cfg.Parser.Proxy != "http://127.0.0.1:8080" {
+		t.Errorf("parser proxy = %v", cfg.Parser.Proxy)
 	}
 	if cfg.Parser.Calls == nil || cfg.Parser.Calls.PreferSite {
 		t.Errorf("calls = %+v", cfg.Parser.Calls)
@@ -112,14 +112,14 @@ func TestEnvLeavesMissingValuesAlone(t *testing.T) {
 	if cfg.Telegram.Token != "file-token" {
 		t.Errorf("token = %q", cfg.Telegram.Token)
 	}
-	if cfg.Parser.Enabled || cfg.Parser.EndHour != 0 {
+	if cfg.Parser.Enabled || cfg.Parser.Proxy != nil {
 		t.Errorf("parser settings should stay as in the file: %+v", cfg.Parser)
 	}
 }
 
 func TestEnvAllocatesOptionalSections(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte("dev: true\n"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("db_path: ./x.db\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -142,11 +142,11 @@ func TestEnvAllocatesOptionalSections(t *testing.T) {
 
 func TestEnvKeepsAbsentOptionalSectionsNil(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte("dev: true\n"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("db_path: ./x.db\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	cfg, err := LoadWithEnv(path, envLookup(map[string]string{"MGKE_DEV": "true"}))
+	cfg, err := LoadWithEnv(path, envLookup(map[string]string{"MGKE_DB_PATH": "./x.db"}))
 	if err != nil {
 		t.Fatalf("load with env: %v", err)
 	}
@@ -163,14 +163,14 @@ func TestEnvReportsInvalidValues(t *testing.T) {
 	err := ApplyEnv(cfg, envLookup(map[string]string{
 		"MGKE_HTTP_PORT":          "not-a-number",
 		"MGKE_TELEGRAM_ADMIN_IDS": "1,two",
-		"MGKE_DEV":                "maybe",
+		"MGKE_PARSER_ACTIVITY":    "nope",
 	}))
 	if err == nil {
 		t.Fatal("expected an error for invalid values")
 	}
 
 	message := err.Error()
-	for _, name := range []string{"MGKE_HTTP_PORT", "MGKE_TELEGRAM_ADMIN_IDS", "MGKE_DEV"} {
+	for _, name := range []string{"MGKE_HTTP_PORT", "MGKE_TELEGRAM_ADMIN_IDS", "MGKE_PARSER_ACTIVITY"} {
 		if !strings.Contains(message, name) {
 			t.Errorf("error should mention %s: %v", name, message)
 		}
@@ -223,13 +223,11 @@ func TestEnvAcceptsLegacyTagAlias(t *testing.T) {
 
 func TestEnvNamesCoverEveryLeaf(t *testing.T) {
 	legacy := map[string]bool{
-		"DEV":              true,
-		"DB_PATH":          true,
-		"LOG_LEVEL":        true,
-		"HTTP_SERVER_NAME": true,
-		"HTTP_PORT":        true,
-		"TG_TOKEN":         true,
-		"ENCRYPT_KEY":      true,
+		"DB_PATH":     true,
+		"LOG_LEVEL":   true,
+		"HTTP_PORT":   true,
+		"TG_TOKEN":    true,
+		"ENCRYPT_KEY": true,
 	}
 
 	seen := make(map[string]bool)
@@ -255,7 +253,6 @@ func TestEnvNamesCoverEveryLeaf(t *testing.T) {
 
 	for _, expected := range []string{
 		"MGKE_HTTP_PORT",
-		"MGKE_HTTP_SERVER_NAME",
 		"MGKE_TELEGRAM_TOKEN",
 		"MGKE_PARSER_ENABLED",
 		"MGKE_PARSER_ENDPOINTS_BELL_SCHEDULE",

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -146,82 +147,89 @@ func main() {
 		metrics.CalendarSuccess(synced)
 	}
 
+	var eventNotifier *notification.EventNotifier
 	if cfg.Telegram.Noticer {
-		eventNotifier := notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
+		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
 		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics)
 		scheduler.Start()
 		defer scheduler.Stop()
 		log.Info().Msg("notification scheduler started")
+	}
 
-		drainEvents := func(tag string) {
-			events := raspCache.DrainEvents()
-			if len(events) > 0 {
-				log.Info().Int("count", len(events)).Str("tag", tag).Msg("draining cache events")
-				eventNotifier.HandleEvents(events)
-			}
+	drainEvents := func(tag string) {
+		events := raspCache.DrainEvents()
+		if len(events) == 0 {
+			return
+		}
+		log.Info().Int("count", len(events)).Str("tag", tag).Msg("draining cache events")
+		if eventNotifier != nil {
+			eventNotifier.HandleEvents(events)
+		}
+	}
+
+	drainEvents("startup")
+
+	parserLoop := parserpkg.LoopConfigFrom(cfg)
+	proxy := ""
+	if cfg.Parser.Proxy != nil {
+		proxy = *cfg.Parser.Proxy
+	}
+	fetcher := parserpkg.NewFetcher(log, raspCache, parserpkg.Options{Proxy: proxy})
+
+	parseOnce := func(force bool) error {
+		started := time.Now()
+
+		parseErr := fetcher.Timetable(cfg.Parser.Endpoints.TimetableGroup, cfg.Parser.Endpoints.TimetableTeacher)
+		if parserLoop.CallsEnabled && (force || raspCache.CallsDue(started, parserLoop.CallsInterval)) {
+			parseErr = errors.Join(parseErr, fetcher.Calls(cfg.Parser.Endpoints.BellSchedule))
+		}
+		if force || raspCache.TeamDue(started, parserLoop.TeamInterval) {
+			parseErr = errors.Join(parseErr, fetcher.Team(cfg.Parser.Endpoints.Team))
 		}
 
-		drainEvents("startup")
+		if parseErr != nil {
+			metrics.ParserFailure(parseErr)
+			bot.AddParseLog(false, parseErr.Error())
+			if eventNotifier != nil {
+				go eventNotifier.ParserError(parseErr)
+			}
+		} else {
+			metrics.ParserSuccess(time.Since(started))
+			bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
+			drainEvents("parse")
+		}
 
-		bot.SetParseFunc(func() error {
-			groupURL := cfg.Parser.Endpoints.TimetableGroup
-			teacherURL := cfg.Parser.Endpoints.TimetableTeacher
-			started := time.Now()
-			err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
-			if err != nil {
-				metrics.ParserFailure(err)
-				bot.AddParseLog(false, err.Error())
-				go eventNotifier.ParserError(err)
-			} else {
-				metrics.ParserSuccess(time.Since(started))
-				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
-				drainEvents("parse")
-			}
-			go func() {
-				syncArchive("parse")
-				syncCalendars(context.Background(), "parse")
-			}()
-			return err
-		})
-	} else {
-		bot.SetParseFunc(func() error {
-			groupURL := cfg.Parser.Endpoints.TimetableGroup
-			teacherURL := cfg.Parser.Endpoints.TimetableTeacher
-			started := time.Now()
-			err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule)
-			if err != nil {
-				metrics.ParserFailure(err)
-				bot.AddParseLog(false, err.Error())
-			} else {
-				metrics.ParserSuccess(time.Since(started))
-				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
-			}
-			go func() {
-				syncArchive("parse")
-				syncCalendars(context.Background(), "parse")
-			}()
-			return err
-		})
+		go func() {
+			syncArchive("parse")
+			syncCalendars(context.Background(), "parse")
+		}()
+
+		return parseErr
 	}
+
+	bot.SetParseFunc(func() error { return parseOnce(true) })
 
 	if err := bot.SetMyCommands(); err != nil {
 		log.Warn().Err(err).Msg("failed to set bot commands")
 	}
 
+	if cfg.Parser.Enabled {
+		go parserpkg.RunLoop(ctx, parserLoop, log, func() error { return parseOnce(false) })
+		log.Info().
+			Dur("default", parserLoop.Default).
+			Dur("activity", parserLoop.ActivityInterval).
+			Dur("error", parserLoop.ErrorDelay).
+			Ints("activity_hours", parserLoop.Activity[:]).
+			Msg("parser loop started")
+	}
+
 	go func() {
-		groupURL := cfg.Parser.Endpoints.TimetableGroup
-		teacherURL := cfg.Parser.Endpoints.TimetableTeacher
 		log.Info().Msg("initial parse starting")
-		started := time.Now()
-		if err := parserpkg.FetchAndParse(log, raspCache, groupURL, teacherURL, cfg.Parser.Endpoints.BellSchedule); err != nil {
-			metrics.ParserFailure(err)
+		if err := parseOnce(false); err != nil {
 			log.Error().Err(err).Msg("initial parse failed")
-		} else {
-			metrics.ParserSuccess(time.Since(started))
-			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
+			return
 		}
-		syncArchive("initial")
-		syncCalendars(ctx, "initial")
+		log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
 	}()
 
 	log.Info().Msg("bot starting")
