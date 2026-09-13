@@ -33,6 +33,7 @@ type surfaceScenario struct {
 type builtKeyboard struct {
 	name string
 	rows func() [][]string
+	data func() [][]string
 }
 
 func SurfaceOf() parity.Surface {
@@ -115,6 +116,36 @@ func SurfaceLayouts() []Layout {
 	return out
 }
 
+type CallbackLayout struct {
+	Builder string
+	Rows    [][]string
+}
+
+func SurfaceCallbackLayouts() []CallbackLayout {
+	b := newSurfaceBot()
+
+	seen := map[string]bool{}
+	var out []CallbackLayout
+	for _, scenario := range surfaceScenarios() {
+		for _, keyboard := range b.surfaceKeyboards(scenario.chat) {
+			if keyboard.data == nil {
+				continue
+			}
+			rows := keyboard.data()
+			if len(rows) == 0 {
+				continue
+			}
+			key := keyboard.name + "|" + serializeRows(rows)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, CallbackLayout{Builder: keyboard.name, Rows: rows})
+		}
+	}
+	return out
+}
+
 func surfaceEntry(cmd Command, textOnly bool) SurfaceEntry {
 	entry := SurfaceEntry{
 		Name:        cmd.Name(),
@@ -135,7 +166,7 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		return builtKeyboard{name: name, rows: func() [][]string { return replyRows(build()) }}
 	}
 	inline := func(name string, build func() *telego.InlineKeyboardMarkup) builtKeyboard {
-		return builtKeyboard{name: name, rows: func() [][]string { return inlineRows(build()) }}
+		return builtKeyboard{name: name, rows: func() [][]string { return inlineRows(build()) }, data: func() [][]string { return inlineData(build()) }}
 	}
 
 	keyboards := []builtKeyboard{
@@ -165,9 +196,20 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		inline("weekTimetableButton", func() *telego.InlineKeyboardMarkup {
 			return weekTimetableButton("На неделю", "group", "100", 0, true)
 		}),
+		inline("weekTimetableButton(teacher)", func() *telego.InlineKeyboardMarkup {
+			return weekTimetableButton("На неделю", "teacher", "Иванов И.И.", 0, true)
+		}),
+		inline("callsFullKeyboard", callsFullKeyboard),
 		inline("weekControlKeyboard", func() *telego.InlineKeyboardMarkup {
 			return b.weekControlKeyboard("group", "100", 0, false)
 		}),
+		inline("googleMenuKeyboard", googleMenuKeyboard),
+		inline("googleListKeyboard(empty)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(false) }),
+		inline("googleListKeyboard(full)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(true) }),
+		inline("googleAuthKeyboard", func() *telego.InlineKeyboardMarkup { return googleAuthKeyboard("https://example.com") }),
+		inline("googleBackKeyboard", googleBackKeyboard),
+		inline("googleControlCalendarKeyboard", googleControlCalendarKeyboard),
+		inline("googlePermissionsControl", func() *telego.InlineKeyboardMarkup { return googlePermissionsControl(1) }),
 		inline("weekControlKeyboard(hidePast)", func() *telego.InlineKeyboardMarkup {
 			return b.weekControlKeyboardHeader("group", "100", 0, true, true)
 		}),
@@ -260,6 +302,26 @@ func replyRows(kb *telego.ReplyKeyboardMarkup) [][]string {
 			labels = append(labels, button.Text)
 		}
 		rows = append(rows, labels)
+	}
+	return rows
+}
+
+func inlineData(kb *telego.InlineKeyboardMarkup) [][]string {
+	if kb == nil {
+		return nil
+	}
+	rows := make([][]string, 0, len(kb.InlineKeyboard))
+	for _, row := range kb.InlineKeyboard {
+		data := make([]string, 0, len(row))
+		for _, button := range row {
+			if button.CallbackData != "" {
+				data = append(data, button.CallbackData)
+			}
+		}
+		if len(data) == 0 {
+			continue
+		}
+		rows = append(rows, data)
 	}
 	return rows
 }

@@ -157,7 +157,11 @@ func (r *Repository) migrate() error {
 		return err
 	}
 
-	return r.migrateSubscriptions()
+	if err := r.migrateSubscriptions(); err != nil {
+		return err
+	}
+
+	return r.migrateGoogle()
 }
 
 func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {

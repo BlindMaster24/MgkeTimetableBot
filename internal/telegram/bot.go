@@ -42,6 +42,8 @@ type Bot struct {
 	parseLogs    []parseLogEntry
 	textCommands []Command
 	scenes       []sceneRoute
+	google       googleService
+	googleSyncMu sync.Mutex
 }
 
 type Update struct {
@@ -184,25 +186,12 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&sqlCmd{bot: b})
 	b.RegisterCommand(&restartCmd{bot: b})
 
-	b.RegisterCallback(&dayCb{bot: b})
-	b.RegisterCallback(&weekCb{bot: b})
-	b.RegisterCallback(&callsCb{bot: b})
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
-	b.RegisterCallback(&imageGroupCb{bot: b})
-	b.RegisterCallback(&imageTeacherCb{bot: b})
 	b.RegisterCallback(&cancelCb{bot: b})
-	b.RegisterCallback(&setupCb{bot: b})
-	b.RegisterCallback(&aboutCb{bot: b})
-	b.RegisterCallback(&groupCb{bot: b})
-	b.RegisterCallback(&teacherCb{bot: b})
-	b.RegisterCallback(&settingsCb{bot: b})
-	b.RegisterCallback(&icsCb{bot: b})
-	b.RegisterCallback(&mainMenuCb{bot: b})
 	b.RegisterCallback(&answerCb{bot: b})
 	b.RegisterCallback(&timetableGroupCb{bot: b})
 	b.RegisterCallback(&timetableTeacherCb{bot: b})
-	b.RegisterCallback(&historyCb{bot: b})
 	b.RegisterCallback(&googleCalCb{bot: b})
 	b.RegisterCallback(&aliasDelCb{bot: b})
 	b.RegisterCallback(&aliasMenuCb{bot: b})
@@ -262,19 +251,24 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 		u.ChatID = msg.Chat.ID
 	}
 
-	bestPrefix := ""
-	var bestHandler Callback
-	for prefix, handler := range b.callbacks {
-		if strings.HasPrefix(cb.Data, prefix) && len(prefix) > len(bestPrefix) {
-			bestPrefix = prefix
-			bestHandler = handler
-		}
-	}
+	bestPrefix, bestHandler := b.findCallback(cb.Data)
 	if bestHandler != nil {
 		if err := bestHandler.Handler(ctx, u); err != nil {
 			b.log.Error().Err(err).Str("prefix", bestPrefix).Msg("callback error")
 		}
 	}
+}
+
+func (b *Bot) findCallback(data string) (string, Callback) {
+	bestPrefix := ""
+	var bestHandler Callback
+	for prefix, handler := range b.callbacks {
+		if strings.HasPrefix(data, prefix) && len(prefix) > len(bestPrefix) {
+			bestPrefix = prefix
+			bestHandler = handler
+		}
+	}
+	return bestPrefix, bestHandler
 }
 
 func (b *Bot) SetMyCommands() error {

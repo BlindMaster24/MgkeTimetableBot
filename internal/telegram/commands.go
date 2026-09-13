@@ -481,22 +481,37 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		}
 	}
 
+	for _, cmd := range b.commandOrder {
+		if !matchesText(cmd, u.Text, chat) {
+			continue
+		}
+		if err := cmd.Handler(ctx, u); err != nil {
+			b.log.Error().Err(err).Msg("text match error")
+		}
+		return true
+	}
+
 	for _, cmd := range b.textCommands {
-		tm, ok := cmd.(TextMatcher)
-		if !ok {
+		if !matchesText(cmd, u.Text, chat) {
 			continue
 		}
-		if sm, ok := cmd.(SceneMatcher); ok && sm.Scene() != "" && sm.Scene() != chat.Scene {
-			continue
+		if err := cmd.Handler(ctx, u); err != nil {
+			b.log.Error().Err(err).Msg("text match error")
 		}
-		if tm.MatchText(u.Text) {
-			if err := cmd.Handler(ctx, u); err != nil {
-				b.log.Error().Err(err).Msg("text match error")
-			}
-			return true
-		}
+		return true
 	}
 	return false
+}
+
+func matchesText(cmd Command, text string, chat *Chat) bool {
+	matcher, ok := cmd.(TextMatcher)
+	if !ok || !matcher.MatchText(text) {
+		return false
+	}
+	if scoped, ok := cmd.(SceneMatcher); ok && scoped.Scene() != "" && scoped.Scene() != chat.Scene {
+		return false
+	}
+	return true
 }
 
 func findClosest(input string, candidates map[string]any) (string, bool) {

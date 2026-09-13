@@ -345,14 +345,6 @@ func formatExplainMap(m map[string]any, groupKey string) string {
 	return strings.Join(parts, " ")
 }
 
-type historyCb struct{ bot *Bot }
-
-func (cb *historyCb) Prefix() string { return "history" }
-func (cb *historyCb) Handler(ctx context.Context, u *Update) error {
-	cmd := &historyCmd{bot: cb.bot}
-	return cmd.Handler(ctx, u)
-}
-
 type subTestPickScene struct{ bot *Bot }
 
 func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
@@ -503,21 +495,6 @@ func subscriptionDayPhrase(day string) string {
 		return "следующую неделю"
 	}
 	return "день"
-}
-
-type callsEditCb struct{ bot *Bot }
-
-func (cb *callsEditCb) Prefix() string { return "calls_edit" }
-func (cb *callsEditCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneCallsEditInput
-	cb.bot.chatRepo.Save(chat)
-
-	return u.Bot.SendText(u.ChatID, "Введите расписание звонков.\nПример\nБудни\n1 08:30 09:15 09:25 10:10\n2 10:20 11:05 11:15 12:00\nСуббота\n1 09:00 09:45 09:55 10:40")
 }
 
 type callsEditInputScene struct{ bot *Bot }

@@ -37,6 +37,13 @@ func (s *Server) routes() {
 	s.engine.GET("/api/parser-health", s.handleParserHealth)
 }
 
+func (s *Server) HandleGoogleOAuth(path string, handler http.HandlerFunc) {
+	if path == "" || handler == nil {
+		return
+	}
+	s.engine.GET(path, gin.WrapH(handler))
+}
+
 func (s *Server) Run() error {
 	return s.engine.Run(":" + itoa(s.port))
 }

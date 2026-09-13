@@ -20,6 +20,11 @@ import (
 
 func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	t.Helper()
+	return setupE2EBotWithCaller(t, stubCaller{}, adminIDs...)
+}
+
+func setupE2EBotWithCaller(t *testing.T, caller telegoapi.Caller, adminIDs ...int64) (*Bot, *Repository) {
+	t.Helper()
 	cfg := &config.Config{}
 	cfg.Telegram.Token = "test:token"
 	cfg.Telegram.AdminIDs = adminIDs
@@ -88,7 +93,7 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	}
 	raspCache.SetCalls(site, cache.Schedule{}, "site")
 
-	bClient, err := telego.NewBot("123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", telego.WithAPICaller(stubCaller{}), telego.WithDiscardLogger())
+	bClient, err := telego.NewBot("123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", telego.WithAPICaller(caller), telego.WithDiscardLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,6 +108,8 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 		commands:  make(map[string]Command),
 		callbacks: make(map[string]Callback),
 	}
+	b.aliasRepo = NewAliasRepository(chatRepo)
+	b.aliasRepo.EnsureTable()
 	b.registerAll()
 	return b, chatRepo
 }
@@ -344,11 +351,9 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 func TestE2E_AllCallbacksRegistered(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	expected := []string{
-		"day", "week", "calls", "calls_full", "image",
-		"image_group:", "image_teacher:", "cancel", "setup",
-		"about", "group", "teacher", "settings", "ics",
-		"main_menu",
-		"timetable_g:", "timetable_t:", "answer:",
+		"calls_full", "image", "cancel", "answer:",
+		"timetable_g:", "timetable_t:", "gcal:",
+		"alias:del:", "alias:menu",
 	}
 	for _, prefix := range expected {
 		found := false

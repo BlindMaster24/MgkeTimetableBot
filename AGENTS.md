@@ -71,7 +71,7 @@
 - SQLite archive for historical schedule data.
 - REST API (gin) with /api/groups, /api/teachers, /api/parser-health.
 - ICS calendar export for schedule events.
-- Google Calendar sync via Service Account.
+- Google Calendar sync via Service Account: per-chat accounts (`google_accounts`) and calendars (`google_calendars`) in `bot_chats.db`, day-level sync from the archive with old-event clearing and lesson times from the bell schedule.
 - Image generation via fogleman/gg (pure Go, no CGO).
 - All user-facing strings in `internal/i18n/locales/ru.json` — zero hardcoded Russian in Go code.
 

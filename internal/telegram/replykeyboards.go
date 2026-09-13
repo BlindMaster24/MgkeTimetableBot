@@ -18,6 +18,13 @@ func noYesSmile(v bool, text string) string {
 	return "🚫 " + text
 }
 
+func yesNoCapital(v bool) string {
+	if v {
+		return "Да"
+	}
+	return "Нет"
+}
+
 func sourceCheck(label string, active bool) string {
 	if active {
 		return "✅ " + label
@@ -93,7 +100,7 @@ func (b *Bot) replySettingsView(chat *Chat) *telego.ReplyKeyboardMarkup {
 		Keyboard: [][]telego.KeyboardButton{
 			{{Text: noYesSmile(chat.HidePastDays, "Скрывать прошедшие дни")}},
 			{{Text: noYesSmile(chat.ShowParserTime, "Время последней загрузки расписания")}},
-			{{Text: noYesSmileVolume(chat.ShowHints, "Показывать подсказки")}},
+			{{Text: noYesSmile(chat.ShowHints, "Показывать подсказки: ") + yesNoCapital(chat.ShowHints)}},
 			settingsBotNavRow(),
 		},
 		IsPersistent:   true,

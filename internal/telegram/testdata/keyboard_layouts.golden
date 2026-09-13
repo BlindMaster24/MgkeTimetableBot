@@ -20,7 +20,7 @@
 === replySettingsView ===
 🚫 Скрывать прошедшие дни
 🚫 Время последней загрузки расписания
-🔇 Показывать подсказки: Нет
+🚫 Показывать подсказки: Нет
 Меню настроек | Главное меню
 === replySettingsDiff ===
 🚫 Включить раздел "Что изменилось"
@@ -66,9 +66,33 @@
 На неделю
 === weekTimetableButton ===
 На неделю
+=== weekTimetableButton(teacher) ===
+На неделю
+=== callsFullKeyboard ===
+Показать полностью
 === weekControlKeyboard ===
 ➡️
 📷 Сгенерировать изображение
+=== googleMenuKeyboard ===
+Список | Добавить
+Права
+=== googleListKeyboard(empty) ===
+Обновить
+Назад
+=== googleListKeyboard(full) ===
+Обновить
+Удалить
+Назад
+=== googleAuthKeyboard ===
+Привязать Google аккаунт
+=== googleBackKeyboard ===
+Назад
+=== googleControlCalendarKeyboard ===
+Настроить календарь
+=== googlePermissionsControl ===
+Дать права редактирования
+Снять права редактирования
+Назад
 === weekControlKeyboard(hidePast) ===
 ➡️
 📷 Сгенерировать изображение
@@ -130,7 +154,7 @@
 === replySettingsView ===
 ✅ Скрывать прошедшие дни
 ✅ Время последней загрузки расписания
-🔈 Показывать подсказки: Да
+✅ Показывать подсказки: Да
 Меню настроек | Главное меню
 === replySettingsNotice ===
 🔈 Оповещение о новых днях: Да

@@ -11,6 +11,14 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	dateLayout   = "02.01.2006"
+	clockLayout  = "15:04"
+	timeZoneName = "Europe/Moscow"
+)
+
+var moscow = time.FixedZone(timeZoneName, 3*60*60)
+
 type CalendarService struct {
 	cfg *config.Config
 }
@@ -45,39 +53,45 @@ func (s *CalendarService) OAuthConfig() OAuthConfig {
 	}
 }
 
-func (s *CalendarService) SyncGroupDay(ctx context.Context, calendarID string, group string, day string, lessons []LessonEvent) error {
-	svc, err := s.ServiceAccountClient(ctx)
+func (s *CalendarService) SyncEnabled() bool {
+	account := s.cfg.Google.ServiceAccount
+	return account.ClientEmail != "" && account.PrivateKey != ""
+}
+
+type Schedule struct {
+	Weekdays [][2][2]string
+	Saturday [][2][2]string
+}
+
+type DayLesson struct {
+	Index       int
+	Title       string
+	Description string
+	Location    string
+}
+
+func (s *CalendarService) SyncDay(ctx context.Context, calendarID string, date string, lessons []DayLesson, calls Schedule) error {
+	service, err := s.ServiceAccountClient(ctx)
 	if err != nil {
 		return err
 	}
 
-	t, err := time.Parse("02.01.2006", day)
+	day, err := time.ParseInLocation(dateLayout, date, moscow)
 	if err != nil {
-		return fmt.Errorf("parse date %s: %w", day, err)
+		return fmt.Errorf("parse date %s: %w", date, err)
+	}
+
+	if err := clearDay(ctx, service, calendarID, day); err != nil {
+		return err
 	}
 
 	for _, lesson := range lessons {
-		startHour := 8 + lesson.Index
-		start := time.Date(t.Year(), t.Month(), t.Day(), startHour, 0, 0, 0, time.UTC)
-		end := start.Add(time.Hour)
-
-		summary := fmt.Sprintf("%d. %s", lesson.Index, lesson.Text)
-
-		event := &calendar.Event{
-			Summary:     summary,
-			Description: fmt.Sprintf("Группа: %s", group),
-			Start: &calendar.EventDateTime{
-				DateTime: start.Format(time.RFC3339),
-				TimeZone: "Europe/Moscow",
-			},
-			End: &calendar.EventDateTime{
-				DateTime: end.Format(time.RFC3339),
-				TimeZone: "Europe/Moscow",
-			},
+		start, end, err := lessonTimes(calls, day, lesson.Index)
+		if err != nil {
+			return err
 		}
 
-		_, err := svc.Events.Insert(calendarID, event).Context(ctx).Do()
-		if err != nil {
+		if _, err := service.Events.Insert(calendarID, buildEvent(lesson, start, end)).Context(ctx).Do(); err != nil {
 			return fmt.Errorf("insert event: %w", err)
 		}
 	}
@@ -85,21 +99,85 @@ func (s *CalendarService) SyncGroupDay(ctx context.Context, calendarID string, g
 	return nil
 }
 
-type LessonEvent struct {
-	Index int
-	Text  string
+func clearDay(ctx context.Context, service *calendar.Service, calendarID string, day time.Time) error {
+	events, err := service.Events.List(calendarID).
+		TimeMin(day.Format(time.RFC3339)).
+		TimeMax(day.Add(24 * time.Hour).Format(time.RFC3339)).
+		SingleEvents(true).
+		ShowDeleted(false).
+		Context(ctx).
+		Do()
+	if err != nil {
+		return fmt.Errorf("list day events: %w", err)
+	}
+
+	for _, event := range events.Items {
+		if err := service.Events.Delete(calendarID, event.Id).Context(ctx).Do(); err != nil {
+			return fmt.Errorf("delete event %s: %w", event.Id, err)
+		}
+	}
+
+	return nil
 }
 
-func (s *CalendarService) ListCalendars(ctx context.Context) ([]*calendar.CalendarListEntry, error) {
-	svc, err := s.ServiceAccountClient(ctx)
-	if err != nil {
-		return nil, err
+func lessonTimes(calls Schedule, day time.Time, index int) (time.Time, time.Time, error) {
+	bounds := lessonBounds(calls, day, index)
+	if bounds[0][0] == "" || bounds[1][1] == "" {
+		return time.Time{}, time.Time{}, fmt.Errorf("no calls schedule for %s", day.Format(dateLayout))
 	}
 
-	list, err := svc.CalendarList.List().Context(ctx).Do()
+	start, err := parseClock(day, bounds[0][0])
 	if err != nil {
-		return nil, err
+		return time.Time{}, time.Time{}, err
+	}
+	end, err := parseClock(day, bounds[1][1])
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	if !end.After(start) {
+		end = start.Add(45 * time.Minute)
 	}
 
-	return list.Items, nil
+	return start, end, nil
+}
+
+func lessonBounds(calls Schedule, day time.Time, index int) [2][2]string {
+	table := calls.Weekdays
+	if day.Weekday() == time.Saturday {
+		table = calls.Saturday
+	}
+	if len(table) == 0 {
+		return [2][2]string{}
+	}
+	if index >= 0 && index < len(table) {
+		return table[index]
+	}
+	return table[len(table)-1]
+}
+
+func parseClock(day time.Time, value string) (time.Time, error) {
+	parsed, err := time.Parse(clockLayout, value)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse time %s: %w", value, err)
+	}
+	return time.Date(day.Year(), day.Month(), day.Day(), parsed.Hour(), parsed.Minute(), 0, 0, moscow), nil
+}
+
+func buildEvent(lesson DayLesson, start, end time.Time) *calendar.Event {
+	event := &calendar.Event{
+		Summary:     lesson.Title,
+		Description: lesson.Description,
+		Start: &calendar.EventDateTime{
+			DateTime: start.Format(time.RFC3339),
+			TimeZone: timeZoneName,
+		},
+		End: &calendar.EventDateTime{
+			DateTime: end.Format(time.RFC3339),
+			TimeZone: timeZoneName,
+		},
+	}
+	if lesson.Location != "" {
+		event.Location = lesson.Location
+	}
+	return event
 }

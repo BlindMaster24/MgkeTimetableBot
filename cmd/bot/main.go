@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
@@ -91,12 +93,6 @@ func main() {
 	syncArchive("startup")
 
 	apiServer := api.NewServer(raspCache, cfg.HTTP.Port)
-	go func() {
-		log.Info().Int("port", cfg.HTTP.Port).Msg("API server starting")
-		if err := apiServer.Run(); err != nil {
-			log.Error().Err(err).Msg("API server error")
-		}
-	}()
 
 	chatRepo, err := telegrambot.NewChatRepo("./bot_chats.db")
 	if err != nil {
@@ -108,6 +104,17 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}
+
+	googleService := google.NewCalendarService(cfg)
+	bot.SetGoogleService(googleService)
+	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(cfg, googleService, chatRepo, bot, log))
+
+	go func() {
+		log.Info().Int("port", cfg.HTTP.Port).Msg("API server starting")
+		if err := apiServer.Run(); err != nil {
+			log.Error().Err(err).Msg("API server error")
+		}
+	}()
 
 	adapter := &chatFinderAdapter{repo: chatRepo, adminIDs: cfg.Telegram.AdminIDs}
 
@@ -139,7 +146,12 @@ func main() {
 				bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
 				drainEvents("parse")
 			}
-			go syncArchive("parse")
+			go func() {
+				syncArchive("parse")
+				if err := bot.SyncGoogleCalendars(context.Background()); err != nil {
+					log.Error().Err(err).Msg("google calendar sync failed")
+				}
+			}()
 			return err
 		})
 	} else {
@@ -171,6 +183,9 @@ func main() {
 			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
 		}
 		syncArchive("initial")
+		if err := bot.SyncGoogleCalendars(ctx); err != nil {
+			log.Error().Err(err).Msg("google calendar sync failed")
+		}
 	}()
 
 	log.Info().Msg("bot starting")
@@ -182,6 +197,56 @@ func main() {
 		log.Error().Err(err).Msg("failed to save cache")
 	}
 	log.Info().Msg("shutdown complete")
+}
+
+func googleOAuthHandler(cfg *config.Config, service *google.CalendarService, chats *telegrambot.Repository, bot *telegrambot.Bot, log *logger.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Error(w, "Auth code not provided", http.StatusBadRequest)
+			return
+		}
+
+		serviceName, peerID, err := telegrambot.DecodeGoogleState(r.URL.Query().Get("state"))
+		if err != nil {
+			http.Error(w, "State not provided", http.StatusBadRequest)
+			return
+		}
+
+		credentials, email, err := service.Exchange(r.Context(), code)
+		if err != nil {
+			log.Error().Err(err).Msg("google oauth exchange failed")
+			http.Error(w, "Не удалось получить доступ к Google аккаунту", http.StatusBadRequest)
+			return
+		}
+
+		if err := chats.SaveGoogleAccount(&telegrambot.GoogleAccount{
+			Email:              email,
+			RefreshToken:       credentials.RefreshToken,
+			AccessToken:        credentials.AccessToken,
+			AccessTokenExpires: credentials.Expiry,
+		}); err != nil {
+			log.Error().Err(err).Msg("failed to save google account")
+			http.Error(w, "Не удалось сохранить Google аккаунт", http.StatusInternalServerError)
+			return
+		}
+
+		chat, err := chats.FindOrCreate(serviceName, peerID)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to load chat for google link")
+		} else {
+			chat.GoogleEmail = email
+			if err := chats.Save(chat); err != nil {
+				log.Error().Err(err).Msg("failed to link google account to chat")
+			}
+		}
+
+		if err := bot.SendGoogleLinked(peerID, email); err != nil {
+			log.Error().Err(err).Msg("failed to notify chat about google link")
+		}
+
+		w.Write([]byte("Аккаунт успешно привязан, можете вернуться обратно в чат"))
+	}
 }
 
 func initArchiveSchema(repo *archive.Repository) {

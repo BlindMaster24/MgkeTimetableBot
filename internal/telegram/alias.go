@@ -121,6 +121,10 @@ func (b *Bot) showAliasRemoveList(u *Update, userID int64) error {
 	if len(aliases) == 0 {
 		return u.Bot.SendText(u.ChatID, "У вас нет алиасов для удаления")
 	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите алиас для удаления:", aliasRemoveKeyboard(aliases))
+}
+
+func aliasRemoveKeyboard(aliases []Alias) *telego.InlineKeyboardMarkup {
 	var rows [][]telego.InlineKeyboardButton
 	for _, a := range aliases {
 		rows = append(rows, []telego.InlineKeyboardButton{
@@ -130,7 +134,7 @@ func (b *Bot) showAliasRemoveList(u *Update, userID int64) error {
 	rows = append(rows, []telego.InlineKeyboardButton{
 		{Text: "Назад", CallbackData: "alias:menu"},
 	})
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите алиас для удаления:", &telego.InlineKeyboardMarkup{InlineKeyboard: rows})
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
 type aliasDelCb struct{ bot *Bot }

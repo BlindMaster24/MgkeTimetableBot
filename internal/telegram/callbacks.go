@@ -27,37 +27,6 @@ func yesNoStr(v bool) string {
 	return "нет"
 }
 
-type dayCb struct{ bot *Bot }
-
-func (cb *dayCb) Prefix() string { return "day" }
-func (cb *dayCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showDaySchedule(u, chat)
-	})
-}
-
-type weekCb struct{ bot *Bot }
-
-func (cb *weekCb) Prefix() string { return "week" }
-func (cb *weekCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.showWeekSchedule(u, chat)
-	})
-}
-
-type callsCb struct{ bot *Bot }
-
-func (cb *callsCb) Prefix() string { return "calls" }
-func (cb *callsCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		cb.bot.showCallsFull(u, chat)
-		return nil
-	})
-}
-
 type callsFullCb struct{ bot *Bot }
 
 func (cb *callsFullCb) Prefix() string { return "calls_full" }
@@ -177,38 +146,6 @@ func (b *Bot) handleImagePayload(u *Update, typeLetter, value string) error {
 	return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 }
 
-func (cb *imageGroupCb) Prefix() string { return "image_group:" }
-func (cb *imageGroupCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	group := strings.TrimPrefix(u.Data, "image_group:")
-	data, ok := cb.bot.cache.GetGroups()[group]
-	if !ok {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("group_not_exists"))
-	}
-	path, err := imagepkg.RenderGroupFromCache(group, data, "./cache/images")
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
-	}
-	return u.Bot.SendPhoto(u.ChatID, path, "")
-}
-
-type imageTeacherCb struct{ bot *Bot }
-
-func (cb *imageTeacherCb) Prefix() string { return "image_teacher:" }
-func (cb *imageTeacherCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	teacher := strings.TrimPrefix(u.Data, "image_teacher:")
-	data, ok := cb.bot.cache.GetTeachers()[teacher]
-	if !ok {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("teacher_not_exists"))
-	}
-	path, err := imagepkg.RenderTeacherFromCache(teacher, data, "./cache/images")
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
-	}
-	return u.Bot.SendPhoto(u.ChatID, path, "")
-}
-
 type cancelCb struct{ bot *Bot }
 
 func (cb *cancelCb) Prefix() string { return "cancel" }
@@ -226,67 +163,6 @@ func (cb *cancelCb) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, cb.bot.loc("input_cancelled"))
 }
 
-type setupCb struct{ bot *Bot }
-
-func (cb *setupCb) Prefix() string { return "setup" }
-func (cb *setupCb) Handler(ctx context.Context, u *Update) error {
-	mode := strings.TrimPrefix(u.Data, "setup:")
-	mode = strings.TrimPrefix(mode, ":")
-
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-
-	switch mode {
-	case "student":
-		chat.Mode = ModeStudent
-		chat.Scene = sceneSetGroup
-	case "teacher":
-		chat.Mode = "teacher"
-		chat.Scene = sceneSetTeacher
-	case "parent":
-		chat.Mode = ModeParent
-		chat.Scene = sceneSetGroup
-	case "guest":
-		chat.Mode = "guest"
-		chat.Scene = ""
-	default:
-		cb.bot.AnswerCallback(u.Callback.ID, "")
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, cb.bot.loc("setup_select_mode"), cb.bot.replySelectMode())
-	}
-
-	cb.bot.chatRepo.Save(chat)
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-
-	switch mode {
-	case "student", "parent":
-		groups := cb.bot.cache.GetGroups()
-		if len(groups) == 0 {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-		}
-		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("setup_enter_group"), randomKey(groups))
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, cb.bot.replyCancel())
-	case "teacher":
-		teachers := cb.bot.cache.GetTeachers()
-		if len(teachers) == 0 {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-		}
-		prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_teacher_name"), randomKey(teachers))
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, cb.bot.replyCancel())
-	default:
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, cb.bot.loc("about_bot"), replyMainMenu(cb.bot, chat))
-	}
-}
-
-type aboutCb struct{ bot *Bot }
-
-func (cb *aboutCb) Prefix() string { return "about" }
-func (cb *aboutCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return u.Bot.SendText(u.ChatID, cb.bot.loc("about_bot"))
-}
-
 type answerCb struct{ bot *Bot }
 
 func (cb *answerCb) Prefix() string { return "answer:" }
@@ -301,72 +177,12 @@ func (cb *answerCb) Handler(ctx context.Context, u *Update) error {
 	return nil
 }
 
-type groupCb struct{ bot *Bot }
-
-func (cb *groupCb) Prefix() string { return "group" }
-func (cb *groupCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+func callsFullKeyboard() *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: "Показать полностью", CallbackData: "calls_full"}},
+		},
 	}
-	chat.Scene = sceneGetGroup
-	cb.bot.chatRepo.Save(chat)
-	groups := cb.bot.cache.GetGroups()
-	if len(groups) == 0 {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_group_number"), randomKey(groups))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
-}
-
-type teacherCb struct{ bot *Bot }
-
-func (cb *teacherCb) Prefix() string { return "teacher" }
-func (cb *teacherCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneGetTeacher
-	cb.bot.chatRepo.Save(chat)
-	teachers := cb.bot.cache.GetTeachers()
-	if len(teachers) == 0 {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
-	}
-	prompt := fmt.Sprintf("%s (например, %s)", cb.bot.loc("enter_teacher_name"), randomKey(teachers))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
-}
-
-type settingsCb struct{ bot *Bot }
-
-func (cb *settingsCb) Prefix() string { return "settings" }
-func (cb *settingsCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		return cb.bot.sendSettingsMenu(u, chat)
-	})
-}
-
-type icsCb struct{ bot *Bot }
-
-func (cb *icsCb) Prefix() string { return "ics" }
-func (cb *icsCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return u.Bot.SendText(u.ChatID, cb.bot.loc("need_group"))
-}
-
-type mainMenuCb struct{ bot *Bot }
-
-func (cb *mainMenuCb) Prefix() string { return "main_menu" }
-func (cb *mainMenuCb) Handler(ctx context.Context, u *Update) error {
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	return withChat(cb.bot, u, func(chat *Chat) error {
-		chat.Scene = ""
-		cb.bot.chatRepo.Save(chat)
-		return cb.bot.showSchedule(u, chat)
-	})
 }
 
 func (b *Bot) showCallsFull(u *Update, chat *Chat) {
@@ -411,12 +227,7 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 
 	text := strings.Join(msg, "\n")
 	if !full {
-		kb := &telego.InlineKeyboardMarkup{
-			InlineKeyboard: [][]telego.InlineKeyboardButton{
-				{{Text: "Показать полностью", CallbackData: "calls_full"}},
-			},
-		}
-		b.sendOrEdit(u.ChatID, text, chat, kb)
+		b.sendOrEdit(u.ChatID, text, chat, callsFullKeyboard())
 		return
 	}
 
