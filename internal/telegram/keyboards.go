@@ -91,7 +91,7 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 	}
 
 	showFast := chat.Mode == ModeStudent || chat.Mode == ModeParent || chat.Mode == ModeTeacher
-	canShowCalls := chat.ShowCalls && b.cfg.Parser.Calls != nil && b.cfg.Parser.Calls.Enabled
+	canShowCalls := chat.ShowCalls && (b.cfg.Parser.Calls == nil || b.cfg.Parser.Calls.Enabled)
 
 	var level2 []telego.KeyboardButton
 	if showFast && chat.ShowFastGroup {
@@ -102,7 +102,7 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 	}
 	if showFast && chat.ShowFastTeacher {
 		label := t("button_teacher")
-		if chat.ShowAbout && canShowCalls && chat.ShowFastGroup {
+		if chat.ShowAbout && chat.ShowCalls && showFast && chat.ShowFastGroup {
 			label = t("button_teacher_short")
 		}
 		level2 = append(level2, telego.KeyboardButton{Text: label})
