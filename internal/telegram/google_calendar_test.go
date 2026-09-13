@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
@@ -18,6 +19,7 @@ type recordedCall struct {
 }
 
 type recordingCaller struct {
+	mu    sync.Mutex
 	tests []string
 	calls []recordedCall
 }
@@ -32,21 +34,31 @@ func (c *recordingCaller) Call(_ context.Context, url string, data *telegoapi.Re
 	if err := json.Unmarshal(data.BodyRaw, &payload); err == nil {
 		if text, ok := payload["text"].(string); ok {
 			record.Text = text
-			if text != "" {
-				c.tests = append(c.tests, text)
-			}
 		}
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if record.Text != "" {
+		c.tests = append(c.tests, record.Text)
 	}
 	c.calls = append(c.calls, record)
 	return &telegoapi.Response{Ok: true, Result: []byte(`{"message_id": 1}`)}, nil
 }
 
 func (c *recordingCaller) reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.tests = nil
 	c.calls = nil
 }
 
 func (c *recordingCaller) last() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if len(c.tests) == 0 {
 		return ""
 	}
@@ -54,6 +66,9 @@ func (c *recordingCaller) last() string {
 }
 
 func (c *recordingCaller) delivered() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	for _, call := range c.calls {
 		switch call.Method {
 		case "sendMessage", "sendPhoto", "sendDocument", "editMessageText":
@@ -61,6 +76,31 @@ func (c *recordingCaller) delivered() bool {
 		}
 	}
 	return false
+}
+
+func (c *recordingCaller) deliveredText() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var text string
+	for _, call := range c.calls {
+		switch call.Method {
+		case "sendMessage", "sendPhoto", "sendDocument", "editMessageText":
+			text = call.Text
+		}
+	}
+	return text
+}
+
+func (c *recordingCaller) payloads() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	out := make([]string, 0, len(c.calls))
+	for _, call := range c.calls {
+		out = append(out, call.Raw)
+	}
+	return out
 }
 
 type fakeGoogleAPI struct {

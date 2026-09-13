@@ -114,14 +114,14 @@ func TestParserHealthCommandSendsTheReparseButton(t *testing.T) {
 		t.Fatalf("last message = %q", caller.last())
 	}
 
-	var sent string
-	for _, call := range caller.calls {
-		if call.Method == "sendMessage" {
-			sent = call.Raw
+	button := false
+	for _, payload := range caller.payloads() {
+		if strings.Contains(payload, notification.ParserReparseCallback) {
+			button = true
 		}
 	}
-	if !strings.Contains(sent, notification.ParserReparseCallback) {
-		t.Errorf("the health command must offer the reparse button, payload: %s", sent)
+	if !button {
+		t.Errorf("the health command must offer the reparse button, payloads: %v", caller.payloads())
 	}
 }
 
@@ -175,6 +175,15 @@ func TestReparseCallbackTriggersTheParser(t *testing.T) {
 	if got := atomic.LoadInt32(&calls); got != 1 {
 		t.Errorf("parse called %d times", got)
 	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(caller.deliveredText(), b.loc("force_parse_done")) {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("the reparse result never reached the chat, messages: %v", caller.payloads())
 }
 
 func TestReparseCallbackRejectsNonAdmins(t *testing.T) {
