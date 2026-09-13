@@ -23,10 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -57,16 +57,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Test
-        run: go test -count=1 -p 1 -covermode=atomic -coverprofile=coverage.out ./internal/... ./tests/...
+        run: go test -count=1 -p 1 -covermode=atomic -coverprofile=coverage.out ./internal/... ./tests/... ./cmd/...
 
       - name: Summarize coverage
         run: |
@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage
           path: coverage.out
@@ -85,26 +85,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Test with -race
-        run: go test -count=1 -p 1 -race ./internal/... ./tests/...
+        run: go test -count=1 -p 1 -race ./internal/... ./tests/... ./cmd/...
 
   parity:
     name: TypeScript parity
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
@@ -121,42 +121,97 @@ jobs:
       - name: Check the docs against the bot surface
         run: go test -count=1 ./tests/
 
-  docker:
-    name: docker image builds
+  container:
+    name: container smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Compute the build date
+        id: builddate
+        run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Build the image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           push: false
           load: true
           tags: mgke-timetable-bot:ci
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.builddate.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test the image
-        run: docker run --rm --entrypoint /bin/sh mgke-timetable-bot:ci -c 'test -x /app/bot && echo "binary present"'
+      - name: Start the bot
+        run: |
+          docker run -d --name mgke-smoke \
+            -e MGKE_TELEGRAM_TOKEN="123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" \
+            -e MGKE_PARSER_ENABLED=false \
+            -e MGKE_HTTP_PORT=8080 \
+            -p 18081:8080 \
+            mgke-timetable-bot:ci
+
+      - name: Wait for the API to report healthy
+        run: |
+          code=""
+          for _ in $(seq 1 60); do
+            code="$(curl -s -o /tmp/health.json -w '%{http_code}' http://127.0.0.1:18081/api/health || true)"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$code" != "200" ]; then
+            echo "health never answered 200 (last status $code)" >&2
+            cat /tmp/health.json >&2 || true
+            exit 1
+          fi
+
+          jq -e '.build.version == "ci"' /tmp/health.json > /dev/null
+          jq -e '.build.commit != "" and .build.commit != "unknown"' /tmp/health.json > /dev/null
+          jq -e '.alerts == [] or .alerts == null' /tmp/health.json > /dev/null
+
+      - name: Check the container runs in the configured timezone
+        run: |
+          zone="$(docker exec mgke-smoke date +%z)"
+          if [ "$zone" != "+0300" ]; then
+            echo "container timezone offset is $zone, expected +0300" >&2
+            exit 1
+          fi
+          docker exec mgke-smoke test -f /usr/share/zoneinfo/Europe/Minsk
+
+      - name: Check the API info endpoint
+        run: |
+          jq -e '.build.version == "ci"' <(curl -s http://127.0.0.1:18081/api/info) > /dev/null
+
+      - name: Show the container logs
+        if: failure()
+        run: docker logs mgke-smoke
+
+      - name: Stop the container
+        if: always()
+        run: docker rm -f mgke-smoke || true
 
   workflow-lint:
     name: workflow lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Lint the workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
-
