@@ -24,6 +24,8 @@ import (
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
 
+var version = "dev"
+
 func main() {
 	cfgPath := flag.String("config", "", "path to config file (default: configs/config.yaml)")
 	flag.Parse()
@@ -61,6 +63,7 @@ func main() {
 	}
 
 	log := logger.New(cfg.Logging.Level, fileCfg)
+	log.Info().Str("version", version).Msg("bot starting")
 	loc := i18n.New("ru")
 
 	metrics := health.NewTracker(healthThresholds(cfg))

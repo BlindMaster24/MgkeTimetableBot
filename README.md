@@ -2,7 +2,7 @@
 
 [English version](README.en.md)
 
-[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)
+[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
 [![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8)](https://go.dev/dl/)
 
 ## Описание
@@ -55,7 +55,7 @@ HTTP API (gin)          ─┴─> расписание
 
 ## Требования
 
-- **Минимальная версия Go — 1.27.1** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)).
+- **Минимальная версия Go — 1.27.1** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
 - CGO не нужен: SQLite и рендеринг картинок работают на чистом Go.
 - Для работы нужен только записываемый каталог для `cache/` и файлов базы.
 
@@ -315,6 +315,19 @@ services:
 - наружу отдаётся только HTTP-порт (`http.port`), Telegram работает через long polling — входящие порты больше не нужны;
 - данные живут в томе `/data`, конфиг можно подменить через `CONFIG_PATH`.
 
+Готовый образ лежит в GHCR, так что локальная сборка нужна не всегда:
+
+```bash
+docker run -d --name mgke-bot \
+  -e MGKE_TELEGRAM_TOKEN="123:ABC" \
+  -e MGKE_TELEGRAM_ADMIN_IDS="1,2" \
+  -v bot-data:/data \
+  -p 8081:8081 \
+  ghcr.io/blindmaster24/mgketimetablebot:latest
+```
+
+`:latest` и `:1.2` — это последний релизный тег, `:edge` — образ, собранный из текущего `main`, `:main` — тот же `edge` под именем ветки.
+
 ## Разработка
 
 ```bash
@@ -370,7 +383,29 @@ go test ./internal/telegram -run Golden          # проверить раскл
 go test ./internal/telegram -update              # перегенерировать golden-файл
 ```
 
-Те же проверки выполняет CI (`.github/workflows/go-ci.yml`): job `build` — сборка, vet, тесты; job `parity` — сравнение с веткой `old` и golden-раскладки.
+Те же проверки выполняет CI — подробности в разделе «CI и релизы» ниже.
+
+## CI и релизы
+
+`.github/workflows/ci.yml` запускается на каждый push в `main` и на каждый pull request. Jobs независимы и идут параллельно:
+
+| Job | Что проверяет |
+| --- | --- |
+| `quality` | `gofmt -l` (любой неотформатированный файл валит job), `go build ./...`, `go vet ./...` и сборка всех трёх бинарников (`bot`, `migrate-pg`, `paritycheck`) |
+| `test` | полный набор тестов с покрытием: итог уходит в summary запуска, `coverage.out` — в артефакты на 14 дней |
+| `race` | тот же набор под `-race`, чтобы гонки в кэше, планировщике и боте не доезжали до пользователей |
+| `parity` | сравнение поверхности с веткой `old`, golden-раскладки клавиатур и docs-guard |
+| `docker` | сборка образа и проверка, что бинарник внутри запускается |
+| `workflow-lint` | `actionlint` по самим workflow-файлам |
+
+`.github/workflows/release.yml` — доставка:
+
+- push в `main` → multi-arch образ (`linux/amd64`, `linux/arm64`) публикуется в GHCR с тегами `:edge` и `:main`;
+- тег вида `v1.2.3` → собираются бинарники под `linux/amd64`, `linux/arm64`, `windows/amd64` и `darwin/arm64`, публикуются в GitHub Release вместе с автоматическими release notes, а образ получает постоянные теги `:1.2.3`, `:1.2` и `:latest`.
+
+Версия сборки подставляется линкером (`-X main.version`) и печатается в логе первой строкой при старте — по ней всегда видно, какой именно бинарник работает.
+
+Зависимости обновляет Dependabot (`.github/dependabot.yml`): Go-модули, версии GitHub Actions и базовые образы `Dockerfile`, раз в неделю по понедельникам.
 
 ## Структура проекта
 

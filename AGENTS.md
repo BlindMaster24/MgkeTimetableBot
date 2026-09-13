@@ -24,6 +24,7 @@
 - `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary.
 - `README.md` / `README.en.md` — mirrored documentation, kept in sync by `tests/docs_test.go`.
 - `Dockerfile`, `docker-compose.yml`, `.dockerignore` — container build; runtime config comes from env vars, state lives in the `/data` volume.
+- `.github/workflows/ci.yml` — quality gates; `.github/workflows/release.yml` — releases and the GHCR image; `.github/dependabot.yml` — weekly dependency bumps.
 
 ## Architecture Overview (Flow)
 - External inputs arrive via Telegram bot (long polling) or HTTP API.
@@ -56,6 +57,16 @@
 - `go test -count=1 ./internal/... ./tests/... -cover` — run with coverage.
 - `go vet ./...` — static analysis.
 - `go clean -cache` — clean build cache.
+- `gofmt -l .` — formatting check (CI fails on any output).
+- `go test -count=1 -p 1 -race ./internal/... ./tests/...` — the race detector run CI performs.
+- `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` — lint the workflow files after touching `.github/workflows/`.
+
+## CI and Releases
+- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (gofmt, build, vet, all three binaries), `test` (suite plus `coverage.out` artifact), `race` (`-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `docker` (image build and a start check) and `workflow-lint` (`actionlint`).
+- The whole CI sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.1` from `go.mod` is the version every check has to pass with — a newer toolchain is never used silently.
+- `.github/workflows/release.yml` publishes: a push to `main` pushes the multi-arch image to `ghcr.io/blindmaster24/mgketimetablebot` as `:edge`/`:main`; a `v*` tag additionally builds linux/amd64, linux/arm64, windows/amd64 and darwin/arm64 archives, attaches them to a GitHub Release and gives the image `:1.2.3`, `:1.2` and `:latest`.
+- The release build injects the tag through `-X main.version`; `cmd/bot/main.go` logs it at startup. Bump the version by tagging, never by editing code.
+- Add a new CI job only when it fails for a reason a developer can reproduce locally, and mirror every new local check in the Verification Checklist above.
 
 ## Verification Checklist
 - `go vet ./...` for static analysis after any changes.

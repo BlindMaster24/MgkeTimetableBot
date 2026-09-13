@@ -2,7 +2,7 @@
 
 [Русская версия](README.md)
 
-[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)
+[![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
 [![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8)](https://go.dev/dl/)
 
 ## Overview
@@ -55,7 +55,7 @@ college site ──> parser ──> cache (JSON + event queue)
 
 ## Requirements
 
-- **Minimum Go version: 1.27.1** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/go-ci.yml)).
+- **Minimum Go version: 1.27.1** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
 - No CGO: SQLite and image rendering are pure Go.
 - A writable directory for `cache/` and the database files.
 
@@ -314,6 +314,19 @@ What to know about the image:
 - only the HTTP port (`http.port`) is published — Telegram works over long polling, so no inbound ports are required;
 - state lives in the `/data` volume, and the config can be replaced through `CONFIG_PATH`.
 
+The image is published to GHCR, so a local build is optional:
+
+```bash
+docker run -d --name mgke-bot \
+  -e MGKE_TELEGRAM_TOKEN="123:ABC" \
+  -e MGKE_TELEGRAM_ADMIN_IDS="1,2" \
+  -v bot-data:/data \
+  -p 8081:8081 \
+  ghcr.io/blindmaster24/mgketimetablebot:latest
+```
+
+`:latest` and `:1.2` point at the newest release, `:edge` is the image built from the current `main`, and `:main` is the same `edge` under the branch name.
+
 ## Development
 
 ```bash
@@ -369,7 +382,29 @@ go test ./internal/telegram -run Golden          # verify layouts
 go test ./internal/telegram -update              # rewrite the golden file
 ```
 
-CI (`.github/workflows/go-ci.yml`) runs the same checks: the `build` job builds, vets and tests, the `parity` job compares against the `old` branch and verifies the golden layouts.
+CI runs the same checks — see “CI and releases” below.
+
+## CI and releases
+
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request. The jobs are independent and run in parallel:
+
+| Job | What it checks |
+| --- | --- |
+| `quality` | `gofmt -l` (any unformatted file fails the job), `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`) |
+| `test` | the full suite with coverage: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days |
+| `race` | the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
+| `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
+| `docker` | the image build plus a check that the binary inside it starts |
+| `workflow-lint` | `actionlint` over the workflow files themselves |
+
+`.github/workflows/release.yml` is the delivery side:
+
+- a push to `main` publishes a multi-arch image (`linux/amd64`, `linux/arm64`) to GHCR tagged `:edge` and `:main`;
+- a tag like `v1.2.3` builds binaries for `linux/amd64`, `linux/arm64`, `windows/amd64` and `darwin/arm64`, attaches them to a GitHub Release with generated release notes, and gives the image the persistent tags `:1.2.3`, `:1.2` and `:latest`.
+
+The build version is injected by the linker (`-X main.version`) and logged on the first line at startup, so you can always tell which binary is running.
+
+Dependencies are bumped by Dependabot (`.github/dependabot.yml`): Go modules, GitHub Actions versions and the `Dockerfile` base images, every Monday.
 
 The `tests/docs_test.go` suite keeps this documentation honest: it asserts that every bot command, every API route and the minimum Go version from `go.mod` appear in both README files, and that every top-level config key is documented.
 

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -14,115 +14,149 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
-  lockfile:
-    name: lockfile
+  quality:
+    name: format, build and vet
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enable corepack
-        run: corepack enable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          node-version: '22'
-          cache: pnpm
+          go-version-file: go.mod
+          cache: true
 
-      - name: Verify lockfile is up to date
-        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt wants to reformat:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
 
-  build:
-    name: build-and-test (node ${{ matrix.node }})
-    needs: lockfile
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build every binary
+        run: |
+          go build -o /tmp/bot ./cmd/bot/
+          go build -o /tmp/migrate-pg ./cmd/migrate-pg/
+          go build -o /tmp/paritycheck ./scripts/paritycheck/
+
+  test:
+    name: tests with coverage
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ['22']
-        experimental: [false]
-        include:
-          - node: '24'
-            experimental: true
-          - node: '25'
-            experimental: true
-    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enable corepack
-        run: corepack enable
-
-      - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          node-version: ${{ matrix.node }}
-          cache: pnpm
+          go-version-file: go.mod
+          cache: true
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: go test -count=1 -p 1 -covermode=atomic -coverprofile=coverage.out ./internal/... ./tests/...
 
-      - name: Seed config.ts from example
-        run: cp config.example.ts config.ts
-
-      - name: Type check
-        run: pnpm run ts-check
-
-      - name: Run tests
-        run: pnpm run test:all
-
-  coverage:
-    name: coverage
-    needs: lockfile
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Enable corepack
-        run: corepack enable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Seed config.ts from example
-        run: cp config.example.ts config.ts
-
-      - name: Run tests with coverage
-        run: pnpm run test:coverage
+      - name: Summarize coverage
+        run: |
+          go tool cover -func=coverage.out | tail -n 1 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage
+          path: coverage.out
           retention-days: 14
 
-  audit:
-    name: audit
-    needs: lockfile
+  race:
+    name: tests under the race detector
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enable corepack
-        run: corepack enable
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          node-version: '22'
-          cache: pnpm
+          go-version-file: go.mod
+          cache: true
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Test with -race
+        run: go test -count=1 -p 1 -race ./internal/... ./tests/...
 
-      - name: Audit (fails on any known vulnerability)
-        run: pnpm audit --audit-level=low
+  parity:
+    name: TypeScript parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fetch the old TypeScript bot branch
+        run: git fetch --depth=1 origin old
+
+      - name: Compare the Go bot against the TypeScript bot
+        run: go run ./scripts/paritycheck -ts-ref origin/old
+
+      - name: Check keyboard layouts against the golden file
+        run: go test -count=1 -run 'Golden|Parity' ./internal/telegram/
+
+      - name: Check the docs against the bot surface
+        run: go test -count=1 ./tests/
+
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: mgke-timetable-bot:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: docker run --rm --entrypoint /bin/sh mgke-timetable-bot:ci -c 'test -x /app/bot && echo "binary present"'
+
+  workflow-lint:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Lint the workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+

@@ -1,5 +1,7 @@
 FROM golang:1.27.1-alpine AS build
 
+ARG VERSION=dev
+
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -8,9 +10,16 @@ RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bot ./cmd/bot/
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/bot ./cmd/bot/
 
 FROM alpine:3.23
+
+ARG VERSION=dev
+
+LABEL org.opencontainers.image.title="MgkeTimetableBot" \
+	org.opencontainers.image.description="Telegram timetable bot for MGKE with a REST API" \
+	org.opencontainers.image.version="${VERSION}" \
+	org.opencontainers.image.source="https://github.com/BlindMaster24/MgkeTimetableBot"
 
 RUN apk add --no-cache ca-certificates tzdata \
 	&& adduser -D -u 10001 -h /data bot
