@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
@@ -308,10 +309,41 @@ func (cb *reparseCb) Handler(ctx context.Context, u *Update) error {
 			cb.bot.SendText(chatID, cb.bot.loc("force_parse_error"))
 			return
 		}
+		cb.bot.markIncidentFix(health.ScopeParser, cb.bot.loc("incident_fix_reparse"))
 		cb.bot.SendText(chatID, cb.bot.loc("force_parse_done"))
 	}()
 
 	return u.Bot.SendText(chatID, cb.bot.loc("force_parse_started"))
+}
+
+type calendarSyncCb struct{ bot *Bot }
+
+func (cb *calendarSyncCb) Prefix() string { return notification.CalendarSyncCallback }
+
+func (cb *calendarSyncCb) Handler(ctx context.Context, u *Update) error {
+	if u.Callback != nil {
+		cb.bot.AnswerCallback(u.Callback.ID, "")
+	}
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	if cb.bot.calendarSync == nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("calendar_sync_unavailable"))
+	}
+
+	chatID := u.ChatID
+	go func() {
+		days, err := cb.bot.calendarSync(context.Background())
+		if err != nil {
+			cb.bot.log.Error().Err(err).Msg("manual calendar sync failed")
+			cb.bot.SendText(chatID, cb.bot.locData("calendar_sync_error", map[string]interface{}{"Error": err.Error()}))
+			return
+		}
+		cb.bot.markIncidentFix(health.ScopeCalendar, cb.bot.loc("incident_fix_calendar"))
+		cb.bot.SendText(chatID, cb.bot.locData("calendar_sync_done", map[string]interface{}{"Days": days}))
+	}()
+
+	return u.Bot.SendText(chatID, cb.bot.loc("calendar_sync_started"))
 }
 
 func isNowInSlot(now time.Time, slot [2][2]string, includedDays []int) bool {

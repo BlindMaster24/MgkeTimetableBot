@@ -181,6 +181,8 @@ Every run collects diagnostics — which selector matched what. When the site ch
 
 Every parser alert arrives in Telegram with a `🔄 Переразобрать сейчас` button that runs a parse out of schedule, without waiting for the next cycle. The full snapshot is available to admins at any moment through `/parserhealth`.
 
+A Google Calendar failure works the same way: the `calendar_failures` and `calendar_stale` alerts carry a `🔄 Синхронизировать сейчас` button. It runs the sync out of schedule — first the days that changed since the last parse, then the calendars that still have days to catch up on — so failed days are retried automatically, because `LastManualSyncedDay` only moves after a successful pass and the day the sync stopped on is not considered done.
+
 The guard limits themselves live in `parser.guard`:
 
 ```yaml
@@ -239,11 +241,13 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits.
 
 `/parserhealth` prints a live parser health snapshot — state, run and error counts, the last success and failure, run duration, the layout problems and guard trips it found, the active alerts and the cache size — and can start a parse immediately instead of waiting for the next cycle.
+
+`/incidents` prints the history of parser, calendar and API incidents — what broke, when, how long it lasted, how it ended and what fixed it. The history lives in the chat database (`bot_state` table, `health.incidents` key) because the question "when did this start" is asked after a restart, and an in-memory list would have lost exactly that; the last 100 records are kept. A `⚠️` record is still open, `🔧` was closed by an admin action (for example the reparse button), `✅` recovered on its own. When an open incident has a fix button, the command shows it under the message.
 
 ## HTTP API
 
@@ -411,6 +415,24 @@ go test ./internal/telegram -run Golden          # verify layouts
 go test ./internal/telegram -update              # rewrite the golden file
 ```
 
+### The race detector locally
+
+Races are not caught by CI alone: the repository ships `scripts/racecheck`, which runs the same suite under `-race` (`./internal/... ./tests/... ./cmd/...`). Before running it checks whether the detector can work on this machine at all, and when it cannot it prints what is missing and exits with code 2.
+
+```bash
+go run ./scripts/racecheck            # check and run the suite under -race
+go run ./scripts/racecheck -check     # only report whether the detector can run
+go run ./scripts/racecheck -pkgs ./internal/telegram/...
+```
+
+The detector requirements: `-race` builds through cgo, so it needs **`CGO_ENABLED=1`** and a **C compiler**.
+
+- Linux: `sudo apt-get install -y build-essential` (the CI runners already have gcc, so the check passes there without any setup);
+- macOS: `xcode-select --install` (clang);
+- Windows: `-race` needs cgo and gcc — `winget install -e --id MSYS2.MSYS2`, then `pacman -S mingw-w64-x86_64-gcc`, or `choco install mingw -y`; the toolchain directory must be on `PATH`.
+
+One more thing to remember: a compiler name alone is not enough — a home-grown or incomplete toolchain without headers (LLVM clang without the Windows SDK, for example) cannot compile everything, so `racecheck` first builds `./internal/build` under `-race` and only then runs the tests. That way the check never claims the detector is available when it is not. When it cannot run locally, the `race` job in `ci.yml` invokes the same command and stays the reference.
+
 CI runs the same checks — see “CI and releases” below.
 
 ## CI and releases
@@ -421,7 +443,7 @@ CI runs the same checks — see “CI and releases” below.
 | --- | --- |
 | `quality` | `gofmt -l` (any unformatted file fails the job), `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`) |
 | `test` | the full suite with coverage: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days |
-| `race` | the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
+| `race` | `go run ./scripts/racecheck` — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
 | `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata and the container timezone (`date +%z` → `+0300`) |
 | `workflow-lint` | `actionlint` over the workflow files themselves |

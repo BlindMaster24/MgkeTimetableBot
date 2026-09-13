@@ -13,7 +13,9 @@ const (
 	healthCooldown = 30 * time.Minute
 
 	ParserReparseCallback = "parser_reparse"
+	CalendarSyncCallback  = "calendar_sync"
 	parserReparseButton   = "🔄 Переразобрать сейчас"
+	calendarSyncButton    = "🔄 Синхронизировать сейчас"
 )
 
 type alertState struct {
@@ -27,10 +29,15 @@ type HealthNotifier struct {
 	chats    EventChatFinder
 	cooldown time.Duration
 	store    health.StateStore
+	incident *health.IncidentLog
 
 	mu       sync.Mutex
 	active   map[string]time.Time
 	restored bool
+}
+
+func (n *HealthNotifier) SetIncidents(log *health.IncidentLog) {
+	n.incident = log
 }
 
 func NewHealthNotifier(tracker *health.Tracker, log *logger.Logger, sender EventSender, chats EventChatFinder, cooldown time.Duration, store health.StateStore) *HealthNotifier {
@@ -106,6 +113,13 @@ func (n *HealthNotifier) diff(alerts []health.Alert, now time.Time) ([]health.Al
 			recovered = append(recovered, key)
 		}
 	}
+
+	for _, alert := range pending {
+		n.incident.Record(alert.Key, alert.Detail)
+	}
+	for _, key := range recovered {
+		n.incident.Resolve(key)
+	}
 	return pending, recovered
 }
 
@@ -166,29 +180,32 @@ func (n *HealthNotifier) broadcast(chats []*EventChat, message string, buttons [
 }
 
 func IsParserAlert(key string) bool {
-	switch key {
-	case health.AlertParserFailures, health.AlertParserStale, health.AlertParserLayout, health.AlertParserGuard:
-		return true
-	}
-	return false
+	return health.AlertScope(key) == health.ScopeParser
+}
+
+func IsCalendarAlert(key string) bool {
+	return health.AlertScope(key) == health.ScopeCalendar
 }
 
 func HealthAlertButtons(key string) []KeyboardButton {
-	if !IsParserAlert(key) {
-		return nil
+	switch {
+	case IsParserAlert(key):
+		return []KeyboardButton{{Text: parserReparseButton, Data: ParserReparseCallback}}
+	case IsCalendarAlert(key):
+		return []KeyboardButton{{Text: calendarSyncButton, Data: CalendarSyncCallback}}
 	}
-	return []KeyboardButton{{Text: parserReparseButton, Data: ParserReparseCallback}}
+	return nil
 }
 
 func healthAlertMessage(alert health.Alert) string {
-	return "⚠️ " + healthAlertTitle(alert.Key) + "\n" + alert.Detail
+	return "⚠️ " + HealthAlertTitle(alert.Key) + "\n" + alert.Detail
 }
 
 func healthRecoveryMessage(key string) string {
-	return "✅ " + healthAlertTitle(key) + " — восстановлено"
+	return "✅ " + HealthAlertTitle(key) + " — восстановлено"
 }
 
-func healthAlertTitle(key string) string {
+func HealthAlertTitle(key string) string {
 	switch key {
 	case health.AlertParserFailures:
 		return "Парсер расписания падает"

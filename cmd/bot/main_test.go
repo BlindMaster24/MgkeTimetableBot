@@ -240,7 +240,9 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	})
 
 	sender := &recordingSender{}
+	incidents := health.NewIncidentLog(nil, 0)
 	notifier := notification.NewHealthNotifier(tracker, logger.New("error", nil), sender, adminFinder{}, time.Minute, nil)
+	notifier.SetIncidents(incidents)
 
 	if err := fetcher.Timetable(srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
 		t.Fatalf("timetable: %v", err)
@@ -284,6 +286,32 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	}
 	if delivered[0].buttons[0].Data != notification.ParserReparseCallback {
 		t.Errorf("alert button = %+v, want the reparse callback", delivered[0].buttons[0])
+	}
+
+	open := incidents.Open()
+	if len(open) != 1 || open[0].Key != health.AlertParserGuard {
+		t.Fatalf("the trip must enter the incident history, got %+v", open)
+	}
+	if !strings.Contains(open[0].Detail, "35 -> 3") {
+		t.Errorf("the incident must keep the counts: %q", open[0].Detail)
+	}
+
+	page.Lock()
+	page.groups = 35
+	page.teachers = 35
+	page.Unlock()
+
+	if err := fetcher.Timetable(srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
+		t.Fatalf("timetable: %v", err)
+	}
+	notifier.Check()
+
+	records := incidents.Recent(1)
+	if len(records) != 1 || records[0].Open() {
+		t.Fatalf("a recovered parser must close the incident: %+v", records)
+	}
+	if records[0].Resolution != health.ResolutionAuto {
+		t.Errorf("resolution = %q, want %q", records[0].Resolution, health.ResolutionAuto)
 	}
 }
 

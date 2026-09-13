@@ -53,6 +53,8 @@ type Bot struct {
 	google       googleService
 	googleSyncMu sync.Mutex
 	health       healthSource
+	calendarSync func(ctx context.Context) (int, error)
+	incidents    *health.IncidentLog
 }
 
 type Update struct {
@@ -127,6 +129,20 @@ func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
 func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
 func (b *Bot) SetHealthSource(src healthSource) {
 	b.health = src
+}
+
+func (b *Bot) SetCalendarSyncFunc(fn func(ctx context.Context) (int, error)) {
+	b.calendarSync = fn
+}
+
+func (b *Bot) SetIncidentLog(log *health.IncidentLog) {
+	b.incidents = log
+}
+
+func (b *Bot) markIncidentFix(scope, note string) {
+	if b.incidents.MarkManual(scope, note) {
+		b.log.Info().Str("scope", scope).Msg("manual fix recorded in the incident history")
+	}
 }
 
 func (b *Bot) RegisterCommand(cmd Command) {
@@ -205,6 +221,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&sqlCmd{bot: b})
 	b.RegisterCommand(&restartCmd{bot: b})
 	b.RegisterCommand(&parserHealthCmd{bot: b})
+	b.RegisterCommand(&incidentsCmd{bot: b})
 
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
@@ -216,6 +233,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&aliasDelCb{bot: b})
 	b.RegisterCallback(&aliasMenuCb{bot: b})
 	b.RegisterCallback(&reparseCb{bot: b})
+	b.RegisterCallback(&calendarSyncCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {

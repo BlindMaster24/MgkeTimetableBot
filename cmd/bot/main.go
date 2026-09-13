@@ -128,6 +128,8 @@ func main() {
 	}
 	bot.SetBuildInfo(buildInfo)
 	bot.SetHealthSource(metrics)
+	incidents := health.NewIncidentLog(chatRepo, health.IncidentLimit)
+	bot.SetIncidentLog(incidents)
 
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)
@@ -143,33 +145,47 @@ func main() {
 
 	adapter := &chatFinderAdapter{repo: chatRepo, adminIDs: cfg.Telegram.AdminIDs}
 
-	syncCalendars := func(ctx context.Context, tag string) {
+	syncCalendars := func(ctx context.Context, tag string) (int, error) {
 		changes := googleDayChanges(raspCache.DrainDayChanges())
 		if !calendarSyncEnabled {
-			return
+			return 0, nil
 		}
 
-		synced, err := bot.SyncGoogleCalendarChanges(ctx, changes)
+		synced := 0
+		var failures []error
+
+		days, err := bot.SyncGoogleCalendarChanges(ctx, changes)
 		if err != nil {
 			metrics.CalendarFailure(err)
 			log.Error().Err(err).Str("tag", tag).Msg("google calendar change sync failed")
+			failures = append(failures, err)
 		} else {
-			metrics.CalendarSuccess(synced)
+			metrics.CalendarSuccess(days)
 		}
+		synced += days
 
-		synced, err = bot.SyncGoogleCalendars(ctx)
+		days, err = bot.SyncGoogleCalendars(ctx)
 		if err != nil {
 			metrics.CalendarFailure(err)
 			log.Error().Err(err).Str("tag", tag).Msg("google calendar reconcile failed")
-			return
+			failures = append(failures, err)
+		} else {
+			metrics.CalendarSuccess(days)
 		}
-		metrics.CalendarSuccess(synced)
+		synced += days
+
+		return synced, errors.Join(failures...)
 	}
+
+	bot.SetCalendarSyncFunc(func(ctx context.Context) (int, error) {
+		return syncCalendars(ctx, "manual")
+	})
 
 	var eventNotifier *notification.EventNotifier
 	if cfg.Telegram.Noticer {
 		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
 		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics, chatRepo)
+		scheduler.SetIncidents(incidents)
 		scheduler.Start()
 		defer scheduler.Stop()
 		log.Info().Msg("notification scheduler started")

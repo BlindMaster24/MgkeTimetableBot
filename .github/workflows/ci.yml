@@ -94,7 +94,7 @@ jobs:
           cache: true
 
       - name: Test with -race
-        run: go test -count=1 -p 1 -race ./internal/... ./tests/... ./cmd/...
+        run: go run ./scripts/racecheck
 
   parity:
     name: TypeScript parity

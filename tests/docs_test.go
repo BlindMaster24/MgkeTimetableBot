@@ -128,6 +128,28 @@ func TestDocsCoverEveryConfigKey(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentTheRaceDetector(t *testing.T) {
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{"scripts/racecheck", "CGO_ENABLED=1", "-race"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the race detector token %q", doc, token)
+			}
+		}
+	}
+}
+
+func TestDocsDocumentTheIncidentHistory(t *testing.T) {
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{"/incidents", "health.incidents"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the incident history token %q", doc, token)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentEnvironmentOverrides(t *testing.T) {
 	for _, doc := range docs {
 		content := readDoc(t, doc)

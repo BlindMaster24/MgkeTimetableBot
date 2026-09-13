@@ -98,6 +98,8 @@
 📷 Сгенерировать изображение
 === parserAlertKeyboard ===
 🔄 Переразобрать сейчас
+=== calendarAlertKeyboard ===
+🔄 Синхронизировать сейчас
 === replyCallsSettings(admin) ===
 📊 Показать
 ✅ Обновить с сайта

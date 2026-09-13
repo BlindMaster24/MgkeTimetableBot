@@ -24,6 +24,7 @@ type Scheduler struct {
 	healthTracker *health.Tracker
 	health        *HealthNotifier
 	store         health.StateStore
+	incidents     *health.IncidentLog
 }
 
 func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, sender EventSender, chats EventChatFinder, tracker *health.Tracker, store health.StateStore) *Scheduler {
@@ -42,6 +43,13 @@ func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, se
 
 func (s *Scheduler) Location() *time.Location {
 	return s.location
+}
+
+func (s *Scheduler) SetIncidents(incidents *health.IncidentLog) {
+	s.incidents = incidents
+	if s.health != nil {
+		s.health.SetIncidents(incidents)
+	}
 }
 
 func (s *Scheduler) Start() {
@@ -66,6 +74,7 @@ func (s *Scheduler) registerHealthCheck() {
 	}
 
 	s.health = NewHealthNotifier(s.healthTracker, s.log, s.sender, s.chats, cooldown, s.store)
+	s.health.SetIncidents(s.incidents)
 	expr := fmt.Sprintf("0 */%d * * * *", minutes)
 	if _, err := s.cron.AddFunc(expr, s.health.Check); err != nil {
 		s.log.Error().Err(err).Msg("failed to schedule health check")

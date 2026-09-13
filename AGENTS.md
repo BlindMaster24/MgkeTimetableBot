@@ -21,7 +21,7 @@
   - `formatter/` — output formats: default, compact, visual, litolax.
   - `parity/` — TS ↔ Go surface comparator used by `scripts/paritycheck` and the offline parity test.
   - `utils/` — academic week index, subject list.
-- `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary.
+- `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic).
 - `README.md` / `README.en.md` — mirrored documentation, kept in sync by `tests/docs_test.go`.
 - `Dockerfile`, `docker-compose.yml`, `.dockerignore` — container build; runtime config comes from env vars, state lives in the `/data` volume.
 - `.github/workflows/ci.yml` — quality gates; `.github/workflows/release.yml` — releases and the GHCR image; `.github/dependabot.yml` — weekly dependency bumps.
@@ -58,11 +58,11 @@
 - `go vet ./...` — static analysis.
 - `go clean -cache` — clean build cache.
 - `gofmt -l .` — formatting check (CI fails on any output).
-- `go test -count=1 -p 1 -race ./internal/... ./tests/...` — the race detector run CI performs.
+- `go run ./scripts/racecheck` — the race detector run CI performs; it verifies the cgo/C-compiler prerequisites first and prints the install steps (or `go run ./scripts/racecheck -check` to only report availability).
 - `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` — lint the workflow files after touching `.github/workflows/`.
 
 ## CI and Releases
-- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (gofmt, build, vet, all three binaries), `test` (suite plus `coverage.out` artifact), `race` (`-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata and the container timezone) and `workflow-lint` (`actionlint`).
+- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (gofmt, build, vet, all three binaries), `test` (suite plus `coverage.out` artifact), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata and the container timezone) and `workflow-lint` (`actionlint`).
 - Actions are pinned by commit SHA with the release tag in a comment; Dependabot bumps the SHA and the comment together, so keep the `# vN` comment when editing a `uses:` line.
 - The whole CI sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.1` from `go.mod` is the version every check has to pass with — a newer toolchain is never used silently.
 - `.github/workflows/release.yml` first runs `verify` (build, vet, tests) on the same revision and only then publishes: a push to `main` pushes the multi-arch image to `ghcr.io/blindmaster24/mgketimetablebot` as `:edge`/`:main`; a `v*` tag additionally builds linux/amd64, linux/arm64, windows/amd64 and darwin/arm64 archives, attaches them to a GitHub Release and gives the image `:1.2.3`, `:1.2` and `:latest`.
@@ -123,6 +123,8 @@
 - Thresholds live in the `health` config section (`disabled`, `check_minutes`, `parser_*`, `calendar_*`, `api_*`); add new alert keys to both `internal/health` and `internal/notification/health.go`.
 - `internal/parser` reports diagnostics for every source through `parser.Report`: each required probe names the CSS selector that must match, and a parse that finds nothing, shrinks suspiciously or falls back keeps the previous cache entry instead of overwriting it. The sink is wired in `cmd/bot/main.go` into `health.Tracker.ParserReport` (alerts `parser_layout` for missing selectors and `parser_guard` for a kept cache or a fallback path) and into the bot, which renders it in `/parserLogs`.
 - Parser alerts are actionable: `notification.HealthAlertButtons` attaches the `parser_reparse` button to every parser alert, the `reparseCb` handler runs the parser out of schedule for admins, and `/parserhealth` renders the live snapshot from the bot's `healthSource` (wired as `health.Tracker` in `cmd/bot/main.go`).
+- Calendar alerts are actionable too: the same button table attaches `calendar_sync` to `calendar_failures`/`calendar_stale`, and the `calendarSyncCb` handler runs the change sync plus the reconcile pass wired as `bot.SetCalendarSyncFunc` in `cmd/bot/main.go` — failed days are retried because `LastManualSyncedDay` only advances after a successful pass.
+- `health.IncidentLog` keeps the history of parser, calendar and API incidents in the chat DB (`bot_state`, key `health.incidents`): `HealthNotifier` records an alert when it fires and closes it on recovery, the button handlers call `bot.markIncidentFix` so the manual fix is kept as the outcome, and `/incidents` renders the last 20 of the stored 100 records.
 - The data-loss guard thresholds are config, not constants: `parser.guard.disabled`, `parser.guard.min_items` (default 10) and `parser.guard.max_drop_percent` (default 80) are handed to `parser.Guard`, and each trip reaches the admins as the `parser_guard` alert (`health.parser_guard_failures`, default 1 — the first trip).
 
 ## Coding Style & Naming Conventions
@@ -149,6 +151,7 @@
 - Bot check: `go test ./internal/telegram/...`
 - Full suite: `go test -count=1 -p 1 ./internal/... ./tests/...`
 - Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`
+- Race detector: `go run ./scripts/racecheck` (needs `CGO_ENABLED=1` and a C compiler — gcc on Linux, clang on macOS, mingw-w64 on Windows; `-check` only reports)
 - Static analysis: `go vet ./...`
 
 ## Commit & Pull Request Guidelines

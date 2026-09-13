@@ -86,7 +86,7 @@ func TestHealthNotifierParserAlertsCarryTheReparseButton(t *testing.T) {
 	}
 }
 
-func TestHealthNotifierKeepsOtherAlertsPlain(t *testing.T) {
+func TestHealthNotifierCalendarAlertsCarryTheSyncButton(t *testing.T) {
 	thresholds := health.DefaultThresholds()
 	thresholds.CalendarFailures = 1
 	tracker := health.NewTracker(thresholds)
@@ -98,19 +98,42 @@ func TestHealthNotifierKeepsOtherAlertsPlain(t *testing.T) {
 	if len(sender.sent) != 1 {
 		t.Fatalf("expected one calendar alert, got %+v", sender.sent)
 	}
-	if len(sender.buttoned()) != 0 {
-		t.Errorf("calendar alerts must stay plain, got %+v", sender.buttoned())
+	buttoned := sender.buttoned()
+	if len(buttoned) != 1 {
+		t.Fatalf("expected the calendar alert to carry a button, got %+v", sender.sent)
+	}
+	if buttoned[0].buttons[0].Data != CalendarSyncCallback {
+		t.Errorf("button data = %q, want %q", buttoned[0].buttons[0].Data, CalendarSyncCallback)
+	}
+	if buttoned[0].buttons[0].Text != calendarSyncButton {
+		t.Errorf("button text = %q", buttoned[0].buttons[0].Text)
 	}
 }
 
-func TestHealthAlertButtonsOnlyForParserAlerts(t *testing.T) {
-	parserKeys := []string{
+func TestHealthNotifierKeepsAPIAlertsPlain(t *testing.T) {
+	thresholds := health.DefaultThresholds()
+	thresholds.APIErrors = 1
+	tracker := health.NewTracker(thresholds)
+	tracker.APIRequest(500, time.Millisecond)
+
+	notifier, sender, _ := newTestHealthNotifier(t, tracker, time.Minute)
+	notifier.Check()
+
+	if len(sender.sent) != 1 {
+		t.Fatalf("expected one API alert, got %+v", sender.sent)
+	}
+	if len(sender.buttoned()) != 0 {
+		t.Errorf("API alerts must stay plain, got %+v", sender.buttoned())
+	}
+}
+
+func TestHealthAlertButtonsMatchTheAlertScope(t *testing.T) {
+	for _, key := range []string{
 		health.AlertParserFailures,
 		health.AlertParserStale,
 		health.AlertParserLayout,
 		health.AlertParserGuard,
-	}
-	for _, key := range parserKeys {
+	} {
 		buttons := HealthAlertButtons(key)
 		if len(buttons) != 1 {
 			t.Errorf("%s: expected one button, got %+v", key, buttons)
@@ -124,13 +147,25 @@ func TestHealthAlertButtonsOnlyForParserAlerts(t *testing.T) {
 		}
 	}
 
-	for _, key := range []string{health.AlertCalendarFailures, health.AlertCalendarStale, health.AlertAPIErrors} {
-		if buttons := HealthAlertButtons(key); len(buttons) != 0 {
-			t.Errorf("%s: expected no buttons, got %+v", key, buttons)
+	for _, key := range []string{health.AlertCalendarFailures, health.AlertCalendarStale} {
+		buttons := HealthAlertButtons(key)
+		if len(buttons) != 1 {
+			t.Errorf("%s: expected the sync button, got %+v", key, buttons)
+			continue
 		}
-		if IsParserAlert(key) {
-			t.Errorf("%s: IsParserAlert = true", key)
+		if buttons[0].Data != CalendarSyncCallback {
+			t.Errorf("%s: button data = %q", key, buttons[0].Data)
 		}
+		if !IsCalendarAlert(key) {
+			t.Errorf("%s: IsCalendarAlert = false", key)
+		}
+	}
+
+	if buttons := HealthAlertButtons(health.AlertAPIErrors); len(buttons) != 0 {
+		t.Errorf("API alerts must stay plain, got %+v", buttons)
+	}
+	if IsParserAlert(health.AlertCalendarFailures) || IsCalendarAlert(health.AlertParserGuard) {
+		t.Error("parser and calendar scopes must stay apart")
 	}
 }
 
@@ -281,6 +316,65 @@ func TestHealthNotifierWithoutAdmins(t *testing.T) {
 
 	if len(sender.sent) != 0 {
 		t.Errorf("no admins means no messages, got %+v", sender.sent)
+	}
+}
+
+func TestHealthNotifierRecordsIncidents(t *testing.T) {
+	store := newMemoryStateStore()
+	incidents := health.NewIncidentLog(store, 0)
+	tracker := failingTracker()
+
+	notifier, _, _ := newTestHealthNotifier(t, tracker, time.Minute)
+	notifier.SetIncidents(incidents)
+
+	notifier.Check()
+	open := incidents.Open()
+	if len(open) != 1 || open[0].Key != health.AlertParserFailures {
+		t.Fatalf("open incidents = %+v", open)
+	}
+	if open[0].Detail == "" {
+		t.Error("the incident must carry the alert detail")
+	}
+
+	tracker.ParserSuccess(time.Millisecond)
+	notifier.Check()
+
+	restarted := health.NewIncidentLog(store, 0)
+	recent := restarted.Recent(1)
+	if len(recent) != 1 {
+		t.Fatalf("records = %+v", recent)
+	}
+	if recent[0].Open() || recent[0].Resolution != health.ResolutionAuto {
+		t.Errorf("a recovery must close the incident by itself: %+v", recent[0])
+	}
+}
+
+func TestHealthNotifierKeepsAManualFixInTheHistory(t *testing.T) {
+	incidents := health.NewIncidentLog(nil, 0)
+	tracker := failingTracker()
+
+	notifier, _, _ := newTestHealthNotifier(t, tracker, time.Minute)
+	notifier.SetIncidents(incidents)
+	notifier.Check()
+
+	incidents.MarkManual(health.ScopeParser, "переразбор вручную")
+
+	tracker.ParserSuccess(time.Millisecond)
+	notifier.Check()
+
+	recent := incidents.Recent(1)
+	if recent[0].Resolution != health.ResolutionManual || recent[0].Note != "переразбор вручную" {
+		t.Errorf("the manual fix must survive the recovery: %+v", recent[0])
+	}
+}
+
+func TestHealthNotifierToleratesAMissingIncidentLog(t *testing.T) {
+	notifier, sender, _ := newTestHealthNotifier(t, failingTracker(), time.Minute)
+
+	notifier.Check()
+
+	if len(sender.sent) != 1 {
+		t.Errorf("alerts must work without an incident log, got %+v", sender.sent)
 	}
 }
 

@@ -13,6 +13,7 @@
     { "section": "commands", "kind": "extra_in_go", "value": "google_calendar", "reason": "Go port exposes Google Calendar as its own command and main-menu button" },
     { "section": "commands", "kind": "extra_in_go", "value": "id", "reason": "Go port adds a test command printing the user and chat id" },
     { "section": "commands", "kind": "extra_in_go", "value": "image", "reason": "Go port adds /image as a shortcut for the cached timetable image" },
+    { "section": "commands", "kind": "extra_in_go", "value": "incidents", "reason": "Go port keeps a stored history of parser and calendar incidents for admins" },
     { "section": "commands", "kind": "extra_in_go", "value": "math", "reason": "Go port adds a math helper command" },
     { "section": "commands", "kind": "extra_in_go", "value": "noticedebug", "reason": "Go port adds a debug command showing which chats receive each notification type" },
     { "section": "commands", "kind": "extra_in_go", "value": "parserhealth", "reason": "Go port adds an admin command with the parser health snapshot and a manual reparse button" },
@@ -25,6 +26,7 @@
     { "section": "callbacks", "kind": "extra_in_go", "value": "alias", "reason": "Go alias menu uses its own callback root; TS kept alias removal outside the callback list" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "gcal", "reason": "Go Google Calendar flows use gcal callback roots where TS used a single google callback" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "parser", "reason": "Go parser alerts carry a manual reparse button; TS health notifications were text only" },
+    { "section": "callbacks", "kind": "extra_in_go", "value": "calendar", "reason": "Go calendar alerts carry a manual sync button; TS health notifications were text only" },
 
     { "section": "buttons", "kind": "missing_in_go", "value": "Проверить", "reason": "StaticKeyboard.NeedAccept returns no keyboard for the telegram service, so this button is VK-only and the Go port excludes VK" },
 

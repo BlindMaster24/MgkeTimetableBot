@@ -9,7 +9,10 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
+	"github.com/mymmrac/telego"
 )
+
+const incidentHistoryLimit = 20
 
 type regexpCmd struct{ bot *Bot }
 
@@ -152,6 +155,91 @@ func (b *Bot) parserHealthText() string {
 
 	lines = append(lines, "", "Кнопка ниже запускает разбор немедленно.")
 	return strings.Join(lines, "\n")
+}
+
+type incidentsCmd struct{ bot *Bot }
+
+func (c *incidentsCmd) Name() string { return "/incidents" }
+
+func (c *incidentsCmd) AdminOnly() bool { return true }
+func (c *incidentsCmd) Description() string {
+	return c.bot.loc("cmd_incidents")
+}
+func (c *incidentsCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.incidentsText(), c.bot.incidentButtons())
+}
+
+func (b *Bot) incidentsText() string {
+	if b.incidents == nil {
+		return b.loc("incidents_unavailable")
+	}
+
+	records := b.incidents.Recent(incidentHistoryLimit)
+	lines := []string{b.locData("incidents_header", map[string]interface{}{"Count": incidentHistoryLimit})}
+	if len(records) == 0 {
+		return strings.Join(append(lines, b.loc("incidents_empty")), "\n")
+	}
+
+	now := time.Now()
+	for _, record := range records {
+		lines = append(lines, b.incidentLine(record, now))
+		if record.Detail != "" {
+			lines = append(lines, "   "+record.Detail)
+		}
+		lines = append(lines, "   "+b.loc("incidents_outcome")+": "+b.incidentOutcome(record))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (b *Bot) incidentLine(record health.Incident, now time.Time) string {
+	icon := "✅"
+	switch {
+	case record.Open():
+		icon = "⚠️"
+	case record.Resolution == health.ResolutionManual:
+		icon = "🔧"
+	}
+
+	window := b.loc("incidents_since") + " " + healthClock(record.StartedAt)
+	if !record.Open() {
+		window = healthClock(record.StartedAt) + "–" + healthClock(record.EndedAt)
+	}
+
+	return fmt.Sprintf("%s %s (%s)\n   %s — %s", icon, window, record.Duration(now).Truncate(time.Second), notification.HealthAlertTitle(record.Key), record.Key)
+}
+
+func (b *Bot) incidentOutcome(record health.Incident) string {
+	if record.Open() {
+		return b.loc("incidents_outcome_open")
+	}
+	if record.Note != "" {
+		return record.Note
+	}
+	return b.loc("incidents_outcome_auto")
+}
+
+func (b *Bot) incidentButtons() *telego.InlineKeyboardMarkup {
+	open := b.incidents.Open()
+	var buttons []notification.KeyboardButton
+	seen := map[string]bool{}
+	for _, record := range open {
+		for _, button := range notification.HealthAlertButtons(record.Key) {
+			if seen[button.Data] {
+				continue
+			}
+			seen[button.Data] = true
+			buttons = append(buttons, button)
+		}
+	}
+	return buttonsKeyboard(buttons)
+}
+
+func healthClock(value time.Time) string {
+	return value.Local().Format("02.01 15:04:05")
 }
 
 func healthTimestamp(value string) string {
