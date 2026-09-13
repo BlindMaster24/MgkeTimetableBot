@@ -2,6 +2,8 @@ package health
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -12,6 +14,7 @@ const (
 
 	AlertParserStale      = "parser_stale"
 	AlertParserFailures   = "parser_failures"
+	AlertParserLayout     = "parser_layout"
 	AlertCalendarStale    = "calendar_stale"
 	AlertCalendarFailures = "calendar_failures"
 	AlertAPIErrors        = "api_errors"
@@ -20,6 +23,7 @@ const (
 type Thresholds struct {
 	ParserStale      time.Duration
 	ParserFailures   int
+	ParserLayout     int
 	CalendarStale    time.Duration
 	CalendarFailures int
 	APIErrors        int
@@ -30,6 +34,7 @@ func DefaultThresholds() Thresholds {
 	return Thresholds{
 		ParserStale:      15 * time.Minute,
 		ParserFailures:   3,
+		ParserLayout:     2,
 		CalendarStale:    6 * time.Hour,
 		CalendarFailures: 3,
 		APIErrors:        20,
@@ -45,6 +50,9 @@ func (t Thresholds) WithDefaults() Thresholds {
 	}
 	if t.ParserFailures <= 0 {
 		t.ParserFailures = fallback.ParserFailures
+	}
+	if t.ParserLayout <= 0 {
+		t.ParserLayout = fallback.ParserLayout
 	}
 	if t.CalendarStale <= 0 {
 		t.CalendarStale = fallback.CalendarStale
@@ -67,15 +75,29 @@ type Alert struct {
 	Detail string `json:"detail"`
 }
 
+type LayoutIssue struct {
+	Source   string `json:"source"`
+	Selector string `json:"selector"`
+	Expected string `json:"expected,omitempty"`
+	Found    int    `json:"found"`
+}
+
+type layoutState struct {
+	issues   []LayoutIssue
+	failures int
+}
+
 type ParserStats struct {
-	Runs                int64  `json:"runs"`
-	Errors              int64  `json:"errors"`
-	ConsecutiveFailures int    `json:"consecutiveFailures"`
-	LastSuccessAt       string `json:"lastSuccessAt,omitempty"`
-	LastErrorAt         string `json:"lastErrorAt,omitempty"`
-	LastError           string `json:"lastError,omitempty"`
-	LagSeconds          int64  `json:"lagSeconds"`
-	LastDurationMS      int64  `json:"lastDurationMs"`
+	Runs                int64         `json:"runs"`
+	Errors              int64         `json:"errors"`
+	ConsecutiveFailures int           `json:"consecutiveFailures"`
+	LastSuccessAt       string        `json:"lastSuccessAt,omitempty"`
+	LastErrorAt         string        `json:"lastErrorAt,omitempty"`
+	LastError           string        `json:"lastError,omitempty"`
+	LagSeconds          int64         `json:"lagSeconds"`
+	LastDurationMS      int64         `json:"lastDurationMs"`
+	Layout              []LayoutIssue `json:"layout,omitempty"`
+	LayoutFailures      int           `json:"layoutFailures"`
 }
 
 type CalendarStats struct {
@@ -119,6 +141,7 @@ type Tracker struct {
 	parserLastError     time.Time
 	parserLastErrorText string
 	parserLastDuration  time.Duration
+	parserLayout        map[string]layoutState
 
 	calendarRuns          int64
 	calendarErrors        int64
@@ -164,6 +187,24 @@ func (t *Tracker) ParserFailure(err error) {
 	t.parserFailures++
 	t.parserLastError = time.Now()
 	t.parserLastErrorText = errorText(err)
+}
+
+func (t *Tracker) ParserReport(source string, issues []LayoutIssue, keptOld bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.parserLayout == nil {
+		t.parserLayout = make(map[string]layoutState)
+	}
+
+	state := t.parserLayout[source]
+	if len(issues) > 0 || keptOld {
+		state.failures++
+	} else {
+		state.failures = 0
+	}
+	state.issues = issues
+	t.parserLayout[source] = state
 }
 
 func (t *Tracker) CalendarSuccess(days int) {
@@ -222,6 +263,8 @@ func (t *Tracker) Snapshot() Snapshot {
 			LastError:           t.parserLastErrorText,
 			LagSeconds:          lagSeconds(now, t.parserLastSuccess),
 			LastDurationMS:      t.parserLastDuration.Milliseconds(),
+			Layout:              t.layoutIssuesLocked(),
+			LayoutFailures:      t.layoutFailuresLocked(),
 		},
 		Calendar: CalendarStats{
 			Runs:                t.calendarRuns,
@@ -253,10 +296,42 @@ func (t *Tracker) Alerts() []Alert {
 	return t.alertsLocked(time.Now())
 }
 
+func (t *Tracker) layoutIssuesLocked() []LayoutIssue {
+	sources := make([]string, 0, len(t.parserLayout))
+	for source := range t.parserLayout {
+		sources = append(sources, source)
+	}
+	sort.Strings(sources)
+
+	var issues []LayoutIssue
+	for _, source := range sources {
+		issues = append(issues, t.parserLayout[source].issues...)
+	}
+	return issues
+}
+
+func (t *Tracker) layoutFailuresLocked() int {
+	worst := 0
+	for _, state := range t.parserLayout {
+		if state.failures > worst {
+			worst = state.failures
+		}
+	}
+	return worst
+}
+
 func (t *Tracker) alertsLocked(now time.Time) []Alert {
 	t.pruneAPIErrors(now)
 
 	var alerts []Alert
+
+	if failures := t.layoutFailuresLocked(); failures >= t.thresholds.ParserLayout && t.thresholds.ParserLayout > 0 {
+		alerts = append(alerts, Alert{
+			Key:    AlertParserLayout,
+			Level:  LevelWarning,
+			Detail: fmt.Sprintf("runs=%d threshold=%d %s", failures, t.thresholds.ParserLayout, layoutDetail(t.layoutIssuesLocked())),
+		})
+	}
 
 	if t.parserFailures > 0 && t.parserFailures >= t.thresholds.ParserFailures {
 		alerts = append(alerts, Alert{
@@ -305,6 +380,18 @@ func (t *Tracker) alertsLocked(now time.Time) []Alert {
 	}
 
 	return alerts
+}
+
+func layoutDetail(issues []LayoutIssue) string {
+	if len(issues) == 0 {
+		return ""
+	}
+
+	parts := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		parts = append(parts, fmt.Sprintf("%s: %s", issue.Source, issue.Selector))
+	}
+	return "missing " + strings.Join(parts, ", ")
 }
 
 func (t *Tracker) pruneAPIErrors(now time.Time) {

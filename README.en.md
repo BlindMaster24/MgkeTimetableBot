@@ -146,6 +146,12 @@ The scheduler follows the college day: during activity hours (9:00–17:00 by de
 
 The bell schedule refreshes itself from the college site; it can still be edited by hand from the calls menu.
 
+#### Resistance to layout changes
+
+The parser does not depend on a rigid page structure: the group or teacher name comes from the nearest heading (any `h1`…`h6` or `caption`), and the day columns are derived from the table header, `colspan` included, instead of hard-coded cell numbers. If the layout collapses to a single column per day, the parser tries to read the room from the cell text.
+
+Every run collects diagnostics — which selector matched what. When the site changes and a required selector stops matching, an empty or sharply shrunken result **never overwrites the cache**: the bot keeps serving the timetable, and the problem shows up in `/parserLogs` (admins) and `GET /api/health` (`parser.layout`), and after `health.parser_layout_failures` runs in a row it arrives as a Telegram alert.
+
 The `parser.v2.*` keys come from the old TypeScript bot and are not read by the Go version — they are no longer part of the example config.
 
 ## Bot commands
@@ -217,7 +223,7 @@ Counters are kept in memory (`internal/health`) and served by `GET /api/health`.
 
 | Group | Metrics | Alerts |
 |-------|---------|--------|
-| Parser | runs and errors, consecutive failures, time since the last successful parse, cycle duration | failure streak, stale data |
+| Parser | runs and errors, consecutive failures, time since the last successful parse, cycle duration, which selectors stopped matching | failure streak, stale data, a broken site layout |
 | Google Calendar | runs and errors, consecutive failures, days synced | failure streak, no successful sync for too long |
 | HTTP API | requests, 5xx responses, recent errors, slowest request | burst of 5xx responses |
 
@@ -230,6 +236,7 @@ health:
   cooldown_minutes: 30         # pause between reminders
   parser_stale_minutes: 15     # the timetable has not been refreshed for so long
   parser_failures: 3           # consecutive failed parses
+  parser_layout_failures: 2    # consecutive parses where a selector stopped matching
   calendar_stale_minutes: 360
   calendar_failures: 3
   api_errors: 20               # 5xx responses inside the window

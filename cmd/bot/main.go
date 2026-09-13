@@ -174,7 +174,21 @@ func main() {
 	if cfg.Parser.Proxy != nil {
 		proxy = *cfg.Parser.Proxy
 	}
-	fetcher := parserpkg.NewFetcher(log, raspCache, parserpkg.Options{Proxy: proxy})
+	onParserReport := func(report parserpkg.Report) {
+		issues := make([]health.LayoutIssue, 0, len(report.Failing()))
+		for _, probe := range report.Failing() {
+			issues = append(issues, health.LayoutIssue{
+				Source:   report.Source,
+				Selector: probe.Selector,
+				Expected: probe.Expected,
+				Found:    probe.Found,
+			})
+		}
+		metrics.ParserReport(report.Source, issues, report.KeptOld)
+		bot.RecordParserReport(report)
+	}
+
+	fetcher := parserpkg.NewFetcher(log, raspCache, parserpkg.Options{Proxy: proxy, OnReport: onParserReport})
 
 	parseOnce := func(force bool) error {
 		started := time.Now()
@@ -251,6 +265,7 @@ func healthThresholds(cfg *config.Config) health.Thresholds {
 
 	thresholds.ParserStale = time.Duration(cfg.Health.ParserStaleMinutes) * time.Minute
 	thresholds.ParserFailures = cfg.Health.ParserFailures
+	thresholds.ParserLayout = cfg.Health.ParserLayoutFailures
 	thresholds.CalendarStale = time.Duration(cfg.Health.CalendarStaleMinutes) * time.Minute
 	thresholds.CalendarFailures = cfg.Health.CalendarFailures
 	thresholds.APIErrors = cfg.Health.APIErrors

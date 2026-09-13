@@ -8,12 +8,15 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
 
-var groupNumberRe = regexp.MustCompile(`^Группа\s*-\s*(.+)$`)
+var groupNumberRe = regexp.MustCompile(`(?i)^Группа\s*[-–—:]?\s*(.+)$`)
+var groupLooseRe = regexp.MustCompile(`(?i)Группа\s*[-–—:]?\s*(.+)$`)
 var subgroupPrefixRe = regexp.MustCompile(`^(\d+)\.`)
 var typeInParensRe = regexp.MustCompile(`^\(([^)]+)\)$`)
+var dashOnlyRe = regexp.MustCompile(`^[-—\s]+$`)
 
 type GroupParser struct {
-	doc *goquery.Document
+	doc    *goquery.Document
+	report Report
 }
 
 func NewGroupParser(doc *goquery.Document) *GroupParser {
@@ -24,52 +27,89 @@ func (p *GroupParser) ContentHash() string {
 	return hashDocument(p.doc)
 }
 
+func (p *GroupParser) Report() Report {
+	return p.report
+}
+
 func (p *GroupParser) Run() (model.Groups, error) {
-	groups := make(model.Groups)
-
-	tables := findContent(p.doc).Find("table")
-
-	tables.Each(func(_ int, table *goquery.Selection) {
-		h2 := findPreviousH2(table)
-		if h2 == nil {
-			return
-		}
-
-		label := strings.TrimSpace(h2.Text())
-		match := groupNumberRe.FindStringSubmatch(label)
-		if match == nil {
-			return
-		}
-
-		groupNum := strings.TrimSpace(match[1])
-		groupNum = strings.TrimSuffix(groupNum, "*")
-
-		if groupNum == "" {
-			return
-		}
-
-		group := p.parseTable(table, groupNum)
-		if group != nil {
-			groups[groupNum] = group
-		}
-	})
-
+	groups, report := p.Parse()
+	p.report = report
 	return groups, nil
 }
 
-func findPreviousH2(table *goquery.Selection) *goquery.Selection {
-	prev := table.Prev()
-	for prev.Length() > 0 {
-		tag := goquery.NodeName(prev)
-		if tag == "h2" {
-			return prev
+func (p *GroupParser) Parse() (model.Groups, Report) {
+	groups := make(model.Groups)
+	builder := newReport(SourceGroups, "")
+
+	tables := scopedTables(p.doc, builder)
+	builder.probe("table", "timetable tables", tables.Length(), true)
+
+	labelled := 0
+	skipped := 0
+	withDays := 0
+	withLessons := 0
+
+	tables.Each(func(_ int, table *goquery.Selection) {
+		match, ok := tableLabel(table, p.doc, groupLabel)
+		if !ok {
+			return
 		}
-		if tag == "table" {
-			return nil
+		labelled++
+
+		group := p.parseTable(table, match.Value)
+		if group == nil {
+			skipped++
+			return
 		}
-		prev = prev.Prev()
+		if match.Loose {
+			builder.fallback("group label without the 'Группа -' prefix: " + match.Value)
+		}
+
+		withDays++
+		if groupHasLessons(group) {
+			withLessons++
+		}
+		groups[match.Value] = group
+	})
+
+	builder.probe("heading: Группа - <номер>", "group headings", labelled, true)
+	builder.probe("th[colspan] with a date", "groups with day columns", withDays, true)
+	builder.probe("td lesson cells", "groups with at least one lesson", withLessons, false)
+
+	if skipped > 0 {
+		builder.warn("%d tables had no readable day columns", skipped)
 	}
-	return nil
+	if withDays > 0 && withLessons == 0 {
+		builder.warn("day columns were found, but no lesson cell produced a subject")
+	}
+
+	return groups, builder.done(len(groups))
+}
+
+func groupLabel(text string) labelMatch {
+	if match := groupNumberRe.FindStringSubmatch(text); match != nil {
+		if name := normalizeGroupName(match[1]); name != "" {
+			return labelMatch{Value: name, OK: true}
+		}
+	}
+	if match := groupLooseRe.FindStringSubmatch(text); match != nil {
+		if name := normalizeGroupName(match[1]); name != "" {
+			return labelMatch{Value: name, Loose: true, OK: true}
+		}
+	}
+	return labelMatch{}
+}
+
+func normalizeGroupName(raw string) string {
+	name := trimSeparators(strings.TrimSpace(raw))
+	name = strings.TrimSpace(strings.TrimSuffix(name, "*"))
+	if name == "" {
+		return ""
+	}
+	if fields := strings.Fields(name); len(fields) > 1 {
+		return fields[0]
+	}
+	return name
 }
 
 func (p *GroupParser) parseTable(table *goquery.Selection, groupNum string) *model.Group {
@@ -78,21 +118,30 @@ func (p *GroupParser) parseTable(table *goquery.Selection, groupNum string) *mod
 		return nil
 	}
 
-	firstRow := rows.First()
-	days := parseDayHeaders(firstRow)
-	if len(days) == 0 {
+	headerRow := findHeaderRow(rows)
+	if headerRow == nil {
 		return nil
 	}
 
-	for i := range days {
-		days[i].Lessons = make([]model.GroupLesson, 0)
+	columns := buildDayColumns(headerRow, true)
+	if len(columns) == 0 {
+		return nil
 	}
 
+	days := make([]model.GroupDay, len(columns))
+	for i, column := range columns {
+		days[i] = model.GroupDay{
+			Day:     column.Day,
+			Lessons: make([]model.GroupLesson, 0),
+		}
+	}
+
+	headerIdx := headerRowIndex(headerRow, rows)
 	rows.Each(func(i int, row *goquery.Selection) {
-		if i <= 1 {
+		if i <= headerIdx || isHeaderRow(rows, row) {
 			return
 		}
-		p.parseLessonRow(row, days)
+		parseGridLessonRow(row, columns, days)
 	})
 
 	for i := range days {
@@ -105,68 +154,58 @@ func (p *GroupParser) parseTable(table *goquery.Selection, groupNum string) *mod
 	}
 }
 
-func parseDayHeaders(row *goquery.Selection) []model.GroupDay {
-	cells := row.Find("th")
-	var days []model.GroupDay
+func groupHasLessons(group *model.Group) bool {
+	for _, day := range group.Days {
+		if len(day.Lessons) > 0 {
+			return true
+		}
+	}
+	return false
+}
 
-	cells.Each(func(_ int, cell *goquery.Selection) {
-		text := strings.TrimSpace(cell.Text())
-		if text == "" {
+func parseGridLessonRow(row *goquery.Selection, columns []DayColumn, days []model.GroupDay) {
+	cells, _, _ := rowCellIndexes(row)
+
+	for i, column := range columns {
+		lessonCell, ok := cells[column.LessonCol]
+		if !ok {
 			return
 		}
 
-		colspan, _ := cell.Attr("colspan")
-		if colspan == "2" {
-			days = append(days, model.GroupDay{
-				Day: text,
-			})
-		}
-	})
-
-	return days
-}
-
-func (p *GroupParser) parseLessonRow(row *goquery.Selection, days []model.GroupDay) {
-	cells := row.Find("td, th")
-	totalCells := cells.Length()
-	if totalCells < 2 {
-		return
-	}
-
-	numDayPairs := (totalCells - 1) / 2
-
-	for dayIdx := 0; dayIdx < numDayPairs && dayIdx < len(days); dayIdx++ {
-		lessonCellIdx := 1 + dayIdx*2
-		cabinetCellIdx := 2 + dayIdx*2
-
-		if lessonCellIdx >= totalCells {
-			break
+		cabinetCell := lessonCell
+		if column.HasCabinet {
+			if cell, exists := cells[column.CabinetCol]; exists {
+				cabinetCell = cell
+			}
 		}
 
-		lessonCell := cells.Eq(lessonCellIdx)
-		cabinetCell := cells.Eq(cabinetCellIdx)
-
-		if cabinetCellIdx >= totalCells {
-			cabinetCell = lessonCell
-		}
-
-		lesson := parseGridLessonCell(lessonCell, cabinetCell)
-		days[dayIdx].Lessons = append(days[dayIdx].Lessons, lesson)
+		days[i].Lessons = append(days[i].Lessons, parseGridLessonCell(lessonCell, cabinetCell, column.HasCabinet))
 	}
 }
 
-func parseGridLessonCell(lessonCell, cabinetCell *goquery.Selection) model.GroupLesson {
+func parseGridLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet bool) model.GroupLesson {
 	lessonText := cleanCellText(lessonCell)
-	cabinetText := cleanCellText(cabinetCell)
-
 	if lessonText == "" || lessonText == "\u00a0" || lessonText == "-" || lessonText == "\u2014" {
 		return nil
 	}
 
-	cabinetText = removeDashes(cabinetText)
+	cabinetText := ""
+	if hasCabinet {
+		cabinetText = removeDashes(cleanCellText(cabinetCell))
+	}
 
 	lessonLines := splitCellLines(lessonCell)
 	cabLines := splitCellLines(cabinetCell)
+
+	if !hasCabinet {
+		var inline string
+		lessonLines, inline = splitInlineCabinet(lessonLines)
+		cabinetText = inline
+		cabLines = []string{inline}
+		if len(lessonLines) == 0 {
+			return nil
+		}
+	}
 
 	chunks := chunkLines(lessonLines, 3)
 	cabChunks := chunkLines(cabLines, 1)
@@ -228,8 +267,7 @@ func buildSingleLesson(chunks [][]string, cabinet string) model.GroupLesson {
 		name = strings.TrimSpace(chunk[0])
 	}
 	if len(chunk) >= 2 {
-		typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[1]))
-		if typeMatch != nil {
+		if typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[1])); typeMatch != nil {
 			lessonType = typeMatch[1]
 		}
 	}
@@ -265,15 +303,14 @@ func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
 
 		if len(chunk) >= 1 {
 			line := strings.TrimSpace(chunk[0])
-			if m := subgroupPrefixRe.FindStringSubmatch(line); m != nil {
-				subgroupNum = int(m[1][0] - '0')
-				line = strings.TrimSpace(line[len(m[0]):])
+			if match := subgroupPrefixRe.FindStringSubmatch(line); match != nil {
+				subgroupNum = int(match[1][0] - '0')
+				line = strings.TrimSpace(line[len(match[0]):])
 			}
 			name = line
 		}
 		if len(chunk) >= 2 {
-			typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[1]))
-			if typeMatch != nil {
+			if typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[1])); typeMatch != nil {
 				lessonType = typeMatch[1]
 			}
 		}
@@ -292,9 +329,9 @@ func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
 			continue
 		}
 
-		n := subgroupNum
+		number := subgroupNum
 		result = append(result, &model.GroupLessonExplain{
-			Subgroup: &n,
+			Subgroup: &number,
 			Lesson:   name,
 			Type:     ptrString(lessonType),
 			Teacher:  ptrString(teacher),
@@ -312,13 +349,12 @@ func cleanCellText(cell *goquery.Selection) string {
 	text := cell.Text()
 	text = strings.ReplaceAll(text, "\u00a0", "")
 	text = strings.ReplaceAll(text, "&nbsp;", "")
-	text = strings.TrimSpace(text)
-	return text
+	return strings.TrimSpace(text)
 }
 
 func removeDashes(text string) string {
 	text = strings.TrimSpace(text)
-	text = regexp.MustCompile(`^[-—\s]+$`).ReplaceAllString(text, "")
+	text = dashOnlyRe.ReplaceAllString(text, "")
 	return strings.TrimSpace(text)
 }
 
@@ -349,8 +385,8 @@ func shortenSubjectName(name string) string {
 }
 
 func extractType(text string) string {
-	if m := typeInParensRe.FindStringSubmatch(text); m != nil {
-		return m[1]
+	if match := typeInParensRe.FindStringSubmatch(text); match != nil {
+		return match[1]
 	}
 	return ""
 }

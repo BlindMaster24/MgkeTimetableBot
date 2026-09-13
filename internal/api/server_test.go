@@ -67,6 +67,47 @@ func TestHealthEndpointReportsTrackerState(t *testing.T) {
 	}
 }
 
+func TestHealthEndpointExposesParserLayout(t *testing.T) {
+	thresholds := health.DefaultThresholds()
+	thresholds.ParserLayout = 1
+	tracker := health.NewTracker(thresholds)
+	tracker.ParserReport("groups", []health.LayoutIssue{{
+		Source:   "groups",
+		Selector: "td lesson cells",
+		Expected: "groups with at least one lesson",
+	}}, false)
+	srv := setupTestServerWith(t, tracker)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/health", nil)
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 while the layout alert is active, got %d", w.Code)
+	}
+
+	var body health.Snapshot
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode snapshot: %v", err)
+	}
+	if len(body.Parser.Layout) != 1 || body.Parser.Layout[0].Selector != "td lesson cells" {
+		t.Errorf("layout issues = %+v", body.Parser.Layout)
+	}
+	if body.Parser.LayoutFailures != 1 {
+		t.Errorf("layout failures = %d", body.Parser.LayoutFailures)
+	}
+
+	found := false
+	for _, alert := range body.Alerts {
+		if alert.Key == health.AlertParserLayout {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected the parser layout alert, got %+v", body.Alerts)
+	}
+}
+
 func TestHealthEndpointFailsWhileAlerting(t *testing.T) {
 	thresholds := health.DefaultThresholds()
 	thresholds.ParserFailures = 1

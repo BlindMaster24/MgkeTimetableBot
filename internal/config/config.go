@@ -23,6 +23,7 @@ type HealthConfig struct {
 	CooldownMinutes      int  `yaml:"cooldown_minutes"`
 	ParserStaleMinutes   int  `yaml:"parser_stale_minutes"`
 	ParserFailures       int  `yaml:"parser_failures"`
+	ParserLayoutFailures int  `yaml:"parser_layout_failures"`
 	CalendarStaleMinutes int  `yaml:"calendar_stale_minutes"`
 	CalendarFailures     int  `yaml:"calendar_failures"`
 	APIErrors            int  `yaml:"api_errors"`

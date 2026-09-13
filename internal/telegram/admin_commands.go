@@ -60,9 +60,6 @@ func (c *parserLogsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
 	logs := c.bot.GetParseLogs()
-	if len(logs) == 0 {
-		return u.Bot.SendText(u.ChatID, "Логов нет")
-	}
 	var lines []string
 	for i, entry := range logs {
 		icon := "✅"
@@ -70,6 +67,14 @@ func (c *parserLogsCmd) Handler(ctx context.Context, u *Update) error {
 			icon = "❌"
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s [%s]: %s", i+1, icon, entry.time.Format("02.01 15:04:05"), entry.msg))
+	}
+
+	if diagnostics := c.bot.parserDiagnostics(); len(diagnostics) > 0 {
+		lines = append(lines, diagnostics...)
+	}
+
+	if len(lines) == 0 {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("parser_logs_no_logs"))
 	}
 	text := strings.Join(lines, "\n")
 	if len(text) > 4096 {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 )
 
 const mockBellScheduleHTML = `<html><body>
@@ -115,6 +116,22 @@ func TestNormalizeCallsTime(t *testing.T) {
 			t.Errorf("normalizeCallsTime(%q, %q) = %q, want %q", tt.h, tt.m, got, tt.want)
 		}
 	}
+}
+
+func fetchAndParseCalls(client *http.Client, rawURL string) *cache.Schedule {
+	resp, err := fetchHTML(client, rawURL)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	schedule, _ := ParseCallsScheduleReport(doc)
+	return schedule
 }
 
 func TestFetchAndParseCalls(t *testing.T) {

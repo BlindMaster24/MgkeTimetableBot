@@ -122,6 +122,8 @@ func healthAlertTitle(key string) string {
 		return "Парсер расписания падает"
 	case health.AlertParserStale:
 		return "Расписание давно не обновлялось"
+	case health.AlertParserLayout:
+		return "Парсер перестал находить данные на сайте"
 	case health.AlertCalendarFailures:
 		return "Ошибки синхронизации Google Calendar"
 	case health.AlertCalendarStale:

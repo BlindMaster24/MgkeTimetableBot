@@ -94,6 +94,7 @@ health:
   cooldown_minutes: 30
   parser_stale_minutes: 15
   parser_failures: 3
+  parser_layout_failures: 2
   calendar_stale_minutes: 360
   calendar_failures: 3
   api_errors: 20

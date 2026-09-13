@@ -2,6 +2,7 @@ package health
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -172,6 +173,86 @@ func TestAPIErrorsUseWindow(t *testing.T) {
 	if alerts := alertKeys(tracker.Alerts()); alerts[AlertAPIErrors] != "" {
 		t.Fatalf("errors outside the window must be pruned, got %+v", alerts)
 	}
+}
+
+func TestParserLayoutAlertNeedsRepeatedRuns(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.ParserLayout = 2
+	tracker := NewTracker(thresholds)
+
+	issue := LayoutIssue{Source: "groups", Selector: "td lesson cells", Expected: "groups with at least one lesson"}
+	tracker.ParserReport("groups", []LayoutIssue{issue}, false)
+
+	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert != nil {
+		t.Errorf("a single run must not alert yet: %+v", alert)
+	}
+
+	tracker.ParserReport("groups", []LayoutIssue{issue}, false)
+	alert := findAlert(tracker.Alerts(), AlertParserLayout)
+	if alert == nil {
+		t.Fatal("expected a layout alert after two runs")
+	}
+	if !strings.Contains(alert.Detail, "td lesson cells") {
+		t.Errorf("alert does not name the selector: %q", alert.Detail)
+	}
+
+	snapshot := tracker.Snapshot()
+	if snapshot.Parser.LayoutFailures != 2 {
+		t.Errorf("layout failures = %d", snapshot.Parser.LayoutFailures)
+	}
+	if len(snapshot.Parser.Layout) != 1 || snapshot.Parser.Layout[0].Selector != "td lesson cells" {
+		t.Errorf("layout issues = %+v", snapshot.Parser.Layout)
+	}
+
+	tracker.ParserReport("groups", nil, false)
+	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert != nil {
+		t.Errorf("alert must clear after a clean run: %+v", alert)
+	}
+	if snapshot := tracker.Snapshot(); snapshot.Parser.LayoutFailures != 0 || len(snapshot.Parser.Layout) != 0 {
+		t.Errorf("layout state was not cleared: %+v", snapshot.Parser)
+	}
+}
+
+func TestParserKeptOldCountsAsLayoutFailure(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.ParserLayout = 2
+	tracker := NewTracker(thresholds)
+
+	tracker.ParserReport("calls", nil, true)
+	tracker.ParserReport("calls", nil, true)
+
+	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert == nil {
+		t.Error("a kept-old run must raise the layout alert")
+	}
+}
+
+func TestParserLayoutThresholdUsesWorstSource(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.ParserLayout = 3
+	tracker := NewTracker(thresholds)
+
+	issue := []LayoutIssue{{Source: "groups", Selector: "table"}}
+	tracker.ParserReport("groups", issue, false)
+	tracker.ParserReport("groups", issue, false)
+	tracker.ParserReport("teachers", issue, false)
+
+	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert != nil {
+		t.Errorf("the threshold counts runs per source: %+v", alert)
+	}
+
+	tracker.ParserReport("groups", issue, false)
+	if alert := findAlert(tracker.Alerts(), AlertParserLayout); alert == nil {
+		t.Error("expected the third groups run to alert")
+	}
+}
+
+func findAlert(alerts []Alert, key string) *Alert {
+	for i := range alerts {
+		if alerts[i].Key == key {
+			return &alerts[i]
+		}
+	}
+	return nil
 }
 
 func TestSnapshotCountersAreMonotonic(t *testing.T) {

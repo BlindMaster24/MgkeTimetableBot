@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	"github.com/mymmrac/telego"
 )
 
@@ -41,6 +43,8 @@ type Bot struct {
 	archive      any
 	aliasRepo    *AliasRepository
 	parseLogs    []parseLogEntry
+	reportsMu    sync.Mutex
+	reports      map[string]parser.Report
 	textCommands []Command
 	scenes       []sceneRoute
 	google       googleService
@@ -521,6 +525,74 @@ func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {
 			os.Remove(filepath.Join(dir, entry.Name()))
 		}
 	}
+}
+
+func (b *Bot) RecordParserReport(report parser.Report) {
+	b.reportsMu.Lock()
+	defer b.reportsMu.Unlock()
+
+	if b.reports == nil {
+		b.reports = make(map[string]parser.Report)
+	}
+	b.reports[report.Source] = report
+}
+
+func (b *Bot) ParserReports() []parser.Report {
+	b.reportsMu.Lock()
+	defer b.reportsMu.Unlock()
+
+	sources := make([]string, 0, len(b.reports))
+	for source := range b.reports {
+		sources = append(sources, source)
+	}
+	sort.Strings(sources)
+
+	reports := make([]parser.Report, 0, len(sources))
+	for _, source := range sources {
+		reports = append(reports, b.reports[source])
+	}
+	return reports
+}
+
+func (b *Bot) parserDiagnostics() []string {
+	reports := b.ParserReports()
+	if len(reports) == 0 {
+		return nil
+	}
+
+	issues := 0
+	lines := make([]string, 0, len(reports)+1)
+	for _, report := range reports {
+		failing := report.Failing()
+		issues += len(failing) + len(report.Warnings)
+
+		summary := fmt.Sprintf("%s: items=%d", report.Source, report.Items)
+		if len(failing) > 0 {
+			selectors := make([]string, 0, len(failing))
+			for _, probe := range failing {
+				selectors = append(selectors, fmt.Sprintf("%s (found %d)", probe.Selector, probe.Found))
+			}
+			summary += "\n   " + b.loc("parser_logs_no_data") + strings.Join(selectors, ", ")
+		}
+		for _, warning := range report.Warnings {
+			summary += "\n   " + b.loc("parser_logs_warning_prefix") + warning
+		}
+		for _, fallback := range report.Fallbacks {
+			summary += "\n   " + b.loc("parser_logs_fallback_prefix") + fallback
+		}
+		if report.URL != "" {
+			summary += "\n   " + report.URL
+		}
+		lines = append(lines, summary)
+	}
+
+	if issues == 0 {
+		lines = append(lines, b.loc("parser_logs_clean"))
+	} else {
+		lines = append([]string{b.loc("parser_logs_diagnostics")}, lines...)
+	}
+
+	return lines
 }
 
 func (b *Bot) AddParseLog(success bool, msg string) {

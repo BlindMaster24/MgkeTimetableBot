@@ -78,6 +78,7 @@ health:
   cooldown_minutes: 45
   parser_stale_minutes: 20
   parser_failures: 4
+  parser_layout_failures: 3
   calendar_stale_minutes: 120
   calendar_failures: 2
   api_errors: 50
@@ -101,6 +102,9 @@ health:
 	}
 	if cfg.Health.ParserStaleMinutes != 20 || cfg.Health.ParserFailures != 4 {
 		t.Errorf("parser thresholds = %+v", cfg.Health)
+	}
+	if cfg.Health.ParserLayoutFailures != 3 {
+		t.Errorf("parser layout threshold = %d", cfg.Health.ParserLayoutFailures)
 	}
 	if cfg.Health.CalendarStaleMinutes != 120 || cfg.Health.CalendarFailures != 2 {
 		t.Errorf("calendar thresholds = %+v", cfg.Health)
