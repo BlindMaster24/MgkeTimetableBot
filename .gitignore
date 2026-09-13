@@ -20,6 +20,8 @@ coverage.out
 # Config with secrets
 configs/config.yaml
 configs/config.local.yaml
+.env
+.env.*
 
 # Database
 *.db
