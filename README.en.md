@@ -309,6 +309,7 @@ services:
 What to know about the image:
 
 - multi-stage build: the binary is compiled on `golang:1.27.1` and the runtime image only carries the binary, the config template and the certificates;
+- the build stage runs on the runner's architecture and cross-compiles for `TARGETARCH`, so the `linux/arm64` image needs no QEMU and finishes in minutes instead of tens of minutes;
 - the process runs as an unprivileged user, CGO is not needed (SQLite and image rendering are pure Go);
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
 - only the HTTP port (`http.port`) is published — Telegram works over long polling, so no inbound ports are required;
