@@ -3,8 +3,10 @@ package tests
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
 func TestDayIndexConversion(t *testing.T) {
@@ -12,8 +14,8 @@ func TestDayIndexConversion(t *testing.T) {
 		date string
 		idx  int64
 	}{
-		{"01.01.1970", 0},
-		{"02.01.1970", 1},
+		{"05.01.1970", 0},
+		{"06.01.1970", 1},
 		{"27.08.2026", archive.DateToDayIndex("27.08.2026")},
 	}
 
@@ -27,6 +29,57 @@ func TestDayIndexConversion(t *testing.T) {
 			t.Errorf("DayIndexToDate(%d) = %s, want %s", idx, date, c.date)
 		}
 	}
+
+	if got := archive.DateToDayIndex("не дата"); got != 0 {
+		t.Errorf("an unparsable date must fall back to 0, got %d", got)
+	}
+}
+
+func TestArchiveDaysAlignWithTheWeekIndex(t *testing.T) {
+	repo, err := archive.New(t.TempDir() + "/archive.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repo.Close()
+
+	day := time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)
+	lessons := []any{map[string]any{"lesson": "Математика", "cabinet": "101"}}
+	if err := repo.AppendDays([]archive.AppendDay{{
+		Type:  "group",
+		Value: "100",
+		Day:   map[string]any{"day": day.Format("02.01.2006"), "lessons": lessons},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	week := utils.WeekIndexFromDate(day)
+	minIdx, maxIdx := week.WeekDayIndexRange()
+	days, err := repo.GroupDaysByRange(int64(minIdx), int64(maxIdx), "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(days) != 1 {
+		t.Fatalf("the bot's own week window must find the archived day, got %d", len(days))
+	}
+	if days[0].Day != day.Format("02.01.2006") {
+		t.Errorf("archived day = %s, want %s", days[0].Day, day.Format("02.01.2006"))
+	}
+
+	exact, err := repo.GroupDay(int64(utils.DayIndexFromDate(day)), "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exact == nil {
+		t.Fatal("an exact day lookup by the bot's index must find the archived day")
+	}
+
+	bounds, err := repo.DayIndexBounds()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bounds.Min != int64(utils.DayIndexFromDate(day)) {
+		t.Errorf("bounds = %+v, want the bot's index %d", bounds, utils.DayIndexFromDate(day))
+	}
 }
 
 func TestArchiveRepository(t *testing.T) {
@@ -38,19 +91,6 @@ func TestArchiveRepository(t *testing.T) {
 	defer repo.Close()
 
 	db := repo.DB()
-
-	db.Exec(`CREATE TABLE IF NOT EXISTS timetable_archive (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		day INTEGER NOT NULL,
-		"group" TEXT,
-		teacher TEXT,
-		data TEXT NOT NULL,
-		UNIQUE(day, "group"),
-		UNIQUE(day, teacher)
-	)`)
-
-	db.Exec(`CREATE INDEX IF NOT EXISTS idx_group_day ON timetable_archive("group", day)`)
-	db.Exec(`CREATE INDEX IF NOT EXISTS idx_teacher_day ON timetable_archive(teacher, day)`)
 
 	group := "63"
 	teacher := "Ivanov"

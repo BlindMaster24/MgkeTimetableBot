@@ -7,7 +7,6 @@ RUN go mod download
 
 COPY cmd/ cmd/
 COPY internal/ internal/
-COPY migrations/ migrations/
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bot ./cmd/bot/
 
@@ -20,7 +19,6 @@ WORKDIR /data
 
 COPY --from=build /out/bot /app/bot
 COPY configs/config.example.yaml /app/configs/config.yaml
-COPY migrations/ /app/migrations/
 
 RUN mkdir -p /data /app/configs \
 	&& chown -R bot:bot /data /app

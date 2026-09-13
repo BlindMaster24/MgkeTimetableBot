@@ -36,7 +36,13 @@ func New(dbPath string) (*Repository, error) {
 		return nil, err
 	}
 
-	return &Repository{db: db}, nil
+	repo := &Repository{db: db}
+	if err := repo.EnsureSchema(); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return repo, nil
 }
 
 func (r *Repository) Close() error {

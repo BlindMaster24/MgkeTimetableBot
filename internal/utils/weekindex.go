@@ -55,32 +55,12 @@ func (w WeekIndex) WeekDayIndexRange() (int, int) {
 	return DayIndexFromDate(d1), DayIndexFromDate(d2)
 }
 
-func (w WeekIndex) GetRelevant(maxLastGroups, maxLastTeachers int) WeekIndex {
-	date := time.Now()
-	weekIndex := WeekIndexFromDate(date)
-	if date.Weekday() == time.Sunday {
-		weekIndex = WeekIndexFromNumber(weekIndex.value + 1)
-	}
-	relevant := weekIndex.value
-	if maxLastGroups > 0 && maxLastGroups < relevant {
-		relevant = maxLastGroups
-	}
-	if maxLastTeachers > 0 && maxLastTeachers < relevant {
-		relevant = maxLastTeachers
-	}
-	return WeekIndexFromNumber(relevant)
-}
-
 func (w WeekIndex) Next() WeekIndex {
 	return WeekIndexFromNumber(w.value + 1)
 }
 
 func (w WeekIndex) IsFutureWeek() bool {
 	return w.value > WeekIndexFromDate(time.Now()).Value()
-}
-
-func (w WeekIndex) Prev() WeekIndex {
-	return WeekIndexFromNumber(w.value - 1)
 }
 
 func (w WeekIndex) String() string {
@@ -108,4 +88,9 @@ func DayIndexFromDate(date time.Time) int {
 	d := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
 	ms := d.UnixMilli() - startingWeekIndexDate.UnixMilli()
 	return int(ms / oneDayMs)
+}
+
+func DayIndexToDate(index int) time.Time {
+	ms := int64(index)*oneDayMs + startingWeekIndexDate.UnixMilli()
+	return time.UnixMilli(ms).UTC()
 }

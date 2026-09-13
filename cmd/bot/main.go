@@ -85,8 +85,6 @@ func main() {
 	defer archiveRepo.Close()
 	log.Info().Msg("archive DB opened")
 
-	initArchiveSchema(archiveRepo)
-
 	syncArchive := func(tag string) {
 		if err := archiveRepo.SyncFromCache(raspCache.GetGroups(), raspCache.GetTeachers()); err != nil {
 			log.Error().Err(err).Str("tag", tag).Msg("archive sync failed")
@@ -347,21 +345,6 @@ func googleOAuthHandler(cfg *config.Config, service *google.CalendarService, cha
 
 		w.Write([]byte("Аккаунт успешно привязан, можете вернуться обратно в чат"))
 	}
-}
-
-func initArchiveSchema(repo *archive.Repository) {
-	db := repo.DB()
-	db.Exec(`CREATE TABLE IF NOT EXISTS timetable_archive (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		day INTEGER NOT NULL,
-		"group" TEXT,
-		teacher TEXT,
-		data TEXT NOT NULL,
-		UNIQUE(day, "group"),
-		UNIQUE(day, teacher)
-	)`)
-	db.Exec(`CREATE INDEX IF NOT EXISTS idx_group_day ON timetable_archive("group", day)`)
-	db.Exec(`CREATE INDEX IF NOT EXISTS idx_teacher_day ON timetable_archive(teacher, day)`)
 }
 
 type chatFinderAdapter struct {

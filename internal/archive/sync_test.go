@@ -14,18 +14,6 @@ func newTestRepo(t *testing.T) *Repository {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { repo.Close() })
-
-	if _, err := repo.DB().Exec(`CREATE TABLE IF NOT EXISTS timetable_archive (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		day INTEGER NOT NULL,
-		"group" TEXT,
-		teacher TEXT,
-		data TEXT NOT NULL,
-		UNIQUE(day, "group"),
-		UNIQUE(day, teacher)
-	)`); err != nil {
-		t.Fatal(err)
-	}
 	return repo
 }
 
