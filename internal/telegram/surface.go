@@ -186,6 +186,9 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		inline("calendarAlertKeyboard", func() *telego.InlineKeyboardMarkup {
 			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertCalendarFailures))
 		}),
+		inline("apiAlertKeyboard", func() *telego.InlineKeyboardMarkup {
+			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertAPIErrors))
+		}),
 	}
 
 	if b.cache != nil {

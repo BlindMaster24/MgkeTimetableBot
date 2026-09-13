@@ -14,8 +14,10 @@ const (
 
 	ParserReparseCallback = "parser_reparse"
 	CalendarSyncCallback  = "calendar_sync"
+	APIProbeCallback      = "api_probe"
 	parserReparseButton   = "🔄 Переразобрать сейчас"
 	calendarSyncButton    = "🔄 Синхронизировать сейчас"
+	apiProbeButton        = "🔌 Проверить API"
 )
 
 type alertState struct {
@@ -187,12 +189,18 @@ func IsCalendarAlert(key string) bool {
 	return health.AlertScope(key) == health.ScopeCalendar
 }
 
+func IsAPIAlert(key string) bool {
+	return health.AlertScope(key) == health.ScopeAPI
+}
+
 func HealthAlertButtons(key string) []KeyboardButton {
 	switch {
 	case IsParserAlert(key):
 		return []KeyboardButton{{Text: parserReparseButton, Data: ParserReparseCallback}}
 	case IsCalendarAlert(key):
 		return []KeyboardButton{{Text: calendarSyncButton, Data: CalendarSyncCallback}}
+	case IsAPIAlert(key):
+		return []KeyboardButton{{Text: apiProbeButton, Data: APIProbeCallback}}
 	}
 	return nil
 }

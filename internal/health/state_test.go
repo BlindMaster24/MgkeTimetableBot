@@ -36,7 +36,7 @@ func TestTrackerRoundTripsThroughTheStore(t *testing.T) {
 	tracker.ParserFailure(errors.New("site down"))
 	tracker.CalendarSuccess(3)
 	tracker.CalendarFailure(errors.New("quota exceeded"))
-	tracker.APIRequest(500, 10*time.Millisecond)
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/health", Status: 500, Duration: 10 * time.Millisecond, Message: "boom"})
 	tracker.ParserReport("groups", []LayoutIssue{{Source: "groups", Selector: "table"}}, nil)
 	tracker.ParserReport("teachers", nil, []GuardIssue{{Source: "teachers", Reason: "shrink", Detail: "81 -> 4 (dropped 95%, limit 80%)"}})
 

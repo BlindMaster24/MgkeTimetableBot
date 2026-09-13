@@ -39,6 +39,79 @@ func TestIncidentLogRecordsStartAndAutoRecovery(t *testing.T) {
 	}
 }
 
+func TestStartupStampSpotsWhatChanged(t *testing.T) {
+	deployed := StartupStamp{Build: "1.0.0 (aaaaaaa)", Config: "11111111"}
+
+	cases := []struct {
+		name     string
+		previous StartupStamp
+		current  StartupStamp
+		want     StartupChange
+	}{
+		{"same build and config", deployed, deployed, ChangeRestart},
+		{"new build", deployed, StartupStamp{Build: "1.1.0 (bbbbbbb)", Config: "11111111"}, ChangeDeploy},
+		{"edited config", deployed, StartupStamp{Build: "1.0.0 (aaaaaaa)", Config: "22222222"}, ChangeConfig},
+		{"only the config was known before", StartupStamp{Config: "11111111"}, deployed, ChangeRestart},
+		{"nothing was known before", StartupStamp{}, deployed, ChangeRestart},
+	}
+
+	for _, tc := range cases {
+		if got := tc.current.ChangeFrom(tc.previous); got != tc.want {
+			t.Errorf("%s: change = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestIncidentLogNotesWhatChangedAtStartup(t *testing.T) {
+	log := NewIncidentLog(nil, 0)
+	log.SetStartupStamp(StartupStamp{Build: "1.0.0 (aaaaaaa, 2026-09-01)", Config: "11111111"})
+
+	log.Record(AlertAPIErrors, "errors=20 window=5m0s")
+	log.Record(AlertParserGuard, "groups: shrink: 35 -> 3")
+
+	current := StartupStamp{Build: "1.1.0 (bbbbbbb, 2026-09-13)", Config: "11111111"}
+	var seen []StartupChange
+	annotated := log.NoteStartup(ScopeAPI, current, func(change StartupChange, previous, current StartupStamp) string {
+		seen = append(seen, change)
+		return previous.Build + " -> " + current.Build
+	})
+	if len(annotated) != 1 {
+		t.Fatalf("annotated = %+v", annotated)
+	}
+	if len(seen) != 1 || seen[0] != ChangeDeploy {
+		t.Errorf("a new build must be recorded as a deploy: %v", seen)
+	}
+	if annotated[0].Note != "1.0.0 (aaaaaaa, 2026-09-01) -> 1.1.0 (bbbbbbb, 2026-09-13)" {
+		t.Errorf("note = %q", annotated[0].Note)
+	}
+
+	records := log.Recent(5)
+	for _, record := range records {
+		switch record.Key {
+		case AlertAPIErrors:
+			if record.Resolution != ResolutionManual {
+				t.Errorf("a deploy must be recorded as a manual fix: %+v", record)
+			}
+			if record.Build != current.Build || record.Config != current.Config {
+				t.Errorf("the record must follow the running stamp: %+v", record)
+			}
+		case AlertParserGuard:
+			if record.Resolution != "" || record.Note != "" {
+				t.Errorf("other scopes must stay untouched: %+v", record)
+			}
+		}
+	}
+
+	log.Resolve(AlertAPIErrors)
+	recent := log.Recent(2)
+	if recent[1].Resolution != ResolutionManual {
+		t.Errorf("a recovery must not overwrite a manual fix: %+v", recent[1])
+	}
+	if log.NoteStartup(ScopeAPI, current, func(StartupChange, StartupStamp, StartupStamp) string { return "again" }) != nil {
+		t.Error("a closed record must not be annotated again")
+	}
+}
+
 func TestIncidentLogKeepsTheManualFix(t *testing.T) {
 	log := NewIncidentLog(nil, 0)
 

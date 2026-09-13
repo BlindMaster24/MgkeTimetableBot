@@ -100,6 +100,8 @@
 🔄 Переразобрать сейчас
 === calendarAlertKeyboard ===
 🔄 Синхронизировать сейчас
+=== apiAlertKeyboard ===
+🔌 Проверить API
 === replyCallsSettings(admin) ===
 📊 Показать
 ✅ Обновить с сайта

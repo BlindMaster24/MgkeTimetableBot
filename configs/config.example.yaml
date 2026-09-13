@@ -105,3 +105,4 @@ health:
   calendar_failures: 3
   api_errors: 20
   api_window_minutes: 5
+  api_slow_ms: 500

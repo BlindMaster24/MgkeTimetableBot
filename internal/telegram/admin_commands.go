@@ -179,6 +179,9 @@ func (b *Bot) incidentsText() string {
 
 	records := b.incidents.Recent(incidentHistoryLimit)
 	lines := []string{b.locData("incidents_header", map[string]interface{}{"Count": incidentHistoryLimit})}
+	if diagnostics := b.apiDiagnostics(); diagnostics != "" {
+		lines = append(lines, diagnostics)
+	}
 	if len(records) == 0 {
 		return strings.Join(append(lines, b.loc("incidents_empty")), "\n")
 	}
@@ -187,7 +190,7 @@ func (b *Bot) incidentsText() string {
 	for _, record := range records {
 		lines = append(lines, b.incidentLine(record, now))
 		if record.Detail != "" {
-			lines = append(lines, "   "+record.Detail)
+			lines = append(lines, indentBlock(record.Detail))
 		}
 		lines = append(lines, "   "+b.loc("incidents_outcome")+": "+b.incidentOutcome(record))
 	}
@@ -195,13 +198,84 @@ func (b *Bot) incidentsText() string {
 	return strings.Join(lines, "\n")
 }
 
+func (b *Bot) apiDiagnostics() string {
+	if b.health == nil {
+		return ""
+	}
+
+	api := b.health.Snapshot().API
+	if len(api.Endpoints) == 0 && len(api.LastErrors) == 0 {
+		return ""
+	}
+
+	lines := []string{b.loc("api_diag_header")}
+	for index, endpoint := range api.Endpoints {
+		if index == apiDiagnosticsLimit {
+			break
+		}
+		line := b.locData("api_diag_endpoint", map[string]interface{}{
+			"Label":    apiEndpointLabel(endpoint.Method, endpoint.Path),
+			"Requests": endpoint.Requests,
+			"Errors":   endpoint.Errors,
+			"Avg":      apiDuration(time.Duration(endpoint.AvgMillis) * time.Millisecond),
+			"Max":      apiDuration(time.Duration(endpoint.MaxMillis) * time.Millisecond),
+		})
+		if endpoint.Slow {
+			line = "🐌 " + line
+		}
+		if endpoint.Message != "" {
+			line += " — " + endpoint.Message
+		}
+		lines = append(lines, line)
+	}
+
+	if len(api.LastErrors) > 0 {
+		lines = append(lines, b.loc("api_diag_last"))
+		for index, sample := range api.LastErrors {
+			if index == apiDiagnosticsLimit {
+				break
+			}
+			line := fmt.Sprintf("%s %s %d", apiSampleClock(sample.At), apiEndpointLabel(sample.Method, sample.Path), sample.Status)
+			if sample.Message != "" {
+				line += " — " + sample.Message
+			}
+			lines = append(lines, line)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func apiEndpointLabel(method, path string) string {
+	if method == "" {
+		return path
+	}
+	return method + " " + path
+}
+
+func apiSampleClock(value string) string {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return value
+	}
+	return parsed.Local().Format("15:04:05")
+}
+
+func indentBlock(text string) string {
+	parts := strings.Split(text, "\n")
+	for index, part := range parts {
+		parts[index] = "   " + part
+	}
+	return strings.Join(parts, "\n")
+}
+
 func (b *Bot) incidentLine(record health.Incident, now time.Time) string {
 	icon := "✅"
 	switch {
-	case record.Open():
-		icon = "⚠️"
 	case record.Resolution == health.ResolutionManual:
 		icon = "🔧"
+	case record.Open():
+		icon = "⚠️"
 	}
 
 	window := b.loc("incidents_since") + " " + healthClock(record.StartedAt)
@@ -213,11 +287,11 @@ func (b *Bot) incidentLine(record health.Incident, now time.Time) string {
 }
 
 func (b *Bot) incidentOutcome(record health.Incident) string {
-	if record.Open() {
-		return b.loc("incidents_outcome_open")
-	}
 	if record.Note != "" {
 		return record.Note
+	}
+	if record.Open() {
+		return b.loc("incidents_outcome_open")
 	}
 	return b.loc("incidents_outcome_auto")
 }
@@ -237,6 +311,8 @@ func (b *Bot) incidentButtons() *telego.InlineKeyboardMarkup {
 	}
 	return buttonsKeyboard(buttons)
 }
+
+const apiDiagnosticsLimit = 5
 
 func healthClock(value time.Time) string {
 	return value.Local().Format("02.01 15:04:05")

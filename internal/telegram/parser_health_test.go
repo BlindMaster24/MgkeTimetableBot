@@ -12,9 +12,19 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-type fakeHealthSource struct{ snapshot health.Snapshot }
+type fakeHealthSource struct {
+	snapshot health.Snapshot
+	slow     time.Duration
+}
 
 func (f *fakeHealthSource) Snapshot() health.Snapshot { return f.snapshot }
+
+func (f *fakeHealthSource) SlowThreshold() time.Duration {
+	if f.slow <= 0 {
+		return health.DefaultThresholds().APISlow
+	}
+	return f.slow
+}
 
 func parserSnapshot() health.Snapshot {
 	return health.Snapshot{

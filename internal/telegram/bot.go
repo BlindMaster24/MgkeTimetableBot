@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
@@ -54,6 +55,7 @@ type Bot struct {
 	googleSyncMu sync.Mutex
 	health       healthSource
 	calendarSync func(ctx context.Context) (int, error)
+	apiProbe     func(ctx context.Context) []apiprobe.Result
 	incidents    *health.IncidentLog
 }
 
@@ -92,6 +94,7 @@ type Callback interface {
 
 type healthSource interface {
 	Snapshot() health.Snapshot
+	SlowThreshold() time.Duration
 }
 
 func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archive any) (*Bot, error) {
@@ -133,6 +136,10 @@ func (b *Bot) SetHealthSource(src healthSource) {
 
 func (b *Bot) SetCalendarSyncFunc(fn func(ctx context.Context) (int, error)) {
 	b.calendarSync = fn
+}
+
+func (b *Bot) SetAPIProbeFunc(fn func(ctx context.Context) []apiprobe.Result) {
+	b.apiProbe = fn
 }
 
 func (b *Bot) SetIncidentLog(log *health.IncidentLog) {
@@ -234,6 +241,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&aliasMenuCb{bot: b})
 	b.RegisterCallback(&reparseCb{bot: b})
 	b.RegisterCallback(&calendarSyncCb{bot: b})
+	b.RegisterCallback(&apiProbeCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {

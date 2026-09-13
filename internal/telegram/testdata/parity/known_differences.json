@@ -27,6 +27,7 @@
     { "section": "callbacks", "kind": "extra_in_go", "value": "gcal", "reason": "Go Google Calendar flows use gcal callback roots where TS used a single google callback" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "parser", "reason": "Go parser alerts carry a manual reparse button; TS health notifications were text only" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "calendar", "reason": "Go calendar alerts carry a manual sync button; TS health notifications were text only" },
+    { "section": "callbacks", "kind": "extra_in_go", "value": "api", "reason": "Go API alerts carry a live endpoint probe button; TS health notifications were text only" },
 
     { "section": "buttons", "kind": "missing_in_go", "value": "Проверить", "reason": "StaticKeyboard.NeedAccept returns no keyboard for the telegram service, so this button is VK-only and the Go port excludes VK" },
 

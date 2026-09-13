@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
@@ -303,6 +304,10 @@ func (cb *reparseCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chatID := u.ChatID
+	if err := u.Bot.SendText(chatID, cb.bot.loc("force_parse_started")); err != nil {
+		return err
+	}
+
 	go func() {
 		if err := cb.bot.parseFunc(); err != nil {
 			cb.bot.log.Error().Err(err).Msg("manual reparse failed")
@@ -313,7 +318,7 @@ func (cb *reparseCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.SendText(chatID, cb.bot.loc("force_parse_done"))
 	}()
 
-	return u.Bot.SendText(chatID, cb.bot.loc("force_parse_started"))
+	return nil
 }
 
 type calendarSyncCb struct{ bot *Bot }
@@ -332,6 +337,10 @@ func (cb *calendarSyncCb) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chatID := u.ChatID
+	if err := u.Bot.SendText(chatID, cb.bot.loc("calendar_sync_started")); err != nil {
+		return err
+	}
+
 	go func() {
 		days, err := cb.bot.calendarSync(context.Background())
 		if err != nil {
@@ -343,7 +352,117 @@ func (cb *calendarSyncCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.SendText(chatID, cb.bot.locData("calendar_sync_done", map[string]interface{}{"Days": days}))
 	}()
 
-	return u.Bot.SendText(chatID, cb.bot.loc("calendar_sync_started"))
+	return nil
+}
+
+type apiProbeCb struct{ bot *Bot }
+
+func (cb *apiProbeCb) Prefix() string { return notification.APIProbeCallback }
+
+func (cb *apiProbeCb) Handler(ctx context.Context, u *Update) error {
+	if u.Callback != nil {
+		cb.bot.AnswerCallback(u.Callback.ID, "")
+	}
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	if cb.bot.apiProbe == nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("api_probe_unavailable"))
+	}
+
+	chatID := u.ChatID
+	if err := u.Bot.SendText(chatID, cb.bot.loc("api_probe_started")); err != nil {
+		return err
+	}
+
+	go func() {
+		results := cb.bot.apiProbe(context.Background())
+		cb.bot.SendText(chatID, cb.bot.apiProbeText(results))
+		if apiprobe.Healthy(results) {
+			cb.bot.markIncidentFix(health.ScopeAPI, cb.bot.locData("incident_fix_api", map[string]interface{}{
+				"Healthy": apiprobe.HealthyCount(results),
+				"Total":   len(results),
+			}))
+		}
+	}()
+
+	return nil
+}
+
+func (b *Bot) apiProbeText(results []apiprobe.Result) string {
+	if len(results) == 0 {
+		return b.loc("api_probe_empty")
+	}
+
+	width := 0
+	for _, result := range results {
+		if label := result.Label(); len(label) > width {
+			width = len(label)
+		}
+	}
+
+	slow := b.slowThreshold()
+	rows := make([]string, 0, len(results))
+	for _, result := range results {
+		status := "—"
+		if result.Err == "" {
+			status = strconv.Itoa(result.Status)
+		}
+		row := fmt.Sprintf("%-*s %3s %8s", width, result.Label(), status, apiDuration(result.Duration))
+		rows = append(rows, row+" "+apiProbeMark(result, slow))
+	}
+
+	lines := []string{b.loc("api_probe_header"), "<code>" + strings.Join(rows, "\n") + "</code>"}
+	lines = append(lines, b.locData("api_probe_summary", map[string]interface{}{
+		"Healthy": apiprobe.HealthyCount(results),
+		"Total":   len(results),
+		"Slowest": apiProbeSlowest(results),
+	}))
+
+	if failed := apiprobe.Failed(results); len(failed) > 0 {
+		labels := make([]string, 0, len(failed))
+		for _, result := range failed {
+			labels = append(labels, apiprobe.Describe(result))
+		}
+		lines = append(lines, b.locData("api_probe_failed", map[string]interface{}{"Failed": strings.Join(labels, "; ")}))
+	}
+
+	if slow > 0 {
+		lines = append(lines, b.locData("api_probe_slow_note", map[string]interface{}{"Threshold": apiDuration(slow)}))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func apiProbeMark(result apiprobe.Result, slow time.Duration) string {
+	if !result.Healthy() {
+		return "⚠️"
+	}
+	if slow > 0 && result.Duration >= slow {
+		return "🐌"
+	}
+	return "✅"
+}
+
+func apiProbeSlowest(results []apiprobe.Result) string {
+	slowest, ok := apiprobe.Slowest(results)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s — %s", slowest.Label(), apiDuration(slowest.Duration))
+}
+
+func apiDuration(value time.Duration) string {
+	if value < time.Second {
+		return fmt.Sprintf("%d мс", value.Milliseconds())
+	}
+	return fmt.Sprintf("%.2f с", value.Seconds())
+}
+
+func (b *Bot) slowThreshold() time.Duration {
+	if b.health == nil {
+		return 0
+	}
+	return b.health.SlowThreshold()
 }
 
 func isNowInSlot(now time.Time, slot [2][2]string, includedDays []int) bool {

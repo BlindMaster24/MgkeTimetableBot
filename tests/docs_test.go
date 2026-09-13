@@ -150,6 +150,17 @@ func TestDocsDocumentTheIncidentHistory(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentTheAPIProbe(t *testing.T) {
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{"🔌 Проверить API", "api_slow_ms"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the API probe token %q", doc, token)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentEnvironmentOverrides(t *testing.T) {
 	for _, doc := range docs {
 		content := readDoc(t, doc)

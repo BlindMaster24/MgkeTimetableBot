@@ -247,7 +247,9 @@ Available to the IDs listed in `telegram.admin_ids` only — the Telegram comman
 
 `/parserhealth` prints a live parser health snapshot — state, run and error counts, the last success and failure, run duration, the layout problems and guard trips it found, the active alerts and the cache size — and can start a parse immediately instead of waiting for the next cycle.
 
-`/incidents` prints the history of parser, calendar and API incidents — what broke, when, how long it lasted, how it ended and what fixed it. The history lives in the chat database (`bot_state` table, `health.incidents` key) because the question "when did this start" is asked after a restart, and an in-memory list would have lost exactly that; the last 100 records are kept. A `⚠️` record is still open, `🔧` was closed by an admin action (for example the reparse button), `✅` recovered on its own. When an open incident has a fix button, the command shows it under the message.
+`/incidents` prints the history of parser, calendar and API incidents — what broke, when, how long it lasted, how it ended and what fixed it. On top it prints a live API slice: which endpoints answer 5xx, how often, with what error text and with what response time (slow ones are marked `🐌`), plus the most recent failures with their time — the same data the `api_errors` alert carries, so the message alone says where to look. The history lives in the chat database (`bot_state` table, `health.incidents` key) because the question "when did this start" is asked after a restart, and an in-memory list would have lost exactly that; the last 100 records are kept. A `⚠️` record is still open, `🔧` carries a recorded manual fix (for example the reparse button), `✅` recovered on its own; a manual fix shows up in the outcome right away, before the alert clears. When an open incident has a fix button, the command shows it under the message.
+
+API incidents also record what helped beyond "recovered on its own": at startup the bot compares the running build and a fingerprint of the config file with the ones the incident started under and writes "after a bot restart", "after a config edit" (with the short file fingerprint) or "after a new build was deployed" (with version, commit and date). The fingerprint is the first 8 characters of the config file's SHA-256, so no secrets enter the history. That tells "it healed by itself" apart from "a rollout, a settings change or a restart fixed it".
 
 ## HTTP API
 
@@ -280,7 +282,11 @@ Metrics and the alert state are persisted to the chat database (the `bot_state` 
 |-------|---------|--------|
 | Parser | runs and errors, consecutive failures, time since the last successful parse, cycle duration, which selectors stopped matching | failure streak, stale data, a broken site layout |
 | Google Calendar | runs and errors, consecutive failures, days synced | failure streak, no successful sync for too long |
-| HTTP API | requests, 5xx responses, recent errors, slowest request | burst of 5xx responses |
+| HTTP API | requests, 5xx responses, recent errors, slowest request, a per-endpoint breakdown (method, route, last status, error text and panic text) | burst of 5xx responses |
+
+The `api_errors` alert names the endpoints that answer 5xx: method, route, how many times, the last status and the error text (a panic message for a crashed handler), plus the most recent failures with their time. A dedicated `slow:` line names the sluggish routes: every endpoint tracks its response time (last, average and maximum) next to the 5xx count, so degradation shows up before a handler starts failing; the limit is `health.api_slow_ms` (500 ms by default). The bot's own healthcheck (`GET /api/health`, answering 503 while an alert is active) is not counted as an error — otherwise the alert would keep itself alive.
+
+Every API alert comes with a `🔌 Проверить API` button: it walks the endpoints with live HTTP requests against the bot's own server (including `/api/group/<group>` and `/api/teacher/<teacher>` with real cache data) and replies with a status-and-response-time table marked `✅` fast, `🐌` slower than `api_slow_ms`, `⚠️` error or no answer. When every route answers, the button closes the open incident as a manual fix, so `/incidents` shows `🔧` and the outcome "помогла ручная проверка API". The same table is always available through the live slice in `/incidents` and through `GET /api/health` (the `api.endpoints` block), which lists requests, errors, average and maximum time per endpoint.
 
 Alerts go to the administrators (`telegram.admin_ids`) as a Telegram message with the details. They repeat at most once per `cooldown_minutes` while the problem persists, and a recovery message follows once it is gone. Thresholds are configured in the `health` section:
 
@@ -297,6 +303,7 @@ health:
   calendar_failures: 3
   api_errors: 20               # 5xx responses inside the window
   api_window_minutes: 5
+  api_slow_ms: 500             # the "slow endpoint" limit
 ```
 
 Every field is also available as an environment variable (`MGKE_HEALTH_PARSER_STALE_MINUTES` and so on).

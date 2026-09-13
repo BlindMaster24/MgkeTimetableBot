@@ -17,10 +17,20 @@ const (
 	ResolutionManual = "manual"
 )
 
+type StartupChange int
+
+const (
+	ChangeRestart StartupChange = iota
+	ChangeConfig
+	ChangeDeploy
+)
+
 type Incident struct {
 	Key        string    `json:"key"`
 	Scope      string    `json:"scope"`
 	Detail     string    `json:"detail,omitempty"`
+	Build      string    `json:"build,omitempty"`
+	Config     string    `json:"config,omitempty"`
 	StartedAt  time.Time `json:"startedAt"`
 	EndedAt    time.Time `json:"endedAt,omitempty"`
 	Resolution string    `json:"resolution,omitempty"`
@@ -45,10 +55,28 @@ type incidentState struct {
 	Records []Incident `json:"records,omitempty"`
 }
 
+type StartupStamp struct {
+	Build  string
+	Config string
+}
+
+func (s StartupStamp) ChangeFrom(previous StartupStamp) StartupChange {
+	if previous.Build != "" && previous.Build != s.Build {
+		return ChangeDeploy
+	}
+	if previous.Config != "" && previous.Config != s.Config {
+		return ChangeConfig
+	}
+	return ChangeRestart
+}
+
+type StartupNote func(change StartupChange, previous, current StartupStamp) string
+
 type IncidentLog struct {
 	mu       sync.Mutex
 	store    StateStore
 	limit    int
+	stamp    StartupStamp
 	records  []Incident
 	restored bool
 }
@@ -72,6 +100,45 @@ func AlertScope(key string) string {
 	return ""
 }
 
+func (l *IncidentLog) SetStartupStamp(stamp StartupStamp) {
+	if l == nil {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.stamp = stamp
+}
+
+func (l *IncidentLog) NoteStartup(scope string, current StartupStamp, note StartupNote) []Incident {
+	if l == nil || scope == "" || note == nil {
+		return nil
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.restoreLocked()
+
+	var annotated []Incident
+	for index := range l.records {
+		record := &l.records[index]
+		if record.Scope != scope || !record.Open() {
+			continue
+		}
+		previous := StartupStamp{Build: record.Build, Config: record.Config}
+		record.Resolution = ResolutionManual
+		record.Note = note(previous.ChangeFrom(current), previous, current)
+		record.Build = current.Build
+		record.Config = current.Config
+		annotated = append(annotated, *record)
+	}
+	if len(annotated) == 0 {
+		return nil
+	}
+	l.flushLocked()
+	return annotated
+}
+
 func (l *IncidentLog) Record(key, detail string) {
 	if l == nil || key == "" {
 		return
@@ -91,6 +158,8 @@ func (l *IncidentLog) Record(key, detail string) {
 		Key:       key,
 		Scope:     AlertScope(key),
 		Detail:    detail,
+		Build:     l.stamp.Build,
+		Config:    l.stamp.Config,
 		StartedAt: time.Now(),
 	})
 	l.trimLocked()

@@ -30,6 +30,7 @@ type HealthConfig struct {
 	CalendarFailures     int  `yaml:"calendar_failures"`
 	APIErrors            int  `yaml:"api_errors"`
 	APIWindowMinutes     int  `yaml:"api_window_minutes"`
+	APISlowMS            int  `yaml:"api_slow_ms"`
 }
 
 type GuardConfig struct {

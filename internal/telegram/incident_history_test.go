@@ -45,6 +45,71 @@ func TestIncidentsTextRendersTheHistory(t *testing.T) {
 	}
 }
 
+func apiFailureSnapshot() health.Snapshot {
+	return health.Snapshot{
+		API: health.APIStats{
+			Errors:      16,
+			LastStatus:  500,
+			LastErrorAt: "2026-09-13T12:04:33Z",
+			Endpoints: []health.APIEndpointStat{
+				{Method: "GET", Path: "/api/health", Status: 500, Requests: 120, Errors: 12, AvgMillis: 8, MaxMillis: 40, Message: "database is locked"},
+				{Method: "GET", Path: "/api/groups", Status: 503, Requests: 12, Errors: 4, AvgMillis: 640, MaxMillis: 1200, Slow: true},
+			},
+			LastErrors: []health.APIErrorSample{
+				{Method: "GET", Path: "/api/health", Status: 500, At: "2026-09-13T12:04:33Z", Message: "database is locked"},
+				{Method: "GET", Path: "/api/groups", Status: 503, At: "2026-09-13T12:04:12Z"},
+			},
+		},
+		Alerts: []health.Alert{{
+			Key:    health.AlertAPIErrors,
+			Level:  health.LevelCritical,
+			Detail: "errors=16 window=5m0s\npaths: GET /api/health x12 (500)",
+		}},
+	}
+}
+
+func TestIncidentsTextShowsAPIDiagnostics(t *testing.T) {
+	b := setupTestBot(t)
+	b.SetIncidentLog(incidentsSnapshot())
+	b.SetHealthSource(&fakeHealthSource{snapshot: apiFailureSnapshot()})
+
+	text := b.incidentsText()
+	for _, want := range []string{
+		"-- Ошибки HTTP API (свежие) --",
+		"GET /api/health — запросов 120, ошибок 12, в среднем 8 мс (макс 40 мс) — database is locked",
+		"🐌 GET /api/groups — запросов 12, ошибок 4, в среднем 640 мс (макс 1.20 с)",
+		"Последние ошибки:",
+		"GET /api/health 500 — database is locked",
+		"GET /api/groups 503",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("incidents text omits %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestIncidentsTextHidesAPIDiagnosticsWhenClean(t *testing.T) {
+	b := setupTestBot(t)
+	b.SetIncidentLog(incidentsSnapshot())
+	b.SetHealthSource(&fakeHealthSource{snapshot: parserSnapshot()})
+
+	if text := b.incidentsText(); strings.Contains(text, b.loc("api_diag_header")) {
+		t.Errorf("a clean API must not get a diagnostics block:\n%s", text)
+	}
+}
+
+func TestIncidentsTextIndentsMultilineDetails(t *testing.T) {
+	b := setupTestBot(t)
+	log := health.NewIncidentLog(nil, 0)
+	log.Record(health.AlertAPIErrors, "errors=20 window=5m0s\npaths: GET /api/health x20 (500)")
+	b.SetIncidentLog(log)
+
+	text := b.incidentsText()
+	if !strings.Contains(text, "   errors=20 window=5m0s\n   paths: GET /api/health x20 (500)") {
+		t.Errorf("multiline details must keep the block indent:\n%s", text)
+	}
+}
+
 func TestIncidentsTextReportsAnEmptyHistory(t *testing.T) {
 	b := setupTestBot(t)
 	b.SetIncidentLog(health.NewIncidentLog(nil, 0))
@@ -93,6 +158,83 @@ func TestIncidentsCommandOffersButtonsForOpenIncidents(t *testing.T) {
 	}
 	if strings.Contains(payloads, notification.CalendarSyncCallback) {
 		t.Errorf("a resolved calendar incident must not offer the sync button, payloads: %v", caller.payloads())
+	}
+}
+
+func TestIncidentsTextShowsTheFixWhileTheIncidentIsOpen(t *testing.T) {
+	b := setupTestBot(t)
+	log := health.NewIncidentLog(nil, 0)
+	log.Record(health.AlertAPIErrors, "errors=20 window=5m0s\npaths: GET /api/groups x20 (500)")
+	log.MarkManual(health.ScopeAPI, b.locData("incident_fix_api", map[string]interface{}{"Healthy": 6, "Total": 6}))
+	b.SetIncidentLog(log)
+
+	text := b.incidentsText()
+	if !strings.Contains(text, "🔧") {
+		t.Errorf("a recorded fix must be visible while the incident is open:\n%s", text)
+	}
+	if !strings.Contains(text, "Итог: помогла ручная проверка API (6 из 6 эндпоинтов отвечают)") {
+		t.Errorf("the note must be the outcome:\n%s", text)
+	}
+	if strings.Contains(text, "ещё не устранено") {
+		t.Errorf("a recorded fix must replace the open outcome:\n%s", text)
+	}
+}
+
+func TestIncidentsTextReportsWhatChangedAtStartup(t *testing.T) {
+	b := setupTestBot(t)
+	log := health.NewIncidentLog(nil, 0)
+	log.SetStartupStamp(health.StartupStamp{Build: "1.0.0 (aaaaaaa, 2026-09-01)", Config: "11111111"})
+	log.Record(health.AlertAPIErrors, "errors=20 window=5m0s")
+	log.NoteStartup(health.ScopeAPI, health.StartupStamp{Build: "1.0.0 (aaaaaaa, 2026-09-01)", Config: "22222222"}, func(change health.StartupChange, previous, current health.StartupStamp) string {
+		if change == health.ChangeConfig {
+			return b.locData("incident_note_config", map[string]interface{}{"Current": current.Config, "Previous": previous.Config})
+		}
+		return b.locData("incident_note_restart", map[string]interface{}{"Current": current.Build})
+	})
+	b.SetIncidentLog(log)
+
+	text := b.incidentsText()
+	if !strings.Contains(text, "Итог: после правки конфига: 22222222 (было 11111111)") {
+		t.Errorf("the config note must be rendered:\n%s", text)
+	}
+}
+
+func TestIncidentsTextReportsARestartNote(t *testing.T) {
+	b := setupTestBot(t)
+	log := health.NewIncidentLog(nil, 0)
+	log.SetStartupStamp(health.StartupStamp{Build: "1.0.0 (aaaaaaa, 2026-09-01)", Config: "11111111"})
+	log.Record(health.AlertAPIErrors, "errors=20 window=5m0s")
+	log.NoteStartup(health.ScopeAPI, health.StartupStamp{Build: "1.0.0 (aaaaaaa, 2026-09-01)", Config: "11111111"}, func(change health.StartupChange, previous, current health.StartupStamp) string {
+		return b.locData("incident_note_restart", map[string]interface{}{"Current": current.Build})
+	})
+	b.SetIncidentLog(log)
+
+	text := b.incidentsText()
+	if !strings.Contains(text, "Итог: после перезапуска бота: 1.0.0 (aaaaaaa, 2026-09-01)") {
+		t.Errorf("the restart note must be rendered:\n%s", text)
+	}
+}
+
+func TestIncidentsCommandOffersTheProbeForAnOpenAPIFailure(t *testing.T) {
+	caller := &recordingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 4242)
+
+	log := health.NewIncidentLog(nil, 0)
+	log.Record(health.AlertAPIErrors, "errors=20 window=5m0s")
+	b.SetIncidentLog(log)
+
+	handler := &incidentsCmd{bot: b}
+	u := &Update{Bot: b, ChatID: 4242, UserID: 4242}
+	if err := handler.Handler(context.Background(), u); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	payloads := strings.Join(caller.payloads(), " ")
+	if !strings.Contains(payloads, notification.APIProbeCallback) {
+		t.Errorf("an open API incident must offer the live probe, payloads: %v", caller.payloads())
+	}
+	if strings.Contains(payloads, notification.ParserReparseCallback) {
+		t.Errorf("an API incident must not offer the reparse button, payloads: %v", caller.payloads())
 	}
 }
 

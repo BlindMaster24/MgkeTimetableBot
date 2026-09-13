@@ -38,6 +38,65 @@ func TestHealthThresholdsCarryTheParserGuardLimit(t *testing.T) {
 	}
 }
 
+func TestAPISlowThresholdComesFromTheConfig(t *testing.T) {
+	cfg := &config.Config{Health: &config.HealthConfig{APISlowMS: 250}}
+	if got := healthThresholds(cfg).APISlow; got != 250*time.Millisecond {
+		t.Errorf("slow threshold = %s, want 250ms", got)
+	}
+
+	fallback := healthThresholds(&config.Config{})
+	if fallback.APISlow != health.DefaultThresholds().APISlow {
+		t.Errorf("without a health section the default slow threshold applies, got %s", fallback.APISlow)
+	}
+}
+
+func TestAPIProbeBaseURLFollowsTheConfiguredPort(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.HTTP.Port = 8081
+
+	if got := apiProbeBaseURL(cfg); got != "http://127.0.0.1:8081" {
+		t.Errorf("probe base url = %q", got)
+	}
+}
+
+func TestAPIAlertReachesTheAdminsWithTheProbeButton(t *testing.T) {
+	thresholds := health.DefaultThresholds()
+	thresholds.APIErrors = 2
+	thresholds.APISlow = 500 * time.Millisecond
+	tracker := health.NewTracker(thresholds)
+	tracker.RecordAPI(health.APIRequest{Method: "GET", Path: "/api/groups", Status: 500, Duration: 600 * time.Millisecond, Message: "boom"})
+	tracker.RecordAPI(health.APIRequest{Method: "GET", Path: "/api/groups", Status: 500, Duration: 700 * time.Millisecond, Message: "boom"})
+
+	sender := &recordingSender{}
+	incidents := health.NewIncidentLog(nil, 0)
+	notifier := notification.NewHealthNotifier(tracker, logger.New("error", nil), sender, adminFinder{}, time.Minute, nil)
+	notifier.SetIncidents(incidents)
+
+	notifier.Check()
+
+	delivered := sender.delivered()
+	if len(delivered) != 1 {
+		t.Fatalf("expected one admin alert, got %+v", delivered)
+	}
+	if len(delivered[0].buttons) != 1 || delivered[0].buttons[0].Data != notification.APIProbeCallback {
+		t.Fatalf("the API alert must offer the live probe, got %+v", delivered[0].buttons)
+	}
+	for _, want := range []string{
+		"Ошибки HTTP API",
+		"paths: GET /api/groups x2 (500)",
+		"slow: GET /api/groups avg=650ms max=700ms n=2 (last 700ms)",
+	} {
+		if !strings.Contains(delivered[0].text, want) {
+			t.Errorf("API alert %q misses %q", delivered[0].text, want)
+		}
+	}
+
+	open := incidents.Open()
+	if len(open) != 1 || open[0].Key != health.AlertAPIErrors {
+		t.Fatalf("the alert must enter the incident history, got %+v", open)
+	}
+}
+
 func TestGuardIssuesReportEveryKeptCache(t *testing.T) {
 	report := parserpkg.Report{
 		Source: parserpkg.SourceGroups,

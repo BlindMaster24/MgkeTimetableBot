@@ -110,11 +110,11 @@ func TestHealthNotifierCalendarAlertsCarryTheSyncButton(t *testing.T) {
 	}
 }
 
-func TestHealthNotifierKeepsAPIAlertsPlain(t *testing.T) {
+func TestHealthNotifierAPIAlertsCarryTheProbeButton(t *testing.T) {
 	thresholds := health.DefaultThresholds()
 	thresholds.APIErrors = 1
 	tracker := health.NewTracker(thresholds)
-	tracker.APIRequest(500, time.Millisecond)
+	tracker.RecordAPI(health.APIRequest{Method: "GET", Path: "/api/health", Status: 500, Duration: time.Millisecond, Message: "database is locked"})
 
 	notifier, sender, _ := newTestHealthNotifier(t, tracker, time.Minute)
 	notifier.Check()
@@ -122,8 +122,20 @@ func TestHealthNotifierKeepsAPIAlertsPlain(t *testing.T) {
 	if len(sender.sent) != 1 {
 		t.Fatalf("expected one API alert, got %+v", sender.sent)
 	}
-	if len(sender.buttoned()) != 0 {
-		t.Errorf("API alerts must stay plain, got %+v", sender.buttoned())
+	buttoned := sender.buttoned()
+	if len(buttoned) != 1 || len(buttoned[0].buttons) != 1 {
+		t.Fatalf("expected the API alert to carry a button, got %+v", sender.sent)
+	}
+	if buttoned[0].buttons[0].Data != APIProbeCallback {
+		t.Errorf("button data = %q, want %q", buttoned[0].buttons[0].Data, APIProbeCallback)
+	}
+	if buttoned[0].buttons[0].Text != apiProbeButton {
+		t.Errorf("button text = %q", buttoned[0].buttons[0].Text)
+	}
+	for _, want := range []string{"Ошибки HTTP API", "paths: GET /api/health x1 (500)", "last: 500 GET /api/health: database is locked"} {
+		if !strings.Contains(sender.sent[0].text, want) {
+			t.Errorf("API alert %q misses %q", sender.sent[0].text, want)
+		}
 	}
 }
 
@@ -161,11 +173,15 @@ func TestHealthAlertButtonsMatchTheAlertScope(t *testing.T) {
 		}
 	}
 
-	if buttons := HealthAlertButtons(health.AlertAPIErrors); len(buttons) != 0 {
-		t.Errorf("API alerts must stay plain, got %+v", buttons)
+	buttons := HealthAlertButtons(health.AlertAPIErrors)
+	if len(buttons) != 1 || buttons[0].Data != APIProbeCallback {
+		t.Errorf("API alerts must carry the probe button, got %+v", buttons)
 	}
-	if IsParserAlert(health.AlertCalendarFailures) || IsCalendarAlert(health.AlertParserGuard) {
-		t.Error("parser and calendar scopes must stay apart")
+	if !IsAPIAlert(health.AlertAPIErrors) {
+		t.Error("the api_errors alert must belong to the API scope")
+	}
+	if IsParserAlert(health.AlertCalendarFailures) || IsCalendarAlert(health.AlertParserGuard) || IsAPIAlert(health.AlertParserFailures) {
+		t.Error("parser, calendar and API scopes must stay apart")
 	}
 }
 

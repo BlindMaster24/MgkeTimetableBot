@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,7 +42,7 @@ func setupTestServerWith(t *testing.T, tracker *health.Tracker) *Server {
 func TestHealthEndpointReportsTrackerState(t *testing.T) {
 	tracker := health.NewDefaultTracker()
 	tracker.ParserSuccess(2 * time.Second)
-	tracker.APIRequest(200, time.Millisecond)
+	tracker.RecordAPI(health.APIRequest{Method: "GET", Path: "/api/health", Status: 200, Duration: time.Millisecond})
 	srv := setupTestServerWith(t, tracker)
 
 	w := httptest.NewRecorder()
@@ -66,6 +68,75 @@ func TestHealthEndpointReportsTrackerState(t *testing.T) {
 	}
 	if len(body.Alerts) != 0 {
 		t.Errorf("expected no alerts, got %+v", body.Alerts)
+	}
+}
+
+func TestServerRecordsEndpointFailures(t *testing.T) {
+	previousWriter := gin.DefaultErrorWriter
+	gin.DefaultErrorWriter = io.Discard
+	defer func() { gin.DefaultErrorWriter = previousWriter }()
+
+	tracker := health.NewDefaultTracker()
+	srv := setupTestServerWith(t, tracker)
+	srv.engine.GET("/api/boom", func(c *gin.Context) { panic("index out of range") })
+	srv.engine.GET("/api/fail", func(c *gin.Context) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database is locked"})
+	})
+
+	for _, target := range []string{"/api/boom", "/api/fail"} {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", target, nil)
+		srv.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("%s: expected 500, got %d", target, w.Code)
+		}
+	}
+
+	api := tracker.Snapshot().API
+	if api.Errors != 2 || api.RecentErrors != 2 {
+		t.Fatalf("api errors = %+v", api)
+	}
+
+	endpoints := map[string]health.APIEndpointStat{}
+	for _, endpoint := range api.Endpoints {
+		endpoints[endpoint.Path] = endpoint
+	}
+	if got := endpoints["/api/boom"]; got.Status != 500 || got.Method != "GET" || got.Message != "index out of range" {
+		t.Errorf("panic endpoint = %+v", got)
+	}
+	if got := endpoints["/api/fail"]; got.Status != 500 || got.Message != "database is locked" {
+		t.Errorf("failing endpoint = %+v", got)
+	}
+	if len(api.LastErrors) != 2 || api.LastErrors[0].At == "" {
+		t.Errorf("last errors = %+v", api.LastErrors)
+	}
+}
+
+func TestHealthProbeIsNotAnAPIError(t *testing.T) {
+	thresholds := health.DefaultThresholds()
+	thresholds.ParserFailures = 1
+	tracker := health.NewTracker(thresholds)
+	tracker.ParserFailure(errors.New("site down"))
+	srv := setupTestServerWith(t, tracker)
+
+	for i := 0; i < 3; i++ {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", healthRoute, nil)
+		srv.Handler().ServeHTTP(w, req)
+		if w.Code != http.StatusServiceUnavailable {
+			t.Fatalf("expected 503 while alerting, got %d", w.Code)
+		}
+	}
+
+	api := tracker.Snapshot().API
+	if api.Errors != 0 || api.RecentErrors != 0 || len(api.LastErrors) != 0 {
+		t.Errorf("the deliberate 503 must not count as a failure: %+v", api)
+	}
+	if len(api.Endpoints) != 1 || api.Endpoints[0].Errors != 0 || api.Endpoints[0].Requests != 3 {
+		t.Errorf("the probe is still a request without errors: %+v", api.Endpoints)
+	}
+	if api.Requests != 3 || api.LastStatus != http.StatusServiceUnavailable {
+		t.Errorf("the probe is still a request: %+v", api)
 	}
 }
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
@@ -29,6 +32,8 @@ var (
 	version = "dev"
 	commit  = "unknown"
 	date    = "unknown"
+
+	apiProbeClient = &http.Client{Timeout: apiprobe.DefaultTimeout}
 )
 
 func main() {
@@ -128,8 +133,26 @@ func main() {
 	}
 	bot.SetBuildInfo(buildInfo)
 	bot.SetHealthSource(metrics)
+	bot.SetAPIProbeFunc(func(ctx context.Context) []apiprobe.Result {
+		return apiprobe.Run(ctx, apiProbeClient, apiProbeBaseURL(cfg), apiprobe.Targets(raspCache))
+	})
+
 	incidents := health.NewIncidentLog(chatRepo, health.IncidentLimit)
+	stamp := health.StartupStamp{Build: buildInfo.Summary(), Config: configStamp(*cfgPath)}
+	incidents.SetStartupStamp(stamp)
 	bot.SetIncidentLog(incidents)
+
+	for _, record := range incidents.NoteStartup(health.ScopeAPI, stamp, func(change health.StartupChange, previous, current health.StartupStamp) string {
+		switch change {
+		case health.ChangeDeploy:
+			return loc.T("ru", "incident_note_deploy", map[string]interface{}{"Current": current.Build, "Previous": previous.Build})
+		case health.ChangeConfig:
+			return loc.T("ru", "incident_note_config", map[string]interface{}{"Current": current.Config, "Previous": previous.Config})
+		}
+		return loc.T("ru", "incident_note_restart", map[string]interface{}{"Current": current.Build})
+	}) {
+		log.Info().Str("key", record.Key).Str("note", record.Note).Msg("open api incident annotated at startup")
+	}
 
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)
@@ -306,8 +329,22 @@ func healthThresholds(cfg *config.Config) health.Thresholds {
 	thresholds.CalendarFailures = cfg.Health.CalendarFailures
 	thresholds.APIErrors = cfg.Health.APIErrors
 	thresholds.APIWindow = time.Duration(cfg.Health.APIWindowMinutes) * time.Minute
+	thresholds.APISlow = time.Duration(cfg.Health.APISlowMS) * time.Millisecond
 
 	return thresholds.WithDefaults()
+}
+
+func apiProbeBaseURL(cfg *config.Config) string {
+	return fmt.Sprintf("http://127.0.0.1:%d", cfg.HTTP.Port)
+}
+
+func configStamp(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])[:8]
 }
 
 func parserGuard(cfg *config.Config) parserpkg.Guard {

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -8,6 +10,11 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	apiCaptureLimit = 512
+	healthRoute     = "/api/health"
 )
 
 type Server struct {
@@ -36,14 +43,66 @@ func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info b
 	return s
 }
 
+type captureWriter struct {
+	gin.ResponseWriter
+	body bytes.Buffer
+	keep bool
+}
+
+func (w *captureWriter) WriteHeader(code int) {
+	w.keep = code >= 500
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *captureWriter) Write(data []byte) (int, error) {
+	if w.keep && w.body.Len() < apiCaptureLimit {
+		clip := data
+		if room := apiCaptureLimit - w.body.Len(); len(clip) > room {
+			clip = clip[:room]
+		}
+		w.body.Write(clip)
+	}
+	return w.ResponseWriter.Write(data)
+}
+
 func (s *Server) observe() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
+		writer := &captureWriter{ResponseWriter: c.Writer}
+		c.Writer = writer
+
+		defer func() {
+			if value := recover(); value != nil {
+				s.recordAPI(c, writer, start, http.StatusInternalServerError, fmt.Sprint(value))
+				panic(value)
+			}
+			s.recordAPI(c, writer, start, writer.Status(), writer.body.String())
+		}()
+
 		c.Next()
-		if s.health != nil {
-			s.health.APIRequest(c.Writer.Status(), time.Since(start))
-		}
 	}
+}
+
+func (s *Server) recordAPI(c *gin.Context, writer *captureWriter, start time.Time, status int, message string) {
+	if s.health == nil {
+		return
+	}
+	path := apiPath(c)
+	s.health.RecordAPI(health.APIRequest{
+		Method:    c.Request.Method,
+		Path:      path,
+		Status:    status,
+		Duration:  time.Since(start),
+		Message:   message,
+		SelfProbe: path == healthRoute && status == http.StatusServiceUnavailable,
+	})
+}
+
+func apiPath(c *gin.Context) string {
+	if route := c.FullPath(); route != "" {
+		return route
+	}
+	return c.Request.URL.Path
 }
 
 func (s *Server) routes() {
@@ -53,7 +112,7 @@ func (s *Server) routes() {
 	s.engine.GET("/api/group/:name", s.handleGroupByName)
 	s.engine.GET("/api/teacher/:name", s.handleTeacherByName)
 	s.engine.GET("/api/parser-health", s.handleParserHealth)
-	s.engine.GET("/api/health", s.handleHealth)
+	s.engine.GET(healthRoute, s.handleHealth)
 }
 
 func (s *Server) HandleGoogleOAuth(path string, handler http.HandlerFunc) {

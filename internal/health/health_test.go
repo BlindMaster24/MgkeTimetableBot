@@ -140,17 +140,17 @@ func TestAPIErrorsUseWindow(t *testing.T) {
 	thresholds.APIWindow = time.Minute
 	tracker := NewTracker(thresholds)
 
-	tracker.APIRequest(200, 5*time.Millisecond)
-	tracker.APIRequest(404, 2*time.Millisecond)
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/groups", Status: 200, Duration: 5 * time.Millisecond})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/teacher/:name", Status: 404, Duration: 2 * time.Millisecond})
 	for i := 0; i < 2; i++ {
-		tracker.APIRequest(500, 10*time.Millisecond)
+		tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/health", Status: 500, Duration: 10 * time.Millisecond, Message: `{"error":"database is locked"}`})
 	}
 
 	if alerts := alertKeys(tracker.Alerts()); alerts[AlertAPIErrors] != "" {
 		t.Fatalf("two errors should not cross a threshold of three, got %+v", alerts)
 	}
 
-	tracker.APIRequest(503, 15*time.Millisecond)
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/info", Status: 503, Duration: 15 * time.Millisecond})
 	if alerts := alertKeys(tracker.Alerts()); alerts[AlertAPIErrors] != LevelCritical {
 		t.Fatalf("expected api error alert, got %+v", alerts)
 	}
@@ -313,7 +313,7 @@ func TestSnapshotCountersAreMonotonic(t *testing.T) {
 	tracker.ParserSuccess(time.Millisecond)
 	tracker.ParserFailure(errors.New("boom"))
 	tracker.CalendarSuccess(2)
-	tracker.APIRequest(200, time.Millisecond)
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/health", Status: 200, Duration: time.Millisecond})
 
 	first := tracker.Snapshot()
 	second := tracker.Snapshot()
@@ -323,5 +323,165 @@ func TestSnapshotCountersAreMonotonic(t *testing.T) {
 	}
 	if second.Calendar.DaysSynced != 2 {
 		t.Errorf("days synced = %d", second.Calendar.DaysSynced)
+	}
+}
+
+func TestAPIAlertNamesEndpointsAndLastErrors(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.APIErrors = 3
+	thresholds.APIWindow = time.Minute
+	tracker := NewTracker(thresholds)
+
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/health", Status: 500, Message: `{"error":"database is locked"}`})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/health", Status: 500, Message: `{"error":"database is locked"}`})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/groups", Status: 503, Message: "upstream\ntimeout"})
+
+	alert := findAlert(tracker.Alerts(), AlertAPIErrors)
+	if alert == nil {
+		t.Fatal("expected an api alert")
+	}
+	for _, want := range []string{
+		"errors=3 window=1m0s",
+		"paths: GET /api/health x2 (500), GET /api/groups x1 (503)",
+		"last: 503 GET /api/groups: upstream timeout",
+		"last: 500 GET /api/health: database is locked",
+	} {
+		if !strings.Contains(alert.Detail, want) {
+			t.Errorf("alert detail %q misses %q", alert.Detail, want)
+		}
+	}
+
+	snapshot := tracker.Snapshot()
+	if len(snapshot.API.Endpoints) != 2 {
+		t.Fatalf("endpoints = %+v", snapshot.API.Endpoints)
+	}
+	if snapshot.API.Endpoints[0].Path != "/api/health" || snapshot.API.Endpoints[0].Errors != 2 {
+		t.Errorf("endpoints should be ordered by errors: %+v", snapshot.API.Endpoints)
+	}
+	if snapshot.API.Endpoints[0].Message != "database is locked" {
+		t.Errorf("the json error body should be unwrapped: %+v", snapshot.API.Endpoints[0])
+	}
+	if snapshot.API.Endpoints[0].LastAt == "" {
+		t.Errorf("endpoints need a timestamp: %+v", snapshot.API.Endpoints[0])
+	}
+	if len(snapshot.API.LastErrors) != 3 || snapshot.API.LastErrors[0].Status != 503 {
+		t.Errorf("last errors should be newest first: %+v", snapshot.API.LastErrors)
+	}
+}
+
+func TestAPIDiagnosticsFollowTheWindow(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.APIWindow = time.Minute
+	tracker := NewTracker(thresholds)
+
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/health", Status: 500, Message: "boom"})
+
+	tracker.mu.Lock()
+	for key, state := range tracker.apiEndpoints {
+		state.lastAt = time.Now().Add(-2 * time.Minute)
+		state.errorTimes = []time.Time{time.Now().Add(-2 * time.Minute)}
+		tracker.apiEndpoints[key] = state
+	}
+	tracker.apiRecentErrors = []time.Time{time.Now().Add(-2 * time.Minute)}
+	tracker.mu.Unlock()
+
+	snapshot := tracker.Snapshot()
+	if len(snapshot.API.Endpoints) != 1 {
+		t.Fatalf("recent endpoints stay within the retention: %+v", snapshot.API.Endpoints)
+	}
+	if snapshot.API.Endpoints[0].Errors != 0 || snapshot.API.Endpoints[0].Requests != 1 {
+		t.Errorf("errors outside the window are dropped, requests stay: %+v", snapshot.API.Endpoints[0])
+	}
+	if len(snapshot.API.LastErrors) != 1 {
+		t.Errorf("the last error samples stay readable: %+v", snapshot.API.LastErrors)
+	}
+	if alerts := alertKeys(tracker.Alerts()); alerts[AlertAPIErrors] != "" {
+		t.Errorf("stale errors must not alert, got %+v", alerts)
+	}
+
+	tracker.mu.Lock()
+	for key, state := range tracker.apiEndpoints {
+		state.lastAt = time.Now().Add(-2 * apiEndpointRetention)
+		tracker.apiEndpoints[key] = state
+	}
+	tracker.mu.Unlock()
+
+	if endpoints := tracker.Snapshot().API.Endpoints; len(endpoints) != 0 {
+		t.Errorf("endpoints older than the retention must be pruned: %+v", endpoints)
+	}
+}
+
+func TestAPIEndpointLatencyIsTrackedForEveryRequest(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.APISlow = 20 * time.Millisecond
+	tracker := NewTracker(thresholds)
+
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/groups", Status: 200, Duration: 10 * time.Millisecond})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/groups", Status: 200, Duration: 20 * time.Millisecond})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/groups", Status: 500, Duration: 30 * time.Millisecond, Message: "boom"})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/info", Status: 200, Duration: 3 * time.Millisecond})
+
+	snapshot := tracker.Snapshot()
+	if len(snapshot.API.Endpoints) != 2 {
+		t.Fatalf("endpoints = %+v", snapshot.API.Endpoints)
+	}
+
+	groups := snapshot.API.Endpoints[0]
+	if groups.Path != "/api/groups" {
+		t.Fatalf("the failing endpoint must come first: %+v", snapshot.API.Endpoints)
+	}
+	if groups.Requests != 3 || groups.Errors != 1 {
+		t.Errorf("requests and errors must add up: %+v", groups)
+	}
+	if groups.LastMillis != 30 || groups.AvgMillis != 20 || groups.MaxMillis != 30 {
+		t.Errorf("latency of every request must be kept: %+v", groups)
+	}
+	if !groups.Slow {
+		t.Errorf("20ms average against a 20ms limit must look slow: %+v", groups)
+	}
+
+	info := snapshot.API.Endpoints[1]
+	if info.Requests != 1 || info.Errors != 0 || info.AvgMillis != 3 || info.Slow {
+		t.Errorf("a healthy fast endpoint = %+v", info)
+	}
+}
+
+func TestAPIAlertNamesSlowEndpoints(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.APIErrors = 1
+	thresholds.APISlow = 50 * time.Millisecond
+	tracker := NewTracker(thresholds)
+
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/group/:name", Status: 200, Duration: 400 * time.Millisecond})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/group/:name", Status: 200, Duration: 900 * time.Millisecond})
+	tracker.RecordAPI(APIRequest{Method: "GET", Path: "/api/info", Status: 500, Message: "boom"})
+
+	alert := findAlert(tracker.Alerts(), AlertAPIErrors)
+	if alert == nil {
+		t.Fatal("expected an api alert")
+	}
+	for _, want := range []string{
+		"paths: GET /api/info x1 (500)",
+		"slow: GET /api/group/:name avg=650ms max=900ms n=2 (last 900ms)",
+	} {
+		if !strings.Contains(alert.Detail, want) {
+			t.Errorf("alert detail %q misses %q", alert.Detail, want)
+		}
+	}
+}
+
+func TestAPIMessageIsCompact(t *testing.T) {
+	if got := apiMessage(" {\"error\":\"  boo m  \"} "); got != "boo m" {
+		t.Errorf("apiMessage = %q", got)
+	}
+	if got := apiMessage("upstream\ntimeout"); got != "upstream timeout" {
+		t.Errorf("plain message = %q", got)
+	}
+	if got := apiMessage("   "); got != "" {
+		t.Errorf("blank message = %q", got)
+	}
+	long := apiMessage(strings.Repeat("x", 400))
+	if len(long) != apiMessageLimit+3 || !strings.HasSuffix(long, "...") {
+		t.Errorf("long message should be clipped, got %d chars", len(long))
 	}
 }
