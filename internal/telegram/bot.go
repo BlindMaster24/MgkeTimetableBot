@@ -185,6 +185,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&endingsCmd{bot: b})
 	b.RegisterCommand(&chatCmd{bot: b})
 	b.registerMenus()
+	b.RegisterTextCommand(&callsCampusTextCmd{bot: b})
 	b.RegisterCommand(&idCmd{bot: b})
 	b.RegisterCommand(&errorCmd{bot: b})
 	b.RegisterCommand(&testCmd{bot: b})

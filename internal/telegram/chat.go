@@ -56,6 +56,7 @@ type Chat struct {
 	DeactivateSecondaryCheck bool
 	CallsEditInput           string
 	CallsEditReason          string
+	CallsCampus              string
 	Ref                      string
 	HistoryGroup             []string
 	HistoryTeacher           []string
@@ -124,6 +125,7 @@ func (r *Repository) migrate() error {
 		deactivate_secondary_check INTEGER NOT NULL DEFAULT 0,
 		calls_edit_input TEXT,
 		calls_edit_reason TEXT,
+		calls_campus TEXT,
 		ref TEXT,
 		history_group TEXT NOT NULL DEFAULT '[]',
 		history_teacher TEXT NOT NULL DEFAULT '[]',
@@ -142,6 +144,7 @@ func (r *Repository) migrate() error {
 		{"deactivate_secondary_check", "ALTER TABLE bot_chats ADD COLUMN deactivate_secondary_check INTEGER NOT NULL DEFAULT 0"},
 		{"calls_edit_input", "ALTER TABLE bot_chats ADD COLUMN calls_edit_input TEXT"},
 		{"calls_edit_reason", "ALTER TABLE bot_chats ADD COLUMN calls_edit_reason TEXT"},
+		{"calls_campus", "ALTER TABLE bot_chats ADD COLUMN calls_campus TEXT"},
 	} {
 		var count int
 		r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count)
@@ -195,7 +198,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref,
 		        history_group, history_teacher,
 		        last_msg_time, subscribe_distribution, need_update_buttons, deactivate_secondary_check,
-		        calls_edit_input, calls_edit_reason
+		        calls_edit_input, calls_edit_reason, calls_campus
 		 FROM bot_chats WHERE service = ? AND peer_id = ?`,
 		service, peerID,
 	)
@@ -208,7 +211,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 
 	var nsScene, nsMode, nsGroup, nsTeacher, nsGoogleEmail, nsRef sql.NullString
 	var nsHistoryGroup, nsHistoryTeacher sql.NullString
-	var nsCallsEditInput, nsCallsEditReason sql.NullString
+	var nsCallsEditInput, nsCallsEditReason, nsCallsCampus sql.NullString
 	err := row.Scan(
 		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &nsScene, &nsMode,
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
@@ -218,7 +221,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
 		&chat.DiffMaxLines, &nsRef, &nsHistoryGroup, &nsHistoryTeacher,
 		&chat.LastMsgTime, &subscribeDistribution, &needUpdateButtons, &deactivateSecondaryCheck,
-		&nsCallsEditInput, &nsCallsEditReason,
+		&nsCallsEditInput, &nsCallsEditReason, &nsCallsCampus,
 	)
 	if err != nil {
 		return nil, err
@@ -257,6 +260,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	chat.DeactivateSecondaryCheck = deactivateSecondaryCheck != 0
 	chat.CallsEditInput = nsCallsEditInput.String
 	chat.CallsEditReason = nsCallsEditReason.String
+	chat.CallsCampus = nsCallsCampus.String
 
 	return chat, nil
 }
@@ -323,7 +327,7 @@ func (r *Repository) Save(chat *Chat) error {
 			show_parser_time=?, show_hints=?, diff_enabled=?, diff_auto_in_week=?,
 			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?,
 			history_group=?, history_teacher=?, last_msg_time=?, subscribe_distribution=?,
-			need_update_buttons=?, deactivate_secondary_check=?, calls_edit_input=?, calls_edit_reason=?
+			need_update_buttons=?, deactivate_secondary_check=?, calls_edit_input=?, calls_edit_reason=?, calls_campus=?
 		 WHERE id=?`,
 		toInt(chat.Accepted), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
 		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
@@ -336,7 +340,7 @@ func (r *Repository) Save(chat *Chat) error {
 		chat.DiffMaxLines, chat.Ref,
 		marshalStringSlice(chat.HistoryGroup), marshalStringSlice(chat.HistoryTeacher),
 		chat.LastMsgTime, toInt(chat.SubscribeDistribution), toInt(chat.NeedUpdateButtons),
-		toInt(chat.DeactivateSecondaryCheck), chat.CallsEditInput, chat.CallsEditReason, chat.ID,
+		toInt(chat.DeactivateSecondaryCheck), chat.CallsEditInput, chat.CallsEditReason, chat.CallsCampus, chat.ID,
 	)
 	return err
 }

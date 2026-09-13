@@ -199,19 +199,24 @@ func (f *Fetcher) Calls(bellScheduleURL string) error {
 		return nil
 	}
 
-	schedule, report := ParseCallsScheduleReport(doc)
+	variants, report := ParseCallsVariants(doc)
 	report.URL = bellScheduleURL
 
-	if schedule == nil || len(schedule.Weekdays) == 0 {
+	if len(variants) == 0 || len(variants[0].Schedule.Weekdays) == 0 {
 		report.KeepOld("the page produced no bell schedule slots")
 		f.emit(report)
 		f.log.Warn().Str("url", bellScheduleURL).Msg("calls parse returned empty, cache left untouched")
 		return nil
 	}
 
-	f.cache.SetCallsNotify(*schedule, cache.Schedule{}, "site", "")
+	schedule := variants[0].Schedule
+	f.cache.SetCallsNotify(cache.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}, cache.Schedule{}, "site", "")
+	f.cache.SetCallsSiteVariants(variants)
 	f.emit(report)
-	f.log.Info().Int("weekdays", len(schedule.Weekdays)).Msg("calls parsed from site")
+	f.log.Info().
+		Int("weekdays", len(schedule.Weekdays)).
+		Strs("variants", report.Variants).
+		Msg("calls parsed from site")
 
 	if err := f.cache.Save(); err != nil {
 		return fmt.Errorf("save cache: %w", err)

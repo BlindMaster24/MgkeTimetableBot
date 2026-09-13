@@ -140,11 +140,16 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 - `parser.update_interval.*` — poll intervals: regular, during activity hours, after an error, for the teacher list, for the bell schedule;
 - `parser.alertable_ignore_filter` and `parser.lesson_index_if_empty` — which lessons count as meaningful in change notifications;
 - `parser.calls.enabled`, `parser.calls.prefer_site`, `parser.calls.notify` — bell schedule: enabled, site versus manual edits, notify on changes;
+- `parser.calls.campus` (or `MGKE_PARSER_CALLS_CAMPUS`) — default campus for the bell schedule; empty means the schedule with the most periods.
 - `parser.proxy` — HTTP(S) proxy for site requests: `http://user:pass@host:port`. When the college site is unreachable directly (a blocked `.by` domain, or a VPN-only network), point this at a proxy or at the local address of your VPN client — for example a Throne SOCKS port; an invalid URL is logged and the bot keeps working over a direct connection.
 
 The scheduler follows the college day: during activity hours (9:00–17:00 by default, the `parser.activity` key) it polls often, outside them it uses the regular interval, Sunday has no activity window at all, and after a failure it retries in `parser.update_interval.error`. The teacher list (`parser.endpoints.team` pages) refreshes once a day and the bell schedule on its own interval.
 
 The bell schedule refreshes itself from the college site; it can still be edited by hand from the calls menu.
+
+#### Campuses
+
+The bell schedule page can hold several tables, one per campus. The parser keeps every variant and shows their names as `🏫 Корпус: …` buttons in the calls menu (only when there is more than one). A user picks their campus, it is stored in the chat database and used both for the displayed bell schedule and for Google Calendar sync. The `🏫 Корпус: авто` button clears the choice back to the default variant (`parser.calls.campus`, otherwise the schedule with the most periods). A single campus for the whole installation is set with `parser.calls.campus`.
 
 #### Resistance to layout changes
 
@@ -152,7 +157,6 @@ The parser does not depend on a rigid page structure: the group or teacher name 
 
 Every run collects diagnostics — which selector matched what. When the site changes and a required selector stops matching, an empty or sharply shrunken result **never overwrites the cache**: the bot keeps serving the timetable, and the problem shows up in `/parserLogs` (admins) and `GET /api/health` (`parser.layout`), and after `health.parser_layout_failures` runs in a row it arrives as a Telegram alert.
 
-The `parser.v2.*` keys come from the old TypeScript bot and are not read by the Go version — they are no longer part of the example config.
 
 ## Bot commands
 
@@ -354,7 +358,7 @@ internal/
   model/                 — Group, Teacher, Day, Lesson, CallsSchedule
   notification/          — scheduler, events and health alerts
   parity/                — TypeScript ↔ Go surface comparator
-  parser/                — v1 parser (tables) and bell schedule parser
+  parser/                — timetable parser (groups, teachers, bell schedule, diagnostics)
   telegram/              — telego: commands, callbacks, menus, keyboards, scenes
   utils/                 — academic weeks, subjects
 configs/config.example.yaml — configuration template

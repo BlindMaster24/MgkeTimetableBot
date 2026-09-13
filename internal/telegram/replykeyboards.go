@@ -175,6 +175,24 @@ func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMa
 	var rows [][]telego.KeyboardButton
 	rows = append(rows, []telego.KeyboardButton{{Text: "📊 Показать"}})
 
+	if names := b.campusNames(); len(names) > 1 {
+		selected := b.selectedCampus(chat)
+		var row []telego.KeyboardButton
+		for _, name := range names {
+			row = append(row, telego.KeyboardButton{Text: campusButtonText(name, selected == name)})
+			if len(row) == 2 {
+				rows = append(rows, row)
+				row = nil
+			}
+		}
+		if len(row) > 0 {
+			rows = append(rows, row)
+		}
+		if selected != "" {
+			rows = append(rows, []telego.KeyboardButton{{Text: campusButtonPrefix + campusAutoLabel}})
+		}
+	}
+
 	if admin {
 		calls := b.cache.GetCalls()
 		check := func(v bool) string {

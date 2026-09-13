@@ -45,15 +45,29 @@ type CallsSchedule struct {
 	Saturday [][2][2]string `json:"saturday"`
 }
 
+type CallsVariant struct {
+	Name      string        `json:"name"`
+	Schedule  CallsSchedule `json:"schedule"`
+	UpdatedAt int64         `json:"updatedAt,omitempty"`
+}
+
+func (v CallsVariant) Slots() int {
+	if len(v.Schedule.Saturday) > len(v.Schedule.Weekdays) {
+		return len(v.Schedule.Saturday)
+	}
+	return len(v.Schedule.Weekdays)
+}
+
 type CallsCache struct {
-	Site                CallsSource `json:"site"`
-	Manual              CallsSource `json:"manual"`
-	Active              CallsActive `json:"active"`
-	Update              int64       `json:"update"`
-	Changed             int64       `json:"changed"`
-	ManualReason        string      `json:"manualReason"`
-	OverrideSource      string      `json:"overrideSource"`
-	SiteEmptyNotifiedAt int64       `json:"siteEmptyNotifiedAt"`
+	Site                CallsSource    `json:"site"`
+	SiteVariants        []CallsVariant `json:"siteVariants,omitempty"`
+	Manual              CallsSource    `json:"manual"`
+	Active              CallsActive    `json:"active"`
+	Update              int64          `json:"update"`
+	Changed             int64          `json:"changed"`
+	ManualReason        string         `json:"manualReason"`
+	OverrideSource      string         `json:"overrideSource"`
+	SiteEmptyNotifiedAt int64          `json:"siteEmptyNotifiedAt"`
 }
 
 type RaspCache struct {
@@ -314,6 +328,25 @@ func (c *RaspCache) setCallsInternal(site Schedule, manual Schedule, source, rea
 	c.Calls.Update = now
 
 	c.selectActiveCallsLocked(skipNotify, reason)
+}
+
+func (c *RaspCache) SetCallsSiteVariants(variants []CallsVariant) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Calls.SiteVariants = variants
+}
+
+func (c *RaspCache) GetCallsVariant(name string) (CallsSchedule, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	for _, variant := range c.Calls.SiteVariants {
+		if variant.Name == name {
+			return variant.Schedule, true
+		}
+	}
+	return CallsSchedule{}, false
 }
 
 func (c *RaspCache) SetCallsPreferSite(v bool) {

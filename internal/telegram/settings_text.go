@@ -675,7 +675,7 @@ func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
 		lines = append(lines, "🪠 "+err.Error())
 	}
 
-	schedule := calls.Active.Schedule
+	schedule := b.callsScheduleFor(chat)
 	if len(schedule.Weekdays) > 0 {
 		lines = append(lines, "\n__ Звонки (будни) __")
 		lines = append(lines, formatCallsPlain(schedule.Weekdays))
@@ -709,6 +709,7 @@ func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 	calls := b.cache.GetCalls()
 
 	lines := []string{"Управление расписанием звонков."}
+	lines = append(lines, b.callsCampusMenuLines(chat)...)
 	if admin {
 		if calls.OverrideSource != "" {
 			lines = append(lines, fmt.Sprintf("Переопределение источника: %s", callsSourceLabel(calls.OverrideSource)))

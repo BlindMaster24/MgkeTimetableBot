@@ -12,9 +12,10 @@ type TimetableConfig struct {
 }
 
 type CallsConfig struct {
-	Enabled    bool `yaml:"enabled"`
-	PreferSite bool `yaml:"prefer_site"`
-	Notify     bool `yaml:"notify"`
+	Enabled    bool   `yaml:"enabled"`
+	PreferSite bool   `yaml:"prefer_site"`
+	Notify     bool   `yaml:"notify"`
+	Campus     string `yaml:"campus"`
 }
 
 type HealthConfig struct {

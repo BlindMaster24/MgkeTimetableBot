@@ -2,6 +2,7 @@ package parser
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -12,12 +13,31 @@ var callsTimeRe = regexp.MustCompile(`\b(\d{1,2})[.:](\d{2})\b`)
 var saturdayRe = regexp.MustCompile(`(?i)(суббот|выход|сб\.)`)
 var callsLineRe = regexp.MustCompile(`(?m)^\s*\d{1,2}\s*(?:пара|звонок)?[.:]?\s*\d{1,2}[.:]\d{2}.*$`)
 
+type callsGroup struct {
+	name     string
+	weekdays [][2][2]string
+	saturday [][2][2]string
+}
+
 func ParseCallsSchedule(doc *goquery.Document) *cache.Schedule {
 	schedule, _ := ParseCallsScheduleReport(doc)
 	return schedule
 }
 
 func ParseCallsScheduleReport(doc *goquery.Document) (*cache.Schedule, Report) {
+	variants, report := ParseCallsVariants(doc)
+	if len(variants) == 0 {
+		return nil, report
+	}
+
+	schedule := cache.Schedule{
+		Weekdays: variants[0].Schedule.Weekdays,
+		Saturday: variants[0].Schedule.Saturday,
+	}
+	return &schedule, report
+}
+
+func ParseCallsVariants(doc *goquery.Document) ([]cache.CallsVariant, Report) {
 	builder := newReport(SourceCalls, "")
 
 	scope, selector, scoped := findScope(doc)
@@ -30,54 +50,138 @@ func ParseCallsScheduleReport(doc *goquery.Document) (*cache.Schedule, Report) {
 	}
 	builder.probe("table", "bell schedule tables", tables.Length(), true)
 
-	var weekdaySlots [][2][2]string
-	var saturdaySlots [][2][2]string
+	var groups []*callsGroup
+	byName := make(map[string]*callsGroup)
+	var current *callsGroup
 	tablesWithSlots := 0
 
 	tables.Each(func(_ int, table *goquery.Selection) {
+		heading := tableHeading(table, doc)
+		isSaturday := saturdayRe.MatchString(heading)
+
+		if !isSaturday {
+			current = groupFor(byName, &groups, campusLabel(heading))
+		}
+
 		slots := extractCallSlots(table)
 		if len(slots) == 0 {
 			return
 		}
 		tablesWithSlots++
 
-		if saturdayRe.MatchString(tableHeading(table, doc)) {
-			saturdaySlots = append(saturdaySlots, slots...)
+		if current == nil {
+			current = groupFor(byName, &groups, campusLabel(heading))
+		}
+		if isSaturday {
+			current.saturday = append(current.saturday, slots...)
 			return
 		}
-		if len(slots) > len(weekdaySlots) {
-			weekdaySlots = slots
+		if len(slots) > len(current.weekdays) {
+			current.weekdays = slots
 		}
 	})
 
 	builder.probe("tr with two time ranges", "bell schedule rows", tablesWithSlots, true)
 
-	if len(weekdaySlots) == 0 {
+	variants := buildVariants(groups)
+	if len(variants) == 0 {
 		if extracted := extractCallsFromText(scope, builder); len(extracted) > 0 {
-			weekdaySlots = extracted
+			variants = []cache.CallsVariant{{
+				Name:     "",
+				Schedule: cache.CallsSchedule{Weekdays: extracted, Saturday: extracted},
+			}}
 		}
 	}
 
-	if len(weekdaySlots) == 0 {
+	if len(variants) == 0 {
 		builder.warn("no bell schedule slots were recognized")
 		return nil, builder.done(0)
 	}
 
-	if len(saturdaySlots) == 0 {
-		saturdaySlots = weekdaySlots
+	if len(variants) == 1 {
+		variants[0].Name = ""
+	}
+	for i := range variants {
+		builder.variant(variants[i].Name)
 	}
 
-	if len(weekdaySlots) > 16 {
-		builder.warn("%d weekday slots look like a mix of several schedules", len(weekdaySlots))
-		weekdaySlots = weekdaySlots[:16]
+	return variants, builder.done(len(variants[0].Schedule.Weekdays))
+}
+
+func groupFor(index map[string]*callsGroup, groups *[]*callsGroup, name string) *callsGroup {
+	if group, ok := index[name]; ok {
+		return group
 	}
 
-	schedule := &cache.Schedule{
-		Weekdays: weekdaySlots,
-		Saturday: saturdaySlots,
+	group := &callsGroup{name: name}
+	index[name] = group
+	*groups = append(*groups, group)
+	return group
+}
+
+func buildVariants(groups []*callsGroup) []cache.CallsVariant {
+	ordered := make([]*callsGroup, 0, len(groups))
+	for _, group := range groups {
+		if len(group.weekdays) > 0 {
+			ordered = append(ordered, group)
+		}
 	}
 
-	return schedule, builder.done(len(weekdaySlots))
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return len(ordered[i].weekdays) > len(ordered[j].weekdays)
+	})
+
+	variants := make([]cache.CallsVariant, 0, len(ordered))
+	for _, group := range ordered {
+		saturday := group.saturday
+		if len(saturday) == 0 {
+			saturday = group.weekdays
+		}
+		if len(saturday) > 16 {
+			saturday = saturday[:16]
+		}
+		weekdays := group.weekdays
+		if len(weekdays) > 16 {
+			weekdays = weekdays[:16]
+		}
+
+		variants = append(variants, cache.CallsVariant{
+			Name: group.name,
+			Schedule: cache.CallsSchedule{
+				Weekdays: weekdays,
+				Saturday: saturday,
+			},
+		})
+	}
+	return variants
+}
+
+func campusLabel(heading string) string {
+	heading = normalizeLabel(heading)
+	if heading == "" {
+		return ""
+	}
+
+	lowered := strings.ToLower(heading)
+	if saturdayRe.MatchString(lowered) {
+		return ""
+	}
+
+	campusMarkers := []string{"корпус", "улиц", "филиал", "площадк", "здани"}
+	for _, marker := range campusMarkers {
+		if !strings.Contains(lowered, marker) {
+			continue
+		}
+		fields := strings.Fields(heading)
+		if len(fields) > 1 {
+			if short := trimSeparators(fields[len(fields)-1]); short != "" {
+				return short
+			}
+		}
+		return heading
+	}
+
+	return heading
 }
 
 func extractCallSlots(table *goquery.Selection) [][2][2]string {

@@ -194,12 +194,9 @@ func (b *Bot) showCallsFullFull(u *Update, chat *Chat) {
 }
 
 func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
-	activeWeekdays := b.cache.GetCallsWeekdays()
-	activeSaturday := b.cache.GetCallsSaturday()
-	if activeWeekdays == nil {
-		activeWeekdays = b.cfg.Timetable.Weekdays
-		activeSaturday = b.cfg.Timetable.Saturday
-	}
+	schedule := b.callsScheduleFor(chat)
+	activeWeekdays := schedule.Weekdays
+	activeSaturday := schedule.Saturday
 
 	maxLessons := len(activeWeekdays)
 	if len(activeSaturday) > maxLessons {
@@ -219,6 +216,9 @@ func (b *Bot) displayCalls(u *Update, chat *Chat, full bool) {
 	calls := b.cache.GetCalls()
 	if calls.Active.Source == "manual" && calls.ManualReason != "" {
 		msg = append(msg, fmt.Sprintf("Причина: %s\n", calls.ManualReason))
+	}
+	if line := b.callsCampusLine(chat); line != "" {
+		msg = append(msg, line)
 	}
 	msg = append(msg, "__ <b>Звонки (будни)</b> __")
 	msg = append(msg, b.callsLines(activeWeekdays, userMax, full, []int{1, 2, 3, 4, 5}))

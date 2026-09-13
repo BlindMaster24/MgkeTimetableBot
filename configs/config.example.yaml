@@ -69,6 +69,7 @@ parser:
     enabled: true
     prefer_site: true
     notify: true
+    campus: ""
 
 timetable:
   weekdays:

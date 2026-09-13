@@ -33,6 +33,7 @@ type Report struct {
 	Probes    []Probe   `json:"probes,omitempty"`
 	Warnings  []string  `json:"warnings,omitempty"`
 	Fallbacks []string  `json:"fallbacks,omitempty"`
+	Variants  []string  `json:"variants,omitempty"`
 	KeptOld   bool      `json:"keptOld,omitempty"`
 }
 
@@ -59,6 +60,9 @@ func (r Report) Summary() string {
 			names = append(names, probe.Selector)
 		}
 		parts = append(parts, "no data for: "+strings.Join(names, ", "))
+	}
+	if len(r.Variants) > 0 {
+		parts = append(parts, "variants: "+strings.Join(r.Variants, ", "))
 	}
 	if len(r.Fallbacks) > 0 {
 		parts = append(parts, "fallbacks: "+strings.Join(r.Fallbacks, ", "))
@@ -106,6 +110,18 @@ func (b *reportBuilder) fallback(name string) {
 	b.report.Fallbacks = append(b.report.Fallbacks, name)
 }
 
+func (b *reportBuilder) variant(name string) {
+	if name == "" {
+		return
+	}
+	for _, existing := range b.report.Variants {
+		if existing == name {
+			return
+		}
+	}
+	b.report.Variants = append(b.report.Variants, name)
+}
+
 func (b *reportBuilder) warn(format string, args ...any) {
 	b.report.Warn(format, args...)
 }
@@ -128,6 +144,7 @@ func mergeReports(reports ...Report) Report {
 	probeIndex := make(map[string]int)
 	seenWarnings := make(map[string]bool)
 	seenFallbacks := make(map[string]bool)
+	seenVariants := make(map[string]bool)
 
 	for _, report := range reports {
 		merged.Items += report.Items
@@ -157,6 +174,14 @@ func mergeReports(reports ...Report) Report {
 			}
 			seenFallbacks[fallback] = true
 			merged.Fallbacks = append(merged.Fallbacks, fallback)
+		}
+
+		for _, variant := range report.Variants {
+			if seenVariants[variant] {
+				continue
+			}
+			seenVariants[variant] = true
+			merged.Variants = append(merged.Variants, variant)
 		}
 
 		if report.URL == "" {

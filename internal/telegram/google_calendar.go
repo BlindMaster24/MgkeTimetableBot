@@ -687,13 +687,35 @@ func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCale
 }
 
 func (b *Bot) activeCallsSchedule() google.Schedule {
+	campus := b.configuredCampus()
+	if campus == "" {
+		campus = b.defaultCampus()
+	}
+
 	weekdays := b.cache.GetCallsWeekdays()
 	saturday := b.cache.GetCallsSaturday()
-	if weekdays == nil {
+	if campus != "" {
+		if variant, ok := b.cache.GetCallsVariant(campus); ok {
+			weekdays = variant.Weekdays
+			saturday = variant.Saturday
+		}
+	}
+	if len(weekdays) == 0 {
 		weekdays = b.cfg.Timetable.Weekdays
 		saturday = b.cfg.Timetable.Saturday
 	}
+	if len(saturday) == 0 {
+		saturday = weekdays
+	}
 	return google.Schedule{Weekdays: weekdays, Saturday: saturday}
+}
+
+func (b *Bot) defaultCampus() string {
+	variants := b.cache.GetCalls().SiteVariants
+	if len(variants) == 1 && variants[0].Name != "" {
+		return variants[0].Name
+	}
+	return ""
 }
 
 func groupDayLessons(day model.GroupDay) []google.DayLesson {
