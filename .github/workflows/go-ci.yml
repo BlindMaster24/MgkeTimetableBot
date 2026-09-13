@@ -1,0 +1,59 @@
+name: Go CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: go-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build, vet and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -count=1 -p 1 ./internal/... ./tests/...
+
+  parity:
+    name: TypeScript parity
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fetch the old TypeScript bot branch
+        run: git fetch --depth=1 origin go
+
+      - name: Compare the Go bot against the TypeScript bot
+        run: go run ./scripts/paritycheck -ts-ref origin/go
+
+      - name: Check keyboard layouts against the golden file
+        run: go test -count=1 -run 'Golden|Parity' ./internal/telegram/

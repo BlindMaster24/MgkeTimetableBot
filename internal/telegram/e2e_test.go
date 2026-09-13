@@ -1497,10 +1497,7 @@ func TestE2E_ReplyKeyboardSettingsMenu(t *testing.T) {
 
 	u := makeUpdate(userID, "/settings")
 	u.Bot = b
-	cmd := &settingsCmd{bot: b}
-	if err := cmd.Handler(context.Background(), u); err != nil {
-		t.Fatalf("settings handler: %v", err)
-	}
+	b.handleMessageText(context.Background(), u)
 
 	saved, _ := repo.FindOrCreate("telegram", userID)
 	if saved.Scene != sceneSettings {

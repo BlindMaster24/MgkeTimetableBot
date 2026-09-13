@@ -329,30 +329,9 @@ func (c *settingsNavTextCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.showSchedule(u, chat)
 }
 
-type schedulesTextCmd struct {
-	bot *Bot
-}
-
-func (c *schedulesTextCmd) Name() string        { return "/schedules_text" }
-func (c *schedulesTextCmd) Description() string { return "" }
-func (c *schedulesTextCmd) Scene() string       { return sceneSettings }
-
-func (c *schedulesTextCmd) MatchText(text string) bool {
-	return text == "🗓️ Управление расписаниями"
-}
-
-func (c *schedulesTextCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettingsSchedules
-	c.bot.chatRepo.Save(chat)
-	return c.bot.SendTextWithReplyKeyboard(u.ChatID, "Управление расписаниями.", c.bot.replySettingsSchedules())
-}
-
 type callsManageTextCmd struct {
-	bot *Bot
+	bot  *Bot
+	menu string
 }
 
 func (c *callsManageTextCmd) Name() string        { return "/calls_manage_text" }
@@ -368,9 +347,11 @@ func (c *callsManageTextCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	chat.Scene = sceneSettingsCalls
-	c.bot.chatRepo.Save(chat)
-	return c.bot.showCallsSettingsReply(u, chat)
+	spec, ok := c.bot.menuByID(c.menu)
+	if !ok {
+		return nil
+	}
+	return c.bot.openMenu(u, chat, spec)
 }
 
 type showCurrentSettingsTextCmd struct {
@@ -395,28 +376,6 @@ func (c *showCurrentSettingsTextCmd) Handler(ctx context.Context, u *Update) err
 
 func b_currentSettingsText(b *Bot, chat *Chat) string {
 	return b.currentSettingsText(chat)
-}
-
-type aliasMenuTextCmd struct {
-	bot *Bot
-}
-
-func (c *aliasMenuTextCmd) Name() string        { return "/alias_menu_text" }
-func (c *aliasMenuTextCmd) Description() string { return "" }
-func (c *aliasMenuTextCmd) Scene() string       { return sceneSettings }
-
-func (c *aliasMenuTextCmd) MatchText(text string) bool {
-	return text == "Алиасы" || text == "Настройка алиасов"
-}
-
-func (c *aliasMenuTextCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettingsAlias
-	c.bot.chatRepo.Save(chat)
-	return c.bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки алиасов.", c.bot.replySettingsAliases())
 }
 
 type aliasActionTextCmd struct {
@@ -733,55 +692,6 @@ func formatCallsPlain(slots [][2][2]string) string {
 		lines = append(lines, fmt.Sprintf("%d. %s - %s | %s - %s", i+1, slot[0][0], slot[0][1], slot[1][0], slot[1][1]))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func registerSettingsTextCommands(b *Bot) {
-	b.RegisterTextCommand(&btnToggleTextCmd{bot: b, kind: "daily"})
-	b.RegisterTextCommand(&btnToggleTextCmd{bot: b, kind: "weekly"})
-	b.RegisterTextCommand(&btnToggleTextCmd{bot: b, kind: "calls"})
-	b.RegisterTextCommand(&btnToggleTextCmd{bot: b, kind: "about"})
-	b.RegisterTextCommand(&btnToggleTextCmd{bot: b, kind: "fast_group"})
-	b.RegisterTextCommand(&btnToggleTextCmd{bot: b, kind: "fast_teacher"})
-	b.RegisterTextCommand(&noticeToggleTextCmd{bot: b, kind: "changes"})
-	b.RegisterTextCommand(&noticeToggleTextCmd{bot: b, kind: "next_week"})
-	b.RegisterTextCommand(&noticeToggleTextCmd{bot: b, kind: "calls"})
-	b.RegisterTextCommand(&viewToggleTextCmd{bot: b, kind: "hide_past_days"})
-	b.RegisterTextCommand(&viewToggleTextCmd{bot: b, kind: "show_parser_time"})
-	b.RegisterTextCommand(&viewToggleTextCmd{bot: b, kind: "show_hints"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "enabled"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "max_lines"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "advanced"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "auto_week"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "auto_updates"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "before_after"})
-	b.RegisterTextCommand(&diffToggleTextCmd{bot: b, kind: "back_basic"})
-	b.RegisterTextCommand(&formatterSelectTextCmd{bot: b})
-	b.RegisterTextCommand(&settingsNavTextCmd{bot: b, kind: "to_settings"})
-	b.RegisterTextCommand(&settingsNavTextCmd{bot: b, kind: "to_main"})
-	b.RegisterTextCommand(&schedulesTextCmd{bot: b})
-	b.RegisterTextCommand(&callsManageTextCmd{bot: b})
-	b.RegisterTextCommand(&showCurrentSettingsTextCmd{bot: b})
-	b.RegisterTextCommand(&aliasMenuTextCmd{bot: b})
-	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "list"})
-	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "add"})
-	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "remove"})
-	b.RegisterTextCommand(&aliasActionTextCmd{bot: b, kind: "clear"})
-	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "add_group"})
-	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "add_teacher"})
-	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "list"})
-	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "remove"})
-	b.RegisterTextCommand(&subsActionTextCmd{bot: b, kind: "test"})
-	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "guest"})
-	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "student"})
-	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "parent"})
-	b.RegisterTextCommand(&setupModeTextCmd{bot: b, kind: "skip"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "show"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "refresh"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "edit"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_site"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_manual"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_config"})
-	b.RegisterTextCommand(&callsSettingsTextCmd{bot: b, kind: "source_auto"})
 }
 
 func callsSourceLabel(source string) string {

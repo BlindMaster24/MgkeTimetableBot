@@ -46,7 +46,21 @@
 - `go vet ./...` for static analysis after any changes.
 - `go test ./internal/... ./tests/... -cover` before commit.
 - `go build -o bot ./cmd/bot/` to verify binary compiles.
+- `go run ./scripts/paritycheck` to verify the Telegram surface still matches the old TypeScript bot.
 - `go run ./cmd/bot/ -config configs/config.yaml` for a smoke run (manual).
+
+## Parity with the old TypeScript bot
+- The old bot lives on the `go` branch; `scripts/paritycheck` reads it straight from git (`-ts-ref`, default `go`).
+- It compares three surfaces: Telegram command names, callback roots, and every keyboard button label.
+- `internal/telegram/testdata/parity/ts_surface.json` is the TypeScript fixture; `go run ./scripts/paritycheck -update` regenerates it.
+- Every accepted difference must be listed in `internal/telegram/testdata/parity/known_differences.json` with a reason; an entry without a reason is an error.
+- `internal/telegram/parity_test.go` re-checks the same surface offline, so plain `go test` catches drift.
+- Keyboard layouts are golden files: `go test ./internal/telegram -run Golden -update` rewrites `internal/telegram/testdata/keyboard_layouts.golden`.
+
+## Menus
+- Menus are declared in `internal/telegram/menus.go`: one entry per menu holds its scene, prompt, opening button texts, keyboard builder and text items.
+- `registerMenus` turns a spec into its `/command` (when it has a public name) or a text-only opener, plus all item handlers.
+- Adding a menu means adding one spec; menus without a scene or with items outside their scene fail `menus_test.go`.
 
 ## Current Features Snapshot
 - Telegram bot via telego long polling.

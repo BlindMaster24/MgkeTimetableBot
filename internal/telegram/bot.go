@@ -143,18 +143,12 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&setGroupCmd{bot: b})
 	b.RegisterCommand(&setTeacherCmd{bot: b})
 	b.RegisterCommand(&brovkaCmd{bot: b})
-	b.RegisterCommand(&settingsCmd{bot: b})
 	b.RegisterCommand(&imageCmd{bot: b})
-	b.RegisterCommand(&buttonsCmd{bot: b})
 	b.RegisterCommand(&buttonsReloadCmd{bot: b})
-	b.RegisterCommand(&formatterCmd{bot: b})
 	b.RegisterCommand(&forceParseCmd{bot: b})
 	b.RegisterCommand(&resetCacheCmd{bot: b})
 	b.RegisterCommand(&eulaCmd{bot: b})
 	b.RegisterCommand(&apiCmd{bot: b})
-	b.RegisterCommand(&diffCmd{bot: b})
-	b.RegisterCommand(&noticeCmd{bot: b})
-	b.RegisterCommand(&viewCmd{bot: b})
 	b.RegisterCommand(&devCmd{bot: b})
 	b.RegisterCommand(&mathCmd{bot: b})
 	b.RegisterCommand(&flushCacheCmd{bot: b})
@@ -179,12 +173,11 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&compareGroupsCmd{bot: b})
 	b.RegisterCommand(&pingCmd{bot: b})
 	b.RegisterCommand(&icsCmd{bot: b})
-	b.RegisterCommand(&subscriptionsCmd{bot: b})
 	b.RegisterCommand(&subscriptionsTestCmd{bot: b})
 	b.RegisterCommand(&archiveCmd{bot: b})
 	b.RegisterCommand(&endingsCmd{bot: b})
 	b.RegisterCommand(&chatCmd{bot: b})
-	registerSettingsTextCommands(b)
+	b.registerMenus()
 	b.RegisterCommand(&idCmd{bot: b})
 	b.RegisterCommand(&errorCmd{bot: b})
 	b.RegisterCommand(&testCmd{bot: b})
@@ -287,8 +280,11 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 func (b *Bot) SetMyCommands() error {
 	var cmds []telego.BotCommand
 	for _, cmd := range b.commands {
+		if hidden, ok := cmd.(HiddenCommand); ok && hidden.Hidden() {
+			continue
+		}
 		cmds = append(cmds, telego.BotCommand{
-			Command:     cmd.Name(),
+			Command:     strings.TrimPrefix(cmd.Name(), "/"),
 			Description: cmd.Description(),
 		})
 	}

@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"context"
 	"fmt"
 	"strings"
 )
@@ -18,28 +17,6 @@ func (b *Bot) formatSubscriptionsList(list []Subscription) string {
 		lines = append(lines, fmt.Sprintf("%d. %s %s", i+1, label, s.Value))
 	}
 	return strings.Join(lines, "\n")
-}
-
-type subscriptionsCmd struct{ bot *Bot }
-
-func (c *subscriptionsCmd) Name() string { return "/subscriptions" }
-func (c *subscriptionsCmd) Description() string {
-	return "Управление подписками на другие группы/преподавателей"
-}
-func (c *subscriptionsCmd) MatchText(text string) bool {
-	return text == "🔔 Подписки" || text == "Подписки"
-}
-func (c *subscriptionsCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID,
-		"Подписки позволяют получать уведомления об изменениях расписания другой группы или преподавателя.",
-		c.bot.replySubscriptionsMenu())
 }
 
 func (b *Bot) subTestPrompt(u *Update) error {

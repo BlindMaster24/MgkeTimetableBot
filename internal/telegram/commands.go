@@ -293,21 +293,6 @@ func (c *teacherCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetTeacher(u, "day")
 }
 
-type settingsCmd struct{ bot *Bot }
-
-func (c *settingsCmd) Name() string        { return "/settings" }
-func (c *settingsCmd) Description() string { return c.bot.loc("cmd_settings") }
-func (c *settingsCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_settings") || text == "Настройки"
-}
-func (c *settingsCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	return c.bot.sendSettingsMenu(u, chat)
-}
-
 type imageCmd struct{ bot *Bot }
 
 func (c *imageCmd) Hidden() bool { return true }
@@ -359,23 +344,6 @@ func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
 }
 
-type buttonsCmd struct{ bot *Bot }
-
-func (c *buttonsCmd) Name() string        { return "/buttons" }
-func (c *buttonsCmd) Description() string { return "Настройки кнопок бота" }
-func (c *buttonsCmd) MatchText(text string) bool {
-	return text == "⌨️ Кнопки"
-}
-func (c *buttonsCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки кнопок.", c.bot.replySettingsButtons(chat))
-}
-
 type buttonsReloadCmd struct{ bot *Bot }
 
 func (c *buttonsReloadCmd) Name() string { return "/buttons_reload" }
@@ -391,23 +359,6 @@ func (c *buttonsReloadCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Клавиатура обновлена", replyMainMenu(c.bot, chat))
-}
-
-type formatterCmd struct{ bot *Bot }
-
-func (c *formatterCmd) Name() string        { return "/formatter" }
-func (c *formatterCmd) Description() string { return "Настройки форматировщика" }
-func (c *formatterCmd) MatchText(text string) bool {
-	return text == "📃 Форматировщик"
-}
-func (c *formatterCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки форматировщика.", c.bot.replySettingsFormatters(chat))
 }
 
 type forceParseCmd struct{ bot *Bot }
@@ -462,58 +413,6 @@ func (c *apiCmd) Name() string        { return "/api" }
 func (c *apiCmd) Description() string { return "Просмотр API ключа" }
 func (c *apiCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("api_info"))
-}
-
-type diffCmd struct{ bot *Bot }
-
-func (c *diffCmd) Name() string { return "/diff" }
-func (c *diffCmd) Description() string {
-	return "Настройки отображения изменений расписания"
-}
-func (c *diffCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настроек раздела \"Что изменилось\".", c.bot.replySettingsDiff(chat))
-}
-
-type noticeCmd struct{ bot *Bot }
-
-func (c *noticeCmd) Name() string        { return "/notice" }
-func (c *noticeCmd) Description() string { return "Настройки оповещений" }
-func (c *noticeCmd) MatchText(text string) bool {
-	return text == "🔊 Оповещения"
-}
-func (c *noticeCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки оповещений.", c.bot.replySettingsNotice(chat))
-}
-
-type viewCmd struct{ bot *Bot }
-
-func (c *viewCmd) Name() string { return "/view" }
-func (c *viewCmd) Description() string {
-	return "Настройки отображения расписания"
-}
-func (c *viewCmd) MatchText(text string) bool {
-	return text == "🖼️ Отображение"
-}
-func (c *viewCmd) Handler(ctx context.Context, u *Update) error {
-	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
-	chat.Scene = sceneSettings
-	c.bot.chatRepo.Save(chat)
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки отображения внешнего вида расписания.", c.bot.replySettingsView(chat))
 }
 
 type flushCacheCmd struct{ bot *Bot }
