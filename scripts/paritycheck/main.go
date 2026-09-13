@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultTSRef      = "go"
+	defaultTSRef      = "old"
 	goPackageDir      = "internal/telegram"
 	localePath        = "internal/i18n/locales/ru.json"
 	tsBotsRoot        = "src/services/bots"
@@ -233,7 +233,7 @@ func printDiffs(diffs []parity.Diff) {
 
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "paritycheck:", err)
-	fmt.Fprintln(os.Stderr, "run from the repository root; the go branch must be fetched (git fetch origin go)")
+	fmt.Fprintln(os.Stderr, "run from the repository root; the old branch must be fetched (git fetch origin old)")
 	os.Exit(1)
 }
 

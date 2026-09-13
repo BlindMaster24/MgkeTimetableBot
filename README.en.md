@@ -316,10 +316,10 @@ go test ./internal/telegram/...
 
 ### Parity with the TypeScript bot
 
-The old TypeScript bot lives on the `go` branch of this repository. `scripts/paritycheck` reads it straight from git and compares three surfaces: Telegram command names, callback data roots and every keyboard button label.
+The old TypeScript bot lives on the `old` branch of this repository (`git fetch origin old`). `scripts/paritycheck` reads it straight from git and compares three surfaces: Telegram command names, callback data roots and every keyboard button label.
 
 ```bash
-go run ./scripts/paritycheck                 # compare against the go branch
+go run ./scripts/paritycheck                 # compare against the old branch
 go run ./scripts/paritycheck -ts-ref origin/go
 go run ./scripts/paritycheck -update         # regenerate the TypeScript fixture
 go run ./scripts/paritycheck -dump-go        # print the live Go surface
@@ -336,7 +336,7 @@ go test ./internal/telegram -run Golden          # verify layouts
 go test ./internal/telegram -update              # rewrite the golden file
 ```
 
-CI (`.github/workflows/go-ci.yml`) runs the same checks: the `build` job builds, vets and tests, the `parity` job compares against the `go` branch and verifies the golden layouts.
+CI (`.github/workflows/go-ci.yml`) runs the same checks: the `build` job builds, vets and tests, the `parity` job compares against the `old` branch and verifies the golden layouts.
 
 The `tests/docs_test.go` suite keeps this documentation honest: it asserts that every bot command, every API route and the minimum Go version from `go.mod` appear in both README files, and that every top-level config key is documented.
 

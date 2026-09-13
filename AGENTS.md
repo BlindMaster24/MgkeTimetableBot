@@ -65,7 +65,7 @@
 - `go run ./cmd/bot/ -config configs/config.yaml` for a smoke run (manual).
 
 ## Parity with the old TypeScript bot
-- The old bot lives on the `go` branch; `scripts/paritycheck` reads it straight from git (`-ts-ref`, default `go`).
+- The old bot lives on the `old` branch; `scripts/paritycheck` reads it straight from git (`-ts-ref`, default `old`).
 - It compares three surfaces: Telegram command names, callback roots, and every keyboard button label. `-dump-go` prints the live Go surface, `-allowlist` overrides the known-differences file.
 - `internal/telegram/testdata/parity/ts_surface.json` is the TypeScript fixture; `go run ./scripts/paritycheck -update` regenerates it.
 - Every accepted difference must be listed in `internal/telegram/testdata/parity/known_differences.json` with a reason; an entry without a reason is an error.

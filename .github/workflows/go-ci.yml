@@ -50,10 +50,10 @@ jobs:
           cache: true
 
       - name: Fetch the old TypeScript bot branch
-        run: git fetch --depth=1 origin go
+        run: git fetch --depth=1 origin old
 
       - name: Compare the Go bot against the TypeScript bot
-        run: go run ./scripts/paritycheck -ts-ref origin/go
+        run: go run ./scripts/paritycheck -ts-ref origin/old
 
       - name: Check keyboard layouts against the golden file
         run: go test -count=1 -run 'Golden|Parity' ./internal/telegram/

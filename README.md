@@ -317,10 +317,10 @@ go test ./internal/telegram/...
 
 ### Паритет с TypeScript-ботом
 
-Старый TS-бот живёт в ветке `go` этого же репозитория. `scripts/paritycheck` читает её прямо из git и сравнивает три поверхности: имена Telegram-команд, корни callback-данных и подписи всех кнопок.
+Старый TS-бот живёт в ветке `old` этого же репозитория (`git fetch origin old`). `scripts/paritycheck` читает её прямо из git и сравнивает три поверхности: имена Telegram-команд, корни callback-данных и подписи всех кнопок.
 
 ```bash
-go run ./scripts/paritycheck                 # сравнить с веткой go
+go run ./scripts/paritycheck                 # сравнить с веткой old
 go run ./scripts/paritycheck -ts-ref origin/go
 go run ./scripts/paritycheck -update         # перегенерировать TS-фикстур
 go run ./scripts/paritycheck -dump-go        # напечатать текущую поверхность Go
@@ -337,7 +337,7 @@ go test ./internal/telegram -run Golden          # проверить раскл
 go test ./internal/telegram -update              # перегенерировать golden-файл
 ```
 
-Те же проверки выполняет CI (`.github/workflows/go-ci.yml`): job `build` — сборка, vet, тесты; job `parity` — сравнение с веткой `go` и golden-раскладки.
+Те же проверки выполняет CI (`.github/workflows/go-ci.yml`): job `build` — сборка, vet, тесты; job `parity` — сравнение с веткой `old` и golden-раскладки.
 
 ## Структура проекта
 
