@@ -320,7 +320,7 @@ The old TypeScript bot lives on the `old` branch of this repository (`git fetch 
 
 ```bash
 go run ./scripts/paritycheck                 # compare against the old branch
-go run ./scripts/paritycheck -ts-ref origin/go
+go run ./scripts/paritycheck -ts-ref origin/old
 go run ./scripts/paritycheck -update         # regenerate the TypeScript fixture
 go run ./scripts/paritycheck -dump-go        # print the live Go surface
 ```

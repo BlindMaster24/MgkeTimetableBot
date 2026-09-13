@@ -321,7 +321,7 @@ go test ./internal/telegram/...
 
 ```bash
 go run ./scripts/paritycheck                 # сравнить с веткой old
-go run ./scripts/paritycheck -ts-ref origin/go
+go run ./scripts/paritycheck -ts-ref origin/old
 go run ./scripts/paritycheck -update         # перегенерировать TS-фикстур
 go run ./scripts/paritycheck -dump-go        # напечатать текущую поверхность Go
 ```
