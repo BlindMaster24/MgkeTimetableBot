@@ -225,6 +225,8 @@ The server listens on `0.0.0.0:http.port`:
 
 Counters are kept in memory (`internal/health`) and served by `GET /api/health`. The endpoint returns metrics plus active alerts, and answers with `503` whenever an alert is active, so it can be wired straight into monitoring.
 
+Metrics and the alert state are persisted to the chat database (the `bot_state` table) after every parse cycle and on shutdown, and read back on startup. A restart therefore never hides a problem: if the timetable has not refreshed for an hour, the `parser_stale` alert fires right after the start, and alerts that were already sent are not repeated until `cooldown_minutes` expires.
+
 | Group | Metrics | Alerts |
 |-------|---------|--------|
 | Parser | runs and errors, consecutive failures, time since the last successful parse, cycle duration, which selectors stopped matching | failure streak, stale data, a broken site layout |

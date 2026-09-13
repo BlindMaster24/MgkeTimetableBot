@@ -104,6 +104,7 @@
 - `cmd/bot/main.go` records parser successes/failures and calendar sync results; the gin middleware in `internal/api/server.go` records requests and 5xx responses.
 - `GET /api/health` returns the snapshot (200 healthy, 503 while alerting) — the Docker healthcheck relies on that code.
 - `notification.HealthNotifier` runs on a cron entry, messages admins once per alert per `health.cooldown_minutes` and sends a recovery message when the alert clears.
+- `internal/health/state.go` persists counters and alert bookkeeping through the `health.StateStore` interface into the `bot_state` table of the chat DB: `Tracker.Restore`/`Tracker.Flush` in `cmd/bot/main.go`, the notifier restores and flushes its own alert state around `Check()`. A restart keeps `parser_stale` and the alert cooldown truthful.
 - Thresholds live in the `health` config section (`disabled`, `check_minutes`, `parser_*`, `calendar_*`, `api_*`); add new alert keys to both `internal/health` and `internal/notification/health.go`.
 - `internal/parser` reports diagnostics for every source through `parser.Report`: each required probe names the CSS selector that must match, and a parse that finds nothing, shrinks suspiciously or falls back keeps the previous cache entry instead of overwriting it. The sink is wired in `cmd/bot/main.go` into `health.Tracker.ParserReport` (alert `parser_layout`, `health.parser_layout_failures`) and into the bot, which renders it in `/parserLogs`.
 

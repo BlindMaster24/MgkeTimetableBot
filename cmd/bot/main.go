@@ -105,6 +105,16 @@ func main() {
 	}
 	defer chatRepo.Close()
 
+	if err := metrics.Restore(chatRepo); err != nil {
+		log.Warn().Err(err).Msg("failed to restore health metrics")
+	}
+
+	saveMetrics := func(tag string) {
+		if err := metrics.Flush(chatRepo); err != nil {
+			log.Warn().Err(err).Str("tag", tag).Msg("failed to persist health metrics")
+		}
+	}
+
 	bot, err := telegrambot.NewBot(cfg, log, loc, chatRepo, raspCache, archiveRepo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create bot")
@@ -150,7 +160,7 @@ func main() {
 	var eventNotifier *notification.EventNotifier
 	if cfg.Telegram.Noticer {
 		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
-		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics)
+		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics, chatRepo)
 		scheduler.Start()
 		defer scheduler.Stop()
 		log.Info().Msg("notification scheduler started")
@@ -216,6 +226,7 @@ func main() {
 		go func() {
 			syncArchive("parse")
 			syncCalendars(context.Background(), "parse")
+			saveMetrics("parse")
 		}()
 
 		return parseErr
@@ -250,6 +261,8 @@ func main() {
 	if err := bot.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("bot stopped")
 	}
+
+	saveMetrics("shutdown")
 
 	if err := raspCache.Save(); err != nil {
 		log.Error().Err(err).Msg("failed to save cache")

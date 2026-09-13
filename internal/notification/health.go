@@ -13,18 +13,24 @@ const (
 	healthCooldown = 30 * time.Minute
 )
 
+type alertState struct {
+	Active map[string]string `json:"active,omitempty"`
+}
+
 type HealthNotifier struct {
 	tracker  *health.Tracker
 	log      *logger.Logger
 	sender   EventSender
 	chats    EventChatFinder
 	cooldown time.Duration
+	store    health.StateStore
 
-	mu     sync.Mutex
-	active map[string]time.Time
+	mu       sync.Mutex
+	active   map[string]time.Time
+	restored bool
 }
 
-func NewHealthNotifier(tracker *health.Tracker, log *logger.Logger, sender EventSender, chats EventChatFinder, cooldown time.Duration) *HealthNotifier {
+func NewHealthNotifier(tracker *health.Tracker, log *logger.Logger, sender EventSender, chats EventChatFinder, cooldown time.Duration, store health.StateStore) *HealthNotifier {
 	if cooldown <= 0 {
 		cooldown = healthCooldown
 	}
@@ -34,6 +40,7 @@ func NewHealthNotifier(tracker *health.Tracker, log *logger.Logger, sender Event
 		sender:   sender,
 		chats:    chats,
 		cooldown: cooldown,
+		store:    store,
 		active:   make(map[string]time.Time),
 	}
 }
@@ -43,6 +50,8 @@ func (n *HealthNotifier) Check() {
 		return
 	}
 
+	n.restore()
+
 	alerts := n.tracker.Alerts()
 	now := time.Now()
 
@@ -50,6 +59,7 @@ func (n *HealthNotifier) Check() {
 	if len(pending) == 0 && len(recovered) == 0 {
 		return
 	}
+	n.flush()
 
 	chats, err := n.chats.FindAdminChats(healthService)
 	if err != nil {
@@ -94,6 +104,43 @@ func (n *HealthNotifier) diff(alerts []health.Alert, now time.Time) ([]health.Al
 		}
 	}
 	return pending, recovered
+}
+
+func (n *HealthNotifier) restore() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.restored || n.store == nil {
+		return
+	}
+	n.restored = true
+
+	var state alertState
+	if err := health.LoadState(n.store, health.AlertsStateKey, &state); err != nil {
+		n.log.Warn().Err(err).Msg("failed to restore health alert state")
+		return
+	}
+
+	for key, value := range state.Active {
+		at, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			continue
+		}
+		n.active[key] = at
+	}
+}
+
+func (n *HealthNotifier) flush() {
+	n.mu.Lock()
+	state := alertState{Active: make(map[string]string, len(n.active))}
+	for key, at := range n.active {
+		state.Active[key] = at.Format(time.RFC3339)
+	}
+	n.mu.Unlock()
+
+	if err := health.SaveState(n.store, health.AlertsStateKey, state); err != nil {
+		n.log.Warn().Err(err).Msg("failed to persist health alert state")
+	}
 }
 
 func (n *HealthNotifier) broadcast(chats []*EventChat, message string) {

@@ -160,6 +160,14 @@ func (r *Repository) migrate() error {
 		return err
 	}
 
+	_, err = r.db.Exec(`CREATE TABLE IF NOT EXISTS bot_state (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	)`)
+	if err != nil {
+		return err
+	}
+
 	if err := r.migrateSubscriptions(); err != nil {
 		return err
 	}
@@ -884,6 +892,32 @@ func (r *Repository) FindSubscriptionsForTeacher(teacher string) ([]Subscription
 		result = append(result, s)
 	}
 	return result, nil
+}
+
+func (r *Repository) LoadState(key string) (string, bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var value string
+	err := r.db.QueryRow(`SELECT value FROM bot_state WHERE key = ?`, key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return value, true, nil
+}
+
+func (r *Repository) SaveState(key, value string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	_, err := r.db.Exec(
+		`INSERT INTO bot_state(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+		key, value,
+	)
+	return err
 }
 
 func (r *Repository) CountSubscriptions(chatID int64) (int, error) {

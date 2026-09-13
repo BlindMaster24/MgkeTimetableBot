@@ -12,12 +12,30 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 )
 
+type memoryStateStore struct {
+	values map[string]string
+}
+
+func newMemoryStateStore() *memoryStateStore {
+	return &memoryStateStore{values: make(map[string]string)}
+}
+
+func (s *memoryStateStore) LoadState(key string) (string, bool, error) {
+	value, ok := s.values[key]
+	return value, ok, nil
+}
+
+func (s *memoryStateStore) SaveState(key, value string) error {
+	s.values[key] = value
+	return nil
+}
+
 func newTestHealthNotifier(t *testing.T, tracker *health.Tracker, cooldown time.Duration) (*HealthNotifier, *mockEventSender, *mockEventChatFinder) {
 	t.Helper()
 
 	sender := &mockEventSender{}
 	finder := &mockEventChatFinder{admins: []*EventChat{{ID: 42, PeerID: 4242}}}
-	notifier := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, cooldown)
+	notifier := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, cooldown, nil)
 	return notifier, sender, finder
 }
 
@@ -96,6 +114,65 @@ func TestHealthNotifierIgnoresHealthyTracker(t *testing.T) {
 	}
 }
 
+func TestHealthNotifierCooldownSurvivesRestart(t *testing.T) {
+	store := newMemoryStateStore()
+	tracker := failingTracker()
+	sender := &mockEventSender{}
+	finder := &mockEventChatFinder{admins: []*EventChat{{ID: 42, PeerID: 4242}}}
+
+	first := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, time.Hour, store)
+	first.Check()
+	if len(sender.sent) != 1 {
+		t.Fatalf("expected the first alert, got %+v", sender.sent)
+	}
+
+	restarted := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, time.Hour, store)
+	restarted.Check()
+	if len(sender.sent) != 1 {
+		t.Errorf("the cooldown must survive a restart, got %+v", sender.sent)
+	}
+}
+
+func TestHealthNotifierSendsRecoveryAfterRestart(t *testing.T) {
+	store := newMemoryStateStore()
+	tracker := failingTracker()
+	sender := &mockEventSender{}
+	finder := &mockEventChatFinder{admins: []*EventChat{{ID: 42, PeerID: 4242}}}
+
+	first := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, time.Hour, store)
+	first.Check()
+
+	tracker.ParserSuccess(time.Millisecond)
+
+	restarted := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, time.Hour, store)
+	restarted.Check()
+
+	if len(sender.sent) != 2 {
+		t.Fatalf("expected an alert and a recovery, got %+v", sender.sent)
+	}
+	if !strings.Contains(sender.sent[1].text, "восстановлено") {
+		t.Errorf("recovery text = %q", sender.sent[1].text)
+	}
+
+	restarted.Check()
+	if len(sender.sent) != 2 {
+		t.Errorf("a recovered alert must not be reported twice, got %+v", sender.sent)
+	}
+}
+
+func TestHealthNotifierToleratesBrokenStoredState(t *testing.T) {
+	store := newMemoryStateStore()
+	store.values[health.AlertsStateKey] = "{broken"
+
+	notifier, sender, _ := newTestHealthNotifier(t, failingTracker(), time.Minute)
+	notifier.store = store
+
+	notifier.Check()
+	if len(sender.sent) != 1 {
+		t.Errorf("a broken stored state must not stop alerts, got %+v", sender.sent)
+	}
+}
+
 func TestHealthNotifierWithoutAdmins(t *testing.T) {
 	notifier, sender, finder := newTestHealthNotifier(t, failingTracker(), time.Minute)
 	finder.admins = nil
@@ -127,7 +204,7 @@ func TestSchedulerRegistersHealthCheck(t *testing.T) {
 
 	cfg := &config.Config{}
 	cfg.Timetable.Weekdays = [][2][2]string{{{"09:00", "09:45"}, {"09:55", "10:40"}}}
-	s := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, health.NewDefaultTracker())
+	s := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, health.NewDefaultTracker(), nil)
 	s.Start()
 	defer s.Stop()
 
@@ -140,7 +217,7 @@ func TestSchedulerRegistersHealthCheck(t *testing.T) {
 
 	disabled := &config.HealthConfig{Disabled: true}
 	cfg.Health = disabled
-	offline := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, health.NewDefaultTracker())
+	offline := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, health.NewDefaultTracker(), nil)
 	offline.Start()
 	defer offline.Stop()
 	if offline.health != nil {

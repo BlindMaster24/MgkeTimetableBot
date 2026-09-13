@@ -22,9 +22,10 @@ type Scheduler struct {
 	notifier      *EventNotifier
 	healthTracker *health.Tracker
 	health        *HealthNotifier
+	store         health.StateStore
 }
 
-func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, sender EventSender, chats EventChatFinder, tracker *health.Tracker) *Scheduler {
+func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, sender EventSender, chats EventChatFinder, tracker *health.Tracker, store health.StateStore) *Scheduler {
 	return &Scheduler{
 		cron:          cron.New(cron.WithSeconds()),
 		cfg:           cfg,
@@ -33,6 +34,7 @@ func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, se
 		sender:        sender,
 		chats:         chats,
 		healthTracker: tracker,
+		store:         store,
 	}
 }
 
@@ -57,7 +59,7 @@ func (s *Scheduler) registerHealthCheck() {
 		cooldown = time.Duration(s.cfg.Health.CooldownMinutes) * time.Minute
 	}
 
-	s.health = NewHealthNotifier(s.healthTracker, s.log, s.sender, s.chats, cooldown)
+	s.health = NewHealthNotifier(s.healthTracker, s.log, s.sender, s.chats, cooldown, s.store)
 	expr := fmt.Sprintf("0 */%d * * * *", minutes)
 	if _, err := s.cron.AddFunc(expr, s.health.Check); err != nil {
 		s.log.Error().Err(err).Msg("failed to schedule health check")
