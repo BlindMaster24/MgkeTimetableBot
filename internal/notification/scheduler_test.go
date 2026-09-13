@@ -15,17 +15,13 @@ import (
 )
 
 type mockEventSender struct {
-	sent     []mockMsg
-	buttoned []struct {
-		chatID  int64
-		text    string
-		buttons []KeyboardButton
-	}
+	sent []mockMsg
 }
 
 type mockMsg struct {
-	chatID int64
-	text   string
+	chatID  int64
+	text    string
+	buttons []KeyboardButton
 }
 
 func (s *mockEventSender) SendText(chatID int64, text string) error {
@@ -34,12 +30,18 @@ func (s *mockEventSender) SendText(chatID int64, text string) error {
 }
 
 func (s *mockEventSender) SendTextWithButtons(chatID int64, text string, buttons []KeyboardButton) error {
-	s.buttoned = append(s.buttoned, struct {
-		chatID  int64
-		text    string
-		buttons []KeyboardButton
-	}{chatID, text, buttons})
+	s.sent = append(s.sent, mockMsg{chatID: chatID, text: text, buttons: buttons})
 	return nil
+}
+
+func (s *mockEventSender) buttoned() []mockMsg {
+	var out []mockMsg
+	for _, message := range s.sent {
+		if len(message.buttons) > 0 {
+			out = append(out, message)
+		}
+	}
+	return out
 }
 
 type mockEventChatFinder struct {
@@ -505,16 +507,16 @@ func TestEventNotifier_UpdateWeek(t *testing.T) {
 
 	n.UpdateWeek(cache.KindGroups, nextWeek)
 
-	if len(sender.buttoned) != 1 {
-		t.Fatalf("expected 1 buttoned message, got %d", len(sender.buttoned))
+	if len(sender.buttoned()) != 1 {
+		t.Fatalf("expected 1 buttoned message, got %d", len(sender.buttoned()))
 	}
-	if !strings.Contains(sender.buttoned[0].text, "🆕 Доступно расписание на следующую неделю") {
-		t.Errorf("unexpected text: %q", sender.buttoned[0].text)
+	if !strings.Contains(sender.buttoned()[0].text, "🆕 Доступно расписание на следующую неделю") {
+		t.Errorf("unexpected text: %q", sender.buttoned()[0].text)
 	}
-	if len(sender.buttoned[0].buttons) != 1 {
+	if len(sender.buttoned()[0].buttons) != 1 {
 		t.Fatalf("expected 1 button")
 	}
-	btn := sender.buttoned[0].buttons[0]
+	btn := sender.buttoned()[0].buttons[0]
 	if btn.Text != "📃 Показать" {
 		t.Errorf("unexpected button label: %q", btn.Text)
 	}
@@ -538,8 +540,8 @@ func TestEventNotifier_UpdateWeek_NoNotice(t *testing.T) {
 	}, "h")
 
 	n.UpdateWeek(cache.KindGroups, nextWeek)
-	if len(sender.buttoned) != 0 {
-		t.Errorf("expected 0 messages when noticeNextWeek off, got %d", len(sender.buttoned))
+	if len(sender.buttoned()) != 0 {
+		t.Errorf("expected 0 messages when noticeNextWeek off, got %d", len(sender.buttoned()))
 	}
 }
 
@@ -585,10 +587,10 @@ func TestEventNotifier_CallsChanged(t *testing.T) {
 		},
 	})
 
-	if len(sender.buttoned) != 2 {
-		t.Fatalf("expected 2 messages, got %d", len(sender.buttoned))
+	if len(sender.buttoned()) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(sender.buttoned()))
 	}
-	text := sender.buttoned[0].text
+	text := sender.buttoned()[0].text
 	if !strings.Contains(text, "🔔 Изменено расписание звонков") {
 		t.Errorf("unexpected text: %q", text)
 	}
@@ -598,7 +600,7 @@ func TestEventNotifier_CallsChanged(t *testing.T) {
 	if !strings.Contains(text, "1. 08:00 - 08:45 | 08:50 - 09:35") {
 		t.Errorf("expected calls line: %q", text)
 	}
-	btn := sender.buttoned[0].buttons[0]
+	btn := sender.buttoned()[0].buttons[0]
 	if btn.Text != "📊 Показать" || btn.Data != "calls_full" {
 		t.Errorf("unexpected button: %+v", btn)
 	}
@@ -607,8 +609,8 @@ func TestEventNotifier_CallsChanged(t *testing.T) {
 func TestEventNotifier_CallsChanged_NoChange(t *testing.T) {
 	n, sender, _, _ := newTestNotifier(t)
 	n.CallsChanged(&cache.CallsEvent{})
-	if len(sender.buttoned) != 0 {
-		t.Errorf("expected 0 messages, got %d", len(sender.buttoned))
+	if len(sender.buttoned()) != 0 {
+		t.Errorf("expected 0 messages, got %d", len(sender.buttoned()))
 	}
 }
 
@@ -649,7 +651,7 @@ func TestEventNotifier_HandleEvents_Dispatch(t *testing.T) {
 	}
 	n.HandleEvents(events)
 
-	total := len(sender.sent) + len(sender.buttoned)
+	total := len(sender.sent)
 	if total < 2 {
 		t.Errorf("expected day + calls notifications, got %d", total)
 	}

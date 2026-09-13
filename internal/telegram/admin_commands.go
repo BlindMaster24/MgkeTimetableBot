@@ -6,6 +6,9 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 )
 
 type regexpCmd struct{ bot *Bot }
@@ -81,6 +84,92 @@ func (c *parserLogsCmd) Handler(ctx context.Context, u *Update) error {
 		text = text[len(text)-4096:]
 	}
 	return u.Bot.SendText(u.ChatID, text)
+}
+
+type parserHealthCmd struct{ bot *Bot }
+
+func (c *parserHealthCmd) Name() string { return "/parserhealth" }
+
+func (c *parserHealthCmd) AdminOnly() bool { return true }
+func (c *parserHealthCmd) Description() string {
+	return c.bot.loc("cmd_parserhealth")
+}
+func (c *parserHealthCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	kb := buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserGuard))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.parserHealthText(), kb)
+}
+
+func (b *Bot) parserHealthText() string {
+	if b.health == nil {
+		return "Метрики здоровья недоступны"
+	}
+
+	snapshot := b.health.Snapshot()
+	parser := snapshot.Parser
+
+	lines := []string{"-- Парсер расписания --"}
+	state := "✅ без сбоев"
+	if parser.ConsecutiveFailures > 0 {
+		state = fmt.Sprintf("⚠️ сбоев подряд: %d", parser.ConsecutiveFailures)
+	}
+	lines = append(lines, "Состояние: "+state)
+	lines = append(lines, fmt.Sprintf("Разборов: %d, ошибок: %d", parser.Runs, parser.Errors))
+	lines = append(lines, "Последний успех: "+healthMoment(parser.LastSuccessAt, parser.LagSeconds))
+	if parser.LastErrorAt != "" {
+		lines = append(lines, fmt.Sprintf("Последний сбой: %s — %s", healthTimestamp(parser.LastErrorAt), parser.LastError))
+	}
+	lines = append(lines, fmt.Sprintf("Длительность последнего разбора: %d мс", parser.LastDurationMS))
+
+	if len(parser.Layout) > 0 {
+		lines = append(lines, "", fmt.Sprintf("-- Вёрстка сайта (подряд %d) --", parser.LayoutFailures))
+		for _, issue := range parser.Layout {
+			lines = append(lines, fmt.Sprintf("%s: %s (найдено %d)", issue.Source, issue.Selector, issue.Found))
+		}
+	}
+
+	if len(parser.Guard) > 0 {
+		lines = append(lines, "", fmt.Sprintf("-- Защита данных (подряд %d) --", parser.GuardFailures))
+		for _, issue := range parser.Guard {
+			lines = append(lines, fmt.Sprintf("%s: %s: %s", issue.Source, issue.Reason, issue.Detail))
+		}
+	}
+
+	if len(snapshot.Alerts) == 0 {
+		lines = append(lines, "", "Активных алертов нет")
+	} else {
+		lines = append(lines, "", "-- Активные алерты --")
+		for _, alert := range snapshot.Alerts {
+			lines = append(lines, fmt.Sprintf("⚠️ %s: %s", alert.Key, alert.Detail))
+		}
+	}
+
+	if b.cache != nil {
+		lines = append(lines, "", "-- Кэш --", fmt.Sprintf("Групп: %d, преподавателей: %d", len(b.cache.GetGroups()), len(b.cache.GetTeachers())))
+	}
+
+	lines = append(lines, "", "Кнопка ниже запускает разбор немедленно.")
+	return strings.Join(lines, "\n")
+}
+
+func healthTimestamp(value string) string {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return value
+	}
+	return parsed.Local().Format("02.01 15:04:05")
+}
+
+func healthMoment(value string, lagSeconds int64) string {
+	if value == "" {
+		return "не было"
+	}
+	if lagSeconds < 0 {
+		return healthTimestamp(value)
+	}
+	return fmt.Sprintf("%s (%s назад)", healthTimestamp(value), time.Duration(lagSeconds)*time.Second)
 }
 
 type requireNewButtonsCmd struct{ bot *Bot }

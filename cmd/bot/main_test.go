@@ -102,28 +102,48 @@ func TestParserGuardComesFromConfig(t *testing.T) {
 	}
 }
 
+type recordingMessage struct {
+	text    string
+	buttons []notification.KeyboardButton
+}
+
 type recordingSender struct {
 	mu   sync.Mutex
-	sent []string
+	sent []recordingMessage
 }
 
 func (s *recordingSender) SendText(chatID int64, text string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.sent = append(s.sent, text)
+	s.sent = append(s.sent, recordingMessage{text: text})
 	return nil
 }
 
 func (s *recordingSender) SendTextWithButtons(chatID int64, text string, buttons []notification.KeyboardButton) error {
-	return s.SendText(chatID, text)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.sent = append(s.sent, recordingMessage{text: text, buttons: buttons})
+	return nil
+}
+
+func (s *recordingSender) delivered() []recordingMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return append([]recordingMessage(nil), s.sent...)
 }
 
 func (s *recordingSender) messages() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return append([]string(nil), s.sent...)
+	out := make([]string, 0, len(s.sent))
+	for _, message := range s.sent {
+		out = append(out, message.text)
+	}
+	return out
 }
 
 type adminFinder struct{}
@@ -256,6 +276,14 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	}
 	if !strings.Contains(messages[0], "35 -> 3") {
 		t.Errorf("alert must carry the counts: %q", messages[0])
+	}
+
+	delivered := sender.delivered()
+	if len(delivered[0].buttons) != 1 {
+		t.Fatalf("the alert must offer one action button, got %+v", delivered[0].buttons)
+	}
+	if delivered[0].buttons[0].Data != notification.ParserReparseCallback {
+		t.Errorf("alert button = %+v, want the reparse callback", delivered[0].buttons[0])
 	}
 }
 

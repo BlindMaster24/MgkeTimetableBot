@@ -15,6 +15,7 @@
     { "section": "commands", "kind": "extra_in_go", "value": "image", "reason": "Go port adds /image as a shortcut for the cached timetable image" },
     { "section": "commands", "kind": "extra_in_go", "value": "math", "reason": "Go port adds a math helper command" },
     { "section": "commands", "kind": "extra_in_go", "value": "noticedebug", "reason": "Go port adds a debug command showing which chats receive each notification type" },
+    { "section": "commands", "kind": "extra_in_go", "value": "parserhealth", "reason": "Go port adds an admin command with the parser health snapshot and a manual reparse button" },
     { "section": "commands", "kind": "extra_in_go", "value": "resetcache", "reason": "Go port splits cache flushing into /flushcache and /resetcache" },
     { "section": "commands", "kind": "extra_in_go", "value": "setgroup", "reason": "TS keeps /setGroup in the deprecated folder without a Telegram command entry; the Go port keeps it as a working command" },
     { "section": "commands", "kind": "extra_in_go", "value": "setteacher", "reason": "TS keeps /setTeacher in the deprecated folder without a Telegram command entry; the Go port keeps it as a working command" },
@@ -23,6 +24,7 @@
 
     { "section": "callbacks", "kind": "extra_in_go", "value": "alias", "reason": "Go alias menu uses its own callback root; TS kept alias removal outside the callback list" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "gcal", "reason": "Go Google Calendar flows use gcal callback roots where TS used a single google callback" },
+    { "section": "callbacks", "kind": "extra_in_go", "value": "parser", "reason": "Go parser alerts carry a manual reparse button; TS health notifications were text only" },
 
     { "section": "buttons", "kind": "missing_in_go", "value": "Проверить", "reason": "StaticKeyboard.NeedAccept returns no keyboard for the telegram service, so this button is VK-only and the Go port excludes VK" },
 

@@ -66,6 +66,74 @@ func TestHealthNotifierAlertsAdmins(t *testing.T) {
 	}
 }
 
+func TestHealthNotifierParserAlertsCarryTheReparseButton(t *testing.T) {
+	notifier, sender, _ := newTestHealthNotifier(t, failingTracker(), time.Minute)
+
+	notifier.Check()
+
+	buttoned := sender.buttoned()
+	if len(buttoned) != 1 {
+		t.Fatalf("expected the parser alert to carry a button, got %+v", sender.sent)
+	}
+	if len(buttoned[0].buttons) != 1 {
+		t.Fatalf("expected a single button, got %+v", buttoned[0].buttons)
+	}
+	if buttoned[0].buttons[0].Data != ParserReparseCallback {
+		t.Errorf("button data = %q, want %q", buttoned[0].buttons[0].Data, ParserReparseCallback)
+	}
+	if buttoned[0].buttons[0].Text != parserReparseButton {
+		t.Errorf("button text = %q", buttoned[0].buttons[0].Text)
+	}
+}
+
+func TestHealthNotifierKeepsOtherAlertsPlain(t *testing.T) {
+	thresholds := health.DefaultThresholds()
+	thresholds.CalendarFailures = 1
+	tracker := health.NewTracker(thresholds)
+	tracker.CalendarFailure(errors.New("calendar down"))
+
+	notifier, sender, _ := newTestHealthNotifier(t, tracker, time.Minute)
+	notifier.Check()
+
+	if len(sender.sent) != 1 {
+		t.Fatalf("expected one calendar alert, got %+v", sender.sent)
+	}
+	if len(sender.buttoned()) != 0 {
+		t.Errorf("calendar alerts must stay plain, got %+v", sender.buttoned())
+	}
+}
+
+func TestHealthAlertButtonsOnlyForParserAlerts(t *testing.T) {
+	parserKeys := []string{
+		health.AlertParserFailures,
+		health.AlertParserStale,
+		health.AlertParserLayout,
+		health.AlertParserGuard,
+	}
+	for _, key := range parserKeys {
+		buttons := HealthAlertButtons(key)
+		if len(buttons) != 1 {
+			t.Errorf("%s: expected one button, got %+v", key, buttons)
+			continue
+		}
+		if buttons[0].Data != ParserReparseCallback {
+			t.Errorf("%s: button data = %q", key, buttons[0].Data)
+		}
+		if !IsParserAlert(key) {
+			t.Errorf("%s: IsParserAlert = false", key)
+		}
+	}
+
+	for _, key := range []string{health.AlertCalendarFailures, health.AlertCalendarStale, health.AlertAPIErrors} {
+		if buttons := HealthAlertButtons(key); len(buttons) != 0 {
+			t.Errorf("%s: expected no buttons, got %+v", key, buttons)
+		}
+		if IsParserAlert(key) {
+			t.Errorf("%s: IsParserAlert = true", key)
+		}
+	}
+}
+
 func TestHealthNotifierReportsTheParserGuard(t *testing.T) {
 	tracker := health.NewDefaultTracker()
 	tracker.ParserReport("groups", nil, []health.GuardIssue{{

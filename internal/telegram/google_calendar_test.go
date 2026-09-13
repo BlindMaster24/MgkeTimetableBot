@@ -14,6 +14,7 @@ import (
 type recordedCall struct {
 	Method string
 	Text   string
+	Raw    string
 }
 
 type recordingCaller struct {
@@ -26,7 +27,7 @@ func (c *recordingCaller) Call(_ context.Context, url string, data *telegoapi.Re
 	if idx := strings.LastIndexByte(url, '/'); idx >= 0 {
 		name = url[idx+1:]
 	}
-	record := recordedCall{Method: name}
+	record := recordedCall{Method: name, Raw: string(data.BodyRaw)}
 	var payload map[string]any
 	if err := json.Unmarshal(data.BodyRaw, &payload); err == nil {
 		if text, ok := payload["text"].(string); ok {

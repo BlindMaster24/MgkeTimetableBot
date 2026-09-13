@@ -94,7 +94,7 @@
 
 ## Current Features Snapshot
 - Telegram bot via telego long polling.
-- Commands: 63 total — schedule and setup (`/start`, `/help`, `/setup`, `/day`, `/week`, `/calls`, `/group`, `/teacher`, `/image`, `/cabinet`, `/history`, `/archive`, `/alias`, `/comparegroups`, `/groups`, `/teachers`, `/ics`, `/google_calendar`, …), admin (`/debug`, `/send`, `/trigger`, `/forceparse`, `/noticedebug`, `/sql`, `/restart`, …) and menu text pseudo-commands. The full list is in `README.md` and enforced by `scripts/paritycheck`.
+- Commands: 64 total — schedule and setup (`/start`, `/help`, `/setup`, `/day`, `/week`, `/calls`, `/group`, `/teacher`, `/image`, `/cabinet`, `/history`, `/archive`, `/alias`, `/comparegroups`, `/groups`, `/teachers`, `/ics`, `/google_calendar`, …), admin (`/debug`, `/send`, `/trigger`, `/forceparse`, `/noticedebug`, `/sql`, `/restart`, …) and menu text pseudo-commands. The full list is in `README.md` and enforced by `scripts/paritycheck`.
 - Keyboard buttons match command text via i18n keys.
 - Parser (table-based) for groups, teachers and the bell schedule, with change detection.
 - File-backed cache with JSON persistence in `cache/rasp/`.
@@ -122,6 +122,7 @@
 - `internal/health/state.go` persists counters and alert bookkeeping through the `health.StateStore` interface into the `bot_state` table of the chat DB: `Tracker.Restore`/`Tracker.Flush` in `cmd/bot/main.go`, the notifier restores and flushes its own alert state around `Check()`. A restart keeps `parser_stale` and the alert cooldown truthful.
 - Thresholds live in the `health` config section (`disabled`, `check_minutes`, `parser_*`, `calendar_*`, `api_*`); add new alert keys to both `internal/health` and `internal/notification/health.go`.
 - `internal/parser` reports diagnostics for every source through `parser.Report`: each required probe names the CSS selector that must match, and a parse that finds nothing, shrinks suspiciously or falls back keeps the previous cache entry instead of overwriting it. The sink is wired in `cmd/bot/main.go` into `health.Tracker.ParserReport` (alerts `parser_layout` for missing selectors and `parser_guard` for a kept cache or a fallback path) and into the bot, which renders it in `/parserLogs`.
+- Parser alerts are actionable: `notification.HealthAlertButtons` attaches the `parser_reparse` button to every parser alert, the `reparseCb` handler runs the parser out of schedule for admins, and `/parserhealth` renders the live snapshot from the bot's `healthSource` (wired as `health.Tracker` in `cmd/bot/main.go`).
 - The data-loss guard thresholds are config, not constants: `parser.guard.disabled`, `parser.guard.min_items` (default 10) and `parser.guard.max_drop_percent` (default 80) are handed to `parser.Guard`, and each trip reaches the admins as the `parser_guard` alert (`health.parser_guard_failures`, default 1 — the first trip).
 
 ## Coding Style & Naming Conventions

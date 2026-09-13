@@ -179,6 +179,8 @@ Every run collects diagnostics — which selector matched what. When the site ch
 - `parser_layout` — a required selector stopped matching (`health.parser_layout_failures` runs in a row, 2 by default);
 - `parser_guard` — the data-loss guard engaged: the page came back empty, the group or teacher count dropped past the limit, or the parser had to take a fallback path (1 run by default, `health.parser_guard_failures: 1`).
 
+Every parser alert arrives in Telegram with a `🔄 Переразобрать сейчас` button that runs a parse out of schedule, without waiting for the next cycle. The full snapshot is available to admins at any moment through `/parserhealth`.
+
 The guard limits themselves live in `parser.guard`:
 
 ```yaml
@@ -237,9 +239,11 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits.
+
+`/parserhealth` prints a live parser health snapshot — state, run and error counts, the last success and failure, run duration, the layout problems and guard trips it found, the active alerts and the cache size — and can start a parse immediately instead of waiting for the next cycle.
 
 ## HTTP API
 

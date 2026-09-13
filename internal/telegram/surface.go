@@ -6,8 +6,10 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/parity"
 	"github.com/mymmrac/telego"
 )
@@ -177,6 +179,9 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		inline("googlePermissionsControl", func() *telego.InlineKeyboardMarkup { return googlePermissionsControl(1) }),
 		inline("weekControlKeyboard(hidePast)", func() *telego.InlineKeyboardMarkup {
 			return b.weekControlKeyboardHeader("group", "100", 0, true, true)
+		}),
+		inline("parserAlertKeyboard", func() *telego.InlineKeyboardMarkup {
+			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserLayout))
 		}),
 	}
 

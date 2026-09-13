@@ -15,6 +15,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
@@ -51,6 +52,7 @@ type Bot struct {
 	scenes       []sceneRoute
 	google       googleService
 	googleSyncMu sync.Mutex
+	health       healthSource
 }
 
 type Update struct {
@@ -86,6 +88,10 @@ type Callback interface {
 	Handler(ctx context.Context, u *Update) error
 }
 
+type healthSource interface {
+	Snapshot() health.Snapshot
+}
+
 func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archive any) (*Bot, error) {
 	client, err := telego.NewBot(cfg.Telegram.Token, telego.WithDefaultDebugLogger())
 	if err != nil {
@@ -119,6 +125,9 @@ func (b *Bot) I18n() *i18n.Localizer          { return b.i18n }
 func (b *Bot) Log() *logger.Logger            { return b.log }
 func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
 func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
+func (b *Bot) SetHealthSource(src healthSource) {
+	b.health = src
+}
 
 func (b *Bot) RegisterCommand(cmd Command) {
 	if _, exists := b.commands[cmd.Name()]; !exists {
@@ -195,6 +204,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&testCmd{bot: b})
 	b.RegisterCommand(&sqlCmd{bot: b})
 	b.RegisterCommand(&restartCmd{bot: b})
+	b.RegisterCommand(&parserHealthCmd{bot: b})
 
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
@@ -205,6 +215,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&googleCalCb{bot: b})
 	b.RegisterCallback(&aliasDelCb{bot: b})
 	b.RegisterCallback(&aliasMenuCb{bot: b})
+	b.RegisterCallback(&reparseCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {
@@ -442,18 +453,21 @@ func (b *Bot) SendTextWithReplyKeyboard(chatID int64, text string, kb *telego.Re
 	return err
 }
 
-func (b *Bot) SendTextWithButtons(chatID int64, text string, buttons []notification.KeyboardButton) error {
-	var kb *telego.InlineKeyboardMarkup
-	if len(buttons) > 0 {
-		rows := make([][]telego.InlineKeyboardButton, 0, len(buttons))
-		for _, btn := range buttons {
-			rows = append(rows, []telego.InlineKeyboardButton{
-				{Text: btn.Text, CallbackData: btn.Data},
-			})
-		}
-		kb = &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
+func buttonsKeyboard(buttons []notification.KeyboardButton) *telego.InlineKeyboardMarkup {
+	if len(buttons) == 0 {
+		return nil
 	}
-	return b.SendTextWithKeyboard(chatID, text, kb)
+	rows := make([][]telego.InlineKeyboardButton, 0, len(buttons))
+	for _, btn := range buttons {
+		rows = append(rows, []telego.InlineKeyboardButton{
+			{Text: btn.Text, CallbackData: btn.Data},
+		})
+	}
+	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+func (b *Bot) SendTextWithButtons(chatID int64, text string, buttons []notification.KeyboardButton) error {
+	return b.SendTextWithKeyboard(chatID, text, buttonsKeyboard(buttons))
 }
 
 func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *telego.InlineKeyboardMarkup) error {

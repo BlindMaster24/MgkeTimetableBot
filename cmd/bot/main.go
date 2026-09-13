@@ -127,6 +127,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create bot")
 	}
 	bot.SetBuildInfo(buildInfo)
+	bot.SetHealthSource(metrics)
 
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)

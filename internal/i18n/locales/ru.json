@@ -113,6 +113,7 @@
   "api_teacher_not_found": "Преподаватель не найден",
   "api_info": "Для доступа к API обратитесь к разработчику.\n\nДокументация: https://github.com/BlindMaster24/MgkeTimetableBot",
   "cmd_debug": "Отладочная информация",
+  "cmd_parserhealth": "Здоровье парсера и перезапуск разбора",
   "cmd_send": "Рассылка всем пользователям",
   "cmd_trigger": "Триггер события",
   "cmd_history": "История расписания",

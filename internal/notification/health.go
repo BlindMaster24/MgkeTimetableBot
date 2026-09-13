@@ -11,6 +11,9 @@ import (
 const (
 	healthService  = "telegram"
 	healthCooldown = 30 * time.Minute
+
+	ParserReparseCallback = "parser_reparse"
+	parserReparseButton   = "🔄 Переразобрать сейчас"
 )
 
 type alertState struct {
@@ -72,10 +75,10 @@ func (n *HealthNotifier) Check() {
 	}
 
 	for _, alert := range pending {
-		n.broadcast(chats, healthAlertMessage(alert))
+		n.broadcast(chats, healthAlertMessage(alert), HealthAlertButtons(alert.Key))
 	}
 	for _, key := range recovered {
-		n.broadcast(chats, healthRecoveryMessage(key))
+		n.broadcast(chats, healthRecoveryMessage(key), nil)
 	}
 }
 
@@ -143,16 +146,38 @@ func (n *HealthNotifier) flush() {
 	}
 }
 
-func (n *HealthNotifier) broadcast(chats []*EventChat, message string) {
+func (n *HealthNotifier) broadcast(chats []*EventChat, message string, buttons []KeyboardButton) {
 	for _, chat := range chats {
 		id := chat.ID
 		if chat.PeerID != 0 {
 			id = chat.PeerID
 		}
-		if err := n.sender.SendText(id, message); err != nil {
+
+		var err error
+		if len(buttons) > 0 {
+			err = n.sender.SendTextWithButtons(id, message, buttons)
+		} else {
+			err = n.sender.SendText(id, message)
+		}
+		if err != nil {
 			n.log.Error().Err(err).Int64("chat", id).Msg("failed to send health alert")
 		}
 	}
+}
+
+func IsParserAlert(key string) bool {
+	switch key {
+	case health.AlertParserFailures, health.AlertParserStale, health.AlertParserLayout, health.AlertParserGuard:
+		return true
+	}
+	return false
+}
+
+func HealthAlertButtons(key string) []KeyboardButton {
+	if !IsParserAlert(key) {
+		return nil
+	}
+	return []KeyboardButton{{Text: parserReparseButton, Data: ParserReparseCallback}}
 }
 
 func healthAlertMessage(alert health.Alert) string {

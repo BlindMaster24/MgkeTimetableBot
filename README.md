@@ -178,6 +178,8 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 - `parser_layout` — обязательный селектор перестал находить данные (`health.parser_layout_failures` прогонов подряд, по умолчанию 2);
 - `parser_guard` — включилась защита от обрыва данных: страница стала пустой или число групп/преподавателей упало сильнее порога, либо парсеру пришлось пойти по запасному пути (по умолчанию алерт приходит с первого такого прогона, `health.parser_guard_failures: 1`).
 
+Любой алерт парсера приходит в Telegram с кнопкой `🔄 Переразобрать сейчас` — она запускает разбор вне расписания, не дожидаясь следующего цикла. Подробный снимок состояния в любой момент доступен администраторам командой `/parserhealth`.
+
 Пороги самой защиты живут в `parser.guard`:
 
 ```yaml
@@ -236,9 +238,11 @@ parser:
 
 Доступны только ID из `telegram.admin_ids` — в меню команд Telegram они показываются только им и с пометкой `[адм]`:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` рассылает сообщение всем чатам с ограничением 25 сообщений в минуту, чтобы не упереться в лимиты Telegram.
+
+`/parserhealth` показывает снимок здоровья парсера прямо сейчас — состояние, число разборов и ошибок, время последнего успеха и сбоя, длительность разбора, найденные проблемы вёрстки и срабатывания защиты данных, активные алерты и размер кэша, — и умеет запустить разбор немедленно, не дожидаясь следующего цикла.
 
 ## HTTP API
 

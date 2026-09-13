@@ -9,6 +9,7 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
@@ -283,6 +284,34 @@ func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool, in
 		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
+}
+
+type reparseCb struct{ bot *Bot }
+
+func (cb *reparseCb) Prefix() string { return notification.ParserReparseCallback }
+
+func (cb *reparseCb) Handler(ctx context.Context, u *Update) error {
+	if u.Callback != nil {
+		cb.bot.AnswerCallback(u.Callback.ID, "")
+	}
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	if cb.bot.parseFunc == nil {
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("parse_not_available"))
+	}
+
+	chatID := u.ChatID
+	go func() {
+		if err := cb.bot.parseFunc(); err != nil {
+			cb.bot.log.Error().Err(err).Msg("manual reparse failed")
+			cb.bot.SendText(chatID, cb.bot.loc("force_parse_error"))
+			return
+		}
+		cb.bot.SendText(chatID, cb.bot.loc("force_parse_done"))
+	}()
+
+	return u.Bot.SendText(chatID, cb.bot.loc("force_parse_started"))
 }
 
 func isNowInSlot(now time.Time, slot [2][2]string, includedDays []int) bool {

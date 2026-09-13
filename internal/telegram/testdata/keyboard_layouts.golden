@@ -96,6 +96,8 @@
 === weekControlKeyboard(hidePast) ===
 ➡️
 📷 Сгенерировать изображение
+=== parserAlertKeyboard ===
+🔄 Переразобрать сейчас
 === replyCallsSettings(admin) ===
 📊 Показать
 ✅ Обновить с сайта
