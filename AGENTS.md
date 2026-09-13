@@ -9,11 +9,11 @@
   - `i18n/` — go-i18n with embedded `locales/*.json` (Russian).
   - `model/` — domain types: Group, Teacher, Day, Lesson, CallsSchedule.
   - `parser/` — goquery HTML parser (groups, teachers, bell schedule, calls).
-  - `archive/` — SQLite repository for timetable archive (modernc.org/sqlite, pure Go).
+  - `archive/` — SQLite repository for timetable archive (modernc.org/sqlite, pure Go); `migrations/*.sql` is embedded and applied by `Repository.EnsureSchema` from `New`.
   - `cache/` — file-backed RaspCache with in-memory state, hit/miss metrics and the event bus drained by the notifier.
-  - `telegram/` — telego bot: commands, callbacks, menus, keyboards, scenes, Google Calendar menus.
+  - `telegram/` — telego bot. `bot.go` registers everything; `chat.go` + `chat_queries.go` + `chat_subscriptions.go` hold the chat database; `commands.go`, `settings_text.go`, `callbacks.go`, `menus.go`, `weekcontrol.go` carry the user surface; one file per feature for the rest (`history.go`, `stats.go`, `archive.go`, `ics.go`, `calls_edit.go`, `calls_campus.go`, `compare_groups.go`, `test_subscriptions.go`, `debug_commands.go`, `google_calendar.go`, `google_store.go`, `admin.go`, `admin_commands.go`).
   - `api/` — gin REST API: info, groups, teachers, group/teacher by name, parser-health, health, Google OAuth callback.
-  - `health/` — in-memory metrics tracker (parser, calendar sync, API) with threshold-based alert evaluation.
+  - `health/` — metrics tracker (parser, calendar sync, API) with threshold-based alert evaluation; `state.go` persists it through the `StateStore` interface.
   - `google/` — Google Calendar OAuth2 user client, Service Account sync, lesson event builders.
   - `image/` — fogleman/gg timetable PNG renderer.
   - `calendar/` — ICS calendar export (hand-rolled, no external lib).
@@ -35,14 +35,15 @@
 - Output is delivered through telego (Telegram) or gin (HTTP API).
 
 ## Where to Add New Code
-- New bot command: add struct in `internal/telegram/commands.go` (or `admin_commands.go` / `extras.go` for admin and service commands), implement `Command` interface, register in `registerAll()`.
+- New bot command: add struct either to `internal/telegram/commands.go` (user surface) or to the feature file it belongs to, implement `Command` interface, register in `registerAll()`. Do not create a catch-all file: one feature, one file.
 - New callback: add struct in `internal/telegram/callbacks.go`, implement `Callback` interface, register in `registerAll()`.
 - New menu: add one spec to the table in `internal/telegram/menus.go`; do not hand-register its command or text handlers.
 - New input scene: add a typed scene constant and a route in `internal/telegram/scenes.go`; never compare raw scene strings in handlers.
 - New API endpoint: add handler in `internal/api/server.go`, register route in `routes()`; both README files must document it (`tests/docs_test.go`).
 - New metric or alert: record it in `internal/health` and map the alert key to a message in `internal/notification/health.go`.
 - New config field: add it with a `yaml` tag — the `MGKE_*` environment name is derived from that tag automatically; document it in `configs/config.example.yaml` and in both README files.
-- New parser type: add file in `internal/parser/`.
+- New parser source: add a file in `internal/parser/` that returns a `Report` from `report.go` — every required probe names the selector it expects.
+- New end-to-end case: extend `tests/e2e_test.go` (real SQLite chat database) or `internal/telegram/*_e2e_test.go` (bot surface) — do not add a mock-only test where a real repository works.
 - New locale string: add key to `internal/i18n/locales/ru.json`, use `b.loc("key")` in code.
 
 ## Build, Test, and Development Commands
