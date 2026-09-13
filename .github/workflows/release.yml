@@ -17,9 +17,32 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
+  verify:
+    name: verify the revision
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -count=1 -p 1 ./internal/... ./tests/...
+
   binaries:
     name: build ${{ matrix.goos }}/${{ matrix.goarch }}
     if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -105,6 +128,7 @@ jobs:
   image:
     name: publish the image
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

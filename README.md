@@ -399,7 +399,7 @@ go test ./internal/telegram -update              # перегенерирова�
 | `docker` | сборка образа и проверка, что бинарник внутри запускается |
 | `workflow-lint` | `actionlint` по самим workflow-файлам |
 
-`.github/workflows/release.yml` — доставка:
+`.github/workflows/release.yml` — доставка. Перед публикацией job `verify` прогоняет сборку, vet и тесты на том же коммите, поэтому сломанный тег или push в `main` не публикуется:
 
 - push в `main` → multi-arch образ (`linux/amd64`, `linux/arm64`) публикуется в GHCR с тегами `:edge` и `:main`;
 - тег вида `v1.2.3` → собираются бинарники под `linux/amd64`, `linux/arm64`, `windows/amd64` и `darwin/arm64`, публикуются в GitHub Release вместе с автоматическими release notes, а образ получает постоянные теги `:1.2.3`, `:1.2` и `:latest`.

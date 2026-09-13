@@ -398,7 +398,7 @@ CI runs the same checks — see “CI and releases” below.
 | `docker` | the image build plus a check that the binary inside it starts |
 | `workflow-lint` | `actionlint` over the workflow files themselves |
 
-`.github/workflows/release.yml` is the delivery side:
+`.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision before anything is published, so a broken tag or `main` push never ships:
 
 - a push to `main` publishes a multi-arch image (`linux/amd64`, `linux/arm64`) to GHCR tagged `:edge` and `:main`;
 - a tag like `v1.2.3` builds binaries for `linux/amd64`, `linux/arm64`, `windows/amd64` and `darwin/arm64`, attaches them to a GitHub Release with generated release notes, and gives the image the persistent tags `:1.2.3`, `:1.2` and `:latest`.
