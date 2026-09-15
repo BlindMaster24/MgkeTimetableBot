@@ -216,11 +216,11 @@ func (b *Bot) showCalls(u *Update, chat *Chat, full bool) {
 
 	text := strings.Join(msg, "\n")
 	if !full {
-		b.sendOrEdit(u.ChatID, text, chat, callsFullKeyboard())
+		b.sendOrEdit(u, text, callsFullKeyboard())
 		return
 	}
 
-	b.sendOrEdit(u.ChatID, text, chat, nil)
+	b.sendOrEdit(u, text, nil)
 }
 
 func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {

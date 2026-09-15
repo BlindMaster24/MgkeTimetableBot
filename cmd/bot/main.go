@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
@@ -79,8 +78,24 @@ func main() {
 
 	metrics := health.NewTracker(healthThresholds(cfg))
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	stop := stopSignals()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), stop...)
 	defer cancel()
+
+	interrupts := make(chan os.Signal, len(stop))
+	signal.Notify(interrupts, stop...)
+	defer signal.Stop(interrupts)
+
+	log.Info().Strs("signals", signalNames(stop)).Msg("graceful shutdown armed")
+
+	go func() {
+		sig := <-interrupts
+		log.Info().Str("signal", sig.String()).Msg("stop signal received, shutting down")
+		<-interrupts
+		log.Warn().Msg("second stop signal received, exiting now")
+		os.Exit(1)
+	}()
 
 	raspCache, err := cache.New(cfg.ResolvedCacheDir())
 	if err != nil {
@@ -302,7 +317,7 @@ func main() {
 		}()
 	}
 
-	log.Info().Msg("bot starting")
+	log.Info().Msg("bot starting, press Ctrl+C to stop")
 	if err := bot.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("bot stopped")
 	}

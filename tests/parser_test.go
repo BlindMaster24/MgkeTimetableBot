@@ -92,8 +92,8 @@ func TestGroupParser(t *testing.T) {
 		t.Fatalf("expected at least 2 days, got %d", len(g63.Days))
 	}
 
-	if g63.Days[0].Day != "Понедельник, 01.09.2025" {
-		t.Errorf("expected day 'Понедельник, 01.09.2025', got %s", g63.Days[0].Day)
+	if g63.Days[0].Day != "01.09.2025" {
+		t.Errorf("expected day '01.09.2025', got %s", g63.Days[0].Day)
 	}
 
 	lessons := g63.Days[0].Lessons

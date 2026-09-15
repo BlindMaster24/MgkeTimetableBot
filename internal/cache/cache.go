@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -514,6 +515,41 @@ func (c *RaspCache) load() {
 	loadFile("teachers.json", c.Teachers)
 	loadFile("team.json", &c.Team)
 	loadFile("calls.json", &c.Calls)
+
+	normalizeTimetableDays(c.Groups)
+	normalizeTimetableDays(c.Teachers)
+}
+
+var cachedDateRe = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})`)
+
+func normalizeTimetableDays(entry *RaspEntry[map[string]any]) {
+	if entry == nil {
+		return
+	}
+
+	for _, value := range entry.Timetable {
+		record, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+		days, ok := record["days"].([]any)
+		if !ok {
+			continue
+		}
+		for _, rawDay := range days {
+			day, ok := rawDay.(map[string]any)
+			if !ok {
+				continue
+			}
+			stored, ok := day["day"].(string)
+			if !ok {
+				continue
+			}
+			if match := cachedDateRe.FindString(stored); match != "" {
+				day["day"] = match
+			}
+		}
+	}
 }
 
 func mapsEqual(a, b map[string]any) bool {

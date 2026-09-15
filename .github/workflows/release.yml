@@ -16,11 +16,19 @@ permissions:
 env:
   GOTOOLCHAIN: local
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   verify:
-    name: verify the revision
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: verify the revision (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 

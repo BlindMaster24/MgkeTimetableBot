@@ -100,10 +100,10 @@ func TestGroupParserDaysFromGrid(t *testing.T) {
 		t.Fatalf("expected 2 days, got %d", len(g.Days))
 	}
 
-	if g.Days[0].Day != "Понедельник, 31.08.2026" {
+	if g.Days[0].Day != "31.08.2026" {
 		t.Errorf("first day = %q", g.Days[0].Day)
 	}
-	if g.Days[1].Day != "Вторник, 01.09.2026" {
+	if g.Days[1].Day != "01.09.2026" {
 		t.Errorf("second day = %q", g.Days[1].Day)
 	}
 }

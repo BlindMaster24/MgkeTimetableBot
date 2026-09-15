@@ -75,6 +75,7 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 	builder.probe("heading: Группа - <номер>", "group headings", labelled, true)
 	builder.probe("th[colspan] with a date", "groups with day columns", withDays, true)
 	builder.probe("td lesson cells", "groups with at least one lesson", withLessons, false)
+	builder.probe("th[colspan] with dd.MM.yyyy", "day columns carrying a parseable date", groupDatedDays(groups), true)
 
 	if skipped > 0 {
 		builder.warn("%d tables had no readable day columns", skipped)
@@ -152,6 +153,18 @@ func (p *GroupParser) parseTable(table *goquery.Selection, groupNum string) *mod
 		Group: groupNum,
 		Days:  days,
 	}
+}
+
+func groupDatedDays(groups model.Groups) int {
+	dated := 0
+	for _, group := range groups {
+		for _, day := range group.Days {
+			if extractDayString(day.Day) != "" {
+				dated++
+			}
+		}
+	}
+	return dated
 }
 
 func groupHasLessons(group *model.Group) bool {

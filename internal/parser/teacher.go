@@ -74,6 +74,7 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 	builder.probe("heading: Преподаватель - <ФИО>", "teacher headings", labelled, true)
 	builder.probe("th[colspan] with a date", "teachers with day columns", withDays, true)
 	builder.probe("td lesson cells", "teachers with at least one lesson", withLessons, false)
+	builder.probe("th[colspan] with dd.MM.yyyy", "day columns carrying a parseable date", teacherDatedDays(teachers), true)
 
 	if skipped > 0 {
 		builder.warn("%d tables had no readable day columns", skipped)
@@ -83,6 +84,18 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 	}
 
 	return teachers, builder.done(len(teachers))
+}
+
+func teacherDatedDays(teachers model.Teachers) int {
+	dated := 0
+	for _, teacher := range teachers {
+		for _, day := range teacher.Days {
+			if extractDayString(day.Day) != "" {
+				dated++
+			}
+		}
+	}
+	return dated
 }
 
 func teacherLabel(text string) labelMatch {

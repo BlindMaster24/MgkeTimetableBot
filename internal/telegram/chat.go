@@ -96,12 +96,12 @@ func (r *Repository) migrate() error {
 		teacher TEXT,
 		google_email TEXT,
 		formatter INTEGER NOT NULL DEFAULT 0,
-		show_about INTEGER NOT NULL DEFAULT 0,
-		show_daily INTEGER NOT NULL DEFAULT 0,
-		show_weekly INTEGER NOT NULL DEFAULT 0,
-		show_calls INTEGER NOT NULL DEFAULT 0,
-		show_fast_group INTEGER NOT NULL DEFAULT 0,
-		show_fast_teacher INTEGER NOT NULL DEFAULT 0,
+		show_about INTEGER NOT NULL DEFAULT 1,
+		show_daily INTEGER NOT NULL DEFAULT 1,
+		show_weekly INTEGER NOT NULL DEFAULT 1,
+		show_calls INTEGER NOT NULL DEFAULT 1,
+		show_fast_group INTEGER NOT NULL DEFAULT 1,
+		show_fast_teacher INTEGER NOT NULL DEFAULT 1,
 		hide_past_days INTEGER NOT NULL DEFAULT 0,
 		delete_last_msg INTEGER NOT NULL DEFAULT 0,
 		last_msg_id INTEGER NOT NULL DEFAULT 0,
@@ -167,6 +167,10 @@ func (r *Repository) migrate() error {
 		return err
 	}
 
+	if err := r.migrateShowButtons(); err != nil {
+		return err
+	}
+
 	if err := r.migrateSubscriptions(); err != nil {
 		return err
 	}
@@ -184,7 +188,10 @@ func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
 	}
 
 	_, err = r.db.Exec(
-		`INSERT OR IGNORE INTO bot_chats (service, peer_id) VALUES (?, ?)`,
+		`INSERT OR IGNORE INTO bot_chats (
+			service, peer_id, show_about, show_daily, show_weekly,
+			show_calls, show_fast_group, show_fast_teacher
+		) VALUES (?, ?, 1, 1, 1, 1, 1, 1)`,
 		service, peerID,
 	)
 	if err != nil {
@@ -270,6 +277,30 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	chat.CallsCampus = nsCallsCampus.String
 
 	return chat, nil
+}
+
+func (r *Repository) migrateShowButtons() error {
+	const key = "migrate.show_buttons_default"
+
+	var stored string
+	err := r.db.QueryRow(`SELECT value FROM bot_state WHERE key = ?`, key).Scan(&stored)
+	if err == nil {
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
+
+	_, err = r.db.Exec(`UPDATE bot_chats SET
+			show_about = 1, show_daily = 1, show_weekly = 1,
+			show_calls = 1, show_fast_group = 1, show_fast_teacher = 1
+		WHERE show_about = 0 AND show_daily = 0 AND show_weekly = 0
+			AND show_calls = 0 AND show_fast_group = 0 AND show_fast_teacher = 0`)
+	if err != nil {
+		return err
+	}
+
+	return r.SaveState(key, "1")
 }
 
 func (r *Repository) SetScene(chat *Chat, scene string) {

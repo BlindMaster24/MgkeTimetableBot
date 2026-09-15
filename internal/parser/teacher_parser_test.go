@@ -93,7 +93,7 @@ func TestTeacherParserDaysFromGrid(t *testing.T) {
 		t.Fatalf("expected 2 days, got %d", len(ivanov.Days))
 	}
 
-	if ivanov.Days[0].Day != "Понедельник, 31.08.2026" {
+	if ivanov.Days[0].Day != "31.08.2026" {
 		t.Errorf("first day = %q", ivanov.Days[0].Day)
 	}
 }

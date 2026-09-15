@@ -17,11 +17,19 @@ permissions:
 env:
   GOTOOLCHAIN: local
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   quality:
-    name: format, build and vet
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: format, build and vet (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -31,7 +39,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Show the toolchain
+        run: go version
+
       - name: Check formatting
+        if: runner.os == 'Linux'
         run: |
           unformatted="$(gofmt -l .)"
           if [ -n "$unformatted" ]; then
@@ -48,14 +60,29 @@ jobs:
 
       - name: Build every binary
         run: |
-          go build -o /tmp/bot ./cmd/bot/
-          go build -o /tmp/migrate-pg ./cmd/migrate-pg/
-          go build -o /tmp/paritycheck ./scripts/paritycheck/
+          out="$(mktemp -d)"
+          go build -o "$out/" ./cmd/bot/
+          go build -o "$out/" ./cmd/migrate-pg/
+          go build -o "$out/" ./scripts/paritycheck/
+          ls -l "$out"
+
+      - name: Cross-compile the release targets
+        if: runner.os == 'Linux'
+        run: |
+          for target in linux/amd64 linux/arm64 windows/amd64 darwin/arm64; do
+            echo "building ${target}"
+            GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 go build -o /dev/null ./cmd/bot/
+            GOOS="${target%/*}" GOARCH="${target#*/}" CGO_ENABLED=0 go build -o /dev/null ./cmd/migrate-pg/
+          done
 
   test:
-    name: tests with coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: tests with coverage (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -69,21 +96,49 @@ jobs:
         run: go test -count=1 -p 1 -covermode=atomic -coverprofile=coverage.out ./internal/... ./tests/... ./cmd/...
 
       - name: Summarize coverage
+        if: runner.os == 'Linux'
         run: |
           go tool cover -func=coverage.out | tail -n 1 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage report
-        if: always()
+        if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage
           path: coverage.out
           retention-days: 14
 
+  newest-toolchain:
+    name: newest Go toolchain (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Show the toolchain
+        run: go version
+
+      - name: Test
+        run: go test -count=1 -p 1 ./internal/... ./tests/... ./cmd/...
+
   race:
-    name: tests under the race detector
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: tests under the race detector (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -94,7 +149,15 @@ jobs:
           cache: true
 
       - name: Test with -race
-        run: go run ./scripts/racecheck
+        run: |
+          if go run ./scripts/racecheck -check; then
+            go run ./scripts/racecheck
+          elif [ "${RUNNER_OS}" = "Windows" ]; then
+            echo "::warning title=race detector unavailable::the runner has no usable C toolchain, skipping -race"
+          else
+            go run ./scripts/racecheck -check
+            exit 1
+          fi
 
   parity:
     name: TypeScript parity
@@ -196,7 +259,20 @@ jobs:
         if: failure()
         run: docker logs mgke-smoke
 
-      - name: Stop the container
+      - name: Stop the bot gracefully
+        run: |
+          docker stop --time 20 mgke-smoke > /dev/null
+          docker logs mgke-smoke 2>&1 | tail -20
+          if ! docker logs mgke-smoke 2>&1 | grep -q "shutdown complete"; then
+            echo "the bot did not finish its graceful shutdown on SIGTERM" >&2
+            exit 1
+          fi
+          if ! docker logs mgke-smoke 2>&1 | grep -q "stop signal received"; then
+            echo "the bot did not log the stop signal it received" >&2
+            exit 1
+          fi
+
+      - name: Remove the container
         if: always()
         run: docker rm -f mgke-smoke || true
 

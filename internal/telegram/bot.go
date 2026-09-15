@@ -60,13 +60,14 @@ type Bot struct {
 }
 
 type Update struct {
-	Bot      *Bot
-	Message  *telego.Message
-	Callback *telego.CallbackQuery
-	ChatID   int64
-	UserID   int64
-	Text     string
-	Data     string
+	Bot       *Bot
+	Message   *telego.Message
+	Callback  *telego.CallbackQuery
+	ChatID    int64
+	UserID    int64
+	MessageID int
+	Text      string
+	Data      string
 }
 
 type Command interface {
@@ -253,12 +254,22 @@ func (b *Bot) Run(ctx context.Context) error {
 	}
 
 	b.log.Info().Msg("bot started, listening for updates")
+	return b.consumeUpdates(ctx, updates)
+}
 
-	for update := range updates {
-		b.handleUpdate(ctx, update)
+func (b *Bot) consumeUpdates(ctx context.Context, updates <-chan telego.Update) error {
+	for {
+		select {
+		case <-ctx.Done():
+			b.log.Info().Msg("stop signal received, leaving the update loop")
+			return nil
+		case update, ok := <-updates:
+			if !ok {
+				return nil
+			}
+			b.handleUpdate(ctx, update)
+		}
 	}
-
-	return nil
 }
 
 func (b *Bot) handleUpdate(ctx context.Context, update telego.Update) {
@@ -296,6 +307,8 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 	}
 	if msg, ok := cb.Message.(*telego.Message); ok && msg != nil {
 		u.ChatID = msg.Chat.ID
+		u.MessageID = msg.MessageID
+		u.Message = msg
 	}
 
 	bestPrefix, bestHandler := b.findCallback(cb.Data)
@@ -510,35 +523,21 @@ func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *tele
 	return err
 }
 
-func (b *Bot) sendOrEdit(chatID int64, text string, chat *Chat, inlineKb *telego.InlineKeyboardMarkup) error {
-	if chat.LastMsgID > 0 {
-		err := b.EditMessageText(chatID, int(chat.LastMsgID), text, inlineKb)
-		if err == nil {
+func (b *Bot) sendOrEdit(u *Update, text string, inlineKb *telego.InlineKeyboardMarkup) error {
+	if u.MessageID > 0 {
+		err := b.EditMessageText(u.ChatID, u.MessageID, text, inlineKb)
+		if err == nil || messageNotModified(err) {
 			return nil
 		}
 	}
-	var msg *telego.Message
-	var err error
-	if inlineKb != nil {
-		msg, err = b.client.SendMessage(context.Background(), &telego.SendMessageParams{
-			ChatID:      telego.ChatID{ID: chatID},
-			Text:        text,
-			ParseMode:   "HTML",
-			ReplyMarkup: inlineKb,
-		})
-	} else {
-		msg, err = b.client.SendMessage(context.Background(), &telego.SendMessageParams{
-			ChatID:    telego.ChatID{ID: chatID},
-			Text:      text,
-			ParseMode: "HTML",
-		})
+	if inlineKb == nil {
+		return b.SendText(u.ChatID, text)
 	}
-	if err != nil {
-		return err
-	}
-	chat.LastMsgID = int64(msg.MessageID)
-	b.chatRepo.Save(chat)
-	return nil
+	return b.SendTextWithKeyboard(u.ChatID, text, inlineKb)
+}
+
+func messageNotModified(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "message is not modified")
 }
 
 func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {

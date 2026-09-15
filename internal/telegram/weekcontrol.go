@@ -199,7 +199,7 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 	}
 
 	kb := b.weekControlKeyboardHeader(typeName, p.Value, p.WeekIndex, p.HidePastDays, p.ShowHeader)
-	return b.sendOrEdit(u.ChatID, text, chat, kb)
+	return b.sendOrEdit(u, text, kb)
 }
 
 func extractDaysFromRange(data any, minIdx, maxIdx int) []map[string]any {
@@ -215,8 +215,7 @@ func extractDaysFromRange(data any, minIdx, maxIdx int) []map[string]any {
 		if err != nil {
 			continue
 		}
-		di := utils.WeekIndexFromDate(t)
-		idx := di.Value()
+		idx := utils.DayIndexFromDate(t)
 		if idx >= minIdx && idx <= maxIdx {
 			result = append(result, day)
 		}
@@ -332,7 +331,7 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 		}
 
 		kb := b.weekControlKeyboard("group", chat.Group, week.Value(), chat.HidePastDays)
-		return b.sendOrEdit(u.ChatID, text, chat, kb)
+		return b.sendOrEdit(u, text, kb)
 
 	case ModeTeacher:
 		if chat.Teacher == "" {
@@ -356,7 +355,7 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 		}
 
 		kb := b.weekControlKeyboard("teacher", chat.Teacher, week.Value(), chat.HidePastDays)
-		return b.sendOrEdit(u.ChatID, text, chat, kb)
+		return b.sendOrEdit(u, text, kb)
 	}
 
 	return u.Bot.SendText(u.ChatID, b.loc("need_group"))

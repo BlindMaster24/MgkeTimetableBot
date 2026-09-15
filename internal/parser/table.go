@@ -164,7 +164,11 @@ func buildDayColumns(headerRow *goquery.Selection, allowUndated bool) []DayColum
 		named := weekdayRe.MatchString(text)
 
 		if dated || (named && span > 1) || (allowUndated && named) {
-			day := DayColumn{Day: text, LessonCol: col}
+			dayValue := extractDayString(text)
+			if dayValue == "" {
+				dayValue = text
+			}
+			day := DayColumn{Day: dayValue, LessonCol: col}
 			if span > 1 {
 				day.HasCabinet = true
 				day.CabinetCol = col + 1

@@ -33,6 +33,71 @@ func TestCIRunsTheRaceCheckScript(t *testing.T) {
 	}
 }
 
+func TestCITestsEveryPlatform(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	for _, runner := range []string{"ubuntu-latest", "windows-latest", "macos-latest"} {
+		if !strings.Contains(workflow, runner) {
+			t.Errorf("ci.yml must run on %s as well", runner)
+		}
+	}
+	if !strings.Contains(workflow, "matrix:") {
+		t.Error("the platform jobs must use a matrix, not a single runner")
+	}
+	if !strings.Contains(workflow, "fail-fast: false") {
+		t.Error("one failing platform must not cancel the others")
+	}
+	if !strings.Contains(workflow, "shell: bash") {
+		t.Error("the workflow must pin bash so one command string works on every platform")
+	}
+}
+
+func TestCIRunsTheNewestToolchain(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	if !strings.Contains(workflow, "go-version: stable") {
+		t.Error("CI must run the suite on the newest stable Go, not only on the pinned minimum")
+	}
+	if !strings.Contains(workflow, "GOTOOLCHAIN: local") {
+		t.Error("the pinned toolchain must stay local so Go never substitutes one silently")
+	}
+}
+
+func TestReleaseVerifiesEveryPlatform(t *testing.T) {
+	release := readRepoFile(t, filepath.Join(".github", "workflows", "release.yml"))
+
+	for _, runner := range []string{"ubuntu-latest", "windows-latest", "macos-latest"} {
+		if !strings.Contains(release, runner) {
+			t.Errorf("release.yml must verify the revision on %s too", runner)
+		}
+	}
+}
+
+func TestContainerSmokeTestChecksTheGracefulShutdown(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	if !strings.Contains(workflow, "docker stop --time") {
+		t.Error("the container smoke test must stop the bot with a timeout so SIGTERM has a chance to arrive")
+	}
+	if !strings.Contains(workflow, "shutdown complete") {
+		t.Error("the container smoke test must assert the bot finished its graceful shutdown")
+	}
+}
+
+func TestSecurityWorkflowScansTheDependencies(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "security.yml"))
+
+	if !strings.Contains(workflow, "govulncheck") {
+		t.Error("the security workflow must run govulncheck")
+	}
+	if !strings.Contains(workflow, "schedule:") {
+		t.Error("the vulnerability scan must run on a schedule, not only on push")
+	}
+	if !strings.Contains(workflow, "workflow_dispatch:") {
+		t.Error("the vulnerability scan must be runnable by hand")
+	}
+}
+
 func TestRaceCommandCoversTheWholeSuite(t *testing.T) {
 	packages := racecheck.DefaultPackages()
 	joined := strings.Join(packages, " ")

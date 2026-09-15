@@ -25,7 +25,7 @@
 - `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic).
 - `README.md` / `README.en.md` — mirrored documentation, kept in sync by `tests/docs_test.go`.
 - `Dockerfile`, `docker-compose.yml`, `.dockerignore` — container build; runtime config comes from env vars, state lives in the `/data` volume.
-- `.github/workflows/ci.yml` — quality gates; `.github/workflows/release.yml` — releases and the GHCR image; `.github/dependabot.yml` — weekly dependency bumps.
+- `.github/workflows/ci.yml` — quality gates on Linux, Windows and macOS; `.github/workflows/release.yml` — releases and the GHCR image; `.github/workflows/security.yml` — the scheduled `govulncheck` scan; `.github/dependabot.yml` — weekly dependency bumps.
 
 ## Architecture Overview (Flow)
 - External inputs arrive via Telegram bot (long polling) or HTTP API.
@@ -34,6 +34,8 @@
 - `cmd/bot/main.go` drains those events after every parse into `internal/notification`, then syncs only the changed days into Google Calendar and finally reconciles calendars that fell behind.
 - `internal/health` records parser, calendar and API outcomes; the scheduler polls it and messages admins while an alert is active.
 - Parsed data is stored in `cache/` (file-backed JSON in `cache/rasp/`) and `archive/` (SQLite).
+- Every cached day carries a plain `дд.мм.гггг` date in its `day` field: the formatters, the archive index, the notification bus and the Google/ICS exporters all parse it with `time.Parse("02.01.2006", ...)`. `cache.New` normalizes legacy labels ("Понедельник, 31.08.2026") on load, and the parser reports a required `th[colspan] with dd.MM.yyyy` probe so a page without parseable dates raises `parser_layout`.
+- Telegram messages: a command or a text button always sends a new message; only an inline button edits the message it belongs to, using the message id of the callback query (`Update.MessageID`). Never route an edit through a message id stored in the chat row.
 - Output is delivered through telego (Telegram) or gin (HTTP API).
 
 ## Where to Add New Code
@@ -61,12 +63,17 @@
 - `gofmt -l .` — formatting check (CI fails on any output).
 - `go run ./scripts/racecheck` — the race detector run CI performs; it verifies the cgo/C-compiler prerequisites first and prints the install steps (or `go run ./scripts/racecheck -check` to only report availability).
 - `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` — lint the workflow files after touching `.github/workflows/`.
+- `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` — dependency vulnerability scan (the scheduled `security.yml` job).
+- `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/bot/` — cross-compilation check; repeat for `linux/arm64` and `darwin/arm64` after touching platform-specific code.
 
 ## CI and Releases
-- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (gofmt, build, vet, all three binaries), `test` (suite plus `coverage.out` artifact), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata and the container timezone) and `workflow-lint` (`actionlint`).
+- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (cross-platform build, vet and all three binaries; gofmt and the release-target cross-compilation only on Linux), `test` (suite plus `coverage.out` artifact), `newest-toolchain` (the suite on the newest stable Go), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata, the container timezone and the graceful `SIGTERM` shutdown) and `workflow-lint` (`actionlint`).
+- The platform-sensitive jobs (`quality`, `test`, `newest-toolchain`, `race`) carry a matrix over `ubuntu-latest`, `windows-latest` and `macos-latest` with `fail-fast: false`, and every workflow sets `defaults: run: shell: bash` so one command string works on all three. The platform-neutral gates (`parity`, `container`, `workflow-lint`) stay on Linux because they need Docker, a `git fetch` of the `old` branch or `jq`.
+- Coverage is measured on all three operating systems but only the Linux run uploads the artifact and the summary, otherwise the artifact names would clash. The race job probes with `racecheck -check` first and, when Windows reports the detector as unavailable, warns instead of failing — `-race` builds through cgo and the Windows runner has no guaranteed C toolchain.
+- `.github/workflows/security.yml` runs `govulncheck` on push to `main`, on a weekly schedule and on demand; it is deliberately outside CI so an advisory never blocks a pull request.
 - Actions are pinned by commit SHA with the release tag in a comment; Dependabot bumps the SHA and the comment together, so keep the `# vN` comment when editing a `uses:` line.
-- The whole CI sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.1` from `go.mod` is the version every check has to pass with — a newer toolchain is never used silently.
-- `.github/workflows/release.yml` first runs `verify` (build, vet, tests) on the same revision and only then publishes: a push to `main` pushes the multi-arch image to `ghcr.io/blindmaster24/mgketimetablebot` as `:edge`/`:main`; a `v*` tag additionally builds linux/amd64, linux/arm64, windows/amd64 and darwin/arm64 archives, attaches them to a GitHub Release and gives the image `:1.2.3`, `:1.2` and `:latest`.
+- Every job sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.1` from `go.mod` is the version the checks pass with and a newer toolchain is never substituted silently. The `newest-toolchain` job opts in explicitly with `go-version: stable`, so a Go release that breaks the suite shows up without moving the pinned minimum.
+- `.github/workflows/release.yml` first runs `verify` (build, vet, tests on Linux, Windows and macOS) on the same revision and only then publishes: a push to `main` pushes the multi-arch image to `ghcr.io/blindmaster24/mgketimetablebot` as `:edge`/`:main`; a `v*` tag additionally builds linux/amd64, linux/arm64, windows/amd64 and darwin/arm64 archives, attaches them to a GitHub Release and gives the image `:1.2.3`, `:1.2` and `:latest`.
 - The release build injects the tag, commit and build date through `-X main.version`, `-X main.commit` and `-X main.date`; `cmd/bot/main.go` logs them at startup, `internal/build` carries them into `GET /api/health`, `GET /api/info` and the admin `/debug` command. Bump the version by tagging, never by editing code.
 - The container runs in the college timezone (`TZ=Europe/Minsk`, `tzdata` installed, `TZ` passed by `docker-compose.yml`). Day boundaries, the academic week index and the notification crons are all derived from `time.Local`, so a container in UTC would fire notifications three hours late — `tests/container_test.go` guards both files.
 - The Dockerfile builds its stage on `$BUILDPLATFORM` and cross-compiles with `GOOS=$TARGETOS GOARCH=$TARGETARCH`, so the multi-arch image never compiles Go under QEMU. Keep `CGO_ENABLED=0` — the bot is pure Go and the runtime image has no libc for cgo.
@@ -78,7 +85,11 @@
 - `go build -o bot ./cmd/bot/` to verify binary compiles.
 - `go run ./scripts/paritycheck` to verify the Telegram surface still matches the old TypeScript bot.
 - `go test -count=1 ./tests/` to verify the documentation still matches the bot surface, API routes and config keys.
-- `go run ./cmd/bot/ -config configs/config.yaml` for a smoke run (manual).
+- `go build ./...`, `go vet ./...` and the suite on Windows and macOS as well (the CI matrix) — a change that only compiles on Linux reaches the platform-specific jobs red.
+- `GOOS=<target> GOARCH=<arch> CGO_ENABLED=0 go build ./cmd/bot/` for the release targets after touching platform-specific code (`cmd/bot/signals_*.go` is the current example).
+- `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` when dependencies change.
+- The suite on the newest stable Go (the `newest-toolchain` job): install the latest Go release and run `go test -count=1 -p 1 ./internal/... ./tests/... ./cmd/...`.
+- `go run ./cmd/bot/ -config configs/config.yaml` for a smoke run (manual); send `Ctrl+C`/`SIGTERM` and check the log ends with `shutdown complete`.
 
 ## Parity with the old TypeScript bot
 - The old bot lives on the `old` branch; `scripts/paritycheck` reads it straight from git (`-ts-ref`, default `old`).

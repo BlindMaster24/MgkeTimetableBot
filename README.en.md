@@ -104,6 +104,8 @@ The config path can also come from the `CONFIG_PATH` environment variable — th
 
 A single process hosts Telegram long polling, the HTTP server (API plus the Google OAuth callback) and the parser goroutine.
 
+Stop the bot with Ctrl+C or with `SIGTERM`, `SIGHUP`, `SIGQUIT` (on Windows: Ctrl+C, Ctrl+Break, `SIGTERM`): it leaves long polling, flushes the metrics and the cache and logs `shutdown complete`. A second signal exits immediately.
+
 ## Configuration
 
 Everything lives in `configs/config.yaml` (template: `configs/config.example.yaml`).
@@ -448,14 +450,19 @@ CI runs the same checks — see “CI and releases” below.
 
 | Job | What it checks |
 | --- | --- |
-| `quality` | `gofmt -l` (any unformatted file fails the job), `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`) |
-| `test` | the full suite with coverage: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days |
-| `race` | `go run ./scripts/racecheck` — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
+| `quality` | on `ubuntu-latest`, `windows-latest` and `macos-latest`: `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (any unformatted file fails the job) and the cross-compilation of the release targets (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) run on Linux |
+| `test` | the full suite with coverage on all three operating systems: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days (uploaded from Linux) |
+| `newest-toolchain` | the same suite on all three operating systems with the newest stable Go (`go-version: stable`), so the minimum version from `go.mod` and the fresh toolchain are checked independently |
+| `race` | `go run ./scripts/racecheck` on all three operating systems — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
-| `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata and the container timezone (`date +%z` → `+0300`) |
+| `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata, the container timezone (`date +%z` → `+0300`) and a graceful `SIGTERM` shutdown (`docker stop` waits for `shutdown complete`) |
 | `workflow-lint` | `actionlint` over the workflow files themselves |
 
-`.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision before anything is published, so a broken tag or `main` push never ships:
+`.github/workflows/security.yml` is a separate security lane: `govulncheck` scans the module and its dependencies on every push to `main`, on a schedule (Monday, 06:00 UTC) and on demand. It does not block pull requests and is not part of CI: its job is to report a known vulnerability, not to stop development.
+
+Runners are used in their `-latest` flavour (`ubuntu-latest`, `windows-latest`, `macos-latest`), so the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the `newest-toolchain` job runs the suite on the newest stable Go release as well.
+
+`.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision on all three operating systems before anything is published, so a broken tag or `main` push never ships:
 
 - a push to `main` publishes a multi-arch image (`linux/amd64`, `linux/arm64`) to GHCR tagged `:edge` and `:main`;
 - a tag like `v1.2.3` builds binaries for `linux/amd64`, `linux/arm64`, `windows/amd64` and `darwin/arm64`, attaches them to a GitHub Release with generated release notes, and gives the image the persistent tags `:1.2.3`, `:1.2` and `:latest`.
