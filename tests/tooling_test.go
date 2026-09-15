@@ -84,6 +84,14 @@ func TestContainerSmokeTestChecksTheGracefulShutdown(t *testing.T) {
 	}
 }
 
+func TestContainerSmokeTestChecksTheImageFont(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	if !strings.Contains(workflow, "DejaVuSans.ttf") {
+		t.Error("the container smoke test must prove the image can render the schedule PNGs")
+	}
+}
+
 func TestSecurityWorkflowScansTheDependencies(t *testing.T) {
 	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "security.yml"))
 

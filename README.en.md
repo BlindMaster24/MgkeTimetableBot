@@ -354,6 +354,7 @@ What to know about the image:
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
 - only the HTTP port (`http.port`) is published — Telegram works over long polling, so no inbound ports are required;
 - the image installs `tzdata` and sets `TZ=Europe/Minsk`, and `docker-compose.yml` passes `TZ` through (same Minsk default) — “today”, the academic week number and the notification times all depend on the timezone, so the container must not run in UTC;
+- the image installs `font-dejavu`: the schedule pictures are drawn by `fogleman/gg`, which looks for a font among the known Debian/Alpine, macOS and Windows paths and otherwise scans the system font directories, so the “generate an image” button works inside the container and locally on all three platforms;
 - state lives in the `/data` volume, and the config can be replaced through `CONFIG_PATH`; the version, commit and build date are injected by the linker (`-X main.*`) and surfaced in `/api/health` and `/debug`.
 
 The image is published to GHCR, so a local build is optional:

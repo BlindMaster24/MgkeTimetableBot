@@ -31,7 +31,7 @@ LABEL org.opencontainers.image.title="MgkeTimetableBot" \
 	org.opencontainers.image.created="${BUILD_DATE}" \
 	org.opencontainers.image.source="https://github.com/BlindMaster24/MgkeTimetableBot"
 
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata font-dejavu \
 	&& adduser -D -u 10001 -h /data bot
 
 WORKDIR /data

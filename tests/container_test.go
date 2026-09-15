@@ -45,6 +45,14 @@ func TestDockerfileKeepsTheTimezone(t *testing.T) {
 	}
 }
 
+func TestDockerfileShipsAFontForTheScheduleImages(t *testing.T) {
+	dockerfile := readFile(t, "Dockerfile")
+
+	if !strings.Contains(dockerfile, "font-dejavu") {
+		t.Error("the image must install a font, otherwise the schedule PNG renderer has nothing to draw with")
+	}
+}
+
 func TestComposePassesTheTimezone(t *testing.T) {
 	compose := readFile(t, "docker-compose.yml")
 

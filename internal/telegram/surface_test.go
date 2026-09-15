@@ -34,9 +34,19 @@ func TestKeyboardLayoutsGolden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read golden file: %v (run go test ./internal/telegram -update)", err)
 	}
-	if got != string(want) {
+	wantText := normalizeLineEndings(string(want))
+	if got != wantText {
 		t.Errorf("keyboard layouts changed; review the diff and run:\n  go test ./internal/telegram -update\n\n%s",
-			firstDifference(string(want), got))
+			firstDifference(wantText, got))
+	}
+}
+
+func TestGoldenComparisonIgnoresLineEndings(t *testing.T) {
+	got := renderLayouts(SurfaceLayouts())
+	crlf := strings.ReplaceAll(got, "\n", "\r\n")
+
+	if normalizeLineEndings(crlf) != got {
+		t.Error("a Windows checkout of the golden file must compare equal to the generated layouts")
 	}
 }
 
@@ -81,6 +91,10 @@ func renderLayouts(layouts []Layout) string {
 		}
 	}
 	return b.String()
+}
+
+func normalizeLineEndings(text string) string {
+	return strings.ReplaceAll(text, "\r\n", "\n")
 }
 
 func firstDifference(want, got string) string {

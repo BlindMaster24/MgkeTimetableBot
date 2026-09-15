@@ -242,6 +242,15 @@ jobs:
           jq -e '.build.commit != "" and .build.commit != "unknown"' /tmp/health.json > /dev/null
           jq -e '.alerts == [] or .alerts == null' /tmp/health.json > /dev/null
 
+      - name: Check the container can render schedule images
+        run: |
+          font="$(docker exec mgke-smoke find /usr/share/fonts -name 'DejaVuSans.ttf' -print -quit)"
+          if [ -z "$font" ]; then
+            echo "the image has no font, so the schedule PNG renderer cannot work" >&2
+            exit 1
+          fi
+          echo "image font: $font"
+
       - name: Check the container runs in the configured timezone
         run: |
           zone="$(docker exec mgke-smoke date +%z)"
@@ -262,13 +271,14 @@ jobs:
       - name: Stop the bot gracefully
         run: |
           docker stop --time 20 mgke-smoke > /dev/null
-          docker logs mgke-smoke 2>&1 | tail -20
-          if ! docker logs mgke-smoke 2>&1 | grep -q "shutdown complete"; then
-            echo "the bot did not finish its graceful shutdown on SIGTERM" >&2
+          logs="$(docker logs mgke-smoke 2>&1)"
+          printf '%s\n' "$logs" | tail -20
+          if ! grep -q "stop signal received" <<< "$logs"; then
+            echo "the bot did not log the stop signal it received" >&2
             exit 1
           fi
-          if ! docker logs mgke-smoke 2>&1 | grep -q "stop signal received"; then
-            echo "the bot did not log the stop signal it received" >&2
+          if ! grep -q "shutdown complete" <<< "$logs"; then
+            echo "the bot did not finish its graceful shutdown on SIGTERM" >&2
             exit 1
           fi
 

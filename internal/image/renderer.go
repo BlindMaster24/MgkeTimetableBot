@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fogleman/gg"
@@ -235,19 +236,79 @@ func (r *Renderer) Cleanup(maxAge time.Duration) {
 	}
 }
 
+var (
+	fontPathOnce   sync.Once
+	fontPathCached string
+)
+
+var fontCandidates = []string{
+	"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+	"/usr/share/fonts/dejavu/DejaVuSans.ttf",
+	"/usr/share/fonts/TTF/DejaVuSans.ttf",
+	"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+	"/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+	"/System/Library/Fonts/Supplemental/Arial.ttf",
+	"/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+	"/System/Library/Fonts/Supplemental/Verdana.ttf",
+	"/Library/Fonts/Arial.ttf",
+	"C:/Windows/Fonts/arial.ttf",
+	"C:/Windows/Fonts/calibri.ttf",
+	"C:/Windows/Fonts/segoeui.ttf",
+}
+
+var fontDirs = []string{
+	"/System/Library/Fonts/Supplemental",
+	"/Library/Fonts",
+	"/System/Library/Fonts",
+	"/usr/share/fonts/truetype",
+	"/usr/local/share/fonts",
+	"/usr/share/fonts",
+	"C:/Windows/Fonts",
+}
+
 func findFont() string {
-	candidates := []string{
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-		"/usr/share/fonts/TTF/DejaVuSans.ttf",
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-		"/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-		"C:/Windows/Fonts/arial.ttf",
-		"C:/Windows/Fonts/calibri.ttf",
-		"C:/Windows/Fonts/segoeui.ttf",
+	fontPathOnce.Do(func() {
+		fontPathCached = lookupFont()
+	})
+	return fontPathCached
+}
+
+func lookupFont() string {
+	for _, path := range fontCandidates {
+		if fontLoads(path) {
+			return path
+		}
 	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
+	for _, dir := range fontDirs {
+		if path := firstFontIn(dir); path != "" {
+			return path
+		}
+	}
+	return ""
+}
+
+func fontLoads(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return gg.NewContext(1, 1).LoadFontFace(path, 12) == nil
+}
+
+func firstFontIn(dir string) string {
+	for _, pattern := range []string{"*.ttf", "*.otf", "*/*.ttf", "*/*.otf", "*/*/*.ttf", "*/*/*.otf"} {
+		matches, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err != nil {
+			continue
+		}
+		for _, path := range matches {
+			name := strings.ToLower(filepath.Base(path))
+			if strings.Contains(name, "emoji") || strings.Contains(name, "symbol") {
+				continue
+			}
+			if fontLoads(path) {
+				return path
+			}
 		}
 	}
 	return ""
