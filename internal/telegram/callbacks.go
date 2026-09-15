@@ -377,13 +377,13 @@ func (cb *apiProbeCb) Handler(ctx context.Context, u *Update) error {
 
 	go func() {
 		results := cb.bot.apiProbe(context.Background())
-		cb.bot.SendText(chatID, cb.bot.apiProbeText(results))
 		if apiprobe.Healthy(results) {
 			cb.bot.markIncidentFix(health.ScopeAPI, cb.bot.locData("incident_fix_api", map[string]interface{}{
 				"Healthy": apiprobe.HealthyCount(results),
 				"Total":   len(results),
 			}))
 		}
+		cb.bot.SendText(chatID, cb.bot.apiProbeText(results))
 	}()
 
 	return nil
