@@ -203,10 +203,6 @@ func TestExtractDays(t *testing.T) {
 	}
 }
 
-func todayAutoSkipped() bool {
-	return time.Now().Weekday() == time.Sunday
-}
-
 func TestGetDayRasp(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
@@ -216,15 +212,14 @@ func TestGetDayRasp(t *testing.T) {
 		t.Error("expected nil for nil input")
 	}
 
-	today := time.Now().Format("02.01.2006")
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
-	dayAfter := time.Now().AddDate(0, 0, 2).Format("02.01.2006")
+	now := time.Date(2026, 9, 16, 10, 0, 0, 0, time.Local)
+	b.SetNow(func() time.Time { return now })
+
+	today := now.Format("02.01.2006")
+	tomorrow := now.AddDate(0, 0, 1).Format("02.01.2006")
+	dayAfter := now.AddDate(0, 0, 2).Format("02.01.2006")
 	first := today
 	second := tomorrow
-	if todayAutoSkipped() {
-		first = tomorrow
-		second = dayAfter
-	}
 
 	daysData := []map[string]any{
 		{"day": "01.01.2006"},
@@ -270,9 +265,12 @@ func TestBuildWeekLabel(t *testing.T) {
 
 func TestRemovePastDays(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
-	today := time.Now().Format("02.01.2006")
-	yesterday := time.Now().AddDate(0, 0, -1).Format("02.01.2006")
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	wednesday := time.Date(2026, 9, 16, 10, 0, 0, 0, time.Local)
+	b.SetNow(func() time.Time { return wednesday })
+
+	today := wednesday.Format("02.01.2006")
+	yesterday := wednesday.AddDate(0, 0, -1).Format("02.01.2006")
+	tomorrow := wednesday.AddDate(0, 0, 1).Format("02.01.2006")
 
 	days := []map[string]any{
 		{"day": yesterday, "lessons": []any{map[string]any{"lesson": "X"}}},
@@ -283,18 +281,34 @@ func TestRemovePastDays(t *testing.T) {
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
 	b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
 	result := b.removePastDays(days)
-	expectedKept := 2
-	if todayAutoSkipped() {
-		expectedKept = 1
-	}
-	if len(result) != expectedKept {
-		t.Errorf("expected %d days, got %d", expectedKept, len(result))
+	if len(result) != 2 {
+		t.Errorf("expected 2 days (today still on), got %d", len(result))
 	}
 
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "00:00"}}}
+	b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "00:00"}}}
 	result = b.removePastDays(days)
-	if len(result) != 1 {
-		t.Errorf("expected 1 day (today autoskipped), got %d", len(result))
+	if len(result) != 1 || result[0]["day"] != tomorrow {
+		t.Errorf("expected tomorrow only (today autoskipped), got %v", result)
+	}
+
+	saturday := time.Date(2026, 9, 19, 14, 0, 0, 0, time.Local)
+	weekend := []map[string]any{
+		{"day": "18.09.2026", "lessons": []any{map[string]any{"lesson": "X"}}},
+		{"day": "19.09.2026", "lessons": []any{map[string]any{"lesson": "Y"}}},
+		{"day": "20.09.2026", "lessons": []any{map[string]any{"lesson": "Z"}}},
+	}
+	b.SetNow(func() time.Time { return saturday })
+	b.cfg.Timetable.Saturday = [][2][2]string{{{"09:00", "09:45"}, {"09:55", "10:40"}}}
+	result = b.removePastDays(weekend)
+	if len(result) != 1 || result[0]["day"] != "20.09.2026" {
+		t.Errorf("expected Sunday only after the Saturday lessons, got %v", result)
+	}
+
+	b.SetNow(func() time.Time { return time.Date(2026, 9, 19, 10, 0, 0, 0, time.Local) })
+	result = b.removePastDays(weekend)
+	if len(result) != 2 {
+		t.Errorf("expected the running Saturday to stay, got %v", result)
 	}
 
 	pastOnly := []map[string]any{
@@ -303,6 +317,39 @@ func TestRemovePastDays(t *testing.T) {
 	result = b.removePastDays(pastOnly)
 	if len(result) != 0 {
 		t.Errorf("expected empty for all-past days, got %d", len(result))
+	}
+}
+
+func TestRemovePastDaysAcrossWeekdays(t *testing.T) {
+	monday := time.Date(2026, 9, 14, 10, 0, 0, 0, time.Local)
+
+	for offset := 0; offset < 7; offset++ {
+		date := monday.AddDate(0, 0, offset)
+		days := []map[string]any{
+			{"day": date.AddDate(0, 0, -1).Format("02.01.2006")},
+			{"day": date.Format("02.01.2006")},
+			{"day": date.AddDate(0, 0, 1).Format("02.01.2006")},
+		}
+
+		b, _, _ := setupTestBotWithData(t)
+		b.SetNow(func() time.Time { return date })
+		b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+		b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
+		kept := b.removePastDays(days)
+		if date.Weekday() == time.Sunday {
+			if len(kept) != 1 {
+				t.Errorf("%s: expected Sunday to be skipped, got %v", date.Weekday(), kept)
+			}
+		} else if len(kept) != 2 {
+			t.Errorf("%s: expected today to stay, got %v", date.Weekday(), kept)
+		}
+
+		b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "00:00"}}}
+		b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "00:00"}}}
+		skipped := b.removePastDays(days)
+		if len(skipped) != 1 || skipped[0]["day"] != days[2]["day"] {
+			t.Errorf("%s: expected today to be skipped, got %v", date.Weekday(), skipped)
+		}
 	}
 }
 

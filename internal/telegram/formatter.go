@@ -28,12 +28,18 @@ func (b *Bot) getRandHint() string {
 }
 
 func (b *Bot) getFormatterOpts(chat *Chat) formatter.FormatOptions {
+	update := b.cache.GetGroupsUpdateTime()
+	if chat.Mode == ModeTeacher {
+		update = b.cache.GetTeachersUpdateTime()
+	}
+
 	opts := formatter.FormatOptions{
-		IsTelegram:     true,
-		ShowParserTime: chat.ShowParserTime,
-		ShowHints:      chat.ShowHints,
-		HasParserError: !b.cache.SuccessUpdate,
-		TeacherNames:   b.cache.GetTeamNames(),
+		IsTelegram:       true,
+		ShowParserTime:   chat.ShowParserTime,
+		ParserUpdateTime: update.UnixMilli(),
+		ShowHints:        chat.ShowHints,
+		HasParserError:   !b.cache.SuccessUpdate,
+		TeacherNames:     b.cache.GetTeamNames(),
 	}
 
 	if opts.ShowHints && !opts.HasParserError {
@@ -119,6 +125,13 @@ func (b *Bot) getDayRasp(days []map[string]any, args ...any) []map[string]any {
 	return showDays
 }
 
+func (b *Bot) nowTime() time.Time {
+	if b.now != nil {
+		return b.now()
+	}
+	return time.Now()
+}
+
 func (b *Bot) nowInTime(includedDays []int, timeFrom, timeTo string) bool {
 	parseMin := func(s string) (int, bool) {
 		parts := strings.Split(s, ":")
@@ -139,7 +152,7 @@ func (b *Bot) nowInTime(includedDays []int, timeFrom, timeTo string) bool {
 	if !ok1 || !ok2 {
 		return false
 	}
-	now := time.Now()
+	now := b.nowTime()
 	nowMin := now.Hour()*60 + now.Minute()
 	weekday := int(now.Weekday())
 	for _, d := range includedDays {
@@ -155,7 +168,7 @@ func (b *Bot) removePastDays(days []map[string]any) []map[string]any {
 }
 
 func (b *Bot) removePastDaysArgs(days []map[string]any, autoskip bool) []map[string]any {
-	isSaturday := time.Now().Weekday() == time.Saturday
+	isSaturday := b.nowTime().Weekday() == time.Saturday
 
 	idx := -1
 	for i, day := range days {
@@ -164,7 +177,7 @@ func (b *Bot) removePastDaysArgs(days []map[string]any, autoskip bool) []map[str
 		if err != nil {
 			continue
 		}
-		now := time.Now()
+		now := b.nowTime()
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 		dayMidnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())
 		if !dayMidnight.Before(today) {
@@ -195,7 +208,7 @@ func (b *Bot) removePastDaysArgs(days []map[string]any, autoskip bool) []map[str
 			lastLessonTime := timetable[todayLessons-1][1][1]
 
 			dateStr, _ := currentDay["day"].(string)
-			now := time.Now()
+			now := b.nowTime()
 			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 			t, err := time.Parse("02.01.2006", dateStr)
 			isToday := err == nil && time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location()).Equal(today)

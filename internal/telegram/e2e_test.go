@@ -922,12 +922,12 @@ func TestE2E_RemovePastDays(t *testing.T) {
 	b.cfg.Timetable.Weekdays = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
 	b.cfg.Timetable.Saturday = [][2][2]string{{{"00:00", "00:00"}, {"00:00", "23:59"}}}
 
-	today := time.Now().Format("02.01.2006")
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	now := time.Date(2026, 9, 16, 10, 0, 0, 0, time.Local)
+	b.SetNow(func() time.Time { return now })
+
+	today := now.Format("02.01.2006")
+	tomorrow := now.AddDate(0, 0, 1).Format("02.01.2006")
 	expectedFirst := today
-	if todayAutoSkipped() {
-		expectedFirst = tomorrow
-	}
 	days := []map[string]any{
 		{"day": "25.08.2026", "lessons": []any{map[string]any{"lesson": "Old"}}},
 		{"day": today, "lessons": []any{map[string]any{"lesson": "Today"}}},

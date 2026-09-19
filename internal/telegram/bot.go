@@ -57,6 +57,7 @@ type Bot struct {
 	calendarSync func(ctx context.Context) (int, error)
 	apiProbe     func(ctx context.Context) []apiprobe.Result
 	incidents    *health.IncidentLog
+	now          func() time.Time
 }
 
 type Update struct {
@@ -131,6 +132,7 @@ func (b *Bot) I18n() *i18n.Localizer          { return b.i18n }
 func (b *Bot) Log() *logger.Logger            { return b.log }
 func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
 func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
+func (b *Bot) SetNow(fn func() time.Time)     { b.now = fn }
 func (b *Bot) SetHealthSource(src healthSource) {
 	b.health = src
 }

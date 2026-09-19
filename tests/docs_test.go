@@ -161,6 +161,28 @@ func TestDocsDocumentTheAPIProbe(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentThePreflightCheck(t *testing.T) {
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{"scripts/preflight", "-skip-site"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the preflight token %q", doc, token)
+			}
+		}
+	}
+}
+
+func TestDocsDocumentTheMessageGoldens(t *testing.T) {
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{"messages.golden", "go test ./internal/notification -update"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the message golden token %q", doc, token)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentEnvironmentOverrides(t *testing.T) {
 	for _, doc := range docs {
 		content := readDoc(t, doc)

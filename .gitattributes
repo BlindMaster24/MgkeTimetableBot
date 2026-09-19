@@ -1,2 +1,4 @@
 internal/telegram/testdata/keyboard_layouts.golden text eol=lf
+internal/telegram/testdata/messages.golden text eol=lf
+internal/notification/testdata/messages.golden text eol=lf
 internal/telegram/testdata/parity/*.json text eol=lf

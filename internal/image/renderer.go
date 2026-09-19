@@ -266,6 +266,10 @@ var fontDirs = []string{
 	"C:/Windows/Fonts",
 }
 
+func FontPath() string {
+	return findFont()
+}
+
 func findFont() string {
 	fontPathOnce.Do(func() {
 		fontPathCached = lookupFont()

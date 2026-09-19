@@ -399,6 +399,8 @@ go test ./internal/telegram/...
 | `internal/telegram/inline_e2e_test.go` | every `callbackData` from any keyboard reaches a registered handler |
 | `internal/telegram/parity_test.go`, `surface_test.go` | the command, callback and button surface against the TypeScript fixture and the golden keyboard layouts |
 | `internal/notification/*_test.go` | the parse sequence (day added and updated), filters, cron entries and health alerts |
+| `internal/telegram/messages_golden_test.go` | message texts (a day in all four formats, a week, the bell schedule) and keyboard labels |
+| `internal/notification/messages_golden_test.go` | notification texts (a new and a changed day, a new week and its withdrawal, bell schedule changes, a parser error, the cron reminder) |
 | `tests/integration_test.go` | HTML → parser → cache → formatters for groups and teachers |
 | `tests/e2e_test.go` | end-to-end scenarios on a real chat database: a changed day reaches only the interested chats, metrics and alerts survive a restart |
 | `tests/docs_test.go` | the docs stay honest: commands, API routes, config keys and the Go version |
@@ -424,6 +426,41 @@ Keyboard layouts are stored in the golden file `internal/telegram/testdata/keybo
 go test ./internal/telegram -run Golden          # verify layouts
 go test ./internal/telegram -update              # rewrite the golden file
 ```
+
+Message texts are frozen in two golden files: `internal/telegram/testdata/messages.golden` (a day, a week, the calls screen, the guest and unknown-group states) and `internal/notification/testdata/messages.golden` (notifications and alerts). Dates, week numbers and button callback data are replaced with tokens (`{{today}}`, `{{tomorrow}}`, `{{date}}`, `{{week}}`), so the file never goes stale with time while any change to a wording, an emoji or the line order fails the test. A separate test fails when a real date leaks into the output — such a golden would break the next day.
+
+```bash
+go test ./internal/telegram -update       # message texts and layouts
+go test ./internal/notification -update   # notification texts
+```
+
+### Pre-flight check
+
+`scripts/preflight` is a single command that verifies everything that must hold before a deploy and prints a report with exit codes: `0` — fine, `1` — something failed. It parses the **live site** with the very parsers the bot uses and checks the rest of the environment.
+
+```bash
+go run ./scripts/preflight -config configs/config.yaml
+go run ./scripts/preflight -skip-site                 # local checks only
+go run ./scripts/preflight -strict                    # treat warnings as failures
+go run ./scripts/preflight -json | jq                 # a report for automation
+go run ./scripts/preflight -image-dir ./tmp/preflight # keep the generated image
+go run ./scripts/preflight -groups-url http://localhost:8080/groups   # override the URLs
+```
+
+What it checks:
+
+| Check | What it protects |
+|-------|------------------|
+| `config` | required keys: the bot token, the group, teacher and bell schedule URLs, `db_path`, `http.port`; warnings cover empty `admin_ids`, a disabled parser or health tracker |
+| `credentials` | the Telegram token shape, the Google service account private key (PEM, PKCS#1/PKCS#8/EC, `Validate`), a complete OAuth pair, an empty `encrypt_key` |
+| `locale` | `locales/ru.json` is valid, has no empty values and carries **every** key referenced by `loc(...)`/`locData(...)` in the code |
+| `storage` | the database, chat and cache directories are writable (missing ones are created) |
+| `timetable` | configured bell schedule slots: the start precedes the end and lessons do not overlap |
+| `site:groups`, `site:teachers` | the page downloaded, the parser found groups and teachers, every day column carries a real `dd.MM.yyyy` date, lessons exist and the days run in order |
+| `site:calls` | the bell schedule parsed, campus variants are listed and the slots are ordered (both single blocks like `08:00–09:20` and paired ones like `09:00–09:45 / 09:55–10:40` are valid) |
+| `image` | a PNG really renders: the first group or teacher with data is drawn and the signature, the dimensions and the available font are verified |
+
+The offline checks (`-skip-site`) render the image from the local cache, so the command is useful on a machine without internet and inside the container too.
 
 ### The race detector locally
 
@@ -495,6 +532,8 @@ internal/
   notification/          — scheduler, events and health alerts
   parity/                — TypeScript ↔ Go surface comparator
   parser/                — timetable parser (groups, teachers, bell schedule, diagnostics)
+  preflight/             — pre-deploy check: config, credentials, locale, live site, image
+  testgolden/            — golden text normalization (tests only)
   telegram/              — telego: commands, callbacks, menus, keyboards, scenes
     bot.go               — command, callback, text-handler and menu registration
     chat.go              — chat model, chat database schema and migrations
@@ -519,6 +558,8 @@ internal/
 configs/config.example.yaml — configuration template
 docs/google-calendar.md     — Google Calendar guide
 scripts/paritycheck/        — TypeScript parity checker
+scripts/preflight/          — the pre-deploy check
+scripts/racecheck/          — the local run under the race detector
 tests/                      — integration and end-to-end tests (parser, cache, archive, notifications, docs)
 cache/rasp/                 — JSON timetable cache (created at runtime)
 ```

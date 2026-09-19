@@ -2,6 +2,7 @@ package notification
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -483,6 +484,7 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 	if len(values) == 0 {
 		return
 	}
+	sort.Strings(values)
 
 	var base []*EventChat
 	var err error

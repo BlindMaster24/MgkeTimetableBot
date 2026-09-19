@@ -307,7 +307,11 @@ func (f *Fetcher) Team(urls []string) error {
 }
 
 func (f *Fetcher) document(rawURL string) (*goquery.Document, error) {
-	resp, err := fetchHTML(f.client, rawURL)
+	return FetchDocument(f.client, rawURL)
+}
+
+func FetchDocument(client *http.Client, rawURL string) (*goquery.Document, error) {
+	resp, err := fetchHTML(client, rawURL)
 	if err != nil {
 		return nil, err
 	}

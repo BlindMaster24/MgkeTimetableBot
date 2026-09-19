@@ -21,8 +21,10 @@
   - `notification/` — cron scheduler (robfig/cron), event-to-message mapping and health alert dispatch.
   - `formatter/` — output formats: default, compact, visual, litolax.
   - `parity/` — TS ↔ Go surface comparator used by `scripts/paritycheck` and the offline parity test.
+  - `preflight/` — pre-deploy checks: config keys, credentials, locale keys, storage, the live site (dates, calls), a rendered PNG; `scripts/preflight` prints the report.
+  - `testgolden/` — golden-text normalization (dates, week numbers, callback data) shared by the message golden tests; tests only.
   - `utils/` — academic week index, subject list.
-- `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic).
+- `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/preflight/` — pre-deploy check; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic).
 - `README.md` / `README.en.md` — mirrored documentation, kept in sync by `tests/docs_test.go`.
 - `Dockerfile`, `docker-compose.yml`, `.dockerignore` — container build; runtime config comes from env vars, state lives in the `/data` volume.
 - `.github/workflows/ci.yml` — quality gates on Linux, Windows and macOS; `.github/workflows/release.yml` — releases and the GHCR image; `.github/workflows/security.yml` — the scheduled `govulncheck` scan; `.github/dependabot.yml` — weekly dependency bumps.
@@ -48,6 +50,8 @@
 - New config field: add it with a `yaml` tag — the `MGKE_*` environment name is derived from that tag automatically; document it in `configs/config.example.yaml` and in both README files.
 - New parser source: add a file in `internal/parser/` that returns a `Report` from `report.go` — every required probe names the selector it expects.
 - New end-to-end case: extend `tests/e2e_test.go` (real SQLite chat database) or `internal/telegram/*_e2e_test.go` (bot surface) — do not add a mock-only test where a real repository works.
+- New pre-deploy check: add a `Check` to `internal/preflight` and cover it offline with an `httptest` fixture; the command must stay usable without network (`-skip-site`).
+- New user-facing message: add it to the matching golden scenario (`internal/telegram/messages_golden_test.go` or `internal/notification/messages_golden_test.go`) in the same change.
 - New locale string: add key to `internal/i18n/locales/ru.json`, use `b.loc("key")` in code.
 
 ## Build, Test, and Development Commands
@@ -67,7 +71,7 @@
 - `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/bot/` — cross-compilation check; repeat for `linux/arm64` and `darwin/arm64` after touching platform-specific code.
 
 ## CI and Releases
-- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (cross-platform build, vet and all three binaries; gofmt and the release-target cross-compilation only on Linux), `test` (suite plus `coverage.out` artifact), `newest-toolchain` (the suite on the newest stable Go), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata, the container timezone and the graceful `SIGTERM` shutdown) and `workflow-lint` (`actionlint`).
+- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (cross-platform build, vet and the tool binaries; gofmt and the release-target cross-compilation only on Linux), `test` (suite plus `coverage.out` artifact), `newest-toolchain` (the suite on the newest stable Go), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata, the container timezone and the graceful `SIGTERM` shutdown) and `workflow-lint` (`actionlint`).
 - The platform-sensitive jobs (`quality`, `test`, `newest-toolchain`, `race`) carry a matrix over `ubuntu-latest`, `windows-latest` and `macos-latest` with `fail-fast: false`, and every workflow sets `defaults: run: shell: bash` so one command string works on all three. The platform-neutral gates (`parity`, `container`, `workflow-lint`) stay on Linux because they need Docker, a `git fetch` of the `old` branch or `jq`.
 - Coverage is measured on all three operating systems but only the Linux run uploads the artifact and the summary, otherwise the artifact names would clash. The race job probes with `racecheck -check` first and, when Windows reports the detector as unavailable, warns instead of failing — `-race` builds through cgo and the Windows runner has no guaranteed C toolchain.
 - `.github/workflows/security.yml` runs `govulncheck` on push to `main`, on a weekly schedule and on demand; it is deliberately outside CI so an advisory never blocks a pull request.
@@ -85,6 +89,7 @@
 - `go test -count=1 -p 1 ./internal/... ./tests/...` before commit.
 - `go build -o bot ./cmd/bot/` to verify binary compiles.
 - `go run ./scripts/paritycheck` to verify the Telegram surface still matches the old TypeScript bot.
+- `go run ./scripts/preflight -config configs/config.yaml` before a deploy: it parses the live site and checks dates, calls, credentials, the locale keys, storage and PNG rendering in one run (exit code 1 on a failure, `-strict` also fails on warnings).
 - `go test -count=1 ./tests/` to verify the documentation still matches the bot surface, API routes and config keys.
 - `go build ./...`, `go vet ./...` and the suite on Windows and macOS as well (the CI matrix) — a change that only compiles on Linux reaches the platform-specific jobs red.
 - `GOOS=<target> GOARCH=<arch> CGO_ENABLED=0 go build ./cmd/bot/` for the release targets after touching platform-specific code (`cmd/bot/signals_*.go` is the current example).
@@ -99,6 +104,7 @@
 - Every accepted difference must be listed in `internal/telegram/testdata/parity/known_differences.json` with a reason; an entry without a reason is an error.
 - `internal/telegram/parity_test.go` re-checks the same surface offline, so plain `go test` catches drift.
 - Keyboard layouts are golden files: `go test ./internal/telegram -run Golden -update` rewrites `internal/telegram/testdata/keyboard_layouts.golden`.
+- Message texts are golden files too: `internal/telegram/testdata/messages.golden` (day, week, calls) and `internal/notification/testdata/messages.golden` (notifications). `go test ./internal/telegram -update` and `go test ./internal/notification -update` rewrite them; `testgolden.Normalize` replaces dates, week numbers and callback data with tokens, and a guard test fails if a raw date reaches the output.
 
 ## Menus
 - Menus are declared in `internal/telegram/menus.go`: one entry per menu holds its scene, prompt, opening button texts, keyboard builder and text items.
@@ -164,7 +170,7 @@
 - Parser check: `go test ./internal/parser/... ./tests/...`
 - Bot check: `go test ./internal/telegram/...`
 - Full suite: `go test -count=1 -p 1 ./internal/... ./tests/...`
-- Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`
+- Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`; message texts: `go test ./internal/telegram ./internal/notification`
 - Race detector: `go run ./scripts/racecheck` (needs `CGO_ENABLED=1` and a C compiler — gcc on Linux, clang on macOS, mingw-w64 on Windows; `-check` only reports)
 - Static analysis: `go vet ./...`
 

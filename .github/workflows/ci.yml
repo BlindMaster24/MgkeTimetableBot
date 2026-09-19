@@ -64,6 +64,7 @@ jobs:
           go build -o "$out/" ./cmd/bot/
           go build -o "$out/" ./cmd/migrate-pg/
           go build -o "$out/" ./scripts/paritycheck/
+          go build -o "$out/" ./scripts/preflight/
           ls -l "$out"
 
       - name: Cross-compile the release targets

@@ -142,7 +142,7 @@ func formatFooter(opts FormatOptions) string {
 	}
 
 	if opts.HasParserError {
-		text = append(text, "⚠️ В последний раз при получении расписания с сайта произошла ошибка. Есть вероятность, что расписание не актуальное.")
+		text = append(text, "⚠️ В последний раз при получении расписания с сайта произошла ошибка. Есть вероятность, что расписание не актуальное. Если проблема не исчезнет - сообщите разработчику.")
 	} else if opts.ShowHints && opts.RandHint != "" {
 		text = append(text, "💬 Подсказка: "+opts.RandHint)
 	}

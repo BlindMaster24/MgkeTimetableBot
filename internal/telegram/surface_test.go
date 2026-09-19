@@ -4,9 +4,10 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/testgolden"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files")
@@ -94,23 +95,9 @@ func renderLayouts(layouts []Layout) string {
 }
 
 func normalizeLineEndings(text string) string {
-	return strings.ReplaceAll(text, "\r\n", "\n")
+	return testgolden.NormalizeLineEndings(text)
 }
 
 func firstDifference(want, got string) string {
-	wantLines := strings.Split(want, "\n")
-	gotLines := strings.Split(got, "\n")
-	for i := 0; i < len(wantLines) || i < len(gotLines); i++ {
-		var wantLine, gotLine string
-		if i < len(wantLines) {
-			wantLine = wantLines[i]
-		}
-		if i < len(gotLines) {
-			gotLine = gotLines[i]
-		}
-		if wantLine != gotLine {
-			return "first difference at line " + strconv.Itoa(i+1) + ":\n  want: " + wantLine + "\n  got:  " + gotLine
-		}
-	}
-	return "no line difference found"
+	return testgolden.FirstDifference(want, got)
 }
