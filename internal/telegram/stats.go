@@ -65,7 +65,7 @@ func (c *statsCmd) getGroupStats(repo *archive.Repository, group string) string 
 	for k, v := range total {
 		sorted = append(sorted, statEntry{key: k, count: v})
 	}
-	sort.Slice(sorted, func(i, j int) bool {
+	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].count > sorted[j].count
 	})
 
@@ -109,7 +109,7 @@ func (c *statsCmd) getTeacherStats(repo *archive.Repository, teacher string) str
 	for k, v := range total {
 		sorted = append(sorted, statEntry{key: k, count: v})
 	}
-	sort.Slice(sorted, func(i, j int) bool {
+	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].count > sorted[j].count
 	})
 
@@ -158,14 +158,14 @@ func formatExplainMap(m map[string]any, groupKey string) string {
 
 	if groupKey != "" {
 		if group, ok := m[groupKey].(string); ok && group != "" {
-			if subgroup, ok := m["subgroup"].(float64); ok {
+			if subgroup, ok := m["subgroup"].(float64); ok && subgroup > 0 {
 				parts = append(parts, fmt.Sprintf("%d-%s.", int(subgroup), group))
 			} else {
 				parts = append(parts, group+".")
 			}
 		}
 	} else {
-		if subgroup, ok := m["subgroup"].(float64); ok {
+		if subgroup, ok := m["subgroup"].(float64); ok && subgroup > 0 {
 			parts = append(parts, fmt.Sprintf("%d.", int(subgroup)))
 		}
 	}

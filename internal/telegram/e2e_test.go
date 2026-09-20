@@ -1144,24 +1144,35 @@ func TestE2E_MatchTeacherList(t *testing.T) {
 		"Николаев Н.Н.": struct{}{},
 	}
 
-	matched, tooMany := matchTeacherList("иванов", candidates)
+	fullNames := map[string]string{
+		"Иванов И.И.":  "Иванов Иван Иванович",
+		"Петров П.П.":  "Петров Пётр Петрович",
+		"Сидоров С.С.": "Сидоров Сидор Сидорович",
+	}
+
+	matched, tooMany := matchTeacherList("иванов", candidates, fullNames)
 	if len(matched) != 2 || tooMany {
 		t.Fatalf("matched: %v tooMany: %v", matched, tooMany)
 	}
 
-	matched, tooMany = matchTeacherList("петров п.п.", candidates)
+	matched, tooMany = matchTeacherList("петров п.п.", candidates, fullNames)
 	if len(matched) != 1 || tooMany {
 		t.Fatalf("exact match failed: %v %v", matched, tooMany)
 	}
 
-	matched, tooMany = matchTeacherList("ов", candidates)
+	matched, tooMany = matchTeacherList("ов", candidates, fullNames)
 	if len(matched) != 5 || tooMany {
 		t.Errorf("broad search: %d matches, tooMany=%v", len(matched), tooMany)
 	}
 
-	matched, _ = matchTeacherList("несуществующий", candidates)
+	matched, _ = matchTeacherList("несуществующий", candidates, fullNames)
 	if len(matched) != 0 {
 		t.Errorf("expected no match, got %v", matched)
+	}
+
+	matched, _ = matchTeacherList("сидор сидорович", candidates, fullNames)
+	if len(matched) != 1 || matched[0] != "Сидоров С.С." {
+		t.Errorf("full name search: %v", matched)
 	}
 }
 

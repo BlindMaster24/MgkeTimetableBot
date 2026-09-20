@@ -131,12 +131,12 @@ func runArchive(t *testing.T, b *Bot, userID int64, text string) {
 func TestArchiveCommandRendersAWeek(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeStudent, "100", "")
 
-	weekNumber := utils.WeekIndexFromDate(time.Now()).Value() - 3
-	week := utils.WeekIndexFromNumber(weekNumber)
+	academicNumber := utils.WeekIndexFromDate(time.Now()).AcademicWeekNumber()
+	week := utils.WeekIndexFromAcademicNumber(academicNumber, time.Now())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "group", "100", start, groupLesson("АрхивнаяМатематика"))
 
-	runArchive(t, b, userID, "/archive week "+strconv.Itoa(weekNumber))
+	runArchive(t, b, userID, "/archive week "+strconv.Itoa(academicNumber))
 
 	text := caller.last()
 	if !strings.Contains(text, "АрхивнаяМатематика") {
@@ -188,7 +188,7 @@ func TestArchiveCommandInputErrors(t *testing.T) {
 	}{
 		{"/archive", "День не указан"},
 		{"/archive week 0", "Неверный номер недели"},
-		{"/archive 32.13", "Неверная дата"},
+		{"/archive 32.13", "Неверный формат даты"},
 		{"/archive 1", "Неверный формат"},
 		{"/archive 12.02.2026.01", "Неверный формат"},
 	}
@@ -200,6 +200,67 @@ func TestArchiveCommandInputErrors(t *testing.T) {
 			t.Errorf("%q → %q, want it to mention %q", c.text, text, c.want)
 		}
 	}
+}
+
+func TestArchiveCommandRendersAGroupWeekFromTheArchive(t *testing.T) {
+	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeParent, "100", "")
+
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	start, _ := week.WeekRange()
+	seedArchivedDay(t, archiveRepo, "group", "100", start, groupLesson("АрхивнаяНеделя"))
+
+	runArchive(t, b, userID, "/archive week "+strconv.Itoa(week.AcademicWeekNumber()))
+
+	if text := caller.last(); !strings.Contains(text, "АрхивнаяНеделя") {
+		t.Fatalf("the archived group week was not rendered: %q", text)
+	}
+}
+
+func TestTeacherWeekFlowAsksForTheWeek(t *testing.T) {
+	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeTeacher, "", "")
+
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	start, _ := week.WeekRange()
+	seedArchivedDay(t, archiveRepo, "teacher", "Иванов И.И.", start, map[string]any{
+		"lesson": "ПараНедели", "type": "Лек", "group": "100", "cabinet": "101",
+	})
+
+	pusher := newMessagePusher(b, userID)
+	pusher.send("/teacherweek")
+
+	if text := caller.last(); !strings.Contains(text, "Введите фамилию преподавателя") {
+		t.Fatalf("the teacher prompt is missing: %q", text)
+	}
+
+	pusher.send("Иванов И.И.")
+	if text := caller.last(); !strings.Contains(text, "Введите номер учебной недели или дату") {
+		t.Fatalf("the week prompt is missing: %q", text)
+	}
+
+	pusher.send("не дата")
+	if text := caller.last(); !strings.Contains(text, "Не удалось определить учебную неделю") {
+		t.Fatalf("an invalid week should be reported: %q", text)
+	}
+
+	pusher.send(strconv.Itoa(week.AcademicWeekNumber()))
+	if text := caller.last(); !strings.Contains(text, "ПараНедели") {
+		t.Fatalf("the requested week was not rendered: %q", text)
+	}
+}
+
+func newMessagePusher(b *Bot, userID int64) *messagePusher {
+	return &messagePusher{bot: b, userID: userID}
+}
+
+type messagePusher struct {
+	bot    *Bot
+	userID int64
+}
+
+func (p *messagePusher) send(text string) {
+	u := makeUpdate(p.userID, text)
+	u.Bot = p.bot
+	p.bot.handleMessageText(context.Background(), u)
 }
 
 func TestArchiveCommandWithoutArchive(t *testing.T) {

@@ -32,7 +32,7 @@ func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
 
 	raw := strings.TrimSpace(strings.TrimPrefix(u.Text, "/archive"))
 	if raw == "" {
-		return u.Bot.SendText(u.ChatID, "День не указан. Пример: /archive 12.02 или /archive week 5")
+		return u.Bot.SendText(u.ChatID, "День не указан")
 	}
 
 	archiveRepo, ok := c.bot.archive.(*archive.Repository)
@@ -53,26 +53,28 @@ func (c *archiveCmd) showWeek(u *Update, chat *Chat, repo *archive.Repository, r
 		return u.Bot.SendText(u.ChatID, "Неверный номер недели")
 	}
 
-	week := utils.WeekIndexFromNumber(weekNum)
+	week := utils.WeekIndexFromAcademicNumber(weekNum, c.bot.nowTime())
 	minIdx, maxIdx := week.WeekDayIndexRange()
-	return c.showRange(u, chat, repo, int64(minIdx), int64(maxIdx), buildWeekLabelFromWeek(week), "Нет данных за указанную неделю")
+	return c.showRange(u, chat, repo, int64(minIdx), int64(maxIdx), buildWeekLabelFromWeek(week), "Нет данных за указанную неделю", week.Value())
 }
+
+const archiveDateFormatHint = "Неверный формат даты. Пример: /archive 12.02 или /archive 12.02.2026 или /archive week 5"
 
 func (c *archiveCmd) showDay(u *Update, chat *Chat, repo *archive.Repository, raw string) error {
 	parts := strings.Split(raw, ".")
 	if len(parts) < 2 || len(parts) > 3 {
-		return u.Bot.SendText(u.ChatID, "Неверный формат. Пример: /archive 12.02 или /archive 12.02.2026")
+		return u.Bot.SendText(u.ChatID, archiveDateFormatHint)
 	}
 
 	day, _ := strconv.Atoi(parts[0])
 	month, _ := strconv.Atoi(parts[1])
-	year := time.Now().Year()
+	year := c.bot.nowTime().Year()
 	if len(parts) == 3 {
 		year, _ = strconv.Atoi(parts[2])
 	}
 
 	if day < 1 || day > 31 || month < 1 || month > 12 {
-		return u.Bot.SendText(u.ChatID, "Неверная дата")
+		return u.Bot.SendText(u.ChatID, archiveDateFormatHint)
 	}
 
 	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
@@ -84,54 +86,57 @@ func (c *archiveCmd) showDay(u *Update, chat *Chat, repo *archive.Repository, ra
 	}
 
 	if index < bounds.Min || index > bounds.Max {
-		return u.Bot.SendText(u.ChatID, "Дата вне периода сохранённых данных")
+		from := utils.DayIndexToDate(int(bounds.Min)).Format("02.01.2006")
+		to := utils.DayIndexToDate(int(bounds.Max)).Format("02.01.2006")
+		return u.Bot.SendText(u.ChatID, "Вы указали день, который находится вне периода сохранённых дней.\n"+
+			fmt.Sprintf("В базе хранятся дни, начиная с %s по %s", from, to))
 	}
 
-	return c.showRange(u, chat, repo, index, index, "", "Ничего не найдено на данный день")
+	return c.showRange(u, chat, repo, index, index, "", "Ничего не найдено на данный день", utils.WeekIndexFromDate(date).Value())
 }
 
-func (c *archiveCmd) showRange(u *Update, chat *Chat, repo *archive.Repository, minIdx, maxIdx int64, weekLabel, emptyMessage string) error {
+func (c *archiveCmd) showRange(u *Update, chat *Chat, repo *archive.Repository, minIdx, maxIdx int64, weekLabel, emptyMessage string, weekIndex int) error {
 	switch chat.Mode {
 	case ModeStudent, ModeParent:
 		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+			return u.Bot.SendText(u.ChatID, c.bot.loc("archive_need_group"))
 		}
 		days, err := repo.GroupDaysByRange(minIdx, maxIdx, chat.Group)
 		if err != nil || len(days) == 0 {
 			return u.Bot.SendText(u.ChatID, emptyMessage)
 		}
-		return c.sendGroupDays(u, chat, days, weekLabel)
+		return c.sendGroupDays(u, chat, days, weekLabel, weekIndex)
 
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, c.bot.loc("need_teacher"))
+			return u.Bot.SendText(u.ChatID, c.bot.loc("archive_need_teacher"))
 		}
 		days, err := repo.TeacherDaysByRange(minIdx, maxIdx, chat.Teacher)
 		if err != nil || len(days) == 0 {
 			return u.Bot.SendText(u.ChatID, emptyMessage)
 		}
-		return c.sendTeacherDays(u, chat, days, weekLabel)
+		return c.sendTeacherDays(u, chat, days, weekLabel, weekIndex)
 	}
 
-	return u.Bot.SendText(u.ChatID, "Выберите группу или учителя")
+	return u.Bot.SendText(u.ChatID, c.bot.locData("archive_mode_unsupported", map[string]interface{}{"Mode": chat.Mode}))
 }
 
-func (c *archiveCmd) sendGroupDays(u *Update, chat *Chat, days []model.GroupDay, weekLabel string) error {
+func (c *archiveCmd) sendGroupDays(u *Update, chat *Chat, days []model.GroupDay, weekLabel string, weekIndex int) error {
 	opts := c.bot.getFormatterOpts(chat)
 	opts.ShowHeader = true
 	opts.WeekLabel = weekLabel
 
 	text := formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, groupDaysToMaps(days), opts)
-	return u.Bot.SendText(u.ChatID, text)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, text, weekTimetableButton("На неделю", "group", chat.Group, weekIndex, true))
 }
 
-func (c *archiveCmd) sendTeacherDays(u *Update, chat *Chat, days []model.TeacherDay, weekLabel string) error {
+func (c *archiveCmd) sendTeacherDays(u *Update, chat *Chat, days []model.TeacherDay, weekLabel string, weekIndex int) error {
 	opts := c.bot.getFormatterOpts(chat)
 	opts.ShowHeader = true
 	opts.WeekLabel = weekLabel
 
 	text := formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, teacherDaysToMaps(days), opts)
-	return u.Bot.SendText(u.ChatID, text)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, text, weekTimetableButton("На неделю", "teacher", chat.Teacher, weekIndex, true))
 }
 
 type endingsCmd struct{ bot *Bot }

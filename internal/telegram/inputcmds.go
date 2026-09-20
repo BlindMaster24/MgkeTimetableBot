@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
@@ -172,7 +173,8 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 
 	switch kind {
 	case "week":
-		return b.sendGroupWeek(u, chat, group, data)
+		week := b.relevantWeekIndex()
+		return b.showWeekDays(u, chat, "group", group, &week)
 	case "image":
 		_, days := b.relevantWeekDays(data)
 		path, err := imagepkg.RenderGroupDays(group, days, "./cache/images")
@@ -189,23 +191,6 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 	}
 }
 
-func (b *Bot) sendGroupWeek(u *Update, chat *Chat, group string, data any) error {
-	week, days := b.relevantWeekDays(data)
-	if chat.HidePastDays {
-		days = b.removePastDays(days)
-	}
-
-	opts := b.fmtOpts(chat, true)
-	opts.WeekLabel = buildWeekLabelFromWeek(week)
-	text := b.getFormatter(chat).FormatGroupFull(group, days, opts)
-	if text == "" {
-		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-	}
-
-	kb := b.weekControlKeyboard("group", group, week.Value(), false)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
-}
-
 func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) error {
 	teachers := b.cache.GetTeachers()
 
@@ -213,7 +198,7 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 		return b.sendTeacherError(u, chat, "Фамилия введена некорректно")
 	}
 
-	matched, tooMany := matchTeacherList(input, teachers)
+	matched, tooMany := matchTeacherList(input, teachers, b.cache.GetTeamNames())
 	if len(matched) == 0 {
 		return b.sendTeacherError(u, chat, "Данный преподаватель не найден")
 	}
@@ -256,7 +241,9 @@ func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) err
 
 	switch kind {
 	case "week":
-		return b.sendTeacherWeek(u, chat, teacher, data)
+		chat.Scene = sceneGetTeacherWeek + ":" + teacher
+		b.chatRepo.Save(chat)
+		return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("history_enter_week"), withCancelButton(teacherHistoryKeyboard(chat)))
 	case "image":
 		_, days := b.relevantWeekDays(data)
 		path, err := imagepkg.RenderTeacherDays(teacher, days, "./cache/images")
@@ -273,21 +260,20 @@ func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) err
 	}
 }
 
-func (b *Bot) sendTeacherWeek(u *Update, chat *Chat, teacher string, data any) error {
-	week, days := b.relevantWeekDays(data)
-	if chat.HidePastDays {
-		days = b.removePastDays(days)
+type teacherWeekScene struct{ bot *Bot }
+
+func (s *teacherWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
+	teacher := strings.TrimPrefix(chat.Scene, sceneGetTeacherWeek+":")
+
+	weekIndex := s.bot.parseWeekIndex(u.Text)
+	if weekIndex == nil {
+		return u.Bot.SendText(u.ChatID, s.bot.loc("history_invalid_week"))
 	}
 
-	opts := b.fmtOpts(chat, true)
-	opts.WeekLabel = buildWeekLabelFromWeek(week)
-	text := b.getFormatter(chat).FormatTeacherFull(teacher, days, opts)
-	if text == "" {
-		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-	}
+	chat.Scene = ""
+	s.bot.chatRepo.Save(chat)
 
-	kb := b.weekControlKeyboard("teacher", teacher, week.Value(), false)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
+	return s.bot.showWeekDays(u, chat, "teacher", teacher, weekIndex)
 }
 
 type setGroupCmd struct{ bot *Bot }
@@ -328,25 +314,54 @@ func (c *setTeacherCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.resolveTeacherInput(u, chat, extractCommandArg(u.Text), "set")
 }
 
-func matchTeacherList(input string, candidates map[string]any) ([]string, bool) {
+func matchTeacherList(input string, candidates map[string]any, fullNames map[string]string) ([]string, bool) {
 	const matchLimit = 5
 	var matched []string
 	search := strings.ToLower(strings.ReplaceAll(input, ".", ""))
 
-	for key := range candidates {
+	for _, key := range sortedKeys(candidates) {
 		needle := strings.ToLower(strings.ReplaceAll(key, ".", ""))
 		if !strings.Contains(needle, search) {
 			continue
 		}
-		if needle == search {
-			return []string{key}, false
-		}
 		matched = append(matched, key)
-		if len(matched) > matchLimit {
-			return matched, true
+		if needle == search || len(matched) > matchLimit {
+			break
 		}
 	}
-	return matched, false
+
+	for _, key := range sortedKeys(fullNames) {
+		if len(matched) > matchLimit {
+			break
+		}
+		if containsString(matched, key) {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(fullNames[key]), strings.ToLower(input)) {
+			continue
+		}
+		matched = append(matched, key)
+	}
+
+	return matched, len(matched) > matchLimit
+}
+
+func sortedKeys[V any](values map[string]V) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func containsString(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *Bot) getFormatter(chat *Chat) formatter.Formatter {

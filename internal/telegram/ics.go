@@ -3,14 +3,22 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io"
+	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/calendar"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
+
+type namedReader struct {
+	name   string
+	reader io.Reader
+}
+
+func (r namedReader) Name() string               { return r.name }
+func (r namedReader) Read(p []byte) (int, error) { return r.reader.Read(p) }
 
 type pingCmd struct{ bot *Bot }
 
@@ -44,17 +52,17 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 	switch chat.Mode {
 	case ModeStudent, ModeParent:
 		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Группа не выбрана. Используйте /setup.", replyMainMenu(c.bot, chat))
 		}
 		return c.bot.buildAndSendICS(u, chat, "group", chat.Group, minIdx, maxIdx, week)
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, c.bot.loc("need_teacher"))
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Преподаватель не выбран. Используйте /setup.", replyMainMenu(c.bot, chat))
 		}
 		return c.bot.buildAndSendICS(u, chat, "teacher", chat.Teacher, minIdx, maxIdx, week)
 	}
 
-	return u.Bot.SendText(u.ChatID, c.bot.loc("need_group"))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Режим чата не поддерживает экспорт расписания.", replyMainMenu(c.bot, chat))
 }
 
 func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
@@ -70,7 +78,7 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 	case "group":
 		days, err := archiveRepo.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
-			return u.Bot.SendText(u.ChatID, "Нет расписания за текущую неделю.")
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
 		}
 		for _, d := range days {
 			builder.AddGroupDay(d, value)
@@ -78,7 +86,7 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 	case "teacher":
 		days, err := archiveRepo.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
-			return u.Bot.SendText(u.ChatID, "Нет расписания за текущую неделю.")
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
 		}
 		for _, d := range days {
 			builder.AddTeacherDay(d, value)
@@ -94,20 +102,9 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 		filename = fmt.Sprintf("schedule-teacher-%s-week-%02d.ics", value, weekNum)
 	}
 
-	path := filepath.Join("./cache", filename)
-	if err := os.WriteFile(path, []byte(ics), 0644); err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка создания .ics файла.")
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения .ics файла.")
-	}
-	defer f.Close()
-
-	_, err = bot.client.SendDocument(context.Background(), &telego.SendDocumentParams{
+	_, err := bot.client.SendDocument(context.Background(), &telego.SendDocumentParams{
 		ChatID:   telego.ChatID{ID: u.ChatID},
-		Document: telego.InputFile{File: f},
+		Document: telego.InputFile{File: namedReader{name: filename, reader: strings.NewReader(ics)}},
 		Caption:  fmt.Sprintf("📅 Расписание %s %s, учебная неделя №%d", typeName, value, weekNum),
 	})
 	return err
