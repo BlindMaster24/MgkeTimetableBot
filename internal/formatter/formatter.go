@@ -138,7 +138,7 @@ func formatFooter(opts FormatOptions) string {
 
 	if opts.ShowParserTime && opts.ParserUpdateTime > 0 {
 		secs := (time.Now().UnixMilli() - opts.ParserUpdateTime) / 1000
-		text = append(text, fmt.Sprintf("Информация была загружена %s назад", formatSeconds(secs)))
+		text = append(text, fmt.Sprintf("Информация была загружена %s назад", FormatSeconds(secs)))
 	}
 
 	if opts.HasParserError {
@@ -150,7 +150,7 @@ func formatFooter(opts FormatOptions) string {
 	return strings.Join(text, "\n\n")
 }
 
-func formatSeconds(secs int64) string {
+func FormatSeconds(secs int64) string {
 	if secs < 60 {
 		return fmt.Sprintf("%d сек", secs)
 	}

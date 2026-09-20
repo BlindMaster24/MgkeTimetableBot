@@ -598,36 +598,71 @@ func (c *mathCmd) Hidden() bool { return true }
 
 func (c *mathCmd) Name() string        { return "/math" }
 func (c *mathCmd) Description() string { return "Математический калькулятор" }
+
+const mathAllowedCharacters = "0123456789+-*/():^×÷ekк,."
+
 func (c *mathCmd) Handler(ctx context.Context, u *Update) error {
-	text := strings.TrimPrefix(u.Text, "/math")
-	text = strings.TrimSpace(text)
+	command := strings.SplitN(u.Text, " ", 2)[0]
+	text := strings.TrimSpace(strings.TrimPrefix(u.Text, command))
 	if text == "" {
-		return u.Bot.SendText(u.ChatID, "/math <пример>\n\nПримеры:\n/math 2+2\n/math (100+50)*2\n/math 1000/3")
+		return u.Bot.SendText(u.ChatID, command+" <some>\n<some> - математический пример")
 	}
 
-	allowed := "0123456789+-*/():. "
-	for _, ch := range text {
-		if !strings.ContainsRune(allowed, ch) {
-			return u.Bot.SendText(u.ChatID, "В примере есть лишние символы.\n\nРазрешены: 0-9 + - * / ( ) : .")
+	expression := strings.ReplaceAll(text, " ", "")
+	for _, ch := range expression {
+		if !strings.ContainsRune(mathAllowedCharacters, ch) {
+			return u.Bot.SendText(u.ChatID, "В примере имеются лишние символы.\nСписок разрешённых: "+mathAllowedCharacters)
 		}
 	}
 
-	text = strings.ReplaceAll(text, "×", "*")
-	text = strings.ReplaceAll(text, "÷", "/")
-	text = strings.ReplaceAll(text, "к", "000")
-	text = strings.ReplaceAll(text, "k", "000")
-	text = strings.ReplaceAll(text, ",", ".")
-
-	if strings.Count(text, "(") != strings.Count(text, ")") {
-		return u.Bot.SendText(u.ChatID, "Неправильное количество скобок")
+	for from, to := range map[string]string{"^": "**", "×": "*", "÷": "/", ":": "/", "k": "000", "к": "000", ",": "."} {
+		expression = strings.ReplaceAll(expression, from, to)
 	}
 
-	result, err := evalMath(text)
+	if !mathExpressionLooksValid(expression) {
+		return u.Bot.SendText(u.ChatID, "Пример записан неправильно")
+	}
+
+	result, err := evalMath(expression)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка: "+err.Error())
+		return u.Bot.SendText(u.ChatID, "Произошла ошибка во время выполнения:\n"+err.Error())
 	}
 
-	return u.Bot.SendText(u.ChatID, fmt.Sprintf("%g", result))
+	if math.IsInf(result, 0) {
+		return u.Bot.SendText(u.ChatID, "бесконечность")
+	}
+
+	formatted := formatMathResult(result)
+	if len(formatted) > 4096 {
+		formatted = formatted[:4096]
+	}
+	return u.Bot.SendText(u.ChatID, formatted)
+}
+
+func mathExpressionLooksValid(expression string) bool {
+	if strings.Count(expression, "(") != strings.Count(expression, ")") {
+		return false
+	}
+	if expression == "" {
+		return false
+	}
+	if !strings.ContainsRune("(0123456789", rune(expression[0])) {
+		return false
+	}
+	if !strings.ContainsRune(")0123456789", rune(expression[len(expression)-1])) {
+		return false
+	}
+	if strings.Count(expression, "(") > 0 && !strings.ContainsAny(expression, "/*+-") {
+		return false
+	}
+	return true
+}
+
+func formatMathResult(result float64) string {
+	if result == math.Trunc(result) && math.Abs(result) < 1e21 {
+		return strconv.FormatFloat(result, 'f', -1, 64)
+	}
+	return strconv.FormatFloat(result, 'g', -1, 64)
 }
 
 func evalMath(expr string) (float64, error) {
@@ -655,7 +690,7 @@ func evalMath(expr string) (float64, error) {
 			idx++
 		} else if (expr[idx] >= '0' && expr[idx] <= '9') || expr[idx] == '.' {
 			start := idx
-			for idx < len(expr) && ((expr[idx] >= '0' && expr[idx] <= '9') || expr[idx] == '.') {
+			for idx < len(expr) && (expr[idx] >= '0' && expr[idx] <= '9' || expr[idx] == '.' || expr[idx] == 'e' || expr[idx] == 'E') {
 				idx++
 			}
 			v, err := strconv.ParseFloat(expr[start:idx], 64)
@@ -676,7 +711,11 @@ func evalMath(expr string) (float64, error) {
 
 		for idx < len(expr) {
 			op := expr[idx]
-			prec := 0
+			power := op == '*' && idx+1 < len(expr) && expr[idx+1] == '*'
+			if power {
+				op = '^'
+			}
+			var prec int
 			switch op {
 			case '+', '-':
 				prec = 1
@@ -684,11 +723,17 @@ func evalMath(expr string) (float64, error) {
 				prec = 2
 			case '^':
 				prec = 3
+			default:
+				return left, nil
 			}
 			if prec < minPrec {
 				break
 			}
-			idx++
+			if power {
+				idx += 2
+			} else {
+				idx++
+			}
 			right, err := parse(prec + 1)
 			if err != nil {
 				return 0, err
@@ -701,9 +746,6 @@ func evalMath(expr string) (float64, error) {
 			case '*':
 				left *= right
 			case '/':
-				if right == 0 {
-					return 0, fmt.Errorf("деление на ноль")
-				}
 				left /= right
 			case '^':
 				left = math.Pow(left, right)

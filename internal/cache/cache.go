@@ -173,6 +173,30 @@ func dueAt(now time.Time, updatedAt int64, interval time.Duration) bool {
 	return now.Sub(time.UnixMilli(updatedAt)) >= interval
 }
 
+func (c *RaspCache) GetGroupsChangedTime() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.UnixMilli(c.Groups.Changed)
+}
+
+func (c *RaspCache) GetTeachersChangedTime() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.UnixMilli(c.Teachers.Changed)
+}
+
+func (c *RaspCache) GetTeamUpdateTime() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.UnixMilli(c.Team.Update)
+}
+
+func (c *RaspCache) GetTeamChangedTime() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.UnixMilli(c.Team.Changed)
+}
+
 func (c *RaspCache) GetGroupsUpdateTime() time.Time {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

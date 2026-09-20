@@ -417,9 +417,9 @@ func TestFormatSeconds(t *testing.T) {
 		{3661, "1 ч 1 мин"},
 	}
 	for _, tt := range tests {
-		got := formatSeconds(tt.secs)
+		got := FormatSeconds(tt.secs)
 		if got != tt.want {
-			t.Errorf("formatSeconds(%d) = %q, want %q", tt.secs, got, tt.want)
+			t.Errorf("FormatSeconds(%d) = %q, want %q", tt.secs, got, tt.want)
 		}
 	}
 }

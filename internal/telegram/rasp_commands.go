@@ -3,10 +3,14 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 )
 
 func weekdayFromDate(date string) string {
@@ -140,21 +144,56 @@ func (c *getGroupsCmd) MatchText(text string) bool {
 }
 func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
-	groups := rasp.GetGroups()
 
-	groupNames := make([]string, 0, len(groups))
-	for name := range groups {
-		groupNames = append(groupNames, name)
+	groupNames := c.bot.archiveValues("group")
+	if len(groupNames) == 0 {
+		groups := rasp.GetGroups()
+		for name := range groups {
+			groupNames = append(groupNames, name)
+		}
+		sort.Strings(groupNames)
 	}
-	sort.Strings(groupNames)
 
 	if len(groupNames) == 0 {
 		return u.Bot.SendText(u.ChatID, "Группы ещё не загружены")
 	}
 
-	ago := time.Since(rasp.GetGroupsUpdateTime()).Truncate(time.Second)
-	msg := fmt.Sprintf("__ Группы в кэше __\n%s\n\nЗагружено: %s назад", strings.Join(groupNames, ", "), ago)
+	msg := fmt.Sprintf("__ Группы в кэше __\n\n%s\n\nЗагружено: %s назад\nИзменено: %s назад",
+		strings.Join(groupNames, ", "),
+		formatAgo(c.bot.nowTime(), rasp.GetGroupsUpdateTime()),
+		formatAgo(c.bot.nowTime(), rasp.GetGroupsChangedTime()))
 	return u.Bot.SendText(u.ChatID, msg)
+}
+
+func (b *Bot) archiveValues(kind string) []string {
+	archiveRepo, ok := b.archive.(*archive.Repository)
+	if !ok || archiveRepo == nil {
+		return nil
+	}
+
+	var (
+		values []string
+		err    error
+	)
+	if kind == "teacher" {
+		values, err = archiveRepo.Teachers()
+	} else {
+		values, err = archiveRepo.Groups()
+	}
+	if err != nil {
+		return nil
+	}
+
+	sort.Strings(values)
+	return values
+}
+
+func formatAgo(now, then time.Time) string {
+	seconds := int64(math.Ceil(now.Sub(then).Seconds()))
+	if seconds < 0 {
+		seconds = 0
+	}
+	return formatter.FormatSeconds(seconds)
 }
 
 type getTeachersCmd struct{ bot *Bot }
@@ -169,26 +208,36 @@ func (c *getTeachersCmd) MatchText(text string) bool {
 }
 func (c *getTeachersCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
-	teachers := rasp.GetTeachers()
 
-	teacherNames := make([]string, 0, len(teachers))
-	for name := range teachers {
-		teacherNames = append(teacherNames, name)
+	teacherNames := c.bot.archiveValues("teacher")
+	if len(teacherNames) == 0 {
+		for name := range rasp.GetTeachers() {
+			teacherNames = append(teacherNames, name)
+		}
+		sort.Strings(teacherNames)
 	}
-	sort.Strings(teacherNames)
 
 	if len(teacherNames) == 0 {
 		return u.Bot.SendText(u.ChatID, "Преподаватели ещё не загружены")
 	}
 
-	var lines []string
-	lines = append(lines, "__ Преподаватели в кэше __")
+	fullNames := rasp.GetTeamNames()
+	lines := []string{"__ Преподаватели в кэше __"}
 	for i, name := range teacherNames {
-		lines = append(lines, fmt.Sprintf("%d. %s", i+1, name))
+		label := name
+		if full, ok := fullNames[name]; ok && full != "" {
+			label = full
+		}
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, label))
 	}
 
-	ago := time.Since(rasp.GetTeachersUpdateTime()).Truncate(time.Second)
-	lines = append(lines, fmt.Sprintf("\nЗагружено: %s назад", ago))
+	lines = append(lines,
+		fmt.Sprintf("\nЗагружено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeachersUpdateTime())),
+		fmt.Sprintf("Изменено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeachersChangedTime())),
+		"\n__ Страницы с учителями/администрацией __",
+		fmt.Sprintf("Загружено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeamUpdateTime())),
+		fmt.Sprintf("Изменено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeamChangedTime())))
+
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
 
@@ -209,9 +258,13 @@ func (c *compareGroupsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Данные с сервера ещё не загружены, ожидайте...")
 	}
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err == nil {
-		chat.Scene = sceneCompareInput
-		c.bot.chatRepo.Save(chat)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendText(u.ChatID, "Введите номера двух групп через пробел (например: 101 102)")
+
+	chat.Scene = sceneCompareStepA
+	c.bot.chatRepo.Save(chat)
+
+	prompt := fmt.Sprintf("Введите номер первой группы (например, %s)", randomKey(groups))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
 }
