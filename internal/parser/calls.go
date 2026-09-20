@@ -4,12 +4,52 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 )
 
 var callsTimeRe = regexp.MustCompile(`\b(\d{1,2})[.:](\d{2})\b`)
+var callsUpdatedAtRe = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})(?:\s+(\d{2}:\d{2}))?`)
+
+type CallsUpdatedAt struct {
+	Raw string
+	At  int64
+}
+
+func ParseCallsUpdatedAt(doc *goquery.Document) CallsUpdatedAt {
+	raw := ""
+	for _, selector := range []string{"[date-updated]", "html[date-updated]", "body[date-updated]"} {
+		if selection := doc.Find(selector).First(); selection.Length() > 0 {
+			if value := strings.TrimSpace(selection.AttrOr("date-updated", "")); value != "" {
+				raw = value
+				break
+			}
+		}
+	}
+
+	if raw == "" {
+		return CallsUpdatedAt{}
+	}
+
+	match := callsUpdatedAtRe.FindStringSubmatch(raw)
+	if match == nil {
+		return CallsUpdatedAt{Raw: raw}
+	}
+
+	clock := match[2]
+	if clock == "" {
+		clock = "00:00"
+	}
+	parsed, err := time.Parse("02.01.2006 15:04", match[1]+" "+clock)
+	if err != nil {
+		return CallsUpdatedAt{Raw: raw}
+	}
+
+	return CallsUpdatedAt{Raw: raw, At: parsed.UnixMilli()}
+}
+
 var saturdayRe = regexp.MustCompile(`(?i)(суббот|выход|сб\.)`)
 var callsLineRe = regexp.MustCompile(`(?m)^\s*\d{1,2}\s*(?:пара|звонок)?[.:]?\s*\d{1,2}[.:]\d{2}.*$`)
 

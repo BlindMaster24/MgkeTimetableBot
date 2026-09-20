@@ -244,6 +244,9 @@ func (f *Fetcher) Calls(bellScheduleURL string) error {
 	schedule := variants[0].Schedule
 	f.cache.SetCallsNotify(cache.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}, cache.Schedule{}, "site", "")
 	f.cache.SetCallsSiteVariants(variants)
+
+	updated := ParseCallsUpdatedAt(doc)
+	f.cache.SetCallsSiteUpdatedAt(updated.Raw, updated.At)
 	f.emit(report)
 	f.log.Info().
 		Int("weekdays", len(schedule.Weekdays)).

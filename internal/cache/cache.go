@@ -29,16 +29,18 @@ type TeamCacheEntry struct {
 }
 
 type CallsSource struct {
-	Schedule  CallsSchedule `json:"schedule"`
-	UpdatedAt int64         `json:"updatedAt"`
-	Hash      string        `json:"hash"`
+	Schedule     CallsSchedule `json:"schedule"`
+	UpdatedAt    int64         `json:"updatedAt"`
+	UpdatedAtRaw string        `json:"updatedAtRaw,omitempty"`
+	Hash         string        `json:"hash"`
 }
 
 type CallsActive struct {
-	Schedule  CallsSchedule `json:"schedule"`
-	UpdatedAt int64         `json:"updatedAt"`
-	Source    string        `json:"source"`
-	Hash      string        `json:"hash"`
+	Schedule     CallsSchedule `json:"schedule"`
+	UpdatedAt    int64         `json:"updatedAt"`
+	UpdatedAtRaw string        `json:"updatedAtRaw,omitempty"`
+	Source       string        `json:"source"`
+	Hash         string        `json:"hash"`
 }
 
 type CallsSchedule struct {
@@ -355,6 +357,23 @@ func (c *RaspCache) setCallsInternal(site Schedule, manual Schedule, source, rea
 	c.selectActiveCallsLocked(skipNotify, reason)
 }
 
+func (c *RaspCache) SetCallsSiteUpdatedAt(raw string, at int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if raw == "" {
+		return
+	}
+	c.Calls.Site.UpdatedAtRaw = raw
+	if at > 0 {
+		c.Calls.Site.UpdatedAt = at
+	}
+	c.Calls.Active.UpdatedAtRaw = raw
+	if at > 0 {
+		c.Calls.Active.UpdatedAt = at
+	}
+}
+
 func (c *RaspCache) SetCallsSiteVariants(variants []CallsVariant) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -386,6 +405,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 	activeSource := "config"
 	activeSchedule := configSchedule
 	activeUpdatedAt := time.Now().UnixMilli()
+	activeUpdatedAtRaw := ""
 
 	switch c.Calls.OverrideSource {
 	case "site":
@@ -393,6 +413,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 			activeSource = "site"
 			activeSchedule = c.Calls.Site.Schedule
 			activeUpdatedAt = c.Calls.Site.UpdatedAt
+			activeUpdatedAtRaw = c.Calls.Site.UpdatedAtRaw
 		}
 	case "manual":
 		if c.Calls.Manual.UpdatedAt > 0 {
@@ -407,6 +428,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 			activeSource = "site"
 			activeSchedule = c.Calls.Site.Schedule
 			activeUpdatedAt = c.Calls.Site.UpdatedAt
+			activeUpdatedAtRaw = c.Calls.Site.UpdatedAtRaw
 		}
 		if c.Calls.Manual.UpdatedAt > 0 {
 			manualIsNewer := c.Calls.Manual.UpdatedAt >= c.Calls.Site.UpdatedAt
@@ -414,6 +436,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 				activeSource = "manual"
 				activeSchedule = c.Calls.Manual.Schedule
 				activeUpdatedAt = c.Calls.Manual.UpdatedAt
+				activeUpdatedAtRaw = ""
 			}
 		}
 	}
@@ -430,10 +453,11 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 
 	c.Calls.Changed = time.Now().UnixMilli()
 	c.Calls.Active = CallsActive{
-		Schedule:  activeSchedule,
-		UpdatedAt: activeUpdatedAt,
-		Source:    activeSource,
-		Hash:      activeHash,
+		Schedule:     activeSchedule,
+		UpdatedAt:    activeUpdatedAt,
+		UpdatedAtRaw: activeUpdatedAtRaw,
+		Source:       activeSource,
+		Hash:         activeHash,
 	}
 
 	if skipNotify || (!weekdaysChanged && !saturdayChanged) {

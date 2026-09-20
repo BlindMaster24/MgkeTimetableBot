@@ -31,6 +31,54 @@ const mockBellScheduleHTML = `<html><body>
 </div></div>
 </body></html>`
 
+func TestParseCallsUpdatedAt(t *testing.T) {
+	cases := []struct {
+		name string
+		html string
+		raw  string
+		zero bool
+	}{
+		{
+			name: "element attribute",
+			html: `<html><body><div class="entry"><div class="content" date-updated="14.09.2026 08:00"><table></table></div></div></body></html>`,
+			raw:  "14.09.2026 08:00",
+		},
+		{
+			name: "date without a clock",
+			html: `<html><body><div date-updated="01.09.2026"></div></body></html>`,
+			raw:  "01.09.2026",
+		},
+		{
+			name: "extra text around the date",
+			html: `<html><body><div date-updated="Обновлено 14.09.2026 в 08:00"></div></body></html>`,
+			raw:  "Обновлено 14.09.2026 в 08:00",
+		},
+		{
+			name: "no attribute at all",
+			html: `<html><body><div></div></body></html>`,
+			zero: true,
+		},
+	}
+
+	for _, c := range cases {
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(c.html))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		updated := ParseCallsUpdatedAt(doc)
+		if updated.Raw != c.raw {
+			t.Errorf("%s: raw = %q, want %q", c.name, updated.Raw, c.raw)
+		}
+		if c.zero && updated.At != 0 {
+			t.Errorf("%s: a page without a date must not carry a timestamp, got %d", c.name, updated.At)
+		}
+		if !c.zero && c.raw != "" && strings.Contains(c.raw, ":") && updated.At == 0 {
+			t.Errorf("%s: the clock was not parsed from %q", c.name, c.raw)
+		}
+	}
+}
+
 func TestParseCallsSchedule(t *testing.T) {
 	doc, _ := goquery.NewDocumentFromReader(strings.NewReader(mockBellScheduleHTML))
 	schedule := ParseCallsSchedule(doc)

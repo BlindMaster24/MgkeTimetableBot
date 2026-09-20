@@ -716,6 +716,8 @@ func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 	}
 
 	switch {
+	case calls.Active.Source == "site" && calls.Site.UpdatedAtRaw != "":
+		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", calls.Site.UpdatedAtRaw))
 	case calls.Active.Source == "site" && calls.Site.UpdatedAt > 0:
 		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
 	case calls.Active.Source == "manual" && calls.ManualReason != "":
