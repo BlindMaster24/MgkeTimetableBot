@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
 )
@@ -429,10 +430,22 @@ func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
+
+	if err := u.Bot.SendText(u.ChatID, "Сброс начат..."); err != nil {
+		return err
+	}
+
 	if err := c.bot.cache.Save(); err != nil {
 		return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
 	}
-	return u.Bot.SendText(u.ChatID, "✅ Кеш сброшен в БД")
+
+	if archiveRepo, ok := c.bot.archive.(*archive.Repository); ok && archiveRepo != nil {
+		if _, err := archiveRepo.FlushCache(c.bot.cache.GetGroups(), c.bot.cache.GetTeachers()); err != nil {
+			return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
+		}
+	}
+
+	return u.Bot.SendText(u.ChatID, "Сброс закончен")
 }
 
 func (b *Bot) handleMessageText(ctx context.Context, u *Update) {

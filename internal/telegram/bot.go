@@ -54,6 +54,7 @@ type Bot struct {
 	google       googleService
 	googleSyncMu sync.Mutex
 	health       healthSource
+	noticeDay    func(index int)
 	calendarSync func(ctx context.Context) (int, error)
 	apiProbe     func(ctx context.Context) []apiprobe.Result
 	incidents    *health.IncidentLog
@@ -132,7 +133,10 @@ func (b *Bot) I18n() *i18n.Localizer          { return b.i18n }
 func (b *Bot) Log() *logger.Logger            { return b.log }
 func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
 func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
-func (b *Bot) SetNow(fn func() time.Time)     { b.now = fn }
+func (b *Bot) SetNoticeDayFunc(fn func(index int)) {
+	b.noticeDay = fn
+}
+func (b *Bot) SetNow(fn func() time.Time) { b.now = fn }
 func (b *Bot) SetHealthSource(src healthSource) {
 	b.health = src
 }

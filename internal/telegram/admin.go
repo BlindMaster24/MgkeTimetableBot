@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -178,7 +179,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 	text := strings.TrimPrefix(u.Text, "/send")
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return u.Bot.SendText(u.ChatID, "Введите текст сообщения после /send")
+		return u.Bot.SendText(u.ChatID, "Сообщение не введено")
 	}
 
 	chats, err := c.bot.chatRepo.FindAllTGChats()
@@ -192,7 +193,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 
 	progressMsg, err := c.bot.client.SendMessage(context.Background(), &telego.SendMessageParams{
 		ChatID:    telego.ChatID{ID: u.ChatID},
-		Text:      fmt.Sprintf("📤 Рассылка: 0/%d (0.00%%)", len(chats)),
+		Text:      "Начинаю отправку сообщений.",
 		ParseMode: "HTML",
 	})
 	if err != nil {
@@ -225,7 +226,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 
 		if time.Since(lastEdit) >= 1*time.Second || i == total-1 {
 			pct := float64(i+1) / float64(total) * 100
-			editText := fmt.Sprintf("📤 tg: %d/%d (%.2f%%)", i+1, total, pct)
+			editText := fmt.Sprintf("tg: %d/%d (%.2f%%)", i+1, total, pct)
 			if failed > 0 {
 				editText += fmt.Sprintf("\n❌ Ошибок: %d", failed)
 			}
@@ -238,7 +239,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 		}
 	}
 
-	result := fmt.Sprintf("✅ Успешно отправлено %d из %d", sent, total)
+	result := "Успешно отправлено!"
 	if failed > 0 {
 		result += fmt.Sprintf("\n❌ Ошибок: %d", failed)
 	}
@@ -264,20 +265,30 @@ func (c *triggerCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
 
-	if c.bot.parseFunc == nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("parse_not_available"))
+	args := strings.Fields(strings.TrimSpace(strings.TrimPrefix(u.Text, "/trigger")))
+	if len(args) == 0 {
+		return u.Bot.SendText(u.ChatID, "not found")
 	}
 
-	go func() {
-		if err := c.bot.parseFunc(); err != nil {
-			c.bot.log.Error().Err(err).Msg("trigger parse error")
-			c.bot.SendText(u.ChatID, c.bot.loc("force_parse_error"))
-			return
-		}
-		c.bot.SendText(u.ChatID, c.bot.loc("force_parse_done"))
-	}()
+	if args[0] != "NextDayUpdater" {
+		return u.Bot.SendText(u.ChatID, "not found")
+	}
 
-	return u.Bot.SendText(u.ChatID, c.bot.loc("force_parse_started"))
+	if len(args) < 2 {
+		return u.Bot.SendText(u.ChatID, "index is not a number")
+	}
+
+	index, err := strconv.Atoi(args[1])
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, "index is not a number")
+	}
+
+	if c.bot.noticeDay == nil {
+		return u.Bot.SendText(u.ChatID, "not found")
+	}
+
+	c.bot.noticeDay(index - 1)
+	return u.Bot.SendText(u.ChatID, "ok")
 }
 
 type noticeDebugCmd struct{ bot *Bot }

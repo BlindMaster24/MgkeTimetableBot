@@ -73,6 +73,17 @@ func (c *capturingCaller) last() string {
 	return c.messages[len(c.messages)-1].text
 }
 
+func (c *capturingCaller) texts() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	sent := make([]string, 0, len(c.messages))
+	for _, message := range c.messages {
+		sent = append(sent, message.text)
+	}
+	return sent
+}
+
 func (c *capturingCaller) reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

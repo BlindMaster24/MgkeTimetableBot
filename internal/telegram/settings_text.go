@@ -217,10 +217,9 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiff(chat))
 	case "max_lines":
 		presets := []int{10, 20, 30, 50}
-		current := chat.DiffMaxLines
-		idx := 0
+		idx := 1
 		for i, p := range presets {
-			if p == current {
+			if p == chat.DiffMaxLines {
 				idx = i
 				break
 			}

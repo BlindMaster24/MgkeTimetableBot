@@ -4,7 +4,42 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
 
+func (r *Repository) FlushCache(groups, teachers map[string]any) (int, error) {
+	entries := cacheEntries(groups, teachers)
+	if len(entries) == 0 {
+		return 0, nil
+	}
+
+	return len(entries), r.AppendDays(entries)
+}
+
 func (r *Repository) SyncFromCache(groups, teachers map[string]any) error {
+	entries := cacheEntries(groups, teachers)
+
+	if len(entries) == 0 {
+		return nil
+	}
+
+	cacheMaxDay := int64(0)
+	for _, e := range entries {
+		if idx := dayIndexOf(e.Day); idx > cacheMaxDay {
+			cacheMaxDay = idx
+		}
+	}
+
+	dbMaxDay := int64(0)
+	if bounds, err := r.DayIndexBounds(); err == nil {
+		dbMaxDay = bounds.Max
+	}
+
+	if cacheMaxDay <= dbMaxDay {
+		return nil
+	}
+
+	return r.AppendDays(entries)
+}
+
+func cacheEntries(groups, teachers map[string]any) []AppendDay {
 	entries := make([]AppendDay, 0, 512)
 
 	for group, v := range groups {
@@ -35,27 +70,7 @@ func (r *Repository) SyncFromCache(groups, teachers map[string]any) error {
 		}
 	}
 
-	if len(entries) == 0 {
-		return nil
-	}
-
-	cacheMaxDay := int64(0)
-	for _, e := range entries {
-		if idx := dayIndexOf(e.Day); idx > cacheMaxDay {
-			cacheMaxDay = idx
-		}
-	}
-
-	dbMaxDay := int64(0)
-	if bounds, err := r.DayIndexBounds(); err == nil {
-		dbMaxDay = bounds.Max
-	}
-
-	if cacheMaxDay <= dbMaxDay {
-		return nil
-	}
-
-	return r.AppendDays(entries)
+	return entries
 }
 
 func dayIndexOf(v interface{}) int64 {

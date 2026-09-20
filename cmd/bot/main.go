@@ -222,6 +222,11 @@ func main() {
 	var eventNotifier *notification.EventNotifier
 	if cfg.Telegram.Noticer {
 		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
+		notifier := eventNotifier
+		bot.SetNoticeDayFunc(func(index int) {
+			notifier.CronDay(cache.KindGroups, index, false)
+			notifier.CronDay(cache.KindTeachers, index, false)
+		})
 		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics, chatRepo)
 		scheduler.SetIncidents(incidents)
 		scheduler.Start()

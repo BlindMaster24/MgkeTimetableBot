@@ -320,7 +320,7 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 
 		opts := b.fmtOpts(chat, false)
 		opts.WeekLabel = buildWeekLabelFromWeek(week)
-		text := formatter.GetByIndex(chat.Formatter).FormatGroupFull("", days, opts)
+		text := formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, days, opts)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
@@ -344,7 +344,7 @@ func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, valu
 
 		opts := b.fmtOpts(chat, false)
 		opts.WeekLabel = buildWeekLabelFromWeek(week)
-		text := formatter.GetByIndex(chat.Formatter).FormatTeacherFull("", days, opts)
+		text := formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, days, opts)
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
