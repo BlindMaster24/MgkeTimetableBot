@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	_ "modernc.org/sqlite"
 )
 
@@ -57,6 +58,17 @@ func (r *Repository) DayIndexBounds() (Bounds, error) {
 	var b Bounds
 	err := r.db.QueryRow("SELECT COALESCE(MIN(day),0), COALESCE(MAX(day),0) FROM timetable_archive").Scan(&b.Min, &b.Max)
 	return b, err
+}
+
+func (r *Repository) WeekIndexBounds() (Bounds, error) {
+	days, err := r.DayIndexBounds()
+	if err != nil {
+		return days, err
+	}
+	return Bounds{
+		Min: int64(utils.WeekIndexFromDate(utils.DayIndexToDate(int(days.Min))).Value()),
+		Max: int64(utils.WeekIndexFromDate(utils.DayIndexToDate(int(days.Max))).Value()),
+	}, nil
 }
 
 func (r *Repository) Groups() ([]string, error) {

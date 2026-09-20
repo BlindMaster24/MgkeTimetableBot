@@ -6,6 +6,11 @@ import (
 
 var startingWeekIndexDate = time.Date(1970, 1, 5, 0, 0, 0, 0, time.UTC)
 
+func dayNumber(date time.Time) int64 {
+	year, month, day := date.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC).UnixMilli() / oneDayMs
+}
+
 const (
 	oneDayMs  = 24 * 60 * 60 * 1000
 	oneWeekMs = 7 * oneDayMs
@@ -16,16 +21,22 @@ type WeekIndex struct {
 }
 
 func WeekIndexFromDate(date time.Time) WeekIndex {
-	day := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	year, month, dayOfMonth := date.Date()
+	day := time.Date(year, month, dayOfMonth, 0, 0, 0, 0, time.UTC)
 	if day.Weekday() == time.Sunday {
 		day = day.AddDate(0, 0, -1)
 	}
-	ms := day.UnixMilli() - startingWeekIndexDate.UnixMilli()
-	return WeekIndex{value: int(ms / oneWeekMs)}
+	days := dayNumber(day) - dayNumber(startingWeekIndexDate)
+	return WeekIndex{value: int(days / 7)}
 }
 
 func WeekIndexFromNumber(n int) WeekIndex {
 	return WeekIndex{value: n}
+}
+
+func WeekIndexFromAcademicNumber(weekNumber int, date time.Time) WeekIndex {
+	start := academicYearStartDate(date)
+	return WeekIndexFromDate(start.AddDate(0, 0, 7*(weekNumber-1)))
 }
 
 func (w WeekIndex) Value() int {
@@ -33,8 +44,7 @@ func (w WeekIndex) Value() int {
 }
 
 func (w WeekIndex) FirstDayDate() time.Time {
-	ms := int64(w.value)*oneWeekMs + startingWeekIndexDate.UnixMilli()
-	return time.UnixMilli(ms)
+	return DayIndexToDate(w.value * 7)
 }
 
 func (w WeekIndex) WeekRange() (time.Time, time.Time) {
@@ -45,9 +55,8 @@ func (w WeekIndex) WeekRange() (time.Time, time.Time) {
 
 func (w WeekIndex) AcademicWeekNumber() int {
 	d := w.FirstDayDate()
-	start := academicYearStartDate(d)
-	diff := d.Sub(start)
-	return int(diff/(7*24*time.Hour)) + 1
+	weeks := dayNumber(d) - dayNumber(academicYearStartDate(d))
+	return int(weeks/7) + 1
 }
 
 func (w WeekIndex) WeekDayIndexRange() (int, int) {
@@ -85,12 +94,9 @@ func academicYearStartDate(date time.Time) time.Time {
 }
 
 func DayIndexFromDate(date time.Time) int {
-	d := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
-	ms := d.UnixMilli() - startingWeekIndexDate.UnixMilli()
-	return int(ms / oneDayMs)
+	return int(dayNumber(date) - dayNumber(startingWeekIndexDate))
 }
 
 func DayIndexToDate(index int) time.Time {
-	ms := int64(index)*oneDayMs + startingWeekIndexDate.UnixMilli()
-	return time.UnixMilli(ms).UTC()
+	return time.UnixMilli((dayNumber(startingWeekIndexDate) + int64(index)) * oneDayMs).UTC()
 }

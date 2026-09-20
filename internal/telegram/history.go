@@ -48,7 +48,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 		return u.Bot.SendText(u.ChatID, "Фамилия введена некорректно")
 	}
 
-	matched, tooMany := matchTeacherList(input, teachers)
+	matched, tooMany := matchTeacherList(input, teachers, s.bot.cache.GetTeamNames())
 	if len(matched) == 0 {
 		return u.Bot.SendText(u.ChatID, "Данный преподаватель не найден")
 	}
@@ -67,79 +67,82 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	chat.Scene = sceneHistoryWeek
 	s.bot.chatRepo.Save(chat)
 
-	return nil
+	prompt := "Введите номер учебной недели или дату (дд.мм или дд.мм.гггг)"
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
 type historyWeekScene struct{ bot *Bot }
 
 func (s *historyWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
-	archiveRepo, ok := s.bot.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
-		return u.Bot.SendText(u.ChatID, "Архив недоступен")
-	}
-
-	weekIndex := s.parseWeekIndex(u.Text)
+	weekIndex := s.bot.parseWeekIndex(u.Text)
 	if weekIndex == nil {
 		return u.Bot.SendText(u.ChatID, s.bot.loc("history_invalid_week"))
 	}
 
-	bounds, err := archiveRepo.DayIndexBounds()
+	chat.Scene = ""
+	s.bot.chatRepo.Save(chat)
+
+	return s.bot.showWeekDays(u, chat, "teacher", chat.Teacher, weekIndex)
+}
+
+func (b *Bot) showWeekDays(u *Update, chat *Chat, kind, value string, weekIndex *utils.WeekIndex) error {
+	archiveRepo, ok := b.archive.(*archive.Repository)
+	if !ok || archiveRepo == nil {
+		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+	}
+
+	bounds, err := archiveRepo.WeekIndexBounds()
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, s.bot.loc("history_no_data"))
+		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
 
 	wi := weekIndex.Value()
 	if int64(wi) < bounds.Min || int64(wi) > bounds.Max {
-		return u.Bot.SendText(u.ChatID, s.bot.loc("history_no_data"))
+		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
 
 	minIdx, maxIdx := weekIndex.WeekDayIndexRange()
-	days, err := archiveRepo.TeacherDaysByRange(int64(minIdx), int64(maxIdx), chat.Teacher)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, s.bot.loc("history_no_data"))
-	}
 
-	var dayMaps []map[string]any
-	for _, d := range days {
-		dm := map[string]any{"day": d.Day}
-		var lessonsAny []any
-		for _, l := range d.Lessons {
-			if l != nil {
-				lessonsAny = append(lessonsAny, l)
-			}
-		}
-		dm["lessons"] = lessonsAny
-		dayMaps = append(dayMaps, dm)
-	}
-
-	opts := s.bot.getFormatterOpts(chat)
+	opts := b.getFormatterOpts(chat)
 	opts.ShowHeader = true
 	opts.WeekLabel = buildWeekLabelFromWeek(*weekIndex)
+	f := formatter.GetByIndex(chat.Formatter)
 
-	text := formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, dayMaps, opts)
-	if text == "" {
-		text = s.bot.loc("no_timetable")
+	var text string
+	switch kind {
+	case "group":
+		days, err := archiveRepo.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
+		}
+		text = f.FormatGroupFull(value, groupDaysToMaps(days), opts)
+	default:
+		days, err := archiveRepo.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
+		if err != nil {
+			return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
+		}
+		text = f.FormatTeacherFull(value, teacherDaysToMaps(days), opts)
 	}
 
-	kb := s.bot.weekControlKeyboard("teacher", chat.Teacher, weekIndex.Value(), false)
+	if text == "" {
+		text = b.loc("no_timetable")
+	}
 
-	chat.Scene = ""
-	s.bot.chatRepo.Save(chat)
-
+	kb := b.weekControlKeyboard(kind, value, weekIndex.Value(), false)
 	return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
 }
 
 var regexp3 = regexp.MustCompile(`^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$`)
 
-func (s *historyWeekScene) parseWeekIndex(text string) *utils.WeekIndex {
+func (b *Bot) parseWeekIndex(text string) *utils.WeekIndex {
 	value := strings.TrimSpace(strings.ToLower(text))
 	if value == "" {
-		wi := utils.WeekIndexFromDate(time.Now())
+		wi := b.relevantWeekIndex()
 		return &wi
 	}
 
 	if matched, _ := strconv.ParseInt(value, 10, 64); matched > 0 {
-		wi := utils.WeekIndexFromNumber(int(matched))
+		wi := utils.WeekIndexFromAcademicNumber(int(matched), b.nowTime())
 		return &wi
 	}
 
@@ -147,7 +150,7 @@ func (s *historyWeekScene) parseWeekIndex(text string) *utils.WeekIndex {
 	if dateMatch != nil {
 		day, _ := strconv.Atoi(dateMatch[1])
 		month, _ := strconv.Atoi(dateMatch[2])
-		year := time.Now().Year()
+		year := b.nowTime().Year()
 		if dateMatch[3] != "" {
 			year, _ = strconv.Atoi(dateMatch[3])
 			if year < 100 {

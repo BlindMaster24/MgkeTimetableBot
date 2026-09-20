@@ -67,13 +67,8 @@ func (b *Bot) weekControlKeyboardHeader(typeName, value string, weekIndex int, h
 
 func (b *Bot) weekIndexBounds() (int, int) {
 	if archiveRepo, ok := b.archive.(*archive.Repository); ok && archiveRepo != nil {
-		if bounds, err := archiveRepo.DayIndexBounds(); err == nil && bounds.Max > 0 {
-			minWeek := int(bounds.Min) / 7
-			maxWeek := int(bounds.Max) / 7
-			if minWeek > maxWeek {
-				minWeek = maxWeek
-			}
-			return minWeek, maxWeek
+		if bounds, err := archiveRepo.WeekIndexBounds(); err == nil && bounds.Max > 0 {
+			return int(bounds.Min), int(bounds.Max)
 		}
 	}
 	current := utils.WeekIndexFromDate(b.nowTime()).Value()
@@ -365,7 +360,7 @@ func buildWeekLabelFromWeek(week utils.WeekIndex) string {
 	d1, d2 := week.WeekRange()
 	weekNum := week.AcademicWeekNumber()
 	return fmt.Sprintf("Учебная неделя №%d (%s-%s)", weekNum,
-		d1.Format("02.01"), d2.Format("02.01"))
+		d1.Format("02.01.2006"), d2.Format("02.01.2006"))
 }
 
 func buildWeekLabel(days []map[string]any) string {
@@ -386,7 +381,7 @@ func buildWeekLabel(days []map[string]any) string {
 	weekNum := week.AcademicWeekNumber()
 
 	return fmt.Sprintf("Учебная неделя №%d (%s-%s)", weekNum,
-		t1.Format("02.01"), t2.Format("02.01"))
+		t1.Format("02.01.2006"), t2.Format("02.01.2006"))
 }
 
 func extractWeekTypeAndValue(data string) (string, string) {
