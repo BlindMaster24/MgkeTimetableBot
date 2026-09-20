@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 )
 
@@ -10,7 +11,8 @@ func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
 	defer r.mu.RUnlock()
 
 	rows, err := r.db.Query(
-		`SELECT id, service, peer_id, mode, "group", teacher, notice_changes, notice_next_week, notice_calls
+		`SELECT id, service, peer_id, COALESCE(mode, ''), COALESCE("group", ''), COALESCE(teacher, ''),
+		 COALESCE(notice_changes, 1), COALESCE(notice_next_week, 1), COALESCE(notice_calls, 1)
 		 FROM bot_chats WHERE service = ? AND accepted = 1 AND mode IS NOT NULL AND allow_send_mess = 1`,
 		service,
 	)
@@ -22,11 +24,13 @@ func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
 	var result []*Chat
 	for rows.Next() {
 		chat := &Chat{}
+		var mode string
 		var noticeChanges, noticeNextWeek, noticeCalls int
-		err := rows.Scan(&chat.ID, &chat.Service, &chat.PeerID, &chat.Mode, &chat.Group, &chat.Teacher, &noticeChanges, &noticeNextWeek, &noticeCalls)
+		err := rows.Scan(&chat.ID, &chat.Service, &chat.PeerID, &mode, &chat.Group, &chat.Teacher, &noticeChanges, &noticeNextWeek, &noticeCalls)
 		if err != nil {
 			continue
 		}
+		chat.Mode = ChatMode(mode)
 		chat.NoticeChanges = noticeChanges != 0
 		chat.NoticeNextWeek = noticeNextWeek != 0
 		chat.NoticeCalls = noticeCalls != 0
@@ -199,37 +203,26 @@ func (r *Repository) FindChatsByGroups(service string, groups []string, noticeCh
 	}
 
 	placeholders := make([]string, len(groups))
-	args := make([]any, 0, len(groups)+3)
+	args := make([]any, 0, len(groups)+1)
 	args = append(args, service)
 	for i, g := range groups {
 		placeholders[i] = "?"
 		args = append(args, g)
 	}
-	args = append(args, boolToIntArg(noticeChanges))
 
-	rows, err := r.db.Query(
-		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
-		 WHERE service = ? AND "group" IN (`+strings.Join(placeholders, ",")+`)
-		 AND accepted = 1 AND allow_send_mess = 1 AND notice_changes = ?
-		 AND (mode IN ('student', 'parent') OR mode IS NULL OR mode = '')`,
-		args...,
-	)
+	query := `SELECT ` + selectEventChats("") + ` FROM bot_chats
+		 WHERE service = ? AND "group" IN (` + strings.Join(placeholders, ",") + `)
+		 AND accepted = 1 AND allow_send_mess = 1
+		 AND (mode IN ('student', 'parent') OR mode IS NULL OR mode = '')`
+	query += noticeChangesFilter("", noticeChanges)
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []*Chat
-	for rows.Next() {
-		chat := &Chat{}
-		var mode sql.NullString
-		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
-			continue
-		}
-		chat.Mode = ChatMode(mode.String)
-		result = append(result, chat)
-	}
-	return result, nil
+	return scanEventChats(rows)
 }
 
 func (r *Repository) FindChatsByTeachers(service string, teachers []string, noticeChanges bool) ([]*Chat, error) {
@@ -241,100 +234,120 @@ func (r *Repository) FindChatsByTeachers(service string, teachers []string, noti
 	}
 
 	placeholders := make([]string, len(teachers))
-	args := make([]any, 0, len(teachers)+3)
+	args := make([]any, 0, len(teachers)+1)
 	args = append(args, service)
 	for i, t := range teachers {
 		placeholders[i] = "?"
 		args = append(args, t)
 	}
-	args = append(args, boolToIntArg(noticeChanges))
 
-	rows, err := r.db.Query(
-		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
-		 WHERE service = ? AND teacher IN (`+strings.Join(placeholders, ",")+`)
-		 AND accepted = 1 AND allow_send_mess = 1 AND notice_changes = ?
-		 AND (mode = 'teacher' OR mode IS NULL OR mode = '')`,
-		args...,
-	)
+	query := `SELECT ` + selectEventChats("") + ` FROM bot_chats
+		 WHERE service = ? AND teacher IN (` + strings.Join(placeholders, ",") + `)
+		 AND accepted = 1 AND allow_send_mess = 1
+		 AND (mode = 'teacher' OR mode IS NULL OR mode = '')`
+	query += noticeChangesFilter("", noticeChanges)
+
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []*Chat
-	for rows.Next() {
-		chat := &Chat{}
-		var mode sql.NullString
-		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
-			continue
-		}
-		chat.Mode = ChatMode(mode.String)
-		result = append(result, chat)
-	}
-	return result, nil
+	return scanEventChats(rows)
 }
 
-func boolToIntArg(b bool) int {
-	if b {
-		return 1
+var eventChatColumns = []string{
+	"%sid", "%speer_id",
+	"COALESCE(%smode, '')", "COALESCE(%s\"group\", '')", "COALESCE(%steacher, '')",
+	"COALESCE(%sallow_send_mess, 1)", "COALESCE(%snotice_changes, 1)", "COALESCE(%snotice_next_week, 1)",
+	"COALESCE(%snotice_calls, 1)", "COALESCE(%snotice_parser_errors, 1)", "COALESCE(%sformatter, 0)",
+	"COALESCE(%shide_past_days, 0)", "COALESCE(%sshow_hints, 1)", "COALESCE(%sshow_parser_time, 0)",
+}
+
+func selectEventChats(prefix string) string {
+	columns := make([]string, 0, len(eventChatColumns))
+	for _, column := range eventChatColumns {
+		columns = append(columns, fmt.Sprintf(column, prefix))
 	}
-	return 0
+	return strings.Join(columns, ", ")
+}
+
+func noticeChangesFilter(prefix string, noticeChanges bool) string {
+	if noticeChanges {
+		return " AND " + prefix + "notice_changes = 1"
+	}
+	return ""
+}
+
+func scanEventChats(rows *sql.Rows) ([]*Chat, error) {
+	var result []*Chat
+	for rows.Next() {
+		var (
+			chat       Chat
+			mode       string
+			allowSend  int
+			noticeCh   int
+			noticeWeek int
+			noticeCall int
+			noticeErr  int
+			hidePast   int
+			hints      int
+			parserTime int
+		)
+		err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher,
+			&allowSend, &noticeCh, &noticeWeek, &noticeCall, &noticeErr, &chat.Formatter,
+			&hidePast, &hints, &parserTime)
+		if err != nil {
+			continue
+		}
+		chat.Mode = ChatMode(mode)
+		chat.AllowSendMess = allowSend != 0
+		chat.NoticeChanges = noticeCh != 0
+		chat.NoticeNextWeek = noticeWeek != 0
+		chat.NoticeCalls = noticeCall != 0
+		chat.NoticeParserErrors = noticeErr != 0
+		chat.HidePastDays = hidePast != 0
+		chat.ShowHints = hints != 0
+		chat.ShowParserTime = parserTime != 0
+		result = append(result, &chat)
+	}
+	return result, nil
 }
 
 func (r *Repository) FindSubscribedChatsByGroup(service, group string, noticeChanges bool) ([]*Chat, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	rows, err := r.db.Query(
-		`SELECT c.id, c.peer_id, c.mode, c."group", c.teacher FROM bot_chats c
+	query := `SELECT ` + selectEventChats("c.") + ` FROM bot_chats c
 		 JOIN subscriptions s ON s.chat_id = c.id AND s.type = 'group' AND s.value = ?
-		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1 AND c.notice_changes = ?`,
-		group, service, boolToIntArg(noticeChanges),
-	)
+		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1`
+	query += noticeChangesFilter("c.", noticeChanges)
+
+	rows, err := r.db.Query(query, group, service)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []*Chat
-	for rows.Next() {
-		chat := &Chat{}
-		var mode sql.NullString
-		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
-			continue
-		}
-		chat.Mode = ChatMode(mode.String)
-		result = append(result, chat)
-	}
-	return result, nil
+	return scanEventChats(rows)
 }
 
 func (r *Repository) FindSubscribedChatsByTeacher(service, teacher string, noticeChanges bool) ([]*Chat, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	rows, err := r.db.Query(
-		`SELECT c.id, c.peer_id, c.mode, c."group", c.teacher FROM bot_chats c
+	query := `SELECT ` + selectEventChats("c.") + ` FROM bot_chats c
 		 JOIN subscriptions s ON s.chat_id = c.id AND s.type = 'teacher' AND s.value = ?
-		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1 AND c.notice_changes = ?`,
-		teacher, service, boolToIntArg(noticeChanges),
-	)
+		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1`
+	query += noticeChangesFilter("c.", noticeChanges)
+
+	rows, err := r.db.Query(query, teacher, service)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var result []*Chat
-	for rows.Next() {
-		chat := &Chat{}
-		var mode sql.NullString
-		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
-			continue
-		}
-		chat.Mode = ChatMode(mode.String)
-		result = append(result, chat)
-	}
-	return result, nil
+	return scanEventChats(rows)
 }
 
 func (r *Repository) FindChatsWithNotice(service, notice string) ([]*Chat, error) {
@@ -352,7 +365,7 @@ func (r *Repository) FindChatsWithNotice(service, notice string) ([]*Chat, error
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
+		`SELECT `+selectEventChats("")+` FROM bot_chats
 		 WHERE service = ? AND accepted = 1 AND allow_send_mess = 1 AND `+column+` = 1`,
 		service,
 	)
@@ -361,17 +374,7 @@ func (r *Repository) FindChatsWithNotice(service, notice string) ([]*Chat, error
 	}
 	defer rows.Close()
 
-	var result []*Chat
-	for rows.Next() {
-		chat := &Chat{}
-		var mode sql.NullString
-		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
-			continue
-		}
-		chat.Mode = ChatMode(mode.String)
-		result = append(result, chat)
-	}
-	return result, nil
+	return scanEventChats(rows)
 }
 
 func (r *Repository) FindAdminChats(service string, adminIDs []int64) ([]*Chat, error) {
@@ -391,7 +394,7 @@ func (r *Repository) FindAdminChats(service string, adminIDs []int64) ([]*Chat, 
 	}
 
 	rows, err := r.db.Query(
-		`SELECT id, peer_id, mode, "group", teacher FROM bot_chats
+		`SELECT `+selectEventChats("")+` FROM bot_chats
 		 WHERE service = ? AND peer_id IN (`+strings.Join(placeholders, ",")+`)
 		 AND accepted = 1 AND allow_send_mess = 1`,
 		args...,
@@ -401,15 +404,5 @@ func (r *Repository) FindAdminChats(service string, adminIDs []int64) ([]*Chat, 
 	}
 	defer rows.Close()
 
-	var result []*Chat
-	for rows.Next() {
-		chat := &Chat{}
-		var mode sql.NullString
-		if err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher); err != nil {
-			continue
-		}
-		chat.Mode = ChatMode(mode.String)
-		result = append(result, chat)
-	}
-	return result, nil
+	return scanEventChats(rows)
 }

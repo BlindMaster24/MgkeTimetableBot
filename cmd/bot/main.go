@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
@@ -124,13 +125,31 @@ func main() {
 
 	syncArchive("startup")
 
-	apiServer := api.NewServer(raspCache, cfg.HTTP.Port, metrics, buildInfo)
-
 	chatRepo, err := telegrambot.NewChatRepo(cfg.ResolvedChatDBPath())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to open chat DB")
 	}
 	defer chatRepo.Close()
+	chatRepo.SetDefaultAccepted(cfg.Accept.Private)
+
+	keyStore := apikey.NewStore(chatRepo.DB(), cfg.EncryptKey)
+	if err := keyStore.EnsureSchema(); err != nil {
+		log.Fatal().Err(err).Msg("failed to prepare the api key table")
+	}
+	if !keyStore.Enabled() {
+		log.Warn().Msg("encrypt_key is missing or shorter than 32 characters, every /api request will be rejected")
+	}
+
+	probeToken := ""
+	if keyStore.Enabled() {
+		if token, err := keyStore.SystemToken(); err != nil {
+			log.Error().Err(err).Msg("failed to prepare the api probe key")
+		} else {
+			probeToken = token
+		}
+	}
+
+	apiServer := api.NewServer(raspCache, cfg.HTTP.Port, metrics, buildInfo, keyStore, loc)
 
 	if err := metrics.Restore(chatRepo); err != nil {
 		log.Warn().Err(err).Msg("failed to restore health metrics")
@@ -148,8 +167,9 @@ func main() {
 	}
 	bot.SetBuildInfo(buildInfo)
 	bot.SetHealthSource(metrics)
+	bot.SetKeyStore(keyStore)
 	bot.SetAPIProbeFunc(func(ctx context.Context) []apiprobe.Result {
-		return apiprobe.Run(ctx, apiProbeClient, apiProbeBaseURL(cfg), apiprobe.Targets(raspCache))
+		return apiprobe.Run(ctx, apiProbeClient, apiProbeBaseURL(cfg), apiprobe.Targets(raspCache), probeToken)
 	})
 
 	incidents := health.NewIncidentLog(chatRepo, health.IncidentLimit)
@@ -181,7 +201,7 @@ func main() {
 		}
 	}()
 
-	adapter := &chatFinderAdapter{repo: chatRepo, adminIDs: cfg.Telegram.AdminIDs}
+	adapter := telegrambot.NewEventChatFinder(chatRepo, cfg.Telegram.AdminIDs)
 
 	syncCalendars := func(ctx context.Context, tag string) (int, error) {
 		changes := googleDayChanges(raspCache.DrainDayChanges())
@@ -223,10 +243,7 @@ func main() {
 	if cfg.Telegram.Noticer {
 		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
 		notifier := eventNotifier
-		bot.SetNoticeDayFunc(func(index int) {
-			notifier.CronDay(cache.KindGroups, index, false)
-			notifier.CronDay(cache.KindTeachers, index, false)
-		})
+		bot.SetNoticeDayFunc(notifier.CronDayAll)
 		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics, chatRepo)
 		scheduler.SetIncidents(incidents)
 		scheduler.Start()
@@ -469,72 +486,4 @@ func googleOAuthHandler(cfg *config.Config, service *google.CalendarService, cha
 
 		w.Write([]byte("Аккаунт успешно привязан, можете вернуться обратно в чат"))
 	}
-}
-
-type chatFinderAdapter struct {
-	repo     *telegrambot.Repository
-	adminIDs []int64
-}
-
-func (a *chatFinderAdapter) toEventChats(chats []*telegrambot.Chat) []*notification.EventChat {
-	result := make([]*notification.EventChat, 0, len(chats))
-	for _, c := range chats {
-		result = append(result, &notification.EventChat{
-			ID:        c.ID,
-			PeerID:    c.PeerID,
-			Mode:      string(c.Mode),
-			Group:     c.Group,
-			Teacher:   c.Teacher,
-			Formatter: c.Formatter,
-		})
-	}
-	return result
-}
-
-func (a *chatFinderAdapter) FindChatsByGroups(service string, groups []string, noticeChanges bool) ([]*notification.EventChat, error) {
-	chats, err := a.repo.FindChatsByGroups(service, groups, noticeChanges)
-	if err != nil {
-		return nil, err
-	}
-	return a.toEventChats(chats), nil
-}
-
-func (a *chatFinderAdapter) FindChatsByTeachers(service string, teachers []string, noticeChanges bool) ([]*notification.EventChat, error) {
-	chats, err := a.repo.FindChatsByTeachers(service, teachers, noticeChanges)
-	if err != nil {
-		return nil, err
-	}
-	return a.toEventChats(chats), nil
-}
-
-func (a *chatFinderAdapter) FindSubscribedChatsByGroup(service, group string, noticeChanges bool) ([]*notification.EventChat, error) {
-	chats, err := a.repo.FindSubscribedChatsByGroup(service, group, noticeChanges)
-	if err != nil {
-		return nil, err
-	}
-	return a.toEventChats(chats), nil
-}
-
-func (a *chatFinderAdapter) FindSubscribedChatsByTeacher(service, teacher string, noticeChanges bool) ([]*notification.EventChat, error) {
-	chats, err := a.repo.FindSubscribedChatsByTeacher(service, teacher, noticeChanges)
-	if err != nil {
-		return nil, err
-	}
-	return a.toEventChats(chats), nil
-}
-
-func (a *chatFinderAdapter) FindChatsWithNotice(service string, notice string) ([]*notification.EventChat, error) {
-	chats, err := a.repo.FindChatsWithNotice(service, notice)
-	if err != nil {
-		return nil, err
-	}
-	return a.toEventChats(chats), nil
-}
-
-func (a *chatFinderAdapter) FindAdminChats(service string) ([]*notification.EventChat, error) {
-	chats, err := a.repo.FindAdminChats(service, a.adminIDs)
-	if err != nil {
-		return nil, err
-	}
-	return a.toEventChats(chats), nil
 }

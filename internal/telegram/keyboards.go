@@ -53,7 +53,7 @@ func getWeekTimetableKeyboard(typeName, value string) *telego.InlineKeyboardMark
 func weekTimetableButton(label, typeName, value string, weekIndex int, showHeader bool) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: label, CallbackData: fmt.Sprintf("timetable_%s:%s:%d:0:%s", string(typeName[0]), value, weekIndex, boolToInt(showHeader))}},
+			{{Text: label, CallbackData: fmt.Sprintf("timetable_%s:%s:%d:0:%s", string(typeName[0]), value, weekIndex, payloadFlag(showHeader))}},
 		},
 	}
 }

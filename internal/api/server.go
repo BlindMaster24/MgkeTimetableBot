@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,27 +22,36 @@ const (
 )
 
 type Server struct {
-	engine *gin.Engine
-	cache  *cache.RaspCache
-	port   int
-	health *health.Tracker
-	build  build.Info
+	engine   *gin.Engine
+	cache    *cache.RaspCache
+	port     int
+	health   *health.Tracker
+	build    build.Info
+	keys     *apikey.Store
+	limiter  *apikey.Limiter
+	loc      *i18n.Localizer
+	public   map[string]bool
+	publicMu sync.RWMutex
 }
 
-func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info) *Server {
+func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info, keys *apikey.Store, loc *i18n.Localizer) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 
 	s := &Server{
-		engine: engine,
-		cache:  cache,
-		port:   port,
-		health: tracker,
-		build:  info,
+		engine:  engine,
+		cache:   cache,
+		port:    port,
+		health:  tracker,
+		build:   info,
+		keys:    keys,
+		limiter: apikey.NewLimiter(nil),
+		loc:     loc,
+		public:  map[string]bool{healthRoute: true},
 	}
 
-	engine.Use(s.observe())
+	engine.Use(s.observe(), s.authorize())
 	s.routes()
 	return s
 }
@@ -83,6 +96,66 @@ func (s *Server) observe() gin.HandlerFunc {
 	}
 }
 
+func (s *Server) authorize() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := apiPath(c)
+		if s.isPublic(path) || !strings.HasPrefix(path, "/api") {
+			c.Next()
+			return
+		}
+
+		if s.keys == nil || !s.keys.Enabled() {
+			s.unauthorized(c)
+			return
+		}
+
+		key, err := s.keys.ByToken(requestToken(c))
+		if err != nil {
+			s.unauthorized(c)
+			return
+		}
+
+		if !s.limiter.Allow(key.ID, key.LimitPerSec) {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": s.message("api_limit_exceeded")})
+			return
+		}
+
+		s.keys.Touch(key.ID, time.Now())
+		c.Next()
+	}
+}
+
+func (s *Server) isPublic(path string) bool {
+	s.publicMu.RLock()
+	defer s.publicMu.RUnlock()
+	return s.public[path]
+}
+
+func (s *Server) markPublic(path string) {
+	s.publicMu.Lock()
+	defer s.publicMu.Unlock()
+	s.public[path] = true
+}
+
+func (s *Server) unauthorized(c *gin.Context) {
+	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": s.message("api_unauthorized")})
+}
+
+func (s *Server) message(key string) string {
+	if s.loc == nil {
+		return key
+	}
+	return s.loc.T("ru", key, nil)
+}
+
+func requestToken(c *gin.Context) string {
+	parts := strings.Split(c.GetHeader("Authorization"), " ")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
+}
+
 func (s *Server) recordAPI(c *gin.Context, writer *captureWriter, start time.Time, status int, message string) {
 	if s.health == nil {
 		return
@@ -119,6 +192,7 @@ func (s *Server) HandleGoogleOAuth(path string, handler http.HandlerFunc) {
 	if path == "" || handler == nil {
 		return
 	}
+	s.markPublic(path)
 	s.engine.GET(path, gin.WrapH(handler))
 }
 

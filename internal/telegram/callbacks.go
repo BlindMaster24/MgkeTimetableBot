@@ -103,38 +103,39 @@ func (b *Bot) handleImagePayload(u *Update, typeLetter, value string) error {
 		}
 	}
 
-	minIdx, maxIdx := utils.WeekIndexFromNumber(weekIndex).WeekDayIndexRange()
-
-	var days []map[string]any
+	var typeName string
 	switch typeLetter {
 	case "g":
-		if _, ok := b.cache.GetGroups()[value]; !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
-		}
-		days = b.archiveDaysForWeek("group", value, minIdx, maxIdx)
-		if len(days) == 0 {
-			return u.Bot.SendText(u.ChatID, "Нет расписания для отображения")
-		}
-		path, err := imagepkg.RenderGroupDays(value, days, "./cache/images")
-		if err != nil {
-			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
-		}
-		return u.Bot.SendPhoto(u.ChatID, path, "")
+		typeName = "group"
 	case "t":
-		if _, ok := b.cache.GetTeachers()[value]; !ok {
+		typeName = "teacher"
+	default:
+		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
+	}
+
+	if !b.hasCachedValue(typeName, value) {
+		if typeName == "teacher" {
 			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
 		}
-		days = b.archiveDaysForWeek("teacher", value, minIdx, maxIdx)
-		if len(days) == 0 {
-			return u.Bot.SendText(u.ChatID, "Нет расписания для отображения")
-		}
-		path, err := imagepkg.RenderTeacherDays(value, days, "./cache/images")
-		if err != nil {
-			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
-		}
-		return u.Bot.SendPhoto(u.ChatID, path, "")
+		return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
 	}
-	return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
+
+	days := b.weekDays(daysFromArchive, typeName, value, utils.WeekIndexFromNumber(weekIndex))
+	if len(days) == 0 {
+		return u.Bot.SendText(u.ChatID, "Нет расписания для отображения")
+	}
+
+	var path string
+	var err error
+	if typeName == "teacher" {
+		path, err = imagepkg.RenderTeacherDays(value, days, "./cache/images")
+	} else {
+		path, err = imagepkg.RenderGroupDays(value, days, "./cache/images")
+	}
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
+	}
+	return u.Bot.SendPhoto(u.ChatID, path, "")
 }
 
 type cancelCb struct{ bot *Bot }

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -12,13 +13,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	"github.com/mymmrac/telego"
@@ -28,6 +32,21 @@ type parseLogEntry struct {
 	time    time.Time
 	success bool
 	msg     string
+}
+
+type archiveStore interface {
+	GroupDays(group string, fromDay *int64) ([]model.GroupDay, error)
+	TeacherDays(teacher string, fromDay *int64) ([]model.TeacherDay, error)
+	GroupDaysByRange(min, max int64, group string) ([]model.GroupDay, error)
+	TeacherDaysByRange(min, max int64, teacher string) ([]model.TeacherDay, error)
+	GroupDay(dayIndex int64, group string) (*model.GroupDay, error)
+	TeacherDay(dayIndex int64, teacher string) (*model.TeacherDay, error)
+	DayIndexBounds() (archive.Bounds, error)
+	WeekIndexBounds() (archive.Bounds, error)
+	Groups() ([]string, error)
+	Teachers() ([]string, error)
+	FlushCache(groups, teachers map[string]any) (int, error)
+	DB() *sql.DB
 }
 
 type Bot struct {
@@ -44,7 +63,7 @@ type Bot struct {
 	parseFunc    func() error
 	startTime    time.Time
 	buildInfo    build.Info
-	archive      any
+	archive      archiveStore
 	aliasRepo    *AliasRepository
 	parseLogs    []parseLogEntry
 	reportsMu    sync.Mutex
@@ -54,6 +73,7 @@ type Bot struct {
 	google       googleService
 	googleSyncMu sync.Mutex
 	health       healthSource
+	keys         *apikey.Store
 	noticeDay    func(index int)
 	calendarSync func(ctx context.Context) (int, error)
 	apiProbe     func(ctx context.Context) []apiprobe.Result
@@ -100,10 +120,14 @@ type healthSource interface {
 	SlowThreshold() time.Duration
 }
 
-func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archive any) (*Bot, error) {
+func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archiveRepo archiveStore) (*Bot, error) {
 	client, err := telego.NewBot(cfg.Telegram.Token, telego.WithDefaultDebugLogger())
 	if err != nil {
 		return nil, fmt.Errorf("create bot: %w", err)
+	}
+
+	if repo, ok := archiveRepo.(*archive.Repository); ok && repo == nil {
+		archiveRepo = nil
 	}
 
 	b := &Bot{
@@ -113,7 +137,7 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 		i18n:     loc,
 		chatRepo: chatRepo,
 		cache:    cache,
-		archive:  archive, commands: make(map[string]Command),
+		archive:  archiveRepo, commands: make(map[string]Command),
 		callbacks: make(map[string]Callback),
 		startTime: time.Now(),
 		buildInfo: build.New("", "", ""),
@@ -125,14 +149,15 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	return b, nil
 }
 
-func (b *Bot) SetBuildInfo(info build.Info)   { b.buildInfo = info }
-func (b *Bot) BuildInfo() build.Info          { return b.buildInfo }
-func (b *Bot) Client() *telego.Bot            { return b.client }
-func (b *Bot) Config() *config.Config         { return b.cfg }
-func (b *Bot) I18n() *i18n.Localizer          { return b.i18n }
-func (b *Bot) Log() *logger.Logger            { return b.log }
-func (b *Bot) GetRaspCache() *cache.RaspCache { return b.cache }
-func (b *Bot) SetParseFunc(fn func() error)   { b.parseFunc = fn }
+func (b *Bot) SetBuildInfo(info build.Info)    { b.buildInfo = info }
+func (b *Bot) BuildInfo() build.Info           { return b.buildInfo }
+func (b *Bot) Client() *telego.Bot             { return b.client }
+func (b *Bot) Config() *config.Config          { return b.cfg }
+func (b *Bot) I18n() *i18n.Localizer           { return b.i18n }
+func (b *Bot) Log() *logger.Logger             { return b.log }
+func (b *Bot) GetRaspCache() *cache.RaspCache  { return b.cache }
+func (b *Bot) SetParseFunc(fn func() error)    { b.parseFunc = fn }
+func (b *Bot) SetKeyStore(store *apikey.Store) { b.keys = store }
 func (b *Bot) SetNoticeDayFunc(fn func(index int)) {
 	b.noticeDay = fn
 }
@@ -202,6 +227,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&devCmd{bot: b})
 	b.RegisterCommand(&mathCmd{bot: b})
 	b.RegisterCommand(&flushCacheCmd{bot: b})
+	b.RegisterCommand(&acceptBotCmd{bot: b})
 	b.RegisterCommand(&debugCmd{bot: b})
 	b.RegisterCommand(&sendCmd{bot: b})
 	b.RegisterCommand(&triggerCmd{bot: b})
@@ -216,7 +242,6 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&parserLogsCmd{bot: b})
 	b.RegisterCommand(&requireNewButtonsCmd{bot: b})
 	b.RegisterCommand(&createApiKeyCmd{bot: b})
-	b.RegisterCommand(&decryptKeyCmd{bot: b})
 	b.RegisterCommand(&getCabinetCmd{bot: b})
 	b.RegisterCommand(&getGroupsCmd{bot: b})
 	b.RegisterCommand(&getTeachersCmd{bot: b})
@@ -304,6 +329,11 @@ func (b *Bot) handleMessage(ctx context.Context, msg *telego.Message) {
 	b.handleMessageText(ctx, u)
 }
 
+func (b *Bot) sendNeedAccept(u *Update, chat *Chat) {
+	_ = chat
+	b.SendText(u.ChatID, b.locData("need_accept", map[string]interface{}{"Key": u.UserID}))
+}
+
 func (b *Bot) sendEulaOnce(u *Update, chat *Chat) {
 	if !chat.Accepted || chat.EULA || u.ChatID == 0 {
 		return
@@ -323,15 +353,32 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 		UserID:   cb.From.ID,
 		Data:     cb.Data,
 	}
-	if msg, ok := cb.Message.(*telego.Message); ok && msg != nil {
-		u.ChatID = msg.Chat.ID
-		u.MessageID = msg.MessageID
-		u.Message = msg
+	switch msg := cb.Message.(type) {
+	case *telego.Message:
+		if msg != nil {
+			u.ChatID = msg.Chat.ID
+			u.MessageID = msg.MessageID
+			u.Message = msg
+		}
+	case *telego.InaccessibleMessage:
+		if msg != nil {
+			u.ChatID = msg.Chat.ID
+			u.MessageID = msg.MessageID
+		}
 	}
 
-	if chat, err := b.chatRepo.FindOrCreate("telegram", cb.From.ID); err == nil {
-		b.sendEulaOnce(u, chat)
+	chat, err := b.chatRepo.FindOrCreate("telegram", cb.From.ID)
+	if err != nil {
+		b.log.Error().Err(err).Msg("failed to load the chat of a callback")
+		return
 	}
+
+	if !chat.Accepted {
+		b.sendNeedAccept(u, chat)
+		return
+	}
+
+	b.sendEulaOnce(u, chat)
 
 	bestPrefix, bestHandler := b.findCallback(cb.Data)
 	if bestHandler != nil {

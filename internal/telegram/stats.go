@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 )
 
 type statsCmd struct{ bot *Bot }
@@ -19,25 +17,24 @@ func (c *statsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 
-	archiveRepo, ok := c.bot.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
+	if c.bot.archive == nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
 	if (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" {
-		msg := c.getGroupStats(archiveRepo, chat.Group)
+		msg := c.getGroupStats(c.bot.archive, chat.Group)
 		return u.Bot.SendText(u.ChatID, msg)
 	}
 
 	if chat.Mode == ModeTeacher && chat.Teacher != "" {
-		msg := c.getTeacherStats(archiveRepo, chat.Teacher)
+		msg := c.getTeacherStats(c.bot.archive, chat.Teacher)
 		return u.Bot.SendText(u.ChatID, msg)
 	}
 
 	return u.Bot.SendText(u.ChatID, c.bot.loc("stats_no_group"))
 }
 
-func (c *statsCmd) getGroupStats(repo *archive.Repository, group string) string {
+func (c *statsCmd) getGroupStats(repo archiveStore, group string) string {
 	days, err := repo.GroupDays(group, nil)
 	if err != nil || len(days) == 0 {
 		return c.bot.loc("no_timetable")
@@ -81,7 +78,7 @@ func (c *statsCmd) getGroupStats(repo *archive.Repository, group string) string 
 	return strings.Join(lines, "\n")
 }
 
-func (c *statsCmd) getTeacherStats(repo *archive.Repository, teacher string) string {
+func (c *statsCmd) getTeacherStats(repo archiveStore, teacher string) string {
 	days, err := repo.TeacherDays(teacher, nil)
 	if err != nil || len(days) == 0 {
 		return c.bot.loc("no_timetable")

@@ -1,24 +1,75 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/gin-gonic/gin"
+
+	_ "modernc.org/sqlite"
 )
+
+const testSecret = "0123456789abcdef0123456789abcdef"
+
+var testToken string
 
 func setupTestServer(t *testing.T) *Server {
 	t.Helper()
 	return setupTestServerWith(t, health.NewDefaultTracker())
+}
+
+func setupTestStore(t *testing.T) *apikey.Store {
+	t.Helper()
+
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "keys.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { db.Close() })
+
+	store := apikey.NewStore(db, testSecret)
+	if err := store.EnsureSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	key, _, err := store.FindOrCreate(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := store.Token(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testToken = token
+
+	return store
+}
+
+func call(t *testing.T, srv *Server, method, path string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	w := httptest.NewRecorder()
+	req, err := http.NewRequest(method, path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	srv.Handler().ServeHTTP(w, req)
+	return w
 }
 
 func setupTestServerWith(t *testing.T, tracker *health.Tracker) *Server {
@@ -36,7 +87,7 @@ func setupTestServerWith(t *testing.T, tracker *health.Tracker) *Server {
 		"Иванов": map[string]any{"teacher": "Иванов"},
 	}, "hash2")
 	gin.SetMode(gin.TestMode)
-	return NewServer(c, 0, tracker, build.New("test", "abcdef1234567890", "2026-01-02T03:04:05Z"))
+	return NewServer(c, 0, tracker, build.New("test", "abcdef1234567890", "2026-01-02T03:04:05Z"), setupTestStore(t), i18n.New("ru"))
 }
 
 func TestHealthEndpointReportsTrackerState(t *testing.T) {
@@ -84,9 +135,7 @@ func TestServerRecordsEndpointFailures(t *testing.T) {
 	})
 
 	for _, target := range []string{"/api/boom", "/api/fail"} {
-		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", target, nil)
-		srv.Handler().ServeHTTP(w, req)
+		w := call(t, srv, "GET", target)
 		if w.Code != http.StatusInternalServerError {
 			t.Fatalf("%s: expected 500, got %d", target, w.Code)
 		}
@@ -206,9 +255,7 @@ func TestHealthEndpointCarriesTheBuildInfo(t *testing.T) {
 func TestInfoEndpointCarriesTheBuildInfo(t *testing.T) {
 	srv := setupTestServer(t)
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/info", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/info")
 
 	var body struct {
 		Name    string     `json:"name"`
@@ -290,9 +337,7 @@ func TestHealthMiddlewareCountsServerErrors(t *testing.T) {
 	tracker := health.NewDefaultTracker()
 	srv := setupTestServerWith(t, tracker)
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/group/missing", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/group/missing")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
@@ -309,9 +354,7 @@ func (errTest) Error() string { return "test failure" }
 
 func TestHandleInfo(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/info", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/info")
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -328,9 +371,7 @@ func TestHandleInfo(t *testing.T) {
 
 func TestHandleGroups(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/groups", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/groups")
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -345,9 +386,7 @@ func TestHandleGroups(t *testing.T) {
 
 func TestHandleTeachers(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/teachers", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/teachers")
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -362,9 +401,7 @@ func TestHandleTeachers(t *testing.T) {
 
 func TestHandleGroupByNameFound(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/group/63", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/group/63")
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -373,9 +410,7 @@ func TestHandleGroupByNameFound(t *testing.T) {
 
 func TestHandleGroupByNameNotFound(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/group/999", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/group/999")
 
 	if w.Code != 404 {
 		t.Fatalf("expected 404, got %d", w.Code)
@@ -384,9 +419,7 @@ func TestHandleGroupByNameNotFound(t *testing.T) {
 
 func TestHandleTeacherByNameFound(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/teacher/Иванов", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/teacher/Иванов")
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -395,9 +428,7 @@ func TestHandleTeacherByNameFound(t *testing.T) {
 
 func TestHandleTeacherByNameNotFound(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/teacher/Несуществующий", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/teacher/Несуществующий")
 
 	if w.Code != 404 {
 		t.Fatalf("expected 404, got %d", w.Code)
@@ -406,9 +437,7 @@ func TestHandleTeacherByNameNotFound(t *testing.T) {
 
 func TestHandleParserHealth(t *testing.T) {
 	srv := setupTestServer(t)
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/api/parser-health", nil)
-	srv.Handler().ServeHTTP(w, req)
+	w := call(t, srv, "GET", "/api/parser-health")
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)

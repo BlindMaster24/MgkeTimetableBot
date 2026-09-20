@@ -2,8 +2,10 @@ package telegram
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -359,29 +361,88 @@ type createApiKeyCmd struct{ bot *Bot }
 func (c *createApiKeyCmd) AdminOnly() bool { return true }
 
 func (c *createApiKeyCmd) Name() string        { return "/createApiKey" }
-func (c *createApiKeyCmd) Description() string { return "Создать API токен" }
+func (c *createApiKeyCmd) Description() string { return c.bot.loc("cmd_createapikey") }
 func (c *createApiKeyCmd) MatchText(text string) bool {
-	return strings.HasPrefix(strings.ToLower(text), "/createapi")
+	normalized := bareCommand(text)
+	return strings.HasPrefix(normalized, "createapikey") || strings.HasPrefix(normalized, "createapitoken")
 }
 func (c *createApiKeyCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendText(u.ChatID, "Создание API токена пока недоступно")
-}
-
-type decryptKeyCmd struct{ bot *Bot }
-
-func (c *decryptKeyCmd) AdminOnly() bool { return true }
-
-func (c *decryptKeyCmd) Name() string        { return "/decryptKey" }
-func (c *decryptKeyCmd) Description() string { return "Дешифровать ключ" }
-func (c *decryptKeyCmd) MatchText(text string) bool {
-	return strings.HasPrefix(strings.ToLower(text), "/decrypt")
-}
-func (c *decryptKeyCmd) Handler(ctx context.Context, u *Update) error {
-	key := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(u.Text, "/decryptKey"), "/decrypt"))
-	if key == "" {
-		return u.Bot.SendText(u.ChatID, "Ключ не указан")
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
-	return u.Bot.SendText(u.ChatID, fmt.Sprintf("Дешифровка ключа пока недоступна"))
+
+	fields := strings.Fields(strings.TrimSpace(u.Text))
+	usage := c.bot.locData("api_create_usage", map[string]interface{}{"Command": "/createApiKey"})
+	if len(fields) == 0 {
+		return u.Bot.SendText(u.ChatID, usage)
+	}
+
+	usage = c.bot.locData("api_create_usage", map[string]interface{}{"Command": fields[0]})
+	args := fields[1:]
+	if len(args) == 0 || len(args) > 2 {
+		return u.Bot.SendText(u.ChatID, usage)
+	}
+
+	chatID, err := strconv.ParseInt(args[0], 10, 64)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, usage)
+	}
+
+	limit := 0
+	hasLimit := false
+	if len(args) == 2 {
+		limit, err = strconv.Atoi(args[1])
+		if err != nil || limit < 0 {
+			return u.Bot.SendText(u.ChatID, usage)
+		}
+		hasLimit = true
+	}
+
+	if c.bot.keys == nil || !c.bot.keys.Enabled() {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("api_disabled"))
+	}
+
+	_, created, err := c.bot.keys.FindOrCreate(chatID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+	}
+
+	if !created {
+		if err := c.bot.keys.Rotate(chatID); err != nil {
+			return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+		}
+	}
+
+	if hasLimit {
+		if err := c.bot.keys.SetLimit(chatID, limit); err != nil {
+			return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+		}
+	}
+
+	key, err := c.bot.keys.ByChatID(chatID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+	}
+
+	token, err := c.bot.keys.Token(key)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+	}
+
+	state := "api_create_added"
+	if !created {
+		state = "api_create_updated"
+	}
+
+	lines := []string{
+		c.bot.locData("api_create_done", map[string]interface{}{"State": c.bot.loc(state)}),
+		c.bot.locData("api_create_id", map[string]interface{}{"ID": key.ID}),
+		c.bot.locData("api_create_key", map[string]interface{}{"Key": token}),
+		c.bot.locData("api_create_limit", map[string]interface{}{"Limit": key.LimitPerSec}),
+		c.bot.locData("api_create_iv", map[string]interface{}{"IV": base64.RawURLEncoding.EncodeToString(key.IV)}),
+	}
+
+	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
 
 type sqlCmd struct{ bot *Bot }

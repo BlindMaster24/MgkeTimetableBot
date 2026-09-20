@@ -12,12 +12,6 @@ func (b *Bot) sendCallsShow(u *Update) error {
 }
 
 func (b *Bot) currentSettingsText(chat *Chat) string {
-	yesNo := func(v bool) string {
-		if v {
-			return "да"
-		}
-		return "нет"
-	}
 	lines := []string{
 		fmt.Sprintf(`Показывать кнопку расписания "📄 На день": %s`, yesNo(chat.ShowDaily)),
 		fmt.Sprintf(`Показывать кнопку расписания "📑 На неделю": %s`, yesNo(chat.ShowWeekly)),

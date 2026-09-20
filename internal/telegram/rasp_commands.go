@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 )
 
@@ -191,8 +190,7 @@ func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 func (b *Bot) archiveValues(kind string) []string {
-	archiveRepo, ok := b.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
+	if b.archive == nil {
 		return nil
 	}
 
@@ -201,9 +199,9 @@ func (b *Bot) archiveValues(kind string) []string {
 		err    error
 	)
 	if kind == "teacher" {
-		values, err = archiveRepo.Teachers()
+		values, err = b.archive.Teachers()
 	} else {
-		values, err = archiveRepo.Groups()
+		values, err = b.archive.Groups()
 	}
 	if err != nil {
 		return nil

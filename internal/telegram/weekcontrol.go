@@ -7,9 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
-	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
-	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
@@ -33,21 +30,21 @@ func (b *Bot) weekControlKeyboardHeader(typeName, value string, weekIndex int, h
 	if weekIndex-1 >= minWeek {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "⬅️",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%s:%s", typeLetter, value, weekIndex-1, boolToInt(hidePastDays), boolToInt(showHeader)),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%s:%s", typeLetter, value, weekIndex-1, payloadFlag(hidePastDays), payloadFlag(showHeader)),
 		})
 	}
 
 	if hidePastDays && weekIndex == currentWeek {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "🔼",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:0:%s", typeLetter, value, weekIndex, boolToInt(showHeader)),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:0:%s", typeLetter, value, weekIndex, payloadFlag(showHeader)),
 		})
 	}
 
 	if weekIndex+1 <= maxWeek {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "➡️",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%s:%s", typeLetter, value, weekIndex+1, boolToInt(hidePastDays), boolToInt(showHeader)),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:%s:%s", typeLetter, value, weekIndex+1, payloadFlag(hidePastDays), payloadFlag(showHeader)),
 		})
 	}
 
@@ -66,20 +63,13 @@ func (b *Bot) weekControlKeyboardHeader(typeName, value string, weekIndex int, h
 }
 
 func (b *Bot) weekIndexBounds() (int, int) {
-	if archiveRepo, ok := b.archive.(*archive.Repository); ok && archiveRepo != nil {
-		if bounds, err := archiveRepo.WeekIndexBounds(); err == nil && bounds.Max > 0 {
+	if b.archive != nil {
+		if bounds, err := b.archive.WeekIndexBounds(); err == nil && bounds.Max > 0 {
 			return int(bounds.Min), int(bounds.Max)
 		}
 	}
 	current := utils.WeekIndexFromDate(b.nowTime()).Value()
 	return current - 1, current + 2
-}
-
-func boolToInt(b bool) string {
-	if b {
-		return "1"
-	}
-	return "0"
 }
 
 func (b *Bot) relevantWeekIndex() utils.WeekIndex {
@@ -158,22 +148,12 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 	}
 
 	week := utils.WeekIndexFromNumber(p.WeekIndex)
-	minIdx, maxIdx := week.WeekDayIndexRange()
 
-	var exists bool
-
-	switch typeName {
-	case "group":
-		_, exists = b.cache.GetGroups()[p.Value]
-	case "teacher":
-		_, exists = b.cache.GetTeachers()[p.Value]
-	}
-
-	if !exists {
+	if !b.hasCachedValue(typeName, p.Value) {
 		return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
 	}
 
-	days := b.archiveDaysForWeek(typeName, p.Value, minIdx, maxIdx)
+	days := b.weekDays(daysFromArchive, typeName, p.Value, week)
 	if p.HidePastDays && p.WeekIndex == b.relevantWeekIndex().Value() {
 		days = b.removePastDays(days)
 	}
@@ -181,14 +161,7 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 	opts := b.fmtOpts(chat, p.ShowHeader)
 	opts.WeekLabel = buildWeekLabelFromWeek(week)
 
-	var text string
-	switch typeName {
-	case "group":
-		text = formatter.GetByIndex(chat.Formatter).FormatGroupFull(p.Value, days, opts)
-	case "teacher":
-		text = formatter.GetByIndex(chat.Formatter).FormatTeacherFull(p.Value, days, opts)
-	}
-
+	text := b.formatDays(chat, typeName, p.Value, days, opts)
 	if text == "" {
 		text = b.loc("no_timetable")
 	}
@@ -197,163 +170,41 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 	return b.sendOrEdit(u, text, kb)
 }
 
-func extractDaysFromRange(data any, minIdx, maxIdx int) []map[string]any {
-	allDays := extractDays(data)
-	if len(allDays) == 0 {
-		return nil
+func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
+	target, ok := scheduleTargetFor(chat)
+	if !ok {
+		return u.Bot.SendText(u.ChatID, b.loc("need_group"))
 	}
 
-	var result []map[string]any
-	for _, day := range allDays {
-		dateStr, _ := day["day"].(string)
-		t, err := time.Parse("02.01.2006", dateStr)
-		if err != nil {
-			continue
-		}
-		idx := utils.DayIndexFromDate(t)
-		if idx >= minIdx && idx <= maxIdx {
-			result = append(result, day)
-		}
-	}
-	return result
-}
-
-func (b *Bot) archiveDaysForWeek(typeName, value string, minIdx, maxIdx int) []map[string]any {
-	archiveRepo, ok := b.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
-		var dataRaw any
-		var exists bool
-		if typeName == "teacher" {
-			dataRaw, exists = b.cache.GetTeachers()[value]
-		} else {
-			dataRaw, exists = b.cache.GetGroups()[value]
-		}
-		if !exists {
-			return nil
-		}
-		return extractDaysFromRange(dataRaw, minIdx, maxIdx)
+	if target.value == "" {
+		hint := randomKey(target.hintMap(b))
+		return u.Bot.SendText(u.ChatID, b.locData(target.notSelectedKey, map[string]interface{}{target.hintField: hint}))
 	}
 
-	from := int64(minIdx)
-	to := int64(maxIdx)
-
-	if typeName == "teacher" {
-		teacherDays, err := archiveRepo.TeacherDaysByRange(from, to, value)
-		if err != nil {
-			return nil
-		}
-		return teacherDaysToMaps(teacherDays)
+	if !b.hasCachedValue(target.typeName, target.value) {
+		return u.Bot.SendText(u.ChatID, b.loc(target.notExistsKey))
 	}
-
-	groupDays, err := archiveRepo.GroupDaysByRange(from, to, value)
-	if err != nil {
-		return nil
-	}
-	return groupDaysToMaps(groupDays)
-}
-
-func groupDaysToMaps(days []model.GroupDay) []map[string]any {
-	var result []map[string]any
-	for _, d := range days {
-		lessonsRaw, err := json.Marshal(d.Lessons)
-		if err != nil {
-			continue
-		}
-		var lessons []any
-		if err := json.Unmarshal(lessonsRaw, &lessons); err != nil {
-			continue
-		}
-		result = append(result, map[string]any{
-			"day":     d.Day,
-			"lessons": lessons,
-		})
-	}
-	return result
-}
-
-func teacherDaysToMaps(days []model.TeacherDay) []map[string]any {
-	var result []map[string]any
-	for _, d := range days {
-		lessonsRaw, err := json.Marshal(d.Lessons)
-		if err != nil {
-			continue
-		}
-		var lessons []any
-		if err := json.Unmarshal(lessonsRaw, &lessons); err != nil {
-			continue
-		}
-		result = append(result, map[string]any{
-			"day":     d.Day,
-			"lessons": lessons,
-		})
-	}
-	return result
-}
-
-func (b *Bot) showWeekScheduleWithKeyboard(u *Update, chat *Chat, typeName, value string) error {
-	groups := b.GetRaspCache().GetGroups()
-	teachers := b.GetRaspCache().GetTeachers()
 
 	week := b.relevantWeekIndex()
-	minIdx, maxIdx := week.WeekDayIndexRange()
-
-	switch chat.Mode {
-	case ModeStudent, ModeParent:
-		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, b.locData("group_not_selected", map[string]interface{}{"Group": randomKey(groups)}))
+	days := b.weekDays(daysFromCache, target.typeName, target.value, week)
+	allDays := days
+	if chat.HidePastDays {
+		days = b.removePastDays(days)
+		if target.rolloverWhenPastHidden && len(days) == 0 && len(allDays) > 0 {
+			week = utils.WeekIndexFromNumber(week.Value() + 1)
+			days = b.weekDays(daysFromCache, target.typeName, target.value, week)
 		}
-		data, ok := groups[chat.Group]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
-		}
-
-		days := extractDaysFromRange(data, minIdx, maxIdx)
-		allDays := days
-		if chat.HidePastDays {
-			days = b.removePastDays(days)
-			if len(days) == 0 && len(allDays) > 0 {
-				week = utils.WeekIndexFromNumber(week.Value() + 1)
-				minIdx, maxIdx = week.WeekDayIndexRange()
-				days = extractDaysFromRange(data, minIdx, maxIdx)
-			}
-		}
-
-		opts := b.fmtOpts(chat, false)
-		opts.WeekLabel = buildWeekLabelFromWeek(week)
-		text := formatter.GetByIndex(chat.Formatter).FormatGroupFull(chat.Group, days, opts)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-
-		kb := b.weekControlKeyboard("group", chat.Group, week.Value(), chat.HidePastDays)
-		return b.sendOrEdit(u, text, kb)
-
-	case ModeTeacher:
-		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, b.locData("teacher_not_selected", map[string]interface{}{"Teacher": randomKey(teachers)}))
-		}
-		data, ok := teachers[chat.Teacher]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
-		}
-
-		days := extractDaysFromRange(data, minIdx, maxIdx)
-		if chat.HidePastDays {
-			days = b.removePastDays(days)
-		}
-
-		opts := b.fmtOpts(chat, false)
-		opts.WeekLabel = buildWeekLabelFromWeek(week)
-		text := formatter.GetByIndex(chat.Formatter).FormatTeacherFull(chat.Teacher, days, opts)
-		if text == "" {
-			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
-		}
-
-		kb := b.weekControlKeyboard("teacher", chat.Teacher, week.Value(), chat.HidePastDays)
-		return b.sendOrEdit(u, text, kb)
 	}
 
-	return u.Bot.SendText(u.ChatID, b.loc("need_group"))
+	opts := b.fmtOpts(chat, false)
+	opts.WeekLabel = buildWeekLabelFromWeek(week)
+	text := b.formatDays(chat, target.typeName, target.value, days, opts)
+	if text == "" {
+		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
+	}
+
+	kb := b.weekControlKeyboard(target.typeName, target.value, week.Value(), chat.HidePastDays)
+	return b.sendOrEdit(u, text, kb)
 }
 
 func buildWeekLabelFromWeek(week utils.WeekIndex) string {

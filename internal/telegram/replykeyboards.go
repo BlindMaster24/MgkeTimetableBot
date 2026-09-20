@@ -11,34 +11,6 @@ type SceneMatcher interface {
 	Scene() string
 }
 
-func noYesSmile(v bool, text string) string {
-	if v {
-		return "✅ " + text
-	}
-	return "🚫 " + text
-}
-
-func yesNoCapital(v bool) string {
-	if v {
-		return "Да"
-	}
-	return "Нет"
-}
-
-func sourceCheck(label string, active bool) string {
-	if active {
-		return "✅ " + label
-	}
-	return label
-}
-
-func noYesSmileVolume(v bool, text string) string {
-	if v {
-		return "🔈 " + text + ": Да"
-	}
-	return "🔇 " + text + ": Нет"
-}
-
 func settingsBotNavRow() []telego.KeyboardButton {
 	return []telego.KeyboardButton{
 		{Text: "Меню настроек"},

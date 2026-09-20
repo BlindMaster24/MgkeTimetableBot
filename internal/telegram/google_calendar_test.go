@@ -145,6 +145,7 @@ type fakeGoogleService struct {
 	synced         []string
 	syncedCalendar []string
 	syncedLessons  []google.DayLesson
+	syncErrs       map[string]error
 	userErr        error
 	syncDisabled   bool
 }
@@ -170,7 +171,7 @@ func (f *fakeGoogleService) SyncDay(_ context.Context, calendarID, date string, 
 	f.synced = append(f.synced, date)
 	f.syncedCalendar = append(f.syncedCalendar, calendarID)
 	f.syncedLessons = append(f.syncedLessons, lessons...)
-	return nil
+	return f.syncErrs[date]
 }
 
 func (f *fakeGoogleService) SyncEnabled() bool { return !f.syncDisabled }

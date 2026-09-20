@@ -72,7 +72,7 @@ func TestTriggerIsAdminOnly(t *testing.T) {
 
 func TestFlushCachePushesEveryCachedDayIntoTheArchive(t *testing.T) {
 	const admin = int64(777)
-	b := setupE2EBotWithArchive(t, admin)
+	b, archiveRepo := setupE2EBotWithArchive(t, admin)
 	caller := &capturingCaller{}
 	b.client = botWithCaller(t, caller)
 
@@ -87,12 +87,11 @@ func TestFlushCachePushesEveryCachedDayIntoTheArchive(t *testing.T) {
 		t.Fatalf("the flush must report its start and finish, got %#v", texts)
 	}
 
-	repo, ok := b.archive.(*archive.Repository)
-	if !ok || repo == nil {
+	if b.archive == nil {
 		t.Fatal("the archive must be wired")
 	}
 
-	days, err := repo.GroupDays("100", nil)
+	days, err := archiveRepo.GroupDays("100", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +102,7 @@ func TestFlushCachePushesEveryCachedDayIntoTheArchive(t *testing.T) {
 		t.Fatalf("the archived days must keep their order, got %q, %q", days[0].Day, days[1].Day)
 	}
 
-	teachers, err := repo.Teachers()
+	teachers, err := archiveRepo.Teachers()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,11 +113,10 @@ func TestFlushCachePushesEveryCachedDayIntoTheArchive(t *testing.T) {
 
 func TestFlushCacheRewritesTheSameDay(t *testing.T) {
 	const admin = int64(777)
-	b := setupE2EBotWithArchive(t, admin)
+	b, repo := setupE2EBotWithArchive(t, admin)
 	caller := &capturingCaller{}
 	b.client = botWithCaller(t, caller)
 
-	repo := b.archive.(*archive.Repository)
 	if err := repo.AppendDays([]archive.AppendDay{{
 		Type:  "group",
 		Value: "100",
@@ -160,7 +158,103 @@ func TestFlushCacheRewritesTheSameDay(t *testing.T) {
 	}
 }
 
-func setupE2EBotWithArchive(t *testing.T, adminIDs ...int64) *Bot {
+func TestChatsAreAcceptedByDefault(t *testing.T) {
+	_, repo := setupE2EBot(t)
+
+	chat, err := repo.FindOrCreate("telegram", 4242)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !chat.Accepted {
+		t.Fatal("a fresh chat must be accepted by default")
+	}
+}
+
+func TestNewChatsWaitForAccessWhenItIsDisabled(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller)
+	b.chatRepo.SetDefaultAccepted(false)
+
+	u := makeUpdate(4242, "/day")
+	u.Bot = b
+	b.handleMessageText(context.Background(), u)
+
+	text := caller.last()
+	if !strings.Contains(text, "У вас нет доступа") || !strings.Contains(text, "4242") {
+		t.Fatalf("the refused chat must get the access hint with its id, got %q", text)
+	}
+
+	chat, err := b.chatRepo.FindOrCreate("telegram", 4242)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chat.Accepted {
+		t.Fatal("the chat must stay unaccepted")
+	}
+}
+
+func TestAcceptBotGrantsAccess(t *testing.T) {
+	const admin = int64(777)
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, admin)
+	b.chatRepo.SetDefaultAccepted(false)
+
+	if _, err := b.chatRepo.FindOrCreate("telegram", 4242); err != nil {
+		t.Fatal(err)
+	}
+
+	u := makeUpdate(admin, "/acceptBot 4242")
+	u.Bot = b
+	if err := (&acceptBotCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if caller.last() != "ok:4242" {
+		t.Fatalf("the accept must be confirmed, got %q", caller.last())
+	}
+
+	chat, err := b.chatRepo.FindOrCreate("telegram", 4242)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !chat.Accepted {
+		t.Fatal("the chat must be accepted after the command")
+	}
+
+	caller.reset()
+	u = makeUpdate(admin, "/acceptBot 9999")
+	u.Bot = b
+	if err := (&acceptBotCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(caller.last(), "не найден") {
+		t.Fatalf("an unknown chat must be reported, got %q", caller.last())
+	}
+
+	caller.reset()
+	u = makeUpdate(admin, "/acceptBot abc")
+	u.Bot = b
+	if err := (&acceptBotCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if caller.last() != "это не число" {
+		t.Fatalf("a bad id must be reported, got %q", caller.last())
+	}
+}
+
+func TestAcceptedChatRunsCommands(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller)
+
+	u := makeUpdate(4242, "/help")
+	u.Bot = b
+	b.handleMessageText(context.Background(), u)
+
+	if !strings.Contains(caller.last(), "Список команд бота:") {
+		t.Fatalf("an accepted chat must get the command output, got %q", caller.last())
+	}
+}
+
+func setupE2EBotWithArchive(t *testing.T, adminIDs ...int64) (*Bot, *archive.Repository) {
 	t.Helper()
 
 	b, _ := setupE2EBot(t, adminIDs...)
@@ -171,7 +265,7 @@ func setupE2EBotWithArchive(t *testing.T, adminIDs ...int64) *Bot {
 	t.Cleanup(func() { repo.Close() })
 	b.archive = repo
 
-	return b
+	return b, repo
 }
 
 func botWithCaller(t *testing.T, caller telegoapi.Caller) *telego.Bot {

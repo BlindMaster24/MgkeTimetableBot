@@ -73,7 +73,7 @@ func TestRunMeasuresEveryTarget(t *testing.T) {
 		{http.MethodGet, "/api/info"},
 		{http.MethodGet, "/api/groups"},
 		{http.MethodGet, HealthPath},
-	})
+	}, "")
 
 	if len(results) != 3 {
 		t.Fatalf("results = %+v", results)
@@ -108,7 +108,7 @@ func TestRunReportsAnUnreachableServer(t *testing.T) {
 	address := server.URL
 	server.Close()
 
-	results := Run(context.Background(), &http.Client{Timeout: time.Second}, address, []Target{{Method: http.MethodGet, Path: "/api/info"}})
+	results := Run(context.Background(), &http.Client{Timeout: time.Second}, address, []Target{{Method: http.MethodGet, Path: "/api/info"}}, "")
 	if len(results) != 1 {
 		t.Fatalf("results = %+v", results)
 	}

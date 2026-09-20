@@ -2,7 +2,9 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
@@ -165,6 +167,35 @@ func TestGoogleResyncTeacherCalendarFromArchive(t *testing.T) {
 	}
 	if len(service.syncedLessons) != 1 || service.syncedLessons[0].Title != "100-Физика" {
 		t.Errorf("synced lessons = %+v", service.syncedLessons)
+	}
+}
+
+func TestSyncGoogleCalendarDaysSkipsOutOfBoundsAndKeepsGoing(t *testing.T) {
+	b, _, _, service := setupGoogleBot(t)
+	archiveRepo := seedTwoGroupDays(t, b)
+
+	bounds, err := archiveRepo.DayIndexBounds()
+	if err != nil {
+		t.Fatalf("bounds: %v", err)
+	}
+
+	service.syncErrs = map[string]error{"15.09.2026": errors.New("calendar backend down")}
+
+	calendar := &GoogleCalendar{Type: "group", Value: "100", CalendarID: "cal-partial"}
+	synced, err := b.syncGoogleCalendarDays(context.Background(), archiveRepo, calendar,
+		[]string{"13.09.2026", "14.09.2026", "15.09.2026"}, b.activeCallsSchedule(), bounds)
+
+	if err == nil || !strings.Contains(err.Error(), "15.09.2026") {
+		t.Fatalf("the failing day must be reported, got %v", err)
+	}
+	if synced != 1 {
+		t.Fatalf("reported %d synced days, want 1", synced)
+	}
+	if len(service.synced) != 2 || service.synced[0] != "14.09.2026" || service.synced[1] != "15.09.2026" {
+		t.Fatalf("synced days = %v", service.synced)
+	}
+	if len(service.syncedLessons) != 2 || service.syncedLessons[0].Title != "Математика" || service.syncedLessons[1].Title != "Информатика" {
+		t.Fatalf("the lessons must come from the archive, got %+v", service.syncedLessons)
 	}
 }
 

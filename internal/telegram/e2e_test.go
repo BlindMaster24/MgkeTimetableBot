@@ -323,9 +323,9 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/start", "/help", "/cancel", "/setup", "/day", "/week",
 		"/calls", "/about", "/group", "/teacher", "/settings",
 		"/image", "/buttons", "/buttons_reload", "/formatter", "/forceparse", "/resetcache",
-		"/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/debug", "/send", "/trigger",
+		"/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/acceptbot", "/debug", "/send", "/trigger",
 		"/history", "/stats", "/google_calendar", "/alias",
-		"/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey", "/decryptKey",
+		"/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey",
 		"/cabinet", "/groups", "/teachers", "/comparegroups",
 		"/ping", "/ics", "/subscriptions", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
@@ -1407,7 +1407,7 @@ func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
 	}
 
 	minIdx, maxIdx := utils.WeekIndexFromNumber(pastWeek).WeekDayIndexRange()
-	days := b.archiveDaysForWeek("group", "100", minIdx, maxIdx)
+	days := b.daysForRange(daysFromArchive, "group", "100", minIdx, maxIdx)
 	if len(days) != 1 {
 		t.Fatalf("expected 1 past-week day from archive, got %d", len(days))
 	}
@@ -1416,7 +1416,7 @@ func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
 	}
 
 	minIdx, maxIdx = utils.WeekIndexFromNumber(futureWeek).WeekDayIndexRange()
-	days = b.archiveDaysForWeek("group", "100", minIdx, maxIdx)
+	days = b.daysForRange(daysFromArchive, "group", "100", minIdx, maxIdx)
 	if len(days) != 1 {
 		t.Fatalf("expected 1 future-week day from archive, got %d", len(days))
 	}

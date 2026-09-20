@@ -287,6 +287,11 @@ func dayString(day map[string]any) string {
 	return s
 }
 
+func (n *EventNotifier) CronDayAll(index int) {
+	n.CronDay(cache.KindGroups, index, false)
+	n.CronDay(cache.KindTeachers, index, false)
+}
+
 func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 	var timetable map[string]any
 	if kind == cache.KindTeachers {

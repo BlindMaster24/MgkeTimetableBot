@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"golang.org/x/text/encoding/charmap"
@@ -68,8 +67,7 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 		return fmt.Errorf("день не указан")
 	}
 
-	archiveRepo, archiveOK := c.bot.archive.(*archive.Repository)
-	if !archiveOK || archiveRepo == nil {
+	if c.bot.archive == nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
@@ -84,7 +82,7 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Для данного чата учитель не был выбран.")
 	}
 
-	bounds, err := archiveRepo.DayIndexBounds()
+	bounds, err := c.bot.archive.DayIndexBounds()
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
@@ -100,7 +98,7 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 		fromDay = bounds.Min
 	}
 
-	entries, err := archiveRepo.TeacherDays(chat.Teacher, &fromDay)
+	entries, err := c.bot.archive.TeacherDays(chat.Teacher, &fromDay)
 	if err != nil || len(entries) == 0 {
 		return u.Bot.SendText(u.ChatID, "Нет данных за указанный период")
 	}

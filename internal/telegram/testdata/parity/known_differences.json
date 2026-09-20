@@ -3,11 +3,11 @@
     { "section": "commands", "kind": "missing_in_go", "value": "eval", "reason": "TS runs arbitrary JavaScript in a VM sandbox; Go has no equivalent and the port deliberately omits it" },
     { "section": "commands", "kind": "missing_in_go", "value": "reloadcmd", "reason": "TS hot-reloads a single command module from disk; Go commands are compiled in, so /buttons_reload covers the command menu instead" },
 
+    { "section": "commands", "kind": "extra_in_go", "value": "acceptbot", "reason": "the old bot sends a user without access an encrypted request key that the user returns to be accepted, and its admin command only flips a chat; the Go port has no request-key flow (which is also why it has no /decryptKey) and grants access with an explicit /acceptBot <id>" },
     { "section": "commands", "kind": "extra_in_go", "value": "alias", "reason": "Go port adds /alias for lesson alias management (TS kept aliases inside the settings scene)" },
     { "section": "commands", "kind": "extra_in_go", "value": "archivestats", "reason": "Go port adds archive statistics for the SQLite timetable archive" },
     { "section": "commands", "kind": "extra_in_go", "value": "chat", "reason": "Go port adds a test command printing the chat record" },
-    { "section": "commands", "kind": "extra_in_go", "value": "createapikey", "reason": "Go port adds API key management for its own REST API" },
-    { "section": "commands", "kind": "extra_in_go", "value": "decryptkey", "reason": "Go port adds API key decryption for its own REST API" },
+    { "section": "commands", "kind": "extra_in_go", "value": "createapikey", "reason": "the old bot keeps /createApiKey out of the Telegram command menu and its argument parser rejects the command word, so it only ever prints the usage hint; the Go port registers the command and implements the whole key lifecycle for its own REST API (issue, rotate, per-key rate limit, last usage, /api and /api_new in the private chat)" },
     { "section": "commands", "kind": "extra_in_go", "value": "dev", "reason": "Go port adds a developer info command" },
     { "section": "commands", "kind": "extra_in_go", "value": "error", "reason": "Go port adds a test command that raises an error" },
     { "section": "commands", "kind": "extra_in_go", "value": "google_calendar", "reason": "Go port exposes Google Calendar as its own command and main-menu button" },
@@ -21,13 +21,18 @@
     { "section": "commands", "kind": "extra_in_go", "value": "setgroup", "reason": "TS keeps /setGroup in the deprecated folder without a Telegram command entry; the Go port keeps it as a working command" },
     { "section": "commands", "kind": "extra_in_go", "value": "setteacher", "reason": "TS keeps /setTeacher in the deprecated folder without a Telegram command entry; the Go port keeps it as a working command" },
     { "section": "commands", "kind": "extra_in_go", "value": "test", "reason": "Go port adds a test command rendering a sample timetable" },
-    { "section": "commands", "kind": "extra_in_go", "value": "trigger", "reason": "Go port exposes the manual parser trigger as /trigger (TS had it unchanged in the admin folder)" },
+    { "section": "commands", "kind": "extra_in_go", "value": "trigger", "reason": "Go port keeps /trigger for the day notification run (NextDayUpdater) and adds a manual parser run through /forceparse; the day run is wired only while telegram.noticer is on, so with notifications disabled the command answers 'not found' instead of running the updater like TS always could" },
 
     { "section": "callbacks", "kind": "extra_in_go", "value": "alias", "reason": "Go alias menu uses its own callback root; TS kept alias removal outside the callback list" },
-    { "section": "callbacks", "kind": "extra_in_go", "value": "gcal", "reason": "Go Google Calendar flows use gcal callback roots where TS used a single google callback" },
+    { "section": "callbacks", "kind": "extra_in_go", "value": "gcal", "reason": "the old bot declares this root as a module-level const (const payloadAction = 'gcal' in callbacks/google.ts), and the TS extractor only reads the class-property form, so the checker reports the root as Go-only although both bots use the same gcal payloads" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "parser", "reason": "Go parser alerts carry a manual reparse button; TS health notifications were text only" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "calendar", "reason": "Go calendar alerts carry a manual sync button; TS health notifications were text only" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "api", "reason": "Go API alerts carry a live endpoint probe button; TS health notifications were text only" },
+
+    { "section": "commands", "kind": "description_differs", "value": "archive", "reason": "the checker compares command names, not descriptions: the old bot describes /archive as 'Архив расписания за прощедшие дни' (typo), the Go port spells it 'прошедшие'" },
+    { "section": "commands", "kind": "description_differs", "value": "teacher", "reason": "the checker compares command names, not descriptions: the old bot describes /teacher as 'Узнать расписаниена день указанного преподавателя' (missing space), the Go port spells it correctly" },
+    { "section": "commands", "kind": "description_differs", "value": "comparegroups", "reason": "the checker compares command names, not descriptions: the old bot stores the description of /comparegroups as an escaped unicode literal, the Go port keeps the same Russian text in plain characters" },
+    { "section": "commands", "kind": "description_differs", "value": "restart", "reason": "the checker compares command names, not descriptions: the old bot describes /restart as 'Перезапуск бота (только при использовании PM2)', the Go port works under systemd and Docker too and names the supervisor in the description" },
 
     { "section": "buttons", "kind": "missing_in_go", "value": "Проверить", "reason": "StaticKeyboard.NeedAccept returns no keyboard for the telegram service, so this button is VK-only and the Go port excludes VK" },
 

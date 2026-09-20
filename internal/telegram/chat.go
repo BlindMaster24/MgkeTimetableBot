@@ -63,8 +63,9 @@ type Chat struct {
 }
 
 type Repository struct {
-	db *sql.DB
-	mu sync.RWMutex
+	db              *sql.DB
+	mu              sync.RWMutex
+	defaultAccepted bool
 }
 
 func New(dbPath string) (*Repository, error) {
@@ -74,7 +75,7 @@ func New(dbPath string) (*Repository, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	r := &Repository{db: db}
+	r := &Repository{db: db, defaultAccepted: true}
 	if err := r.migrate(); err != nil {
 		return nil, err
 	}
@@ -181,6 +182,13 @@ func (r *Repository) migrate() error {
 	return r.migrateGoogle()
 }
 
+func (r *Repository) SetDefaultAccepted(accepted bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.defaultAccepted = accepted
+}
+
 func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -190,18 +198,42 @@ func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
 		return chat, nil
 	}
 
+	accepted := 0
+	if r.defaultAccepted {
+		accepted = 1
+	}
+
 	_, err = r.db.Exec(
 		`INSERT OR IGNORE INTO bot_chats (
-			service, peer_id, show_about, show_daily, show_weekly,
+			service, peer_id, accepted, show_about, show_daily, show_weekly,
 			show_calls, show_fast_group, show_fast_teacher
-		) VALUES (?, ?, 1, 1, 1, 1, 1, 1)`,
-		service, peerID,
+		) VALUES (?, ?, ?, 1, 1, 1, 1, 1, 1)`,
+		service, peerID, accepted,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	return r.findByPeerID(service, peerID)
+}
+
+func (r *Repository) Accept(service string, peerID int64) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	result, err := r.db.Exec(
+		`UPDATE bot_chats SET accepted = 1 WHERE service = ? AND peer_id = ?`,
+		service, peerID,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
 }
 
 func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {

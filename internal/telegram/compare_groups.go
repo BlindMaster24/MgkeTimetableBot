@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
@@ -195,20 +194,13 @@ func (b *Bot) compareGroupsMessage(groupA, groupB string) string {
 	return strings.Join(lines, "\n")
 }
 
-func orNone(value string) string {
-	if value == "" {
-		return "нет"
-	}
-	return value
-}
-
 func (b *Bot) weekDayLessons(minIdx, maxIdx int, group string) map[string][]any {
 	result := make(map[string][]any)
 
-	if archiveRepo, ok := b.archive.(*archive.Repository); ok && archiveRepo != nil {
-		days, err := archiveRepo.GroupDaysByRange(int64(minIdx), int64(maxIdx), group)
+	if b.archive != nil {
+		days, err := b.archive.GroupDaysByRange(int64(minIdx), int64(maxIdx), group)
 		if err == nil {
-			for _, day := range groupDaysToMaps(days) {
+			for _, day := range daysToMaps(days) {
 				date, _ := day["day"].(string)
 				lessons, _ := day["lessons"].([]any)
 				result[date] = lessons

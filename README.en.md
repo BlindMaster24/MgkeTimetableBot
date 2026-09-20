@@ -122,11 +122,11 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `api` | Base path of the REST API |
 | `google` | OAuth client and service account for Google Calendar |
 | `calendar.ics.enabled` | Enable the ICS export and its menu button |
-| `accept` | What to show in the timetable (rooms, private entries) |
+| `accept` | Whether a new user gets access right away (`private`). With `false` the bot answers that there is no access yet and waits for an admin to run `/acceptbot <id>`; `room` is kept for compatibility with the old config — records are keyed by user, so access is granted once per user |
 | `parser` | Poll intervals, sources, bell schedule, proxy |
 | `timetable` | Fallback bell schedule: `weekdays`, `saturday` (used when the site is unreachable) |
 | `health` | Alert thresholds: parser, calendar sync, API errors |
-| `encrypt_key` | Encryption key (for `createApiKey` / `decryptKey`) |
+| `encrypt_key` | Encryption key: it signs the REST API keys and encrypts the stored Google OAuth tokens, so it must be at least 32 characters long |
 
 The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQLite (see `db_path`); the archive schema is embedded into the binary (`internal/archive/migrations/`).
 
@@ -245,7 +245,7 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/decryptKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits.
 
@@ -270,6 +270,16 @@ The server listens on `0.0.0.0:http.port`:
 | GET | `/api/health` | Health metrics (parser, calendars, API) and active alerts; 503 while alerting |
 
 `google.url` (default `/google/oauth`) is the Google OAuth callback the user returns to after authorization.
+
+Every route except `GET /api/health` is protected by a key and expects it in the `Authorization: Bearer <key>` header: a request without a key or with an unknown one gets `401` (`{"error":"Неверный ключ авторизации"}`), and one over the rate limit gets `429` (`{"error":"Превышен лимит запросов"}`). The bot itself hands out the keys:
+
+- `/api` in a private chat shows that chat's key — its number, the key, the requests-per-second limit and the last usage time;
+- `/api_new` reissues the key, and the old one stops working at once;
+- `/createApiKey <chatId> [limit]` (admins only) issues or updates the key of a given chat record and sets its limit; without arguments it prints the usage hint.
+
+A key only grants access to the API and carries the rate limit; it does not scope data, so every valid key sees the same group and teacher lists (as in the old bot). A request to an unknown `/api/...` route also gets `401`, so the routes cannot be enumerated without a key, while the registered Google OAuth callback (`google.url`) is exempt: the browser is redirected there and has no key.
+
+The key secret is `encrypt_key` (at least 32 characters): without it the commands answer that keys are unavailable and the API stays closed for everyone. The internal API probe (`🔌 Проверить API`) uses a system key without a limit, so an alert can be investigated without issuing a key first. In the `/api` answer the documentation link points at this repository: the Go port has no VK article, while the key texts follow the old bot.
 
 ## Metrics and health
 
@@ -399,8 +409,11 @@ go test ./internal/telegram/...
 | `internal/telegram/e2e_test.go` | the student, teacher, parent and guest lifecycles, every settings toggle and every keyboard |
 | `internal/telegram/menus_e2e_test.go` | every button of every menu either opens a menu, changes a setting or is listed as an exception |
 | `internal/telegram/inline_e2e_test.go` | every `callbackData` from any keyboard reaches a registered handler |
+| `internal/telegram/image_callback_test.go` | the image callback (`image_g` / `image_t`) renders a week from the archive and, without one, from the cache, while an unknown type, an unknown group and an empty week stay text-only answers |
 | `internal/telegram/parity_test.go`, `surface_test.go` | the command, callback and button surface against the TypeScript fixture and the golden keyboard layouts |
 | `internal/notification/*_test.go` | the parse sequence (day added and updated), filters, cron entries and health alerts |
+| `internal/telegram/event_chats_test.go`, `notice_wiring_test.go`, `callback_gate_test.go` | the notification adapter keeps every notice flag, the next-week notice reaches subscribers, `/trigger` sends the next day and never twice, button presses stop without granted access; `notice_wiring_test.go` runs the day and the new-week notice in five zones (`UTC`, Minsk, `America/Chicago`, `Pacific/Kiritimati`, `Pacific/Midway`) |
+| `internal/api/auth_test.go`, `auth_hardening_test.go`, `internal/apikey/*_test.go` | REST API key auth: 401 without a key, with another secret, with an empty `encrypt_key` and with a key in the query; 429 on the limit and under parallel load; rotation revokes the old key; the key never reaches error texts or metrics; the token matches the old bot byte for byte |
 | `internal/telegram/messages_golden_test.go` | message texts (a day in all four formats, a week, the bell schedule) and keyboard labels |
 | `internal/notification/messages_golden_test.go` | notification texts (a new and a changed day, a new week and its withdrawal, bell schedule changes, a parser error, the cron reminder) |
 | `tests/integration_test.go` | HTML → parser → cache → formatters for groups and teachers |
@@ -543,9 +556,12 @@ internal/
     chat_subscriptions.go— extra group and teacher subscriptions
     commands.go          — timetable and setup: /start, /day, /week, /group, /teacher, …
     settings_text.go     — settings menus on reply keyboards
+    calls_settings.go    — the calls menu: source, refresh, entry into manual editing
     callbacks.go         — inline callbacks (day and week paging, calls, images)
     menus.go             — the declarative menu table
     weekcontrol.go       — academic week switching
+    timetabledays.go     — the single place that picks the day source (cache or archive) and the chat target
+    texthints.go         — small text helpers (yes/no, on/off, callback flags)
     history.go           — /history
     stats.go             — /stats
     archive.go           — /archive and /endings

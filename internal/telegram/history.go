@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
-	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
@@ -86,12 +84,11 @@ func (s *historyWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 }
 
 func (b *Bot) showWeekDays(u *Update, chat *Chat, kind, value string, weekIndex *utils.WeekIndex) error {
-	archiveRepo, ok := b.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
+	if b.archive == nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
-	bounds, err := archiveRepo.WeekIndexBounds()
+	bounds, err := b.archive.WeekIndexBounds()
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
@@ -101,28 +98,17 @@ func (b *Bot) showWeekDays(u *Update, chat *Chat, kind, value string, weekIndex 
 		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
 
-	minIdx, maxIdx := weekIndex.WeekDayIndexRange()
-
 	opts := b.getFormatterOpts(chat)
 	opts.ShowHeader = true
 	opts.WeekLabel = buildWeekLabelFromWeek(*weekIndex)
-	f := formatter.GetByIndex(chat.Formatter)
 
-	var text string
-	switch kind {
-	case "group":
-		days, err := archiveRepo.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
-		if err != nil {
-			return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
-		}
-		text = f.FormatGroupFull(value, groupDaysToMaps(days), opts)
-	default:
-		days, err := archiveRepo.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
-		if err != nil {
-			return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
-		}
-		text = f.FormatTeacherFull(value, teacherDaysToMaps(days), opts)
+	minIdx, maxIdx := weekIndex.WeekDayIndexRange()
+	days, result := b.archiveDaysForRange(kind, value, minIdx, maxIdx)
+	if result != archiveAnswered {
+		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
+
+	text := b.formatDays(chat, kind, value, days, opts)
 
 	if text == "" {
 		text = b.loc("no_timetable")

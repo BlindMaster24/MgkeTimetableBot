@@ -2,13 +2,14 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 	"strconv"
 	"strings"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/mymmrac/telego"
 )
@@ -237,10 +238,6 @@ func (c *weekCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.showWeekSchedule(u, chat)
 }
 
-func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
-	return b.showWeekScheduleWithKeyboard(u, chat, "", "")
-}
-
 type callsCmd struct{ bot *Bot }
 
 func (c *callsCmd) Name() string        { return "/calls" }
@@ -413,9 +410,91 @@ func (c *eulaCmd) Handler(ctx context.Context, u *Update) error {
 type apiCmd struct{ bot *Bot }
 
 func (c *apiCmd) Name() string        { return "/api" }
-func (c *apiCmd) Description() string { return "Просмотр API ключа" }
+func (c *apiCmd) Description() string { return c.bot.loc("cmd_api") }
+func (c *apiCmd) MatchText(text string) bool {
+	normalized := bareCommand(text)
+	return normalized == "api" || normalized == "api_new"
+}
 func (c *apiCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendText(u.ChatID, c.bot.loc("api_info"))
+	if isGroupUpdate(u) {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("api_group_chat"))
+	}
+
+	if c.bot.keys == nil || !c.bot.keys.Enabled() {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("api_disabled"))
+	}
+
+	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+
+	renew := strings.HasSuffix(bareCommand(u.Text), "_new")
+
+	key, _, err := c.bot.keys.FindOrCreate(chat.ID)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+	}
+
+	if renew {
+		if err := c.bot.keys.Rotate(chat.ID); err != nil {
+			return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+		}
+		if key, err = c.bot.keys.ByChatID(chat.ID); err != nil {
+			return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+		}
+	}
+
+	token, err := c.bot.keys.Token(key)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, c.bot.apiKeyError(err))
+	}
+
+	titleKey := "api_token_title"
+	if renew {
+		titleKey = "api_token_title_new"
+	}
+
+	used := c.bot.loc("api_token_never_used")
+	if key.Used {
+		used = key.LastUsed.Format("02.01.2006 15:04")
+	}
+
+	lines := []string{
+		c.bot.locData(titleKey, map[string]interface{}{"ID": key.ID}),
+		"<code>" + token + "</code>",
+		c.bot.locData("api_token_limit", map[string]interface{}{"Limit": key.LimitPerSec}),
+		c.bot.locData("api_token_last_used", map[string]interface{}{"Used": used}),
+		c.bot.loc("api_token_footer"),
+	}
+
+	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
+}
+
+func bareCommand(text string) string {
+	normalized := strings.ToLower(strings.TrimSpace(text))
+	switch {
+	case strings.HasPrefix(normalized, "/"):
+		return normalized[1:]
+	case strings.HasPrefix(normalized, "!"):
+		return normalized[1:]
+	}
+	return normalized
+}
+
+func (b *Bot) apiKeyError(err error) string {
+	if errors.Is(err, apikey.ErrShortSecret) {
+		return b.loc("api_disabled")
+	}
+	b.log.Error().Err(err).Msg("api key handling failed")
+	return b.loc("api_error")
+}
+
+func isGroupUpdate(u *Update) bool {
+	if u.Message == nil {
+		return false
+	}
+	return u.Message.Chat.Type != "" && u.Message.Chat.Type != "private"
 }
 
 type flushCacheCmd struct{ bot *Bot }
@@ -439,8 +518,8 @@ func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
 	}
 
-	if archiveRepo, ok := c.bot.archive.(*archive.Repository); ok && archiveRepo != nil {
-		if _, err := archiveRepo.FlushCache(c.bot.cache.GetGroups(), c.bot.cache.GetTeachers()); err != nil {
+	if c.bot.archive != nil {
+		if _, err := c.bot.archive.FlushCache(c.bot.cache.GetGroups(), c.bot.cache.GetTeachers()); err != nil {
 			return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
 		}
 	}
@@ -454,7 +533,12 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		return
 	}
 
-	if chat.Accepted && chat.NeedUpdateButtons {
+	if !chat.Accepted {
+		b.sendNeedAccept(u, chat)
+		return
+	}
+
+	if chat.NeedUpdateButtons {
 		chat.NeedUpdateButtons = false
 		chat.Scene = ""
 		b.chatRepo.Save(chat)

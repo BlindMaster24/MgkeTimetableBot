@@ -57,7 +57,7 @@ func TestDocsListEveryAPIEndpoint(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	server := api.NewServer(raspCache, 0, health.NewDefaultTracker(), build.New("test", "", ""))
+	server := api.NewServer(raspCache, 0, health.NewDefaultTracker(), build.New("test", "", ""), nil, nil)
 	server.HandleGoogleOAuth("/google/oauth", nil)
 
 	engine, ok := server.Handler().(*gin.Engine)

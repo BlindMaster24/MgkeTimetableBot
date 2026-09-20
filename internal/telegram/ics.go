@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/calendar"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
@@ -66,8 +65,7 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
-	archiveRepo, ok := bot.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
+	if bot.archive == nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
@@ -76,7 +74,7 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 
 	switch typeName {
 	case "group":
-		days, err := archiveRepo.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
+		days, err := bot.archive.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
 		}
@@ -84,7 +82,7 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 			builder.AddGroupDay(d, value)
 		}
 	case "teacher":
-		days, err := archiveRepo.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
+		days, err := bot.archive.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
 		}

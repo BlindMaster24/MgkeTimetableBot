@@ -101,8 +101,7 @@ func (s *Scheduler) registerSlots(slots [][2][2]string, weekRange string) {
 
 		idx := index
 		_, err := s.cron.AddFunc(cronExpr, func() {
-			s.notifier.CronDay(cache.KindGroups, idx, false)
-			s.notifier.CronDay(cache.KindTeachers, idx, false)
+			s.notifier.CronDayAll(idx)
 		})
 		if err != nil {
 			s.log.Error().Err(err).Str("expr", cronExpr).Msg("failed to schedule notification")

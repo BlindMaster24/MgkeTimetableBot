@@ -406,19 +406,18 @@ func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
 
-	archiveRepo, ok := c.bot.archive.(*archive.Repository)
-	if !ok || archiveRepo == nil {
+	if c.bot.archive == nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
 	var total, withGroup, withTeacher int
-	if err := archiveRepo.DB().QueryRow("SELECT COUNT(*), COUNT(\"group\"), COUNT(teacher) FROM timetable_archive").Scan(&total, &withGroup, &withTeacher); err != nil {
+	if err := c.bot.archive.DB().QueryRow("SELECT COUNT(*), COUNT(\"group\"), COUNT(teacher) FROM timetable_archive").Scan(&total, &withGroup, &withTeacher); err != nil {
 		return u.Bot.SendText(u.ChatID, "Ошибка чтения архива: "+err.Error())
 	}
 
 	var lines []string
 	lines = append(lines, "-- Архив --")
-	if bounds, err := archiveRepo.DayIndexBounds(); err == nil && bounds.Max > 0 {
+	if bounds, err := c.bot.archive.DayIndexBounds(); err == nil && bounds.Max > 0 {
 		lines = append(lines, fmt.Sprintf("Дни: %s — %s", archive.DayIndexToDate(bounds.Min), archive.DayIndexToDate(bounds.Max)))
 		minWeek := int(bounds.Min) / 7
 		maxWeek := int(bounds.Max) / 7
@@ -428,10 +427,10 @@ func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 	lines = append(lines, fmt.Sprintf("Записей: %d (группы: %d, преподаватели: %d)", total, withGroup, withTeacher))
 
-	if groups, err := archiveRepo.Groups(); err == nil && len(groups) > 0 {
+	if groups, err := c.bot.archive.Groups(); err == nil && len(groups) > 0 {
 		lines = append(lines, fmt.Sprintf("Групп в архиве: %d", len(groups)))
 	}
-	if teachers, err := archiveRepo.Teachers(); err == nil && len(teachers) > 0 {
+	if teachers, err := c.bot.archive.Teachers(); err == nil && len(teachers) > 0 {
 		lines = append(lines, fmt.Sprintf("Преподавателей в архиве: %d", len(teachers)))
 	}
 

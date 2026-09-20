@@ -69,7 +69,7 @@ func Targets(c *cache.RaspCache) []Target {
 	return targets
 }
 
-func Run(ctx context.Context, client *http.Client, baseURL string, targets []Target) []Result {
+func Run(ctx context.Context, client *http.Client, baseURL string, targets []Target, token string) []Result {
 	if client == nil {
 		client = &http.Client{Timeout: DefaultTimeout}
 	}
@@ -77,18 +77,21 @@ func Run(ctx context.Context, client *http.Client, baseURL string, targets []Tar
 	base := strings.TrimRight(baseURL, "/")
 	results := make([]Result, 0, len(targets))
 	for _, target := range targets {
-		results = append(results, probe(ctx, client, base, target))
+		results = append(results, probe(ctx, client, base, target, token))
 	}
 	return results
 }
 
-func probe(ctx context.Context, client *http.Client, base string, target Target) Result {
+func probe(ctx context.Context, client *http.Client, base string, target Target, token string) Result {
 	result := Result{Method: target.Method, Path: target.Path}
 
 	request, err := http.NewRequestWithContext(ctx, target.Method, base+target.Path, nil)
 	if err != nil {
 		result.Err = err.Error()
 		return result
+	}
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	started := time.Now()
