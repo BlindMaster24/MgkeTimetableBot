@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
+	"golang.org/x/net/html"
 )
 
 var dayPattern = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})`)
@@ -27,6 +31,11 @@ func findContent(doc *goquery.Document) *goquery.Selection {
 }
 
 func findScope(doc *goquery.Document) (*goquery.Selection, string, bool) {
+	scope, selector, scoped := findScopes(doc)
+	return scope.First(), selector, scoped
+}
+
+func findScopes(doc *goquery.Document) (*goquery.Selection, string, bool) {
 	var fallback *goquery.Selection
 	var fallbackSelector string
 
@@ -37,10 +46,10 @@ func findScope(doc *goquery.Document) (*goquery.Selection, string, bool) {
 		}
 
 		if found.Find("table").Length() > 0 {
-			return found.First(), selector, true
+			return found, selector, true
 		}
 		if fallback == nil {
-			fallback = found.First()
+			fallback = found
 			fallbackSelector = selector
 		}
 	}
@@ -53,7 +62,7 @@ func findScope(doc *goquery.Document) (*goquery.Selection, string, bool) {
 }
 
 func scopedTables(doc *goquery.Document, builder *reportBuilder) *goquery.Selection {
-	scope, selector, scoped := findScope(doc)
+	scope, selector, scoped := findScopes(doc)
 	builder.probe(selector, "content block with tables", scope.Find("table").Length(), true)
 
 	tables := scope.Find("table")
@@ -64,6 +73,63 @@ func scopedTables(doc *goquery.Document, builder *reportBuilder) *goquery.Select
 	}
 
 	return tables
+}
+
+func eachTable(tables *goquery.Selection, visit func(table *goquery.Selection)) {
+	seen := make(map[*html.Node]bool)
+	tables.Each(func(_ int, table *goquery.Selection) {
+		node := table.Get(0)
+		if node == nil || seen[node] {
+			return
+		}
+		seen[node] = true
+		visit(table)
+	})
+}
+
+func dayDate(day string) (time.Time, bool) {
+	parsed, err := time.Parse("02.01.2006", extractDayString(day))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
+func mergeDays[T any](existing, incoming []T, dayOf func(T) string) []T {
+	index := make(map[string]int, len(existing))
+	for i, day := range existing {
+		index[dayOf(day)] = i
+	}
+
+	for _, day := range incoming {
+		if i, ok := index[dayOf(day)]; ok {
+			existing[i] = day
+			continue
+		}
+		index[dayOf(day)] = len(existing)
+		existing = append(existing, day)
+	}
+
+	sort.SliceStable(existing, func(i, j int) bool {
+		left, leftOK := dayDate(dayOf(existing[i]))
+		right, rightOK := dayDate(dayOf(existing[j]))
+		if !leftOK || !rightOK {
+			return false
+		}
+		return left.Before(right)
+	})
+
+	return existing
+}
+
+func mergeGroupDays(existing, incoming *model.Group) *model.Group {
+	existing.Days = mergeDays(existing.Days, incoming.Days, func(day model.GroupDay) string { return day.Day })
+	return existing
+}
+
+func mergeTeacherDays(existing, incoming *model.Teacher) *model.Teacher {
+	existing.Days = mergeDays(existing.Days, incoming.Days, func(day model.TeacherDay) string { return day.Day })
+	return existing
 }
 
 func extractDayString(text string) string {

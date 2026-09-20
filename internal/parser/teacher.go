@@ -44,11 +44,12 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 	builder.probe("table", "timetable tables", tables.Length(), true)
 
 	labelled := 0
+	blocks := 0
 	skipped := 0
 	withDays := 0
 	withLessons := 0
 
-	tables.Each(func(_ int, table *goquery.Selection) {
+	eachTable(tables, func(table *goquery.Selection) {
 		match, ok := tableLabel(table, p.doc, teacherLabel)
 		if !ok {
 			return
@@ -64,9 +65,14 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 			builder.fallback("teacher label without the 'Преподаватель -' prefix: " + match.Value)
 		}
 
+		blocks++
 		withDays++
 		if teacherHasLessons(teacher) {
 			withLessons++
+		}
+		if existing, ok := teachers[match.Value]; ok {
+			teachers[match.Value] = mergeTeacherDays(existing, teacher)
+			return
 		}
 		teachers[match.Value] = teacher
 	})
@@ -75,6 +81,7 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 	builder.probe("th[colspan] with a date", "teachers with day columns", withDays, true)
 	builder.probe("td lesson cells", "teachers with at least one lesson", withLessons, false)
 	builder.probe("th[colspan] with dd.MM.yyyy", "day columns carrying a parseable date", teacherDatedDays(teachers), true)
+	builder.probe("table with a day header", "timetable blocks across every published week", blocks, true)
 
 	if skipped > 0 {
 		builder.warn("%d tables had no readable day columns", skipped)

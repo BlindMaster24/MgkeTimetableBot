@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-var weekdayNames = []string{"Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"}
+var weekdayNames = []string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}
 
 type Formatter interface {
 	Name() string

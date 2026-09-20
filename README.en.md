@@ -176,6 +176,8 @@ The bell schedule page can hold several tables, one per campus. The parser keeps
 
 The parser does not depend on a rigid page structure: the group or teacher name comes from the nearest heading (any `h1`…`h6` or `caption`), and the day columns are derived from the table header, `colspan` included, instead of hard-coded cell numbers. If the layout collapses to a single column per day, the parser tries to read the room from the cell text.
 
+The site publishes several weeks at once, one block each. The parser reads **every** block on the page instead of the first one only and folds the days of a group (or teacher) into a single entry keyed by date: a repeated date is overwritten by the later block, and the days are kept in ascending order. Right after a new week is published the bot therefore knows both the current and the next one and notifies about the new week. Weekday names are spelled out in full ("Понедельник, 21.09.2026") the way the site writes them.
+
 Every run collects diagnostics — which selector matched what. When the site changes and a required selector stops matching, an empty or sharply shrunken result **never overwrites the cache**: the bot keeps serving the timetable, and the admins hear about it right away — as a Telegram alert, plus in `/parserLogs` and `GET /api/health`:
 
 - `parser_layout` — a required selector stopped matching (`health.parser_layout_failures` runs in a row, 2 by default);
@@ -393,7 +395,7 @@ go test ./internal/telegram/...
 
 | File | What it checks |
 |------|----------------|
-| `internal/parser/*_test.go` | group, teacher and bell schedule parsing, every heading shape, `colspan`, single-column days, the text fallback, the proxy, the polling scheduler and the cache guard against an empty response |
+| `internal/parser/*_test.go` | group, teacher and bell schedule parsing, every heading shape, `colspan`, single-column days, several weeks on one page, the text fallback, the proxy, the polling scheduler and the cache guard against an empty response |
 | `internal/telegram/e2e_test.go` | the student, teacher, parent and guest lifecycles, every settings toggle and every keyboard |
 | `internal/telegram/menus_e2e_test.go` | every button of every menu either opens a menu, changes a setting or is listed as an exception |
 | `internal/telegram/inline_e2e_test.go` | every `callbackData` from any keyboard reaches a registered handler |

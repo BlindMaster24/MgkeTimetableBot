@@ -45,11 +45,12 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 	builder.probe("table", "timetable tables", tables.Length(), true)
 
 	labelled := 0
+	blocks := 0
 	skipped := 0
 	withDays := 0
 	withLessons := 0
 
-	tables.Each(func(_ int, table *goquery.Selection) {
+	eachTable(tables, func(table *goquery.Selection) {
 		match, ok := tableLabel(table, p.doc, groupLabel)
 		if !ok {
 			return
@@ -65,9 +66,14 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 			builder.fallback("group label without the 'Группа -' prefix: " + match.Value)
 		}
 
+		blocks++
 		withDays++
 		if groupHasLessons(group) {
 			withLessons++
+		}
+		if existing, ok := groups[match.Value]; ok {
+			groups[match.Value] = mergeGroupDays(existing, group)
+			return
 		}
 		groups[match.Value] = group
 	})
@@ -76,6 +82,7 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 	builder.probe("th[colspan] with a date", "groups with day columns", withDays, true)
 	builder.probe("td lesson cells", "groups with at least one lesson", withLessons, false)
 	builder.probe("th[colspan] with dd.MM.yyyy", "day columns carrying a parseable date", groupDatedDays(groups), true)
+	builder.probe("table with a day header", "timetable blocks across every published week", blocks, true)
 
 	if skipped > 0 {
 		builder.warn("%d tables had no readable day columns", skipped)

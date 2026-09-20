@@ -379,6 +379,34 @@ func extractDaysFromData(data map[string]any) []map[string]any {
 	return result
 }
 
+func TestDayHeadersUseFullWeekdayNames(t *testing.T) {
+	days := []map[string]any{
+		{"day": "07.09.2026", "lessons": []any{map[string]any{"lesson": "Математика", "type": "Лек", "cabinet": "101"}}},
+		{"day": "08.09.2026", "lessons": []any{map[string]any{"lesson": "Физика", "type": "Пр", "cabinet": "202"}}},
+	}
+
+	for _, formatter := range AllFormatters {
+		plain := formatter.FormatGroupFull("777", days, FormatOptions{})
+		if !strings.Contains(plain, "Понедельник, 07.09.2026") {
+			t.Errorf("%s: monday header is not spelled out: %q", formatter.Name(), plain)
+		}
+		if !strings.Contains(plain, "Вторник, 08.09.2026") {
+			t.Errorf("%s: tuesday header is not spelled out: %q", formatter.Name(), plain)
+		}
+
+		html := formatter.FormatGroupFull("777", days, FormatOptions{IsTelegram: true})
+		if !strings.Contains(html, "Понедельник") || !strings.Contains(html, "07.09.2026") {
+			t.Errorf("%s: monday header is missing from the telegram output: %q", formatter.Name(), html)
+		}
+
+		for _, short := range []string{"Пн,", "Вт,", "Ср,", "Чт,", "Пт,", "Сб,", "Вс,"} {
+			if strings.Contains(plain, short) || strings.Contains(html, short) {
+				t.Errorf("%s: abbreviated weekday leaked into the output: %q", formatter.Name(), plain)
+			}
+		}
+	}
+}
+
 func TestFormatSeconds(t *testing.T) {
 	tests := []struct {
 		secs int64

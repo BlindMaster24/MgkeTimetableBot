@@ -13,7 +13,7 @@ var (
 	dateTimeRe   = regexp.MustCompile(`\d{2}\.\d{2}\.\d{4},? \d{2}:\d{2}`)
 	fullDateRe   = regexp.MustCompile(`\d{2}\.\d{2}\.\d{4}`)
 	shortDateRe  = regexp.MustCompile(`\d{2}\.\d{2}`)
-	weekdayRe    = regexp.MustCompile(`Пн|Вт|Ср|Чт|Пт|Сб|Вс`)
+	weekdayRe    = regexp.MustCompile(`Понедельник|Вторник|Среда|Четверг|Пятница|Суббота|Воскресенье|Пн|Вт|Ср|Чт|Пт|Сб|Вс`)
 	weekNumberRe = regexp.MustCompile(`№\s*\d+`)
 	dayHintRe    = regexp.MustCompile(`\((сегодня|завтра)\)`)
 	loadedAtRe   = regexp.MustCompile(`загружена \d.*? назад`)

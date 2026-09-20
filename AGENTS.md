@@ -36,6 +36,7 @@
 - `cmd/bot/main.go` drains those events after every parse into `internal/notification`, then syncs only the changed days into Google Calendar and finally reconciles calendars that fell behind.
 - `internal/health` records parser, calendar and API outcomes; the scheduler polls it and messages admins while an alert is active.
 - Parsed data is stored in `cache/` (file-backed JSON in `cache/rasp/`) and `archive/` (SQLite).
+- The site publishes several weeks at once, one content block per week: `internal/parser` walks every block (`findScopes`/`eachTable`), never the first one only, and merges the days of a group/teacher by date (`mergeDays`), so a repeated date is overwritten by the later block and the cache always holds every published week.
 - Every cached day carries a plain `дд.мм.гггг` date in its `day` field: the formatters, the archive index, the notification bus and the Google/ICS exporters all parse it with `time.Parse("02.01.2006", ...)`. `cache.New` normalizes legacy labels ("Понедельник, 31.08.2026") on load, and the parser reports a required `th[colspan] with dd.MM.yyyy` probe so a page without parseable dates raises `parser_layout`.
 - Telegram messages: a command or a text button always sends a new message; only an inline button edits the message it belongs to, using the message id of the callback query (`Update.MessageID`). Never route an edit through a message id stored in the chat row.
 - Output is delivered through telego (Telegram) or gin (HTTP API).
@@ -101,6 +102,7 @@
 - The old bot lives on the `old` branch; `scripts/paritycheck` reads it straight from git (`-ts-ref`, default `old`).
 - It compares three surfaces: Telegram command names, callback roots, and every keyboard button label. `-dump-go` prints the live Go surface, `-allowlist` overrides the known-differences file.
 - `internal/telegram/testdata/parity/ts_surface.json` is the TypeScript fixture; `go run ./scripts/paritycheck -update` regenerates it.
+- For side-by-side reading, export the branch once into a gitignored `old/` (`rm -rf old && mkdir old && git archive old | tar -x -C old`) and use the node helpers in `old/_tools` (`label-diff.js`, `string-diff.js`, `near-diff.js`, `command-diff.js`); `SURFACE_DUMP=old/_tools/go-commands.txt go test ./internal/telegram -run TestSurfaceDump` dumps the Go commands with their descriptions.
 - Every accepted difference must be listed in `internal/telegram/testdata/parity/known_differences.json` with a reason; an entry without a reason is an error.
 - `internal/telegram/parity_test.go` re-checks the same surface offline, so plain `go test` catches drift.
 - Keyboard layouts are golden files: `go test ./internal/telegram -run Golden -update` rewrites `internal/telegram/testdata/keyboard_layouts.golden`.
