@@ -261,9 +261,16 @@ jobs:
           fi
           docker exec mgke-smoke test -f /usr/share/zoneinfo/Europe/Minsk
 
-      - name: Check the API info endpoint
+      - name: Check the API info endpoint requires a key
         run: |
-          jq -e '.build.version == "ci"' <(curl -s http://127.0.0.1:18081/api/info) > /dev/null
+          code="$(curl -s -o /tmp/info.json -w '%{http_code}' http://127.0.0.1:18081/api/info)"
+          if [ "$code" != "401" ]; then
+            echo "an unkeyed /api/info answered $code, expected 401" >&2
+            cat /tmp/info.json >&2 || true
+            exit 1
+          fi
+
+          jq -e '.error == "Неверный ключ авторизации"' /tmp/info.json > /dev/null
 
       - name: Show the container logs
         if: failure()
