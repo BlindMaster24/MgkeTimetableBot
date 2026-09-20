@@ -9,6 +9,7 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
+	"github.com/mymmrac/telego"
 )
 
 type compareGroupsStepA struct{ bot *Bot }
@@ -51,28 +52,56 @@ func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *C
 }
 
 func (b *Bot) findGroup(u *Update, chat *Chat, input string) (string, bool) {
+	return b.findGroupWithKeyboard(u, chat, input, replyMainMenu(b, chat))
+}
+
+func (b *Bot) findGroupWithKeyboard(u *Update, chat *Chat, input string, keyboard *telego.ReplyKeyboardMarkup) (string, bool) {
 	normalized := strings.TrimRight(strings.TrimSpace(input), "*")
 
 	if normalized == "" {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", replyMainMenu(b, chat))
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", keyboard)
 		return "", false
 	}
 	for _, ch := range normalized {
 		if ch < '0' || ch > '9' {
-			u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", replyMainMenu(b, chat))
+			u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", keyboard)
 			return "", false
 		}
 	}
 	if len(normalized) > 3 {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Номер группы введён неверно", replyMainMenu(b, chat))
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Номер группы введён неверно", keyboard)
 		return "", false
 	}
 	if _, ok := b.cache.GetGroups()[normalized]; !ok {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данной учебной группы не существует", replyMainMenu(b, chat))
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данной учебной группы не существует", keyboard)
 		return "", false
 	}
 
 	return normalized, true
+}
+
+func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keyboard *telego.ReplyKeyboardMarkup) (string, bool, bool) {
+	if len(input) < 3 {
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Фамилия введена некорректно", keyboard)
+		return "", false, false
+	}
+
+	matched, tooMany := matchTeacherList(input, b.cache.GetTeachers(), b.cache.GetTeamNames())
+	if len(matched) == 0 {
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данный преподаватель не найден", keyboard)
+		return "", false, false
+	}
+	if tooMany {
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Слишком много результатов для выборки.", keyboard)
+		return "", false, false
+	}
+	if len(matched) > 1 {
+		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
+		u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
+		return "", false, true
+	}
+
+	return matched[0], true, false
 }
 
 func (b *Bot) compareGroupsMessage(groupA, groupB string) string {

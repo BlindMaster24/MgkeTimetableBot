@@ -763,14 +763,12 @@ func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
 		return
 	}
 
-	input := strings.TrimSpace(u.Text)
-	matched, _ := findClosest(input, groups)
+	matched, ok := b.findGroupWithKeyboard(u, chat, strings.TrimSpace(u.Text), b.replySubscriptionsMenu())
 
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
 
-	if matched == "" {
-		b.SendText(u.ChatID, b.loc("invalid_group_number"))
+	if !ok {
 		return
 	}
 
@@ -788,14 +786,15 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 		return
 	}
 
-	input := strings.TrimSpace(u.Text)
-	matched, _ := findClosest(input, teachers)
+	matched, ok, retry := b.findTeacherWithKeyboard(u, chat, strings.TrimSpace(u.Text), b.replySubscriptionsMenu())
+	if retry {
+		return
+	}
 
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
 
-	if matched == "" {
-		b.SendText(u.ChatID, b.loc("teacher_not_found"))
+	if !ok {
 		return
 	}
 
@@ -819,14 +818,8 @@ func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
 		return
 	}
 
-	var idx int
-	for _, c := range input {
-		if c >= '0' && c <= '9' {
-			idx = idx*10 + int(c-'0')
-		}
-	}
-
-	if idx < 1 || idx > len(list) {
+	idx, err := strconv.Atoi(input)
+	if err != nil || idx < 1 || idx > len(list) {
 		b.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", b.replySubscriptionsMenu())
 		return
 	}

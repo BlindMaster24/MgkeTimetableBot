@@ -33,6 +33,15 @@ func (c *getCabinetCmd) MatchText(text string) bool {
 }
 
 var cabinetRegexp = regexp.MustCompile(`^(!|\/)(get)?cabinet(\b|\s|$)`)
+var cabinetNumberRegexp = regexp.MustCompile(`(\d+-)?\d+`)
+
+func cabinetMatches(cabinet, query string) bool {
+	want := cabinetNumberRegexp.FindString(query)
+	if want == "" {
+		return strings.EqualFold(strings.TrimSpace(cabinet), strings.TrimSpace(query))
+	}
+	return cabinetNumberRegexp.FindString(cabinet) == want
+}
 
 func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
@@ -83,7 +92,7 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 				if cab == "" {
 					continue
 				}
-				if !strings.EqualFold(cab, input) {
+				if !cabinetMatches(cab, input) {
 					continue
 				}
 				lessonName, _ := lessonMap["lesson"].(string)
@@ -114,10 +123,25 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Кабинет не найден.")
 	}
 
-	var lines []string
-	for cab, days := range info {
-		lines = append(lines, fmt.Sprintf("Кабинет: %s", cab))
-		for _, d := range days {
+	cabinets := make([]string, 0, len(info))
+	for cab := range info {
+		cabinets = append(cabinets, cab)
+	}
+	sort.Strings(cabinets)
+
+	var blocks []string
+	for _, cab := range cabinets {
+		dates := make([]string, 0, len(info[cab]))
+		for date := range info[cab] {
+			dates = append(dates, date)
+		}
+		sort.Strings(dates)
+
+		lines := []string{fmt.Sprintf("Кабинет: %s", cab)}
+		for _, date := range dates {
+			d := info[cab][date]
+			sort.SliceStable(d.Lessons, func(i, j int) bool { return d.Lessons[i].Index < d.Lessons[j].Index })
+
 			lines = append(lines, fmt.Sprintf("%s, %s", d.Weekday, d.Date))
 			for _, l := range d.Lessons {
 				subgroup := ""
@@ -126,10 +150,11 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 				}
 				lines = append(lines, fmt.Sprintf("%d. %s (%s), %s%s, %s", l.Index+1, l.Lesson, l.Type, subgroup, l.Group, l.Teacher))
 			}
-			lines = append(lines, "")
 		}
+		blocks = append(blocks, strings.Join(lines, "\n"))
 	}
-	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
+
+	return u.Bot.SendText(u.ChatID, strings.Join(blocks, "\n\n"))
 }
 
 type getGroupsCmd struct{ bot *Bot }

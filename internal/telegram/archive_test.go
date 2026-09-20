@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,8 +22,9 @@ type capturedMessage struct {
 }
 
 type capturingCaller struct {
-	mu       sync.Mutex
-	messages []capturedMessage
+	mu        sync.Mutex
+	messages  []capturedMessage
+	documents []string
 }
 
 func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.RequestData) (*telegoapi.Response, error) {
@@ -37,8 +39,28 @@ func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.
 			c.mu.Unlock()
 		}
 	}
+	if strings.HasSuffix(url, "/sendDocument") {
+		body := data.BodyRaw
+		if len(body) == 0 && data.BodyStream != nil {
+			body, _ = io.ReadAll(data.BodyStream)
+		}
+
+		c.mu.Lock()
+		c.documents = append(c.documents, string(body))
+		c.mu.Unlock()
+	}
 
 	return &telegoapi.Response{Ok: true, Result: []byte(`{"message_id": 1}`)}, nil
+}
+
+func (c *capturingCaller) documentPayload() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.documents) == 0 {
+		return ""
+	}
+	return c.documents[len(c.documents)-1]
 }
 
 func (c *capturingCaller) last() string {
@@ -55,6 +77,7 @@ func (c *capturingCaller) reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.messages = nil
+	c.documents = nil
 }
 
 func setupArchiveBot(t *testing.T, mode ChatMode, group, teacher string) (*Bot, *capturingCaller, *archive.Repository, int64) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -154,8 +155,14 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 	type dayStat map[int]int
 	stat := make(map[string]dayStat)
 
-	for _, raw := range groups {
-		dataMap, ok := raw.(map[string]any)
+	names := make([]string, 0, len(groups))
+	for name := range groups {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		dataMap, ok := groups[name].(map[string]any)
 		if !ok {
 			continue
 		}
@@ -163,55 +170,97 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 		if !ok {
 			continue
 		}
+
+		days := make([]map[string]any, 0, len(daysArr))
 		for _, d := range daysArr {
-			dayMap, ok := d.(map[string]any)
-			if !ok {
-				continue
+			if dayMap, ok := d.(map[string]any); ok {
+				days = append(days, dayMap)
 			}
-			dayStr, _ := dayMap["day"].(string)
-			lessons, _ := dayMap["lessons"].([]any)
-			lastLesson := -1
-			for i, l := range lessons {
-				if l == nil {
-					continue
-				}
-				switch v := l.(type) {
-				case map[string]any:
-					if _, ok := v["lesson"]; ok {
-						lastLesson = i
-					}
-				case []any:
-					for _, sub := range v {
-						if subMap, ok := sub.(map[string]any); ok {
-							if _, ok := subMap["lesson"]; ok {
-								lastLesson = i
-							}
-						}
-					}
-				}
-			}
-			if lastLesson == -1 {
-				continue
-			}
-			if stat[dayStr] == nil {
-				stat[dayStr] = make(dayStat)
-			}
-			stat[dayStr][lastLesson+1]++
 		}
+		sort.SliceStable(days, func(i, j int) bool {
+			left, _ := days[i]["day"].(string)
+			right, _ := days[j]["day"].(string)
+			leftTime, leftErr := time.Parse("02.01.2006", left)
+			rightTime, rightErr := time.Parse("02.01.2006", right)
+			if leftErr != nil || rightErr != nil {
+				return left < right
+			}
+			return leftTime.Before(rightTime)
+		})
+
+		relevant := c.bot.getDayRasp(days, false)
+		if len(relevant) == 0 {
+			continue
+		}
+
+		dayStr, _ := relevant[0]["day"].(string)
+		lessons, _ := relevant[0]["lessons"].([]any)
+		lastLesson := lastLessonIndex(lessons)
+		if lastLesson == -1 {
+			continue
+		}
+		if stat[dayStr] == nil {
+			stat[dayStr] = make(dayStat)
+		}
+		stat[dayStr][lastLesson+1]++
 	}
 
 	if len(stat) == 0 {
 		return u.Bot.SendText(u.ChatID, "Нет данных для отображения")
 	}
 
+	days := make([]string, 0, len(stat))
+	for day := range stat {
+		days = append(days, day)
+	}
+	sort.SliceStable(days, func(i, j int) bool {
+		left, leftErr := time.Parse("02.01.2006", days[i])
+		right, rightErr := time.Parse("02.01.2006", days[j])
+		if leftErr != nil || rightErr != nil {
+			return days[i] < days[j]
+		}
+		return left.Before(right)
+	})
+
 	var msg []string
-	for day, counts := range stat {
+	for _, day := range days {
+		lessons := make([]int, 0, len(stat[day]))
+		for lesson := range stat[day] {
+			lessons = append(lessons, lesson)
+		}
+		sort.Ints(lessons)
+
 		part := []string{"__ " + day + " __"}
-		for lesson, count := range counts {
-			part = append(part, fmt.Sprintf("%d групп заканчивают к %d паре", count, lesson))
+		for _, lesson := range lessons {
+			part = append(part, fmt.Sprintf("%d групп заканчивают к %d паре", stat[day][lesson], lesson))
 		}
 		msg = append(msg, strings.Join(part, "\n"))
 	}
 
 	return u.Bot.SendText(u.ChatID, strings.Join(msg, "\n\n"))
+}
+
+func lastLessonIndex(lessons []any) int {
+	last := -1
+
+	for i, lesson := range lessons {
+		switch v := lesson.(type) {
+		case nil:
+			continue
+		case map[string]any:
+			if _, ok := v["lesson"]; ok {
+				last = i
+			}
+		case []any:
+			for _, sub := range v {
+				if subMap, ok := sub.(map[string]any); ok {
+					if _, ok := subMap["lesson"]; ok {
+						last = i
+					}
+				}
+			}
+		}
+	}
+
+	return last
 }
