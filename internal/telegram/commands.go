@@ -276,7 +276,7 @@ type groupCmd struct{ bot *Bot }
 func (c *groupCmd) Name() string        { return "/group" }
 func (c *groupCmd) Description() string { return c.bot.loc("cmd_group") }
 func (c *groupCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_group")
+	return groupDayButtonRe.MatchString(text)
 }
 func (c *groupCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetGroup(u, "day")
@@ -287,7 +287,7 @@ type teacherCmd struct{ bot *Bot }
 func (c *teacherCmd) Name() string        { return "/teacher" }
 func (c *teacherCmd) Description() string { return c.bot.loc("cmd_teacher") }
 func (c *teacherCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_teacher")
+	return teacherDayButtonRe.MatchString(text)
 }
 func (c *teacherCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetTeacher(u, "day")
@@ -320,7 +320,8 @@ func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, c.bot.loc("group_not_exists"))
 		}
-		path, err := imagepkg.RenderGroupFromCache(chat.Group, data, "./cache/images")
+		_, days := c.bot.relevantWeekDays(data)
+		path, err := imagepkg.RenderGroupDays(chat.Group, days, "./cache/images")
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, c.bot.loc("image_failed"))
 		}
@@ -334,7 +335,8 @@ func (c *imageCmd) Handler(ctx context.Context, u *Update) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, c.bot.loc("teacher_not_exists"))
 		}
-		path, err := imagepkg.RenderTeacherFromCache(chat.Teacher, data, "./cache/images")
+		_, days := c.bot.relevantWeekDays(data)
+		path, err := imagepkg.RenderTeacherDays(chat.Teacher, days, "./cache/images")
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, c.bot.loc("image_failed"))
 		}
@@ -419,8 +421,10 @@ type flushCacheCmd struct{ bot *Bot }
 
 func (c *flushCacheCmd) Hidden() bool { return true }
 
-func (c *flushCacheCmd) Name() string        { return "/flushcache" }
-func (c *flushCacheCmd) Description() string { return "Сбросить кеш в БД" }
+func (c *flushCacheCmd) Name() string { return "/flushcache" }
+func (c *flushCacheCmd) Description() string {
+	return "Сбросить расписание из кэша парсера в БД"
+}
 func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
@@ -443,6 +447,8 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		b.chatRepo.Save(chat)
 		b.SendTextWithReplyKeyboard(u.ChatID, "Клавиатура была принудительно пересоздана (обновлена)", replyMainMenu(b, chat))
 	}
+
+	b.sendEulaOnce(u, chat)
 
 	if b.dispatchTextCommand(ctx, u, chat) {
 		return
@@ -473,7 +479,11 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if idx := strings.IndexByte(cmdName, ' '); idx >= 0 {
 			cmdName = cmdName[:idx]
 		}
-		if cmd, ok := b.commands["/"+cmdName]; ok {
+		cmd := b.commands["/"+cmdName]
+		if cmd == nil {
+			cmd = b.commandByName(cmdName)
+		}
+		if cmd != nil {
 			if err := cmd.Handler(ctx, u); err != nil {
 				b.log.Error().Err(err).Str("cmd", cmdName).Msg("command error")
 			}

@@ -79,7 +79,7 @@ func (r *AliasRepository) Clear(userID int64) error {
 type aliasCmd struct{ bot *Bot }
 
 func (c *aliasCmd) Name() string        { return "/alias" }
-func (c *aliasCmd) Description() string { return "Настройка алиасов" }
+func (c *aliasCmd) Description() string { return "Настройки алиасов" }
 func (c *aliasCmd) MatchText(text string) bool {
 	return text == "Алиасы" || text == "Настройка алиасов"
 }

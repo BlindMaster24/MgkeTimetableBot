@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/calendar"
@@ -39,7 +38,7 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 
-	week := utils.WeekIndexFromDate(time.Now())
+	week := c.bot.relevantWeekIndex()
 	minIdx, maxIdx := week.WeekDayIndexRange()
 
 	switch chat.Mode {

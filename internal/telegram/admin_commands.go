@@ -20,7 +20,7 @@ func (c *regexpCmd) Name() string { return "/regexp" }
 
 func (c *regexpCmd) AdminOnly() bool { return true }
 func (c *regexpCmd) Description() string {
-	return "Отобразить все команды и регулярки"
+	return "Отобразить все команды и регулярки к ним"
 }
 func (c *regexpCmd) MatchText(text string) bool {
 	return text == "/regexp"
@@ -342,7 +342,7 @@ func (c *requireNewButtonsCmd) Name() string { return "/requireNewButtons" }
 
 func (c *requireNewButtonsCmd) AdminOnly() bool { return true }
 func (c *requireNewButtonsCmd) Description() string {
-	return "Обновить клавиатуру пользователям"
+	return "Выставляет метку, что после обращения юзера бот обновит клавиатуру"
 }
 func (c *requireNewButtonsCmd) MatchText(text string) bool {
 	return text == "/requireNewButtons"
@@ -442,8 +442,10 @@ type restartCmd struct{ bot *Bot }
 
 func (c *restartCmd) AdminOnly() bool { return true }
 
-func (c *restartCmd) Name() string        { return "/restart" }
-func (c *restartCmd) Description() string { return "Перезапустить бота" }
+func (c *restartCmd) Name() string { return "/restart" }
+func (c *restartCmd) Description() string {
+	return "Перезапуск бота (нужен супервизор: systemd, PM2 или Docker)"
+}
 func (c *restartCmd) MatchText(text string) bool {
 	return text == "/restart"
 }

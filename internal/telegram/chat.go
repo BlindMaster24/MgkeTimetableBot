@@ -22,6 +22,7 @@ type Chat struct {
 	Service                  string
 	PeerID                   int64
 	Accepted                 bool
+	EULA                     bool
 	Scene                    string
 	Mode                     ChatMode
 	Group                    string
@@ -90,6 +91,7 @@ func (r *Repository) migrate() error {
 		service TEXT NOT NULL DEFAULT 'telegram',
 		peer_id INTEGER NOT NULL,
 		accepted INTEGER NOT NULL DEFAULT 1,
+		eula INTEGER NOT NULL DEFAULT 0,
 		scene TEXT,
 		mode TEXT,
 		"group" TEXT,
@@ -135,6 +137,7 @@ func (r *Repository) migrate() error {
 	}
 
 	for _, col := range []struct{ name, ddl string }{
+		{"eula", "ALTER TABLE bot_chats ADD COLUMN eula INTEGER NOT NULL DEFAULT 0"},
 		{"history_group", "ALTER TABLE bot_chats ADD COLUMN history_group TEXT NOT NULL DEFAULT '[]'"},
 		{"history_teacher", "ALTER TABLE bot_chats ADD COLUMN history_teacher TEXT NOT NULL DEFAULT '[]'"},
 		{"last_msg_time", "ALTER TABLE bot_chats ADD COLUMN last_msg_time INTEGER NOT NULL DEFAULT 0"},
@@ -203,7 +206,7 @@ func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
 
 func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	row := r.db.QueryRow(
-		`SELECT id, service, peer_id, accepted, scene, mode, "group", teacher,
+		`SELECT id, service, peer_id, accepted, eula, scene, mode, "group", teacher,
 		        google_email, formatter, show_about, show_daily, show_weekly,
 		        show_calls, show_fast_group, show_fast_teacher, hide_past_days,
 		        delete_last_msg, last_msg_id, allow_send_mess, notice_changes,
@@ -218,7 +221,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	)
 
 	chat := &Chat{}
-	var accepted, showAbout, showDaily, showWeekly, showCalls, showFastGroup, showFastTeacher int
+	var accepted, eula, showAbout, showDaily, showWeekly, showCalls, showFastGroup, showFastTeacher int
 	var hidePastDays, deleteLastMsg, allowSendMess, noticeChanges, noticeNextWeek, noticeCalls, noticeParserErrors int
 	var showParserTime, showHints, diffEnabled, diffAutoInWeek, diffAutoInUpdates, diffShowBeforeAfter int
 	var subscribeDistribution, needUpdateButtons, deactivateSecondaryCheck int
@@ -227,7 +230,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	var nsHistoryGroup, nsHistoryTeacher sql.NullString
 	var nsCallsEditInput, nsCallsEditReason, nsCallsCampus sql.NullString
 	err := row.Scan(
-		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &nsScene, &nsMode,
+		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &eula, &nsScene, &nsMode,
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
 		&showAbout, &showDaily, &showWeekly, &showCalls, &showFastGroup, &showFastTeacher,
 		&hidePastDays, &deleteLastMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
@@ -250,6 +253,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	_ = json.Unmarshal([]byte(nsHistoryTeacher.String), &chat.HistoryTeacher)
 
 	chat.Accepted = accepted != 0
+	chat.EULA = eula != 0
 	chat.ShowAbout = showAbout != 0
 	chat.ShowDaily = showDaily != 0
 	chat.ShowWeekly = showWeekly != 0
@@ -357,7 +361,7 @@ func (r *Repository) Save(chat *Chat) error {
 
 	_, err := r.db.Exec(
 		`UPDATE bot_chats SET
-			accepted=?, scene=?, mode=?, "group"=?, teacher=?,
+			accepted=?, eula=?, scene=?, mode=?, "group"=?, teacher=?,
 			google_email=?, formatter=?, show_about=?, show_daily=?, show_weekly=?,
 			show_calls=?, show_fast_group=?, show_fast_teacher=?, hide_past_days=?,
 			delete_last_msg=?, last_msg_id=?, allow_send_mess=?, notice_changes=?,
@@ -367,7 +371,7 @@ func (r *Repository) Save(chat *Chat) error {
 			history_group=?, history_teacher=?, last_msg_time=?, subscribe_distribution=?,
 			need_update_buttons=?, deactivate_secondary_check=?, calls_edit_input=?, calls_edit_reason=?, calls_campus=?
 		 WHERE id=?`,
-		toInt(chat.Accepted), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
+		toInt(chat.Accepted), toInt(chat.EULA), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
 		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
 		toInt(chat.ShowWeekly), toInt(chat.ShowCalls), toInt(chat.ShowFastGroup),
 		toInt(chat.ShowFastTeacher), toInt(chat.HidePastDays), toInt(chat.DeleteLastMsg),

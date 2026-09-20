@@ -67,7 +67,8 @@ func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("group_not_exists"))
 		}
-		path, err := imagepkg.RenderGroupFromCache(chat.Group, data, "./cache/images")
+		_, days := cb.bot.relevantWeekDays(data)
+		path, err := imagepkg.RenderGroupDays(chat.Group, days, "./cache/images")
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
 		}
@@ -81,7 +82,8 @@ func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
 		if !ok {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("teacher_not_exists"))
 		}
-		path, err := imagepkg.RenderTeacherFromCache(chat.Teacher, data, "./cache/images")
+		_, days := cb.bot.relevantWeekDays(data)
+		path, err := imagepkg.RenderTeacherDays(chat.Teacher, days, "./cache/images")
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
 		}

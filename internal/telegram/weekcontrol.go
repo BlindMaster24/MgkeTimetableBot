@@ -20,7 +20,7 @@ func (b *Bot) weekControlKeyboard(typeName, value string, weekIndex int, hidePas
 
 func (b *Bot) weekControlKeyboardHeader(typeName, value string, weekIndex int, hidePastDays bool, showHeader bool) *telego.InlineKeyboardMarkup {
 	minWeek, maxWeek := b.weekIndexBounds()
-	currentWeek := utils.WeekIndexFromDate(time.Now()).Value()
+	currentWeek := utils.WeekIndexFromDate(b.nowTime()).Value()
 
 	typeLetter := string(typeName[0])
 
@@ -76,7 +76,7 @@ func (b *Bot) weekIndexBounds() (int, int) {
 			return minWeek, maxWeek
 		}
 	}
-	current := utils.WeekIndexFromDate(time.Now()).Value()
+	current := utils.WeekIndexFromDate(b.nowTime()).Value()
 	return current - 1, current + 2
 }
 
@@ -88,7 +88,7 @@ func boolToInt(b bool) string {
 }
 
 func (b *Bot) relevantWeekIndex() utils.WeekIndex {
-	date := time.Now()
+	date := b.nowTime()
 	weekIndex := utils.WeekIndexFromDate(date)
 	if date.Weekday() == time.Sunday {
 		weekIndex = utils.WeekIndexFromNumber(weekIndex.Value() + 1)

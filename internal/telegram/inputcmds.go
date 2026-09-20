@@ -3,24 +3,22 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
-type getGroupCmd struct{ bot *Bot }
-
-func (c *getGroupCmd) Name() string        { return "/group" }
-func (c *getGroupCmd) Description() string { return c.bot.loc("cmd_group") }
-func (c *getGroupCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_group") || text == "Группа День" || text == "👩‍🎓 Группа День"
-}
-func (c *getGroupCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetGroup(u, "day")
-}
+var (
+	groupDayButtonRe     = regexp.MustCompile(`(?i)^(👩‍🎓\s)?Группа(\s?День)?$`)
+	groupWeekButtonRe    = regexp.MustCompile(`(?i)^(👩‍🎓\s)?Группа\s?Неделя$`)
+	groupImageButtonRe   = regexp.MustCompile(`(?i)^(👩‍🎓\s)?Группа\s?(фото(графия)?|таблица)$`)
+	teacherDayButtonRe   = regexp.MustCompile(`(?i)^(👩‍🏫\s)?(Учитель|Преподаватель|Препод\.?)(\s?День)?$`)
+	teacherWeekButtonRe  = regexp.MustCompile(`(?i)^(👩‍🏫\s)?(Учитель|Преподаватель|Препод\.?)\s?Неделя$`)
+	teacherImageButtonRe = regexp.MustCompile(`(?i)^(👩‍🏫\s)?(Учитель|Преподаватель)\s?(фотография|таблица)$`)
+)
 
 type getGroupWeekCmd struct{ bot *Bot }
 
@@ -29,7 +27,7 @@ func (c *getGroupWeekCmd) Description() string {
 	return "Узнать расписание на неделю указанной группы (не зависит от текущего вашего)"
 }
 func (c *getGroupWeekCmd) MatchText(text string) bool {
-	return text == "Группа Неделя" || text == "👩‍🎓 Группа Неделя"
+	return groupWeekButtonRe.MatchString(text)
 }
 func (c *getGroupWeekCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetGroup(u, "week")
@@ -42,21 +40,10 @@ func (c *getGroupImageCmd) Description() string {
 	return "Сгенерировать фотографию расписания группы (не зависит от текущего вашего)"
 }
 func (c *getGroupImageCmd) MatchText(text string) bool {
-	return strings.HasPrefix(text, "Группафото") || strings.HasPrefix(text, "Группа таблица")
+	return groupImageButtonRe.MatchString(text)
 }
 func (c *getGroupImageCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetGroup(u, "image")
-}
-
-type getTeacherCmd struct{ bot *Bot }
-
-func (c *getTeacherCmd) Name() string        { return "/teacher" }
-func (c *getTeacherCmd) Description() string { return c.bot.loc("cmd_teacher") }
-func (c *getTeacherCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_teacher") || text == "Преподаватель День" || text == "Учитель День"
-}
-func (c *getTeacherCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetTeacher(u, "day")
 }
 
 type getTeacherWeekCmd struct{ bot *Bot }
@@ -66,7 +53,7 @@ func (c *getTeacherWeekCmd) Description() string {
 	return "Узнать расписание на неделю указанного преподавателя (не зависит от текущего вашего)"
 }
 func (c *getTeacherWeekCmd) MatchText(text string) bool {
-	return text == "Преподаватель Неделя" || text == "Учитель Неделя"
+	return teacherWeekButtonRe.MatchString(text)
 }
 func (c *getTeacherWeekCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetTeacher(u, "week")
@@ -79,7 +66,7 @@ func (c *getTeacherImageCmd) Description() string {
 	return "Сгенерировать фотографию расписания преподавателя (не зависит от текущего вашего)"
 }
 func (c *getTeacherImageCmd) MatchText(text string) bool {
-	return strings.HasPrefix(text, "Преподавательфотография") || strings.HasPrefix(text, "Учительфотография") || strings.HasPrefix(text, "Преподаватель таблица")
+	return teacherImageButtonRe.MatchString(text)
 }
 func (c *getTeacherImageCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.startGetTeacher(u, "image")
@@ -187,7 +174,8 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 	case "week":
 		return b.sendGroupWeek(u, chat, group, data)
 	case "image":
-		path, err := imagepkg.RenderGroupFromCache(group, data, "./cache/images")
+		_, days := b.relevantWeekDays(data)
+		path, err := imagepkg.RenderGroupDays(group, days, "./cache/images")
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
 		}
@@ -270,7 +258,8 @@ func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) err
 	case "week":
 		return b.sendTeacherWeek(u, chat, teacher, data)
 	case "image":
-		path, err := imagepkg.RenderTeacherFromCache(teacher, data, "./cache/images")
+		_, days := b.relevantWeekDays(data)
+		path, err := imagepkg.RenderTeacherDays(teacher, days, "./cache/images")
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
 		}
@@ -365,7 +354,7 @@ func (b *Bot) getFormatter(chat *Chat) formatter.Formatter {
 }
 
 func (b *Bot) relevantWeekDays(data any) (utils.WeekIndex, []map[string]any) {
-	week := utils.WeekIndexFromDate(time.Now())
+	week := b.relevantWeekIndex()
 	minIdx, maxIdx := week.WeekDayIndexRange()
 	days := extractDaysFromRange(data, minIdx, maxIdx)
 	return week, days

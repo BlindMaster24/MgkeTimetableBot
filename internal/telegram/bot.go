@@ -300,6 +300,18 @@ func (b *Bot) handleMessage(ctx context.Context, msg *telego.Message) {
 	b.handleMessageText(ctx, u)
 }
 
+func (b *Bot) sendEulaOnce(u *Update, chat *Chat) {
+	if !chat.Accepted || chat.EULA || u.ChatID == 0 {
+		return
+	}
+
+	chat.EULA = true
+	if err := b.chatRepo.Save(chat); err != nil {
+		return
+	}
+	u.Bot.SendText(u.ChatID, b.loc("eula_text"))
+}
+
 func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 	u := &Update{
 		Bot:      b,
@@ -311,6 +323,10 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 		u.ChatID = msg.Chat.ID
 		u.MessageID = msg.MessageID
 		u.Message = msg
+	}
+
+	if chat, err := b.chatRepo.FindOrCreate("telegram", cb.From.ID); err == nil {
+		b.sendEulaOnce(u, chat)
 	}
 
 	bestPrefix, bestHandler := b.findCallback(cb.Data)

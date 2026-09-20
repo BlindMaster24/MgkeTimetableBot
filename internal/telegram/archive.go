@@ -138,7 +138,7 @@ type endingsCmd struct{ bot *Bot }
 
 func (c *endingsCmd) Name() string { return "/endings" }
 func (c *endingsCmd) Description() string {
-	return "Сколько групп заканчивают к определённой паре"
+	return "Отображает сколько групп заканчивают к определённой паре"
 }
 func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 	groups := c.bot.cache.GetGroups()

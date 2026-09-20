@@ -17,6 +17,9 @@ coverage.out
 # Go build cache
 .cache/
 
+# Local reference copy of the old TypeScript bot (script: git archive old)
+/old/
+
 # Config with secrets
 configs/config.yaml
 configs/config.local.yaml
