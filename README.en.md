@@ -316,7 +316,7 @@ Counters are kept in memory (`internal/health`) and served by `GET /api/health`.
 
 ```bash
 curl -s localhost:8081/api/health | jq .build
-# { "version": "1.2.3", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.1", "os": "linux", "arch": "amd64" }
+# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.1", "os": "linux", "arch": "amd64" }
 ```
 
 Metrics and the alert state are persisted to the chat database (the `bot_state` table) after every parse cycle and on shutdown, and read back on startup. A restart therefore never hides a problem: if the timetable has not refreshed for an hour, the `parser_stale` alert fires right after the start, and alerts that were already sent are not repeated until `cooldown_minutes` expires.

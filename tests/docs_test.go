@@ -98,8 +98,41 @@ func TestDocsStateTheGoVersion(t *testing.T) {
 	}
 
 	for _, doc := range docs {
-		if !strings.Contains(readDoc(t, doc), version) {
+		content := readDoc(t, doc)
+		if !strings.Contains(content, version) {
 			t.Errorf("%s does not state the minimum Go version %s", doc, version)
+			continue
+		}
+
+		for _, mention := range goVersionMentions(content) {
+			if mention != version {
+				t.Errorf("%s mentions Go %s while go.mod pins %s", doc, mention, version)
+			}
+		}
+	}
+}
+
+var (
+	goVersionMentionRe = regexp.MustCompile(`(?i)\bgo[ :]?(\d+\.\d+(?:\.\d+)?)|(?i)\bgo1\.(\d+\.\d+(?:\.\d+)?)`)
+	concreteImageTagRe = regexp.MustCompile(`ghcr\.io/[^\s:]+:[0-9]`)
+)
+
+func goVersionMentions(content string) []string {
+	var mentions []string
+	for _, match := range goVersionMentionRe.FindAllStringSubmatch(content, -1) {
+		for _, group := range match[1:] {
+			if group != "" {
+				mentions = append(mentions, group)
+			}
+		}
+	}
+	return mentions
+}
+
+func TestDocsDoNotPinAReleaseVersion(t *testing.T) {
+	for _, doc := range docs {
+		if tag := concreteImageTagRe.FindString(readDoc(t, doc)); tag != "" {
+			t.Errorf("%s pins the concrete image tag %q; link the releases page and the GHCR package instead", doc, tag)
 		}
 	}
 }
