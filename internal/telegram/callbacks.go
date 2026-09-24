@@ -229,7 +229,7 @@ func countCurrentLessons(chat *Chat, c *cache.RaspCache) int {
 }
 
 func (b *Bot) callsLines(slots [][2][2]string, maxLessons int, showFull bool, includedDays []int) string {
-	now := time.Now()
+	now := b.nowTime()
 
 	var lines []string
 	for i := 0; i < maxLessons; i++ {

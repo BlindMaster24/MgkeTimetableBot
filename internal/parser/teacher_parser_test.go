@@ -26,16 +26,16 @@ const mockTeacherGridHTML = `<html><body>
 </tr>
 <tr>
 <th>1</th>
-<td>63ТП<br>Математика<br>(Лек)</td>
+<td>63ТП-Математика<br>(Лек)</td>
 <td class="sub">101</td>
 <td>-</td>
 <td class="sub">&nbsp;</td>
 </tr>
 <tr>
 <th>2</th>
-<td>64ТП<br>Физика<br>(Пр)</td>
+<td>64ТП-Физика<br>(Пр)</td>
 <td class="sub">102</td>
-<td>65ТП<br>Химия<br>(Лек)</td>
+<td>65ТП-Химия<br>(Лек)</td>
 <td class="sub">103</td>
 </tr>
 </table>
@@ -52,7 +52,7 @@ const mockTeacherGridHTML = `<html><body>
 </tr>
 <tr>
 <th>1</th>
-<td>65ТП<br>Физика<br>(Пр)</td>
+<td>65ТП-Физика<br>(Пр)</td>
 <td class="sub">301</td>
 </tr>
 </table>

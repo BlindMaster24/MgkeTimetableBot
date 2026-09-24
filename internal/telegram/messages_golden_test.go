@@ -15,6 +15,8 @@ import (
 
 var rawDateRe = regexp.MustCompile(`\d{2}\.\d{2}(\.\d{4})?|№\s*\d+`)
 
+var messageGoldenNow = time.Date(2026, 8, 30, 5, 4, 0, 0, time.Local)
+
 const (
 	messageGoldenPath = "testdata/messages.golden"
 	dayGroup          = "778"
@@ -88,6 +90,7 @@ func renderScenario(t *testing.T, scenario messageScenario) string {
 
 	caller := &recordingCaller{}
 	bot, repo := setupE2EBotWithCaller(t, caller, 4242)
+	bot.SetNow(func() time.Time { return messageGoldenNow })
 	seedGoldenCache(t, bot)
 
 	chat, err := repo.FindOrCreate("telegram", userID)
@@ -118,7 +121,7 @@ func renderScenario(t *testing.T, scenario messageScenario) string {
 		t.Fatal("nothing was delivered to the user")
 	}
 
-	now := time.Now()
+	now := messageGoldenNow
 	rendered := testgolden.Normalize(text, now)
 	if scenario.weekView {
 		rendered = testgolden.NormalizeWeek(text, now)
@@ -132,15 +135,15 @@ func renderScenario(t *testing.T, scenario messageScenario) string {
 func seedGoldenCache(t *testing.T, b *Bot) {
 	t.Helper()
 
-	week := testgolden.RelevantWeek(time.Now())
+	week := testgolden.RelevantWeek(messageGoldenNow)
 	var weekDates []string
 	weekDates = append(weekDates, testgolden.WeekDates(week, 6)...)
 	weekDates = append(weekDates, testgolden.WeekDates(week.Next(), 6)...)
 
 	dayDates := []string{
-		time.Now().AddDate(0, 0, 1).Format("02.01.2006"),
-		time.Now().AddDate(0, 0, 2).Format("02.01.2006"),
-		time.Now().AddDate(0, 0, 3).Format("02.01.2006"),
+		messageGoldenNow.AddDate(0, 0, 1).Format("02.01.2006"),
+		messageGoldenNow.AddDate(0, 0, 2).Format("02.01.2006"),
+		messageGoldenNow.AddDate(0, 0, 3).Format("02.01.2006"),
 	}
 
 	b.cache.SetGroups(map[string]any{
@@ -234,7 +237,7 @@ func renderReplyMarkup(raw string) []string {
 	for _, row := range payload.ReplyMarkup.InlineKeyboard {
 		cells := make([]string, 0, len(row))
 		for _, button := range row {
-			cells = append(cells, button.Text+" -> "+testgolden.NormalizeWeekNumber(button.CallbackData, testgolden.RelevantWeek(time.Now()).Value()))
+			cells = append(cells, button.Text+" -> "+testgolden.NormalizeWeekNumber(button.CallbackData, testgolden.RelevantWeek(messageGoldenNow).Value()))
 		}
 		lines = append(lines, strings.Join(cells, " | "))
 	}

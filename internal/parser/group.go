@@ -2,10 +2,12 @@ package parser
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
 const electiveType = "ф-в"
@@ -232,20 +234,19 @@ func parseGridLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet 
 	}
 
 	chunks := chunkLines(lessonLines, 3)
-	cabChunks := chunkLines(cabLines, 1)
 
-	isSubgroup := len(chunks) > 1
+	isSubgroup := len(chunks) > 1 && len(cabLines) > 1
 	if !isSubgroup {
-		for _, line := range lessonLines {
-			if subgroupPrefixRe.MatchString(strings.TrimSpace(line)) {
+		for _, chunk := range chunks {
+			if len(chunk) > 0 && subgroupPrefixRe.MatchString(strings.TrimSpace(chunk[0])) {
 				isSubgroup = true
 				break
 			}
 		}
 	}
 
-	if isSubgroup && len(chunks) > 1 {
-		return buildSubgroups(chunks, cabChunks)
+	if isSubgroup {
+		return buildSubgroups(chunks, cabLines)
 	}
 
 	return buildSingleLesson(chunks, cabinetText)
@@ -253,6 +254,7 @@ func parseGridLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet 
 
 func splitCellLines(cell *goquery.Selection) []string {
 	cell.Find("br").ReplaceWithHtml("\n")
+	cell.Find("p").AppendHtml("\n")
 	text := cell.Text()
 	lines := strings.Split(text, "\n")
 	var result []string
@@ -299,9 +301,6 @@ func buildSingleLesson(chunks [][]string, cabinet string) model.GroupLesson {
 		teacher = strings.TrimSpace(chunk[2])
 	}
 
-	name = strings.TrimPrefix(name, "1.")
-	name = strings.TrimPrefix(name, "2.")
-	name = strings.TrimSpace(name)
 	name = shortenSubjectName(name)
 
 	if name == "" {
@@ -316,7 +315,7 @@ func buildSingleLesson(chunks [][]string, cabinet string) model.GroupLesson {
 	}
 }
 
-func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
+func buildSubgroups(chunks [][]string, cabLines []string) model.GroupLesson {
 	var result []*model.GroupLessonExplain
 
 	for i, chunk := range chunks {
@@ -328,13 +327,15 @@ func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
 		if len(chunk) >= 1 {
 			line := strings.TrimSpace(chunk[0])
 			if match := subgroupPrefixRe.FindStringSubmatch(line); match != nil {
-				subgroupNum = int(match[1][0] - '0')
+				if number, err := strconv.Atoi(match[1]); err == nil {
+					subgroupNum = number
+				}
 				line = strings.TrimSpace(line[len(match[0]):])
 			}
 			name = line
 		}
 		if len(chunk) >= 2 {
-			if typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[1])); typeMatch != nil {
+			if typeMatch := typeRe.FindStringSubmatch(strings.TrimSpace(chunk[1])); typeMatch != nil {
 				lessonType = typeMatch[1]
 			}
 		}
@@ -343,11 +344,6 @@ func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
 		}
 
 		name = shortenSubjectName(name)
-
-		cab := ""
-		if i < len(cabChunks) && len(cabChunks[i]) > 0 {
-			cab = removeDashes(cabChunks[i][0])
-		}
 
 		if name == "" {
 			continue
@@ -359,7 +355,7 @@ func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
 			Lesson:   name,
 			Type:     ptrString(lessonType),
 			Teacher:  ptrString(teacher),
-			Cabinet:  ptrString(cab),
+			Cabinet:  ptrString(subgroupCabinet(cabLines, len(chunks), i, subgroupNum)),
 		})
 	}
 
@@ -367,6 +363,25 @@ func buildSubgroups(chunks [][]string, cabChunks [][]string) model.GroupLesson {
 		return nil
 	}
 	return result
+}
+
+func subgroupCabinet(cabLines []string, subgroups, index, sgNumber int) string {
+	if len(cabLines) == 0 {
+		return ""
+	}
+	if len(cabLines) == 1 {
+		return removeDashes(cabLines[0])
+	}
+	if subgroups < len(cabLines) {
+		if sgNumber >= 1 && sgNumber <= len(cabLines) {
+			return removeDashes(cabLines[sgNumber-1])
+		}
+		return ""
+	}
+	if index < len(cabLines) {
+		return removeDashes(cabLines[index])
+	}
+	return ""
 }
 
 func cleanCellText(cell *goquery.Selection) string {
@@ -471,23 +486,7 @@ func clearEndingNulls(lessons *[]model.GroupLesson) {
 }
 
 func shortenSubjectName(name string) string {
-	name = strings.TrimSpace(name)
-	replacements := map[string]string{
-		"Материалы ЭТех":       "МатЭТех",
-		"Мат в професс":        "МатвПрофесс",
-		"Основы инж гр":        "ОснИнжГр",
-		"Физ химия":            "ФизХим",
-		"Осн элек и микр":      "ОснЭлекМикр",
-		"Ин Яз":                "ИнЯз",
-		"ЭлИз":                 "ЭлИз",
-		"Лабораторные занятия": "ЛабЗанятия",
-	}
-	for old, short := range replacements {
-		if strings.Contains(name, old) {
-			name = strings.Replace(name, old, short, 1)
-		}
-	}
-	return name
+	return utils.GetShortSubjectName(strings.TrimSpace(name))
 }
 
 func extractType(text string) string {

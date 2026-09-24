@@ -25,13 +25,15 @@ const (
 	tsCommandsRoot    = tsBotsRoot + "/commands"
 	tsCallbacksRoot   = tsBotsRoot + "/callbacks"
 	tsKeyboardRoot    = tsBotsRoot + "/keyboard"
+	tsFormatterRoot   = "src/formatter"
 	literalLookBehind = 240
 )
 
 var (
-	tgCommandExpr  = regexp.MustCompile(`command:\s*'([^']+)'`)
-	payloadActExpr = regexp.MustCompile(`payloadAction:\s*string\s*=\s*'([^']+)'`)
-	noYesSmileExpr = regexp.MustCompile(`noYesSmile\([^()]*,\s*$`)
+	tgCommandExpr     = regexp.MustCompile(`command:\s*'([^']+)'`)
+	payloadActExpr    = regexp.MustCompile(`payloadAction:\s*string\s*=\s*'([^']+)'`)
+	noYesSmileExpr    = regexp.MustCompile(`noYesSmile\([^()]*,\s*$`)
+	servicesFieldExpr = regexp.MustCompile(`(?:^|[^A-Za-z])services\s*(?::[^=\n]+)?=\s*\[([^\]]*)\]`)
 )
 
 func main() {
@@ -52,13 +54,18 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
+	tsTexts, err := extractTypeScriptTexts(*tsRef)
+	if err != nil {
+		fail(err)
+	}
 
 	if *update {
+		tsSurface.Texts = tsTexts
 		if err := parity.SaveSurface(fixturePath, tsSurface); err != nil {
 			fail(err)
 		}
-		fmt.Printf("wrote %s (%d commands, %d callbacks, %d buttons)\n",
-			fixturePath, len(tsSurface.Commands), len(tsSurface.Callbacks), len(tsSurface.Buttons))
+		fmt.Printf("wrote %s (%d commands, %d callbacks, %d buttons, %d texts)\n",
+			fixturePath, len(tsSurface.Commands), len(tsSurface.Callbacks), len(tsSurface.Buttons), len(tsSurface.Texts))
 		return
 	}
 
@@ -66,7 +73,9 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	if drift := parity.Compare(recorded, tsSurface, parity.Allowlist{}); len(drift) > 0 {
+	drift := parity.Compare(recorded, tsSurface, parity.Allowlist{})
+	drift = append(drift, parity.CompareSets(parity.SectionTexts, recorded.Texts, tsTexts, parity.Allowlist{})...)
+	if len(drift) > 0 {
 		fmt.Printf("the checked-in fixture is stale (%d differences vs %s); run with -update\n", len(drift), *tsRef)
 		printDiffs(drift)
 		os.Exit(1)
@@ -83,13 +92,55 @@ func main() {
 	}
 
 	diffs := parity.Compare(tsSurface, goSurface, allow)
+	diffs = append(diffs, parity.CompareTexts(tsTexts, goTextCorpus(), allow)...)
 	if len(diffs) == 0 {
-		fmt.Printf("parity ok: %d commands, %d callbacks, %d buttons match %s\n",
-			len(tsSurface.Commands), len(tsSurface.Callbacks), len(tsSurface.Buttons), *tsRef)
+		fmt.Printf("parity ok: %d commands, %d callbacks, %d buttons, %d texts match %s\n",
+			len(tsSurface.Commands), len(tsSurface.Callbacks), len(tsSurface.Buttons), len(tsTexts), *tsRef)
 		return
 	}
 	printDiffs(diffs)
 	os.Exit(1)
+}
+
+func extractTypeScriptTexts(ref string) ([]string, error) {
+	sources := map[string]string{}
+	for _, root := range []string{tsBotsRoot, tsFormatterRoot} {
+		files, err := gitList(ref, root)
+		if err != nil {
+			return nil, err
+		}
+		for _, file := range files {
+			if !strings.HasSuffix(file, ".ts") || !textScope(file) {
+				continue
+			}
+			src, err := gitShow(ref, file)
+			if err != nil {
+				return nil, err
+			}
+			if serviceScopedAwayFromTelegram(src) {
+				continue
+			}
+			sources[file] = src
+		}
+	}
+	return parity.MessageTexts(sources), nil
+}
+
+func textScope(file string) bool {
+	return !strings.Contains(file, tsBotsRoot+"/vk/") && !strings.Contains(file, tsBotsRoot+"/viber/")
+}
+
+func serviceScopedAwayFromTelegram(src string) bool {
+	match := servicesFieldExpr.FindStringSubmatch(src)
+	return match != nil && !strings.Contains(match[1], "'tg'") && !strings.Contains(match[1], `"tg"`)
+}
+
+func goTextCorpus() string {
+	locale, err := parity.LoadLocale(localePath)
+	if err != nil {
+		fail(err)
+	}
+	return parity.GoTextCorpus([]string{"internal/telegram", "internal/formatter", "internal/notification", "internal/calendar"}, locale)
 }
 
 func extractGoSurface() (parity.Surface, error) {

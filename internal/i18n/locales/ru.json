@@ -10,6 +10,7 @@
   "mode_parent": "👨‍👩‍👦 Родитель",
   "group_not_selected": "Ваша учебная группа не выбрана\n\nВыбрать группу можно командой /setGroup <group>\nПример:\n/setGroup {{.Group}}",
   "teacher_not_selected": "Имя преподавателя не выбрано\n\nВыбрать преподвателя можно командой /setTeacher <teacher>\nПример:\n/setTeacher {{.Teacher}}",
+  "teacher_not_selected_menu": "Имя преподавателя не выбрано\n\nВыбрать преподавателя можно командой /setTeacher <teacher>\nПример:\n/setTeacher {{.Teacher}}",
   "group_not_exists": "Данной учебной группы не существует",
   "teacher_not_exists": "Данного преподавателя не существует",
   "data_not_loaded": "Данные с сервера ещё не загружены, ожидайте...",

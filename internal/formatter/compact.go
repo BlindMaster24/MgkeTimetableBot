@@ -14,12 +14,12 @@ func (f *CompactFormatter) NoTimetable() string {
 }
 
 func (f *CompactFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
-	daysInfo := parseDaysFromSlice(days)
+	daysInfo := parseDaysFromSlice(days, opts.now())
 	return f.formatFull(group, "", daysInfo, true, opts)
 }
 
 func (f *CompactFormatter) FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string {
-	daysInfo := parseDaysFromSlice(days)
+	daysInfo := parseDaysFromSlice(days, opts.now())
 	return f.formatFull("", teacher, daysInfo, false, opts)
 }
 

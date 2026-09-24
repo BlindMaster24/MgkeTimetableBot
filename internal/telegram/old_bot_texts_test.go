@@ -353,6 +353,52 @@ func TestOldBot_DebugCountsChatsAndApiKeys(t *testing.T) {
 	}
 }
 
+func TestOldBot_TeacherHintSpellingFollowsTheOldCommands(t *testing.T) {
+	caller := &recordingCaller{}
+	b, repo := setupE2EBotWithCaller(t, caller, 4242)
+	b.cache.SetTeachers(map[string]any{"Иванов И.И.": map[string]any{"days": []any{}}}, "hint-teachers")
+
+	const userID int64 = 9001
+	chat, err := repo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat.Mode = ModeTeacher
+	chat.Accepted = true
+	if err := repo.Save(chat); err != nil {
+		t.Fatal(err)
+	}
+
+	sendOldText(t, b, userID, "/start")
+	texts := deliveredTexts(t, caller, 1)
+	last := texts[len(texts)-1]
+	if !strings.Contains(last, "Выбрать преподавателя можно командой /setTeacher") {
+		t.Fatalf("the start hint lost the old wording: %q", last)
+	}
+	if strings.Contains(last, "преподвателя") {
+		t.Fatalf("the start hint must use the correct spelling, got %q", last)
+	}
+
+	caller.reset()
+	sendOldText(t, b, userID, "/day")
+	texts = deliveredTexts(t, caller, 1)
+	last = texts[len(texts)-1]
+	if !strings.Contains(last, "Выбрать преподвателя можно командой /setTeacher") {
+		t.Fatalf("the day hint must keep the old typo verbatim, got %q", last)
+	}
+
+	caller.reset()
+	sendOldText(t, b, userID, "/week")
+	texts = deliveredTexts(t, caller, 1)
+	last = texts[len(texts)-1]
+	if !strings.Contains(last, "Выбрать преподавателя можно командой /setTeacher") {
+		t.Fatalf("the week hint lost the old wording: %q", last)
+	}
+	if strings.Contains(last, "преподвателя") {
+		t.Fatalf("the week hint must use the correct spelling, got %q", last)
+	}
+}
+
 func indexOfText(texts []string, want string) int {
 	for i, text := range texts {
 		if text == want {

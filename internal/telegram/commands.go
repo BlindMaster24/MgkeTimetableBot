@@ -77,7 +77,7 @@ func (b *Bot) showSchedule(u *Update, chat *Chat) error {
 		}
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			text = b.locData("teacher_not_selected", map[string]interface{}{"Teacher": randomKey(teachers)})
+			text = b.locData("teacher_not_selected_menu", map[string]interface{}{"Teacher": randomKey(teachers)})
 		} else {
 			data, ok := teachers[chat.Teacher]
 			if !ok {

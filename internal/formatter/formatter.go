@@ -27,6 +27,7 @@ type FormatOptions struct {
 	IsTelegram       bool
 	RandHint         string
 	TeacherNames     map[string]string
+	Now              time.Time
 }
 
 func (o FormatOptions) b(text string) string {
@@ -41,6 +42,13 @@ func (o FormatOptions) i(text string) string {
 		return "<i>" + text + "</i>"
 	}
 	return text
+}
+
+func (o FormatOptions) now() time.Time {
+	if !o.Now.IsZero() {
+		return o.Now
+	}
+	return time.Now()
 }
 
 func (o FormatOptions) getFullTeacherName(shortName string) string {
@@ -169,7 +177,10 @@ func formatFooter(opts FormatOptions) string {
 	var text []string
 
 	if opts.ShowParserTime && opts.ParserUpdateTime > 0 {
-		secs := int64(math.Ceil(float64(time.Now().UnixMilli()-opts.ParserUpdateTime) / 1000))
+		secs := int64(math.Ceil(float64(opts.now().UnixMilli()-opts.ParserUpdateTime) / 1000))
+		if secs < 0 {
+			secs = 0
+		}
 		text = append(text, fmt.Sprintf("Информация была загружена %s назад", FormatSeconds(secs)))
 	}
 

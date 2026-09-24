@@ -160,7 +160,7 @@ func TestGroupParserSubgroupsFromGrid(t *testing.T) {
 		t.Fatalf("expected 2 subgroups, got %d", len(subs))
 	}
 
-	if subs[0].Lesson != "Русский язык" {
+	if subs[0].Lesson != "Рус Яз" {
 		t.Errorf("subgroup 1 lesson = %q", subs[0].Lesson)
 	}
 	if subs[1].Lesson != "Англ. язык" {
@@ -352,8 +352,8 @@ func TestShortenSubjectName(t *testing.T) {
 	tests := []struct {
 		input, want string
 	}{
-		{"Материалы ЭТех", "МатЭТех"},
-		{"Физ химия", "ФизХим"},
+		{"Иностранный язык", "Ин Яз"},
+		{"Материалы ЭТех", "Материалы ЭТех"},
 		{"Математика", "Математика"},
 	}
 	for _, tt := range tests {

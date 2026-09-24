@@ -74,7 +74,7 @@ func teacherHTML(date string) string {
 <th colspan="2">Понедельник, ` + date + `</th>
 </tr>
 <tr><th class="sub">D</th><th class="sub">A</th></tr>
-<tr><th>1</th><td>63ТП<br>Математика<br>(Лек)</td><td class="sub">101</td></tr>
+<tr><th>1</th><td>63ТП-Математика<br>(Лек)</td><td class="sub">101</td></tr>
 </table>
 </div></div>
 </body></html>`

@@ -66,17 +66,17 @@ const mockTeacherElectivesHTML = `<html><body>
 </tr>
 <tr>
 <th>1</th>
-<td>63ТП<br>Факультатив по математике<br>(ф-в)</td>
+<td>63ТП-Факультатив по математике<br>(ф-в)</td>
 <td class="sub">101</td>
 </tr>
 <tr>
 <th>2</th>
-<td>63ТП<br>Факультатив по математике<br>(ф-в)</td>
+<td>63ТП-Факультатив по математике<br>(ф-в)</td>
 <td class="sub">101</td>
 </tr>
 <tr>
 <th>3</th>
-<td>63ТП<br>Математика<br>(Лек)</td>
+<td>63ТП-Математика<br>(Лек)</td>
 <td class="sub">102</td>
 </tr>
 </table>

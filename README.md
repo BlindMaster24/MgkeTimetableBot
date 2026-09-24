@@ -411,7 +411,7 @@ go test ./internal/telegram/...
 | `internal/telegram/menus_e2e_test.go` | каждая кнопка каждого меню либо открывает меню, либо меняет настройку, либо перечислена в исключениях |
 | `internal/telegram/inline_e2e_test.go` | каждый `callbackData` из любой клавиатуры доходит до зарегистрированного обработчика |
 | `internal/telegram/image_callback_test.go` | колбэк картинки (`image_g` / `image_t`) рисует неделю из архива и без архива — из кэша, а неизвестный тип, неизвестная группа и пустая неделя остаются только текстовыми ответами |
-| `internal/telegram/parity_test.go`, `surface_test.go` | поверхность команд, callback-корней и подписей кнопок против фикстуры TS и golden-раскладок |
+| `internal/telegram/parity_test.go`, `surface_test.go` | поверхность команд, callback-корней, подписей кнопок и текстов сообщений против фикстуры TS и golden-раскладок |
 | `internal/notification/*_test.go` | последовательность парсингов (добавление и обновление дня), фильтры, расписание cron, алерты здоровья |
 | `internal/telegram/event_chats_test.go`, `notice_wiring_test.go`, `callback_gate_test.go` | адаптер уведомлений сохраняет все флаги рассылок, уведомление о новой неделе доходит до подписчиков, `/trigger` шлёт день следующего дня и не повторяется, нажатия не проходят без выданного доступа; `notice_wiring_test.go` гоняет день и новую неделю в пяти зонах (`UTC`, Минск, `America/Chicago`, `Pacific/Kiritimati`, `Pacific/Midway`) |
 | `internal/api/auth_test.go`, `auth_hardening_test.go`, `internal/apikey/*_test.go` | авторизация REST API: 401 без ключа, с чужим секретом, при пустом `encrypt_key` и с ключом из query; 429 по лимиту и под параллельной нагрузкой; ротация отзывает старый ключ; ключ не попадает в тексты ошибок и в метрики; токен побайтово совпадает с ключом старого бота |
@@ -423,7 +423,7 @@ go test ./internal/telegram/...
 
 ### Паритет с TypeScript-ботом
 
-Старый TS-бот живёт в ветке `old` этого же репозитория (`git fetch origin old`). `scripts/paritycheck` читает её прямо из git и сравнивает три поверхности: имена Telegram-команд, корни callback-данных и подписи всех кнопок.
+Старый TS-бот живёт в ветке `old` этого же репозитория (`git fetch origin old`). `scripts/paritycheck` читает её прямо из git и сравнивает четыре поверхности: имена Telegram-команд, корни callback-данных, подписи всех кнопок и тексты сообщений (каждый старый текст должен существовать в Go или быть зафиксирован в known_differences).
 
 ```bash
 go run ./scripts/paritycheck                 # сравнить с веткой old

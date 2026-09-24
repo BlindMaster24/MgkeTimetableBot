@@ -422,7 +422,7 @@ go test ./internal/telegram/...
 
 ### Parity with the TypeScript bot
 
-The old TypeScript bot lives on the `old` branch of this repository (`git fetch origin old`). `scripts/paritycheck` reads it straight from git and compares three surfaces: Telegram command names, callback data roots and every keyboard button label.
+The old TypeScript bot lives on the `old` branch of this repository (`git fetch origin old`). `scripts/paritycheck` reads it straight from git and compares four surfaces: Telegram command names, callback data roots, every keyboard button label and the message texts (every old text must exist in Go or be documented in known_differences).
 
 ```bash
 go run ./scripts/paritycheck                 # compare against the old branch

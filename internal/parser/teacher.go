@@ -2,6 +2,7 @@ package parser
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -11,6 +12,7 @@ import (
 var teacherNameRe = regexp.MustCompile(`(?i)^Преподаватель\s*[-–—:]?\s*(.+)$`)
 var teacherLooseRe = regexp.MustCompile(`(?i)Преподаватель\s*[-–—:]?\s*(.+)$`)
 var typeRe = regexp.MustCompile(`\(([^)]+)\)`)
+var typeOnlyRe = regexp.MustCompile(`^\s*\([^()]*\)\s*$`)
 var subgroupRe = regexp.MustCompile(`^(\d+)\.\s*(.+)`)
 
 type TeacherParser struct {
@@ -251,109 +253,74 @@ func parseTeacherLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabin
 		}
 	}
 
-	chunks := chunkLines(lines, 3)
-	if len(chunks) == 0 {
-		return nil
-	}
-
-	isSubgroup := len(chunks) > 1 || len(cabLines) > 1
-	if !isSubgroup {
-		for _, line := range lines {
-			if subgroupPrefixRe.MatchString(strings.TrimSpace(line)) {
-				isSubgroup = true
-				break
-			}
-		}
-	}
-
-	if isSubgroup && len(chunks) > 1 {
-		return buildTeacherSubgroups(chunks, cabLines)
-	}
-
-	return buildTeacherSingle(chunks, cabinetText)
+	return buildTeacherLessons(lines, cabLines, cabinetText)
 }
 
-func buildTeacherSingle(chunks [][]string, cabinet string) []model.TeacherLesson {
-	if len(chunks) == 0 || len(chunks[0]) == 0 {
-		return nil
-	}
-
-	chunk := chunks[0]
-	group := ""
-	name := ""
-	lessonType := ""
-
-	if len(chunk) >= 1 {
-		group = strings.TrimSpace(chunk[0])
-	}
-	if len(chunk) >= 2 {
-		name = strings.TrimSpace(chunk[1])
-	}
-	if len(chunk) >= 3 {
-		if typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[2])); typeMatch != nil {
-			lessonType = typeMatch[1]
-		} else {
-			name = strings.TrimSpace(chunk[1]) + " " + strings.TrimSpace(chunk[2])
-		}
-	}
-
-	if name == "" {
-		return nil
-	}
-
-	return []model.TeacherLesson{{
-		Group:   group,
-		Lesson:  name,
-		Type:    ptrString(lessonType),
-		Cabinet: ptrString(cabinet),
-	}}
-}
-
-func buildTeacherSubgroups(chunks [][]string, cabLines []string) []model.TeacherLesson {
+func buildTeacherLessons(lines, cabLines []string, cabinetText string) []model.TeacherLesson {
 	var result []model.TeacherLesson
 
-	for i, chunk := range chunks {
-		group := ""
-		name := ""
-		lessonType := ""
-
-		if len(chunk) >= 1 {
-			line := strings.TrimSpace(chunk[0])
-			if match := subgroupPrefixRe.FindStringSubmatch(line); match != nil {
-				line = strings.TrimSpace(line[len(match[0]):])
-			}
-			group = line
+	for i := 0; i < len(lines); {
+		nameLine := lines[i]
+		i++
+		typeLine := ""
+		if i < len(lines) && typeOnlyRe.MatchString(lines[i]) {
+			typeLine = lines[i]
+			i++
 		}
-		if len(chunk) >= 2 {
-			name = strings.TrimSpace(chunk[1])
-		}
-		if len(chunk) >= 3 {
-			if typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[2])); typeMatch != nil {
-				lessonType = typeMatch[1]
-			}
-		}
-
-		cab := ""
-		if i < len(cabLines) {
-			cab = removeDashes(cabLines[i])
-		}
-
-		if name == "" {
+		if !strings.Contains(nameLine, "-") {
 			continue
 		}
-
-		result = append(result, &model.TeacherLessonExplain{
-			Group:   group,
-			Lesson:  name,
-			Type:    ptrString(lessonType),
-			Cabinet: ptrString(cab),
-		})
+		result = append(result, buildTeacherEntry(nameLine, typeLine, teacherCabinet(cabLines, cabinetText, len(result))))
 	}
 
 	if len(result) == 0 {
 		return nil
 	}
 	return result
+}
+
+func teacherCabinet(cabLines []string, cabinetText string, pairIndex int) string {
+	switch {
+	case len(cabLines) == 0:
+		return cabinetText
+	case len(cabLines) == 1:
+		return removeDashes(cabLines[0])
+	case pairIndex < len(cabLines):
+		return removeDashes(cabLines[pairIndex])
+	default:
+		return ""
+	}
+}
+
+func buildTeacherEntry(nameLine, typeLine, cabinet string) model.TeacherLesson {
+	lessonType := ""
+	if match := typeRe.FindStringSubmatch(typeLine); match != nil {
+		lessonType = match[1]
+	}
+
+	groupPart := nameLine
+	lesson := ""
+	if idx := strings.Index(nameLine, "-"); idx >= 0 {
+		groupPart = nameLine[:idx]
+		lesson = strings.TrimSpace(nameLine[idx+1:])
+	}
+
+	group := strings.Join(strings.Fields(groupPart), "")
+	var subgroup *int
+	if parts := strings.SplitN(group, ".", 2); len(parts) == 2 {
+		if number, err := strconv.Atoi(parts[0]); err == nil {
+			subgroup = &number
+		}
+		group = parts[1]
+	}
+
+	return &model.TeacherLessonExplain{
+		Lesson:   shortenSubjectName(lesson),
+		Type:     ptrString(lessonType),
+		Subgroup: subgroup,
+		Group:    group,
+		Cabinet:  ptrString(cabinet),
+	}
 }
 
 func clearEndingTeacherNulls(lessons *[]model.TeacherLesson) {

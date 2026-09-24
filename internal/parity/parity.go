@@ -10,6 +10,7 @@ type Surface struct {
 	Commands  []string `json:"commands"`
 	Callbacks []string `json:"callbacks"`
 	Buttons   []string `json:"buttons"`
+	Texts     []string `json:"texts,omitempty"`
 }
 
 type Decision struct {
@@ -95,6 +96,7 @@ func normalizeSurface(s Surface) Surface {
 		Commands:  normalizeCommands(s.Commands),
 		Callbacks: normalizeCallbacks(s.Callbacks),
 		Buttons:   normalizeButtons(s.Buttons),
+		Texts:     normalizeTexts(s.Texts),
 	}
 }
 

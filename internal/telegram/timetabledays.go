@@ -49,7 +49,7 @@ func scheduleTargetFor(chat *Chat) (scheduleTarget, bool) {
 		return scheduleTarget{
 			typeName:       "teacher",
 			value:          chat.Teacher,
-			notSelectedKey: "teacher_not_selected",
+			notSelectedKey: "teacher_not_selected_menu",
 			notExistsKey:   "teacher_not_exists",
 			hintField:      "Teacher",
 			hintMap:        func(b *Bot) map[string]any { return b.cache.GetTeachers() },

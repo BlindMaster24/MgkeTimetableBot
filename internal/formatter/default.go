@@ -15,11 +15,11 @@ func (f *DefaultFormatter) NoTimetable() string {
 }
 
 func (f *DefaultFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
-	return f.formatFull(group, "", parseDaysFromSlice(days), true, opts)
+	return f.formatFull(group, "", parseDaysFromSlice(days, opts.now()), true, opts)
 }
 
 func (f *DefaultFormatter) FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string {
-	return f.formatFull("", teacher, parseDaysFromSlice(days), false, opts)
+	return f.formatFull("", teacher, parseDaysFromSlice(days, opts.now()), false, opts)
 }
 
 func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInfo, isGroup bool, opts FormatOptions) string {
@@ -179,12 +179,11 @@ func (f *DefaultFormatter) formatLessonLine(p LessonPart, show map[string]bool, 
 	return strings.Join(parts, " ")
 }
 
-func parseDaysFromSlice(days []map[string]any) []DayInfo {
+func parseDaysFromSlice(days []map[string]any, now time.Time) []DayInfo {
 	if len(days) == 0 {
 		return nil
 	}
 
-	now := time.Now()
 	today := now.Format("02.01.2006")
 	tomorrow := now.AddDate(0, 0, 1).Format("02.01.2006")
 

@@ -34,6 +34,8 @@ func TestParityWithTypeScriptSurface(t *testing.T) {
 	}
 
 	diffs := parity.Compare(fixture, got, allow)
+	corpus := parity.GoTextCorpus([]string{".", "../formatter", "../notification", "../calendar"}, locale)
+	diffs = append(diffs, parity.CompareTexts(fixture.Texts, corpus, allow)...)
 	if len(diffs) == 0 {
 		return
 	}
