@@ -1,6 +1,9 @@
 package calendar
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -9,132 +12,234 @@ import (
 )
 
 type ICSBuilder struct {
-	events []icsEvent
+	events     []icsEvent
+	weekdays   [][2][2]string
+	saturday   [][2][2]string
+	weekNumber int
+	now        time.Time
 }
 
 type icsEvent struct {
-	UID         string
-	DTStart     time.Time
-	DTEnd       time.Time
-	Summary     string
-	Description string
+	uid         string
+	dtstamp     string
+	start       time.Time
+	end         time.Time
+	summary     string
+	description string
+	location    string
 }
 
-func NewICSBuilder() *ICSBuilder {
-	return &ICSBuilder{}
+func NewICSBuilder(weekdays, saturday [][2][2]string, weekNumber int) *ICSBuilder {
+	return &ICSBuilder{
+		weekdays:   weekdays,
+		saturday:   saturday,
+		weekNumber: weekNumber,
+		now:        time.Now(),
+	}
 }
 
 func (b *ICSBuilder) AddGroupDay(day model.GroupDay, group string) {
-	t, err := time.Parse("02.01.2006", day.Day)
-	if err != nil {
+	calls, ok := b.callsFor(day.Day)
+	if !ok {
 		return
 	}
 
-	for i, l := range day.Lessons {
-		text := formatGroupLessonForICS(l)
-		if text == "" || text == "-" {
+	for index, entry := range day.Lessons {
+		if index >= len(calls) {
 			continue
 		}
-		start := t.Add(time.Duration(8+i) * time.Hour)
-		end := start.Add(time.Hour)
-
-		b.events = append(b.events, icsEvent{
-			UID:         fmt.Sprintf("%s-%s-%d@bot", group, day.Day, i+1),
-			DTStart:     start,
-			DTEnd:       end,
-			Summary:     fmt.Sprintf("%d. %s", i+1, text),
-			Description: fmt.Sprintf("Группа: %s", group),
-		})
+		start, end, ok := lessonRange(day.Day, calls[index])
+		if !ok {
+			continue
+		}
+		for _, lesson := range groupEntryLessons(entry) {
+			if lesson == nil || lesson.Lesson == "" {
+				continue
+			}
+			b.events = append(b.events, b.groupEvent(group, day.Day, index, start, end, lesson))
+		}
 	}
 }
 
-func (b *ICSBuilder) AddTeacherDay(day model.TeacherDay, teacher string) {
-	t, err := time.Parse("02.01.2006", day.Day)
+func groupEntryLessons(entry model.GroupLesson) []*model.GroupLessonExplain {
+	if entry == nil {
+		return nil
+	}
+
+	raw, err := json.Marshal(entry)
 	if err != nil {
+		return nil
+	}
+
+	var single model.GroupLessonExplain
+	if err := json.Unmarshal(raw, &single); err == nil {
+		return []*model.GroupLessonExplain{&single}
+	}
+
+	var many []*model.GroupLessonExplain
+	if err := json.Unmarshal(raw, &many); err != nil {
+		return nil
+	}
+	return many
+}
+
+func (b *ICSBuilder) AddTeacherDay(day model.TeacherDay, teacher string) {
+	calls, ok := b.callsFor(day.Day)
+	if !ok {
 		return
 	}
 
-	for i, l := range day.Lessons {
-		text := formatTeacherLessonForICS(l)
-		if text == "" || text == "-" {
+	for index, lesson := range day.Lessons {
+		if index >= len(calls) {
 			continue
 		}
-		start := t.Add(time.Duration(8+i) * time.Hour)
-		end := start.Add(time.Hour)
-
-		b.events = append(b.events, icsEvent{
-			UID:         fmt.Sprintf("%s-%s-%d@bot", teacher, day.Day, i+1),
-			DTStart:     start,
-			DTEnd:       end,
-			Summary:     fmt.Sprintf("%d. %s", i+1, text),
-			Description: fmt.Sprintf("Преподаватель: %s", teacher),
-		})
+		if lesson == nil || lesson.Lesson == "" {
+			continue
+		}
+		start, end, ok := lessonRange(day.Day, calls[index])
+		if !ok {
+			continue
+		}
+		b.events = append(b.events, b.teacherEvent(teacher, day.Day, index, start, end, lesson))
 	}
 }
 
 func (b *ICSBuilder) Build() string {
-	var sb strings.Builder
-	sb.WriteString("BEGIN:VCALENDAR\r\n")
-	sb.WriteString("VERSION:2.0\r\n")
-	sb.WriteString("PRODID:-//MgkeBot//Timetable//RU\r\n")
-	sb.WriteString("CALSCALE:GREGORIAN\r\n")
-
-	for _, e := range b.events {
-		sb.WriteString("BEGIN:VEVENT\r\n")
-		sb.WriteString(fmt.Sprintf("UID:%s\r\n", e.UID))
-		sb.WriteString(fmt.Sprintf("DTSTART:%s\r\n", e.DTStart.Format("20060102T150405")))
-		sb.WriteString(fmt.Sprintf("DTEND:%s\r\n", e.DTEnd.Format("20060102T150405")))
-		sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", e.Summary))
-		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", e.Description))
-		sb.WriteString("END:VEVENT\r\n")
+	lines := []string{
+		"BEGIN:VCALENDAR",
+		"VERSION:2.0",
+		"PRODID:-//MGKE Timetable Bot//EN",
+		"CALSCALE:GREGORIAN",
+		"METHOD:PUBLISH",
 	}
 
-	sb.WriteString("END:VCALENDAR\r\n")
-	return sb.String()
+	for _, event := range b.events {
+		lines = append(lines,
+			"BEGIN:VEVENT",
+			"UID:"+event.uid,
+			"DTSTAMP:"+event.dtstamp,
+			"DTSTART:"+formatICSDateTime(event.start),
+			"DTEND:"+formatICSDateTime(event.end),
+			"SUMMARY:"+escapeICSText(event.summary),
+		)
+		if event.description != "" {
+			lines = append(lines, "DESCRIPTION:"+escapeICSText(event.description))
+		}
+		if event.location != "" {
+			lines = append(lines, "LOCATION:"+escapeICSText(event.location))
+		}
+		lines = append(lines, "END:VEVENT")
+	}
+
+	lines = append(lines, "END:VCALENDAR")
+	return strings.Join(lines, "\r\n")
 }
 
 func (b *ICSBuilder) EventCount() int {
 	return len(b.events)
 }
 
-func formatGroupLessonForICS(l model.GroupLesson) string {
-	if l == nil {
-		return "-"
+func (b *ICSBuilder) callsFor(day string) ([][2][2]string, bool) {
+	date, err := time.Parse("02.01.2006", day)
+	if err != nil {
+		return nil, false
 	}
-	if s := model.AsSingle(l); s != nil {
-		return formatSingleForICS(s.Lesson, s.Type, s.Teacher, s.Cabinet, s.Comment)
+	if date.Weekday() == time.Saturday {
+		return b.saturday, true
 	}
-	if arr := model.AsArray(l); arr != nil {
-		parts := make([]string, 0, len(arr))
-		for _, e := range arr {
-			parts = append(parts, formatSingleForICS(e.Lesson, e.Type, e.Teacher, e.Cabinet, e.Comment))
-		}
-		return strings.Join(parts, " | ")
-	}
-	return "-"
+	return b.weekdays, true
 }
 
-func formatTeacherLessonForICS(l model.TeacherLesson) string {
-	if l == nil {
-		return "-"
-	}
-	return formatSingleForICS(l.Lesson, l.Type, &l.Group, l.Cabinet, l.Comment)
-}
-
-func formatSingleForICS(lesson string, typ, extra1, extra2, extra3 *string) string {
+func (b *ICSBuilder) groupEvent(value, day string, index int, start, end time.Time, lesson *model.GroupLessonExplain) icsEvent {
 	var parts []string
-	parts = append(parts, lesson)
-	if typ != nil && *typ != "" {
-		parts = append(parts, fmt.Sprintf("(%s)", *typ))
+	if lesson.Teacher != nil && *lesson.Teacher != "" {
+		parts = append(parts, "Преподаватель: "+*lesson.Teacher)
 	}
-	if extra1 != nil && *extra1 != "" {
-		parts = append(parts, *extra1)
+	subgroup := 0
+	if lesson.Subgroup != nil {
+		subgroup = *lesson.Subgroup
 	}
-	if extra2 != nil && *extra2 != "" {
-		parts = append(parts, *extra2)
+	return b.newEvent("group", value, day, index, start, end, lesson.Lesson, lesson.Type, lesson.Cabinet, subgroup, parts)
+}
+
+func (b *ICSBuilder) teacherEvent(value, day string, index int, start, end time.Time, lesson *model.TeacherLessonExplain) icsEvent {
+	var parts []string
+	if lesson.Group != "" {
+		parts = append(parts, "Группа: "+lesson.Group)
 	}
-	if extra3 != nil && *extra3 != "" {
-		parts = append(parts, fmt.Sprintf("[%s]", *extra3))
+	subgroup := 0
+	if lesson.Subgroup != nil {
+		subgroup = *lesson.Subgroup
 	}
-	return strings.Join(parts, " ")
+	return b.newEvent("teacher", value, day, index, start, end, lesson.Lesson, lesson.Type, lesson.Cabinet, subgroup, parts)
+}
+
+func (b *ICSBuilder) newEvent(kind, value, day string, index int, start, end time.Time, lesson string, lessonType, cabinet *string, subgroup int, parts []string) icsEvent {
+	summary := lesson + lessonTypeSuffix(lessonType) + subgroupSuffix(subgroup)
+
+	cabinetValue := deref(cabinet)
+	if cabinetValue != "" {
+		parts = append(parts, "Кабинет: "+cabinetValue)
+	}
+
+	return icsEvent{
+		uid:         eventUID(kind, value, b.weekNumber, day, index, lesson, cabinetValue, deref(lessonType), subgroup),
+		dtstamp:     formatICSDateTime(b.now),
+		start:       start,
+		end:         end,
+		summary:     summary,
+		description: strings.Join(parts, "\n"),
+		location:    cabinetValue,
+	}
+}
+
+func lessonRange(day string, call [2][2]string) (time.Time, time.Time, bool) {
+	start, err := time.Parse("02.01.2006 15:04", day+" "+call[0][0])
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	end, err := time.Parse("02.01.2006 15:04", day+" "+call[1][1])
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	return start, end, true
+}
+
+func eventUID(kind, value string, weekNumber int, day string, index int, lesson, cabinet, lessonType string, subgroup int) string {
+	source := fmt.Sprintf("%s:%s:%d:%s:%d:%s:%s:%s:%d", kind, value, weekNumber, day, index, lesson, cabinet, lessonType, subgroup)
+	sum := sha256.Sum256([]byte(source))
+	return hex.EncodeToString(sum[:])
+}
+
+func lessonTypeSuffix(lessonType *string) string {
+	if lessonType == nil || *lessonType == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (%s)", *lessonType)
+}
+
+func subgroupSuffix(subgroup int) string {
+	if subgroup == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", подгр. %d", subgroup)
+}
+
+func deref(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func formatICSDateTime(t time.Time) string {
+	return t.Format("20060102T150405")
+}
+
+func escapeICSText(value string) string {
+	value = strings.ReplaceAll(value, "\\", "\\\\")
+	value = strings.ReplaceAll(value, "\n", "\\n")
+	value = strings.ReplaceAll(value, ",", "\\,")
+	value = strings.ReplaceAll(value, ";", "\\;")
+	return value
 }

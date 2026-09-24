@@ -130,16 +130,30 @@ func (b *Bot) resolveGroupInput(u *Update, chat *Chat, input, kind string) error
 	groups := b.cache.GetGroups()
 
 	normalized := strings.TrimRight(strings.TrimSpace(input), "*")
-	if normalized == "" {
-		return u.Bot.SendText(u.ChatID, "Это не число")
-	}
-	for _, ch := range normalized {
-		if ch < '0' || ch > '9' {
-			return b.sendGroupError(u, chat, "Это не число")
+
+	invalid := normalized == ""
+	if !invalid {
+		for _, ch := range normalized {
+			if ch < '0' || ch > '9' {
+				invalid = true
+				break
+			}
 		}
 	}
-	if len(normalized) > 3 {
-		return b.sendGroupError(u, chat, "Номер группы введён неверно")
+
+	message := "Это не число"
+	if !invalid && len(normalized) > 3 {
+		invalid = true
+		message = "Номер группы введён неверно"
+	}
+	if invalid && kind == "set" {
+		message = fmt.Sprintf("Неправильный синтаксис команды\n\nПример:\n/setGroup %s", randomKey(groups))
+	}
+	if invalid {
+		if normalized == "" {
+			return u.Bot.SendText(u.ChatID, message)
+		}
+		return b.sendGroupError(u, chat, message)
 	}
 	if _, ok := groups[normalized]; !ok {
 		return b.sendGroupError(u, chat, "Данной учебной группы не существует")
@@ -195,7 +209,11 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 	teachers := b.cache.GetTeachers()
 
 	if len(input) < 3 {
-		return b.sendTeacherError(u, chat, "Фамилия введена некорректно")
+		message := "Фамилия введена некорректно"
+		if kind == "set" {
+			message = fmt.Sprintf("Неправильный синтаксис команды\n\nПример:\n/setTeacher %s", randomKey(teachers))
+		}
+		return b.sendTeacherError(u, chat, message)
 	}
 
 	matched, tooMany := matchTeacherList(input, teachers, b.cache.GetTeamNames())

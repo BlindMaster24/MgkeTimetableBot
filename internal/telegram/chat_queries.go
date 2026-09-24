@@ -162,6 +162,17 @@ func (r *Repository) FindAllTGChats() ([]*Chat, error) {
 	return result, nil
 }
 
+func (r *Repository) CountTGChats() (int, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var total, allowed int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*), COALESCE(SUM(allow_send_mess), 0) FROM bot_chats WHERE service = 'telegram' AND accepted = 1`,
+	).Scan(&total, &allowed)
+	return total, allowed, err
+}
+
 func (r *Repository) CountAll() (int, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

@@ -64,7 +64,7 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 
 	day := strings.TrimSpace(strings.TrimPrefix(u.Text, "/vychetkaDlyaBrovkiDSOnline"))
 	if day == "" {
-		return fmt.Errorf("день не указан")
+		return u.Bot.SendText(u.ChatID, "День, с которого необходимо начать не указан")
 	}
 
 	if c.bot.archive == nil {

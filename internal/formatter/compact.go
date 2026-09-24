@@ -9,6 +9,9 @@ type CompactFormatter struct{}
 
 func (f *CompactFormatter) Name() string  { return "compact" }
 func (f *CompactFormatter) Label() string { return "Компактный" }
+func (f *CompactFormatter) NoTimetable() string {
+	return "Нет расписания для отображения"
+}
 
 func (f *CompactFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
 	daysInfo := parseDaysFromSlice(days)
@@ -38,11 +41,14 @@ func (f *CompactFormatter) formatFull(name string, teacher string, days []DayInf
 	if len(days) > 0 {
 		for _, day := range days {
 			dayText := f.formatDayHeader(day, opts)
-			lessonsText := f.formatLessons(day.Lessons, opts)
+			lessonsText := f.formatTeacherLessons(day.Lessons, opts)
+			if isGroup {
+				lessonsText = f.formatGroupLessons(day.Lessons, opts)
+			}
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, notTimetable())
+		text = append(text, f.NoTimetable())
 	}
 
 	footer := formatFooter(opts)
@@ -61,9 +67,9 @@ func (f *CompactFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 	return "__ " + opts.b(w) + ", " + day.Date + " __"
 }
 
-func (f *CompactFormatter) formatLessons(lessons []any, opts FormatOptions) string {
+func (f *CompactFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return notLessons()
+		return opts.i("Пар нет")
 	}
 
 	var text []string
@@ -79,34 +85,65 @@ func (f *CompactFormatter) formatLessons(lessons []any, opts FormatOptions) stri
 
 		lessonHeader := fmt.Sprintf("%d. ", i+1)
 
-		lessonsEqual := allEqual(func(p LessonPart) string { return p.Lesson }, subs)
+		withSubgroups := isSubgroupList(lesson)
+		showOpts := groupLessonOptions(subs, withSubgroups)
 
-		showOpts := map[string]bool{
-			"lesson":  true,
-			"cabinet": true,
-		}
-		if len(subs) == 1 || lessonsEqual {
-			showOpts["lesson"] = true
-		}
-
-		mainLesson := f.formatLessonLine(subs[0], showOpts, opts)
+		mainLesson := f.formatGroupLessonLine(subs[0], showOpts)
 		text = append(text, lessonHeader+mainLesson)
 
-		if len(subs) > 1 {
+		if withSubgroups {
+			reverseOpts := reverseGroupLessonOptions(showOpts)
 			for _, sub := range subs {
-				value := f.formatLessonLine(sub, showOpts, opts)
-				text = append(text, "- "+value)
+				text = append(text, "- "+f.formatGroupLessonLine(sub, reverseOpts))
 			}
 		}
 	}
 
-	return strings.Join(text, "\n")
+	return strings.TrimSpace(strings.Join(text, "\n"))
 }
 
-func (f *CompactFormatter) formatLessonLine(p LessonPart, show map[string]bool, opts FormatOptions) string {
+func (f *CompactFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
+	if len(lessons) == 0 {
+		return opts.i("Пар нет")
+	}
+
+	var text []string
+	for i, lesson := range lessons {
+		if lesson == nil {
+			continue
+		}
+
+		subs := getSubgroups(lesson)
+		if len(subs) == 0 {
+			continue
+		}
+
+		text = append(text, fmt.Sprintf("%d. ", i+1)+f.formatTeacherLesson(subs[0]))
+	}
+
+	return strings.TrimSpace(strings.Join(text, "\n"))
+}
+
+func (f *CompactFormatter) formatTeacherLesson(p LessonPart) string {
 	var parts []string
 
 	if p.Subgroup > 0 {
+		parts = append(parts, fmt.Sprintf("%d.", p.Subgroup))
+	}
+
+	parts = append(parts, p.Group+"-"+p.Lesson)
+
+	if p.Cabinet != "" {
+		parts = append(parts, "{"+p.Cabinet+"}")
+	}
+
+	return strings.Join(parts, " ")
+}
+
+func (f *CompactFormatter) formatGroupLessonLine(p LessonPart, show map[string]bool) string {
+	var parts []string
+
+	if show["subgroup"] && p.Subgroup > 0 {
 		parts = append(parts, fmt.Sprintf("%d.", p.Subgroup))
 	}
 

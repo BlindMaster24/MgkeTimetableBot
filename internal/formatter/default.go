@@ -10,6 +10,9 @@ type DefaultFormatter struct{}
 
 func (f *DefaultFormatter) Name() string  { return "default" }
 func (f *DefaultFormatter) Label() string { return "📝 Стуктурированный" }
+func (f *DefaultFormatter) NoTimetable() string {
+	return "Нет расписания для отображения"
+}
 
 func (f *DefaultFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
 	return f.formatFull(group, "", parseDaysFromSlice(days), true, opts)
@@ -37,11 +40,14 @@ func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInf
 	if len(days) > 0 {
 		for _, day := range days {
 			dayText := f.formatDayHeader(day, opts)
-			lessonsText := f.formatLessons(day.Lessons, opts)
+			lessonsText := f.formatTeacherLessons(day.Lessons, opts)
+			if isGroup {
+				lessonsText = f.formatGroupLessons(day.Lessons, opts)
+			}
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, notTimetable())
+		text = append(text, f.NoTimetable())
 	}
 
 	footer := formatFooter(opts)
@@ -60,9 +66,9 @@ func (f *DefaultFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 	return "__ " + opts.b(w) + ", " + day.Date + " __"
 }
 
-func (f *DefaultFormatter) formatLessons(lessons []any, opts FormatOptions) string {
+func (f *DefaultFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return notLessons()
+		return opts.i("Пар нет")
 	}
 
 	var text []string
@@ -78,30 +84,14 @@ func (f *DefaultFormatter) formatLessons(lessons []any, opts FormatOptions) stri
 
 		lessonHeader := fmt.Sprintf("%d. ", i+1)
 
-		withSubgroups := len(subs) > 1
-		lessonsEqual := allEqual(func(p LessonPart) string { return p.Lesson }, subs)
-		typeEqual := lessonsEqual && allEqual(func(p LessonPart) string { return p.Type }, subs)
-		teacherEqual := typeEqual && allEqual(func(p LessonPart) string { return p.Teacher }, subs)
-		cabinetEqual := teacherEqual && allEqual(func(p LessonPart) string { return p.Cabinet }, subs)
-		commentEqual := allEqual(func(p LessonPart) string { return p.Comment }, subs)
-
-		showOpts := map[string]bool{
-			"subgroup": !withSubgroups,
-			"lesson":   !withSubgroups || lessonsEqual,
-			"type":     !withSubgroups || typeEqual,
-			"teacher":  !withSubgroups || teacherEqual,
-			"cabinet":  !withSubgroups || cabinetEqual,
-			"comment":  !withSubgroups || commentEqual,
-		}
+		withSubgroups := isSubgroupList(lesson)
+		showOpts := groupLessonOptions(subs, withSubgroups)
 
 		mainLesson := f.formatLessonLine(subs[0], showOpts, opts)
 		text = append(text, lessonHeader+mainLesson)
 
 		if withSubgroups {
-			reverseOpts := map[string]bool{}
-			for k, v := range showOpts {
-				reverseOpts[k] = !v
-			}
+			reverseOpts := reverseGroupLessonOptions(showOpts)
 			var subLines []string
 			for j, sub := range subs {
 				value := f.formatLessonLine(sub, reverseOpts, opts)
@@ -115,7 +105,53 @@ func (f *DefaultFormatter) formatLessons(lessons []any, opts FormatOptions) stri
 		}
 	}
 
-	return strings.Join(text, "\n")
+	return strings.TrimSpace(strings.Join(text, "\n"))
+}
+
+func (f *DefaultFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
+	if len(lessons) == 0 {
+		return opts.i("Пар нет")
+	}
+
+	var text []string
+	for i, lesson := range lessons {
+		if lesson == nil {
+			continue
+		}
+
+		subs := getSubgroups(lesson)
+		if len(subs) == 0 {
+			continue
+		}
+
+		text = append(text, fmt.Sprintf("%d. ", i+1)+f.formatTeacherLesson(subs[0]))
+	}
+
+	return strings.TrimSpace(strings.Join(text, "\n"))
+}
+
+func (f *DefaultFormatter) formatTeacherLesson(p LessonPart) string {
+	var parts []string
+
+	if p.Subgroup > 0 {
+		parts = append(parts, fmt.Sprintf("%d.", p.Subgroup))
+	}
+
+	parts = append(parts, p.Group+"-"+p.Lesson)
+
+	if p.Type != "" {
+		parts = append(parts, "("+p.Type+")")
+	}
+
+	if p.Cabinet != "" {
+		parts = append(parts, "{"+p.Cabinet+"}")
+	}
+
+	if p.Comment != "" {
+		parts = append(parts, "// "+p.Comment)
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func (f *DefaultFormatter) formatLessonLine(p LessonPart, show map[string]bool, opts FormatOptions) string {

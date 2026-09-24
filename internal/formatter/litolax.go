@@ -9,6 +9,9 @@ type LitolaxFormatter struct{}
 
 func (f *LitolaxFormatter) Name() string  { return "litolax" }
 func (f *LitolaxFormatter) Label() string { return "💩 LitolaxStyle" }
+func (f *LitolaxFormatter) NoTimetable() string {
+	return "Нет расписания для отображения"
+}
 
 func (f *LitolaxFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
 	daysInfo := parseDaysFromSlice(days)
@@ -38,11 +41,14 @@ func (f *LitolaxFormatter) formatFull(name string, teacher string, days []DayInf
 	if len(days) > 0 {
 		for _, day := range days {
 			dayText := f.formatDayHeader(day, opts)
-			lessonsText := f.formatLessons(day.Lessons, opts)
+			lessonsText := f.formatTeacherLessons(day.Lessons, opts)
+			if isGroup {
+				lessonsText = f.formatGroupLessons(day.Lessons, opts)
+			}
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, notTimetable())
+		text = append(text, f.NoTimetable())
 	}
 
 	footer := formatFooter(opts)
@@ -61,9 +67,9 @@ func (f *LitolaxFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 	return "\nДень - " + w + ", " + day.Date + "\n"
 }
 
-func (f *LitolaxFormatter) formatLessons(lessons []any, opts FormatOptions) string {
+func (f *LitolaxFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return notLessons()
+		return opts.i("Пар нет")
 	}
 
 	var text []string
@@ -77,45 +83,70 @@ func (f *LitolaxFormatter) formatLessons(lessons []any, opts FormatOptions) stri
 			continue
 		}
 
-		lessonHeader := "\n" + opts.b(fmt.Sprintf("Пара: №%d", i+1))
-		text = append(text, lessonHeader)
+		header := "\n" + opts.b(fmt.Sprintf("Пара: №%d", i+1))
 
-		withSubgroups := len(subs) > 1
-
-		if !withSubgroups {
-			mainLesson := f.formatLessonLine(subs[0], opts)
-			text = append(text, mainLesson)
-
-			if subs[0].Cabinet != "" {
-				text = append(text, "Каб: "+subs[0].Cabinet)
-			}
+		if !isSubgroupList(lesson) {
+			text = append(text, header+"\n"+f.formatGroupLessonLine(subs[0]))
 		} else {
+			text = append(text, header)
 			for _, sub := range subs {
-				value := f.formatLessonLine(sub, opts)
-				text = append(text, value)
-
-				cab := sub.Cabinet
-				if cab == "" {
-					cab = "-"
-				}
-				text = append(text, "Каб: "+cab)
+				text = append(text, f.formatGroupLessonLine(sub))
 			}
 		}
+
+		text = append(text, "Каб: "+strings.Join(cabinetsOf(subs), " "))
 	}
 
-	return strings.Join(text, "\n")
+	return strings.TrimSpace(strings.Join(text, "\n"))
 }
 
-func (f *LitolaxFormatter) formatLessonLine(p LessonPart, opts FormatOptions) string {
+func (f *LitolaxFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
+	if len(lessons) == 0 {
+		return opts.i("Пар нет")
+	}
+
+	var text []string
+	for i, lesson := range lessons {
+		if lesson == nil {
+			continue
+		}
+
+		subs := getSubgroups(lesson)
+		if len(subs) == 0 {
+			continue
+		}
+
+		header := "\n" + opts.b(fmt.Sprintf("Пара: №%d", i+1))
+		text = append(text, header+"\n"+f.formatTeacherLesson(subs[0]))
+		text = append(text, "Каб: "+oldDash(subs[0].Cabinet))
+	}
+
+	return strings.TrimSpace(strings.Join(text, "\n"))
+}
+
+func cabinetsOf(subs []LessonPart) []string {
+	cabinets := make([]string, 0, len(subs))
+	for _, sub := range subs {
+		cabinets = append(cabinets, oldDash(sub.Cabinet))
+	}
+	return cabinets
+}
+
+func oldDash(cabinet string) string {
+	if cabinet == "" {
+		return "-"
+	}
+	return cabinet
+}
+
+func (f *LitolaxFormatter) formatGroupLessonLine(p LessonPart) string {
 	var parts []string
 
 	if p.Subgroup > 0 {
 		parts = append(parts, fmt.Sprintf("%d.", p.Subgroup))
 	}
 
-	if p.Lesson != "" {
-		parts = append(parts, p.Lesson)
-	}
+	parts = append(parts, p.Lesson)
 
 	if p.Type != "" {
 		parts = append(parts, "("+p.Type+")")
@@ -123,6 +154,26 @@ func (f *LitolaxFormatter) formatLessonLine(p LessonPart, opts FormatOptions) st
 
 	if p.Teacher != "" {
 		parts = append(parts, p.Teacher)
+	}
+
+	if p.Comment != "" {
+		parts = append(parts, "// "+p.Comment)
+	}
+
+	return strings.Join(parts, " ")
+}
+
+func (f *LitolaxFormatter) formatTeacherLesson(p LessonPart) string {
+	var parts []string
+
+	if p.Subgroup > 0 {
+		parts = append(parts, fmt.Sprintf("%d.", p.Subgroup))
+	}
+
+	parts = append(parts, p.Group+"-"+p.Lesson)
+
+	if p.Type != "" {
+		parts = append(parts, "("+p.Type+")")
 	}
 
 	if p.Comment != "" {

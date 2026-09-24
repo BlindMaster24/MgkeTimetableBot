@@ -3,6 +3,8 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -13,9 +15,36 @@ import (
 )
 
 type recordedCall struct {
-	Method string
-	Text   string
-	Raw    string
+	Method  string
+	Text    string
+	Raw     string
+	ReplyTo int
+}
+
+func multipartReplyTo(body string) int {
+	idx := strings.Index(body, "reply_parameters")
+	if idx < 0 {
+		return 0
+	}
+	rest := body[idx:]
+	idIdx := strings.Index(rest, "message_id")
+	if idIdx < 0 {
+		return 0
+	}
+	rest = rest[idIdx:]
+	start := strings.IndexAny(rest, "0123456789")
+	if start < 0 {
+		return 0
+	}
+	end := start
+	for end < len(rest) && rest[end] >= '0' && rest[end] <= '9' {
+		end++
+	}
+	value, err := strconv.Atoi(rest[start:end])
+	if err != nil {
+		return 0
+	}
+	return value
 }
 
 type recordingCaller struct {
@@ -29,12 +58,26 @@ func (c *recordingCaller) Call(_ context.Context, url string, data *telegoapi.Re
 	if idx := strings.LastIndexByte(url, '/'); idx >= 0 {
 		name = url[idx+1:]
 	}
-	record := recordedCall{Method: name, Raw: string(data.BodyRaw)}
+	body := string(data.BodyRaw)
+	if body == "" && data.BodyStream != nil {
+		if raw, err := io.ReadAll(data.BodyStream); err == nil {
+			body = string(raw)
+		}
+	}
+	record := recordedCall{Method: name, Raw: body}
 	var payload map[string]any
-	if err := json.Unmarshal(data.BodyRaw, &payload); err == nil {
+	if err := json.Unmarshal([]byte(body), &payload); err == nil {
 		if text, ok := payload["text"].(string); ok {
 			record.Text = text
 		}
+		if reply, ok := payload["reply_parameters"].(map[string]any); ok {
+			if id, ok := reply["message_id"].(float64); ok {
+				record.ReplyTo = int(id)
+			}
+		}
+	}
+	if record.ReplyTo == 0 {
+		record.ReplyTo = multipartReplyTo(body)
 	}
 
 	c.mu.Lock()
@@ -90,6 +133,31 @@ func (c *recordingCaller) deliveredText() string {
 		}
 	}
 	return text
+}
+
+func (c *recordingCaller) toasts() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var out []string
+	for _, call := range c.calls {
+		if call.Method == "answerCallbackQuery" && call.Text != "" {
+			out = append(out, call.Text)
+		}
+	}
+	return out
+}
+
+func (c *recordingCaller) photoReplyTo() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, call := range c.calls {
+		if call.Method == "sendPhoto" {
+			return call.ReplyTo
+		}
+	}
+	return 0
 }
 
 func (c *recordingCaller) payloads() []string {

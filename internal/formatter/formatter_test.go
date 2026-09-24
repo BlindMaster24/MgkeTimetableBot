@@ -128,19 +128,36 @@ func TestDefaultFormatter_GroupDay(t *testing.T) {
 	}
 }
 
-func TestDefaultFormatter_TeacherDay(t *testing.T) {
-	f := &DefaultFormatter{}
-	data := makeDataWithDays(makeTestDaysData())
-	days := extractDaysFromData(data)
-
-	opts := FormatOptions{IsTelegram: true}
-	result := f.FormatTeacherFull("Иванов И.И.", days, opts)
-
-	if result == "" {
-		t.Fatal("default formatter returned empty string")
+func makeTeacherDaysData() map[string]any {
+	today := time.Now().Format("02.01.2006")
+	return map[string]any{
+		"days": []any{
+			map[string]any{
+				"day": today,
+				"lessons": []any{
+					map[string]any{"lesson": "Математика", "type": "лекция", "group": "100", "cabinet": "101"},
+				},
+			},
+		},
 	}
-	if !strings.Contains(result, "Иванов") {
-		t.Fatalf("expected teacher name in output, got: %s", result)
+}
+
+func TestTeacherLessonsCarryTheGroupPrefix(t *testing.T) {
+	days := extractDaysFromData(makeTeacherDaysData())
+
+	for _, f := range AllFormatters {
+		opts := FormatOptions{IsTelegram: true}
+		result := f.FormatTeacherFull("Иванов И.И.", days, opts)
+
+		if result == "" {
+			t.Fatalf("%s: teacher day returned empty string", f.Name())
+		}
+		if !strings.Contains(result, "100-Математика") {
+			t.Fatalf("%s: a teacher lesson must name its group, got: %s", f.Name(), result)
+		}
+		if strings.Contains(result, "Иванов") {
+			t.Fatalf("%s: the teacher's own schedule must not repeat the teacher name, got: %s", f.Name(), result)
+		}
 	}
 }
 
@@ -258,29 +275,54 @@ func TestNoHTMLFormatting(t *testing.T) {
 }
 
 func TestNoLessons(t *testing.T) {
-	for _, f := range AllFormatters {
-		data := map[string]any{
-			"days": []any{
-				map[string]any{"day": "01.01.2030", "lessons": []any{}},
-			},
-		}
-		days := extractDaysFromData(data)
-		opts := FormatOptions{IsTelegram: true}
-		result := f.FormatGroupFull("Г1", days, opts)
+	data := map[string]any{
+		"days": []any{
+			map[string]any{"day": "01.01.2030", "lessons": []any{}},
+		},
+	}
+	days := extractDaysFromData(data)
 
-		if !strings.Contains(result, "Нет пар") && !strings.Contains(result, "нет") {
-			t.Fatalf("%s: expected 'no lessons' message, got: %s", f.Name(), result)
+	want := map[string][2]string{
+		"default": {"<i>Пар нет</i>", "Пар нет"},
+		"visual":  {"🚫 Нет пар на этот день", "🚫 Нет пар на этот день"},
+		"compact": {"<i>Пар нет</i>", "Пар нет"},
+		"litolax": {"<i>Пар нет</i>", "Пар нет"},
+	}
+
+	for _, f := range AllFormatters {
+		expected, ok := want[f.Name()]
+		if !ok {
+			t.Fatalf("no expectation for formatter %q", f.Name())
+		}
+
+		if got := f.FormatGroupFull("Г1", days, FormatOptions{IsTelegram: true}); !strings.Contains(got, expected[0]) {
+			t.Fatalf("%s: telegram output %q must carry %q", f.Name(), got, expected[0])
+		}
+		if got := f.FormatGroupFull("Г1", days, FormatOptions{}); strings.Contains(got, "<i>") || !strings.Contains(got, expected[1]) {
+			t.Fatalf("%s: plain output %q must carry %q without tags", f.Name(), got, expected[1])
 		}
 	}
 }
 
 func TestEmptyDays(t *testing.T) {
-	for _, f := range AllFormatters {
-		opts := FormatOptions{IsTelegram: true}
-		result := f.FormatGroupFull("Г1", nil, opts)
+	want := map[string]string{
+		"default": "Нет расписания для отображения",
+		"visual":  "🚫 Нет расписания для отображения",
+		"compact": "Нет расписания для отображения",
+		"litolax": "Нет расписания для отображения",
+	}
 
-		if !strings.Contains(result, "Нет расписания") {
-			t.Fatalf("%s: expected 'no timetable' message, got: %s", f.Name(), result)
+	for _, f := range AllFormatters {
+		expected, ok := want[f.Name()]
+		if !ok {
+			t.Fatalf("no expectation for formatter %q", f.Name())
+		}
+
+		if got := f.FormatGroupFull("Г1", nil, FormatOptions{IsTelegram: true}); !strings.Contains(got, expected) {
+			t.Fatalf("%s: expected %q, got: %s", f.Name(), expected, got)
+		}
+		if got := f.FormatTeacherFull("Иванов И.И.", nil, FormatOptions{IsTelegram: true}); !strings.Contains(got, expected) {
+			t.Fatalf("%s: expected %q for a teacher too, got: %s", f.Name(), expected, got)
 		}
 	}
 }
@@ -412,14 +454,77 @@ func TestFormatSeconds(t *testing.T) {
 		secs int64
 		want string
 	}{
-		{30, "30 сек"},
-		{120, "2 мин 0 сек"},
-		{3661, "1 ч 1 мин"},
+		{0, "0 сек."},
+		{30, "30 сек."},
+		{59, "59 сек."},
+		{60, "1 мин. 0 сек."},
+		{90, "1 мин. 30 сек."},
+		{120, "2 мин. 0 сек."},
+		{3599, "59 мин. 59 сек."},
+		{3600, "1 ч. 0 мин. 0 сек."},
+		{3661, "1 ч. 1 мин. 1 сек."},
+		{86399, "23 ч. 59 мин. 59 сек."},
+		{86400, "1 д. 0 ч. 0 мин. 0 сек."},
+		{90000, "1 д. 1 ч. 0 мин. 0 сек."},
+		{31536000, "1 г. 0 д. 0 ч. 0 мин. 0 сек."},
 	}
 	for _, tt := range tests {
 		got := FormatSeconds(tt.secs)
 		if got != tt.want {
 			t.Errorf("FormatSeconds(%d) = %q, want %q", tt.secs, got, tt.want)
 		}
+	}
+}
+
+func TestSubgroupLayoutMatchesTheOldBot(t *testing.T) {
+	day := func(lessons []any) []map[string]any {
+		return extractDaysFromData(map[string]any{
+			"days": []any{map[string]any{"day": time.Now().Format("02.01.2006"), "lessons": lessons}},
+		})
+	}
+
+	first := map[string]any{"subgroup": 1.0, "lesson": "Программирование", "type": "лабораторная", "teacher": "А", "cabinet": "10"}
+	second := map[string]any{"subgroup": 2.0, "lesson": "Программирование", "type": "лабораторная", "teacher": "Б", "cabinet": "20"}
+
+	cases := []struct {
+		name    string
+		lessons []any
+		want    map[string]string
+	}{
+		{
+			name:    "two subgroups",
+			lessons: []any{[]any{first, second}},
+			want: map[string]string{
+				"default": "1. Программирование (лабораторная)\n├── 1. А {10}\n└── 2. Б {20}",
+				"visual":  "1️⃣ Пара:\n    📚 Программирование (лабораторная)\n\n    🎒 Подгруппа 1:\n    🎓 А\n    🏫 10\n\n    🎒 Подгруппа 2:\n    🎓 Б\n    🏫 20",
+				"compact": "1. Программирование\n- 1. {10}\n- 2. {20}",
+				"litolax": "Пара: №1\n1. Программирование (лабораторная) А\n2. Программирование (лабораторная) Б\nКаб: 10 20",
+			},
+		},
+		{
+			name:    "a single subgroup still keeps the subgroup layout",
+			lessons: []any{[]any{first}},
+			want: map[string]string{
+				"default": "1. Программирование (лабораторная)\n└── 1. А {10}",
+				"visual":  "1️⃣ Пара:\n    📚 Программирование (лабораторная)\n\n    🎒 Подгруппа 1:\n    🎓 А\n    🏫 10",
+				"compact": "1. Программирование\n- 1. {10}",
+				"litolax": "Пара: №1\n1. Программирование (лабораторная) А\nКаб: 10",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, f := range AllFormatters {
+				expected, ok := tc.want[f.Name()]
+				if !ok {
+					t.Fatalf("no expectation for formatter %q", f.Name())
+				}
+				got := f.FormatGroupFull("100", day(tc.lessons), FormatOptions{})
+				if !strings.Contains(got, expected) {
+					t.Fatalf("%s: subgroup layout drifted\nwant fragment:\n%s\ngot:\n%s", f.Name(), expected, got)
+				}
+			}
+		})
 	}
 }

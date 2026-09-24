@@ -300,3 +300,29 @@ func TestImageCommandRendersTheCachedWeek(t *testing.T) {
 		t.Fatalf("an unknown group must be reported, got %q", got)
 	}
 }
+
+func TestTimetableCallbackNamesTheMissingTarget(t *testing.T) {
+	when := time.Date(2026, time.September, 16, 10, 0, 0, 0, time.Local)
+	week := utils.WeekIndexFromDate(when)
+
+	caller := &recordingCaller{}
+	b, repo := setupE2EBotWithCaller(t, caller)
+	b.SetNow(func() time.Time { return when })
+
+	seedGroupCache(t, b, "100", lessonOn(weekDayDate(week, 0), "Физика"))
+	seedTeacherCache(t, b, "Иванов И.И.", lessonOn(weekDayDate(week, 0), "Физика"))
+
+	chatWithGroup(t, repo, 7701, "100")
+	caller.reset()
+	timetableCallback(t, b, 7701, "t", "Петров П.П.", week.Value())
+	if got := caller.last(); got != b.loc("teacher_not_exists") {
+		t.Fatalf("a missing teacher must be named as such, got %q", got)
+	}
+
+	chatWithGroup(t, repo, 7702, "100")
+	caller.reset()
+	timetableCallback(t, b, 7702, "g", "999", week.Value())
+	if got := caller.last(); got != b.loc("group_not_exists") {
+		t.Fatalf("a missing group must be named as such, got %q", got)
+	}
+}

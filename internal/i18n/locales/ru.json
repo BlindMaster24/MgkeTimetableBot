@@ -24,6 +24,7 @@
   "parser_logs_warning_prefix": "⚠️ ",
   "parser_logs_fallback_prefix": "↪️ ",
   "force_parse_started": "Принудительная перезагрузка данных...",
+  "force_parse_queued": "Запущено",
   "cmd_forceparse": "Спарсить расписание прямо сейчас",
   "cmd_resetcache": "Сбросить кеш",
   "force_parse_done": "Данные успешно обновлены!",

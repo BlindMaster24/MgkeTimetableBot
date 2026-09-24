@@ -33,68 +33,20 @@ func (cb *imageCb) Prefix() string { return "image" }
 func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
 	payload := strings.TrimPrefix(u.Data, "image")
 	payload = strings.TrimPrefix(payload, "_")
-	if idx := strings.IndexByte(payload, ':'); idx >= 0 {
-		typePart := payload[:idx]
-		value := payload[idx+1:]
-		switch typePart {
-		case "g", "group":
-			cb.bot.AnswerCallback(u.Callback.ID, "")
-			err := cb.bot.handleImagePayload(u, "g", value)
-			if err == nil {
-				cb.bot.AnswerCallback(u.Callback.ID, "Изображение было отправлено")
-			}
-			return err
-		case "t", "teacher":
-			cb.bot.AnswerCallback(u.Callback.ID, "")
-			err := cb.bot.handleImagePayload(u, "t", value)
-			if err == nil {
-				cb.bot.AnswerCallback(u.Callback.ID, "Изображение было отправлено")
-			}
-			return err
-		}
+
+	idx := strings.IndexByte(payload, ':')
+	if idx < 0 {
+		return cb.bot.AnswerCallback(u.Callback.ID, "")
 	}
 
-	cb.bot.AnswerCallback(u.Callback.ID, "")
-	chat, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID)
-	if err != nil {
-		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	toast, err := cb.bot.handleImagePayload(u, payload[:idx], payload[idx+1:])
+	if toast != "" {
+		cb.bot.AnswerCallback(u.Callback.ID, toast)
 	}
-	if chat.Mode == ModeStudent || chat.Mode == ModeParent {
-		if chat.Group == "" {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("need_group"))
-		}
-		data, ok := cb.bot.cache.GetGroups()[chat.Group]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("group_not_exists"))
-		}
-		_, days := cb.bot.relevantWeekDays(data)
-		path, err := imagepkg.RenderGroupDays(chat.Group, days, "./cache/images")
-		if err != nil {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
-		}
-		return u.Bot.SendPhoto(u.ChatID, path, "")
-	}
-	if chat.Mode == "teacher" {
-		if chat.Teacher == "" {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("need_teacher"))
-		}
-		data, ok := cb.bot.cache.GetTeachers()[chat.Teacher]
-		if !ok {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("teacher_not_exists"))
-		}
-		_, days := cb.bot.relevantWeekDays(data)
-		path, err := imagepkg.RenderTeacherDays(chat.Teacher, days, "./cache/images")
-		if err != nil {
-			return u.Bot.SendText(u.ChatID, cb.bot.loc("image_failed"))
-		}
-		return u.Bot.SendPhoto(u.ChatID, path, "")
-	}
-	return u.Bot.SendText(u.ChatID, cb.bot.loc("need_group"))
+	return err
 }
 
-type imageGroupCb struct{ bot *Bot }
-
-func (b *Bot) handleImagePayload(u *Update, typeLetter, value string) error {
+func (b *Bot) handleImagePayload(u *Update, typePart, value string) (string, error) {
 	weekIndex := b.relevantWeekIndex().Value()
 	if idx := strings.LastIndexByte(value, ':'); idx >= 0 {
 		if w, err := strconv.Atoi(value[idx+1:]); err == nil {
@@ -104,25 +56,25 @@ func (b *Bot) handleImagePayload(u *Update, typeLetter, value string) error {
 	}
 
 	var typeName string
-	switch typeLetter {
-	case "g":
+	switch typePart {
+	case "g", "group":
 		typeName = "group"
-	case "t":
+	case "t", "teacher":
 		typeName = "teacher"
 	default:
-		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
+		return b.loc("image_failed"), nil
 	}
 
 	if !b.hasCachedValue(typeName, value) {
 		if typeName == "teacher" {
-			return u.Bot.SendText(u.ChatID, b.loc("teacher_not_exists"))
+			return b.loc("teacher_not_exists"), nil
 		}
-		return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
+		return b.loc("group_not_exists"), nil
 	}
 
 	days := b.weekDays(daysFromArchive, typeName, value, utils.WeekIndexFromNumber(weekIndex))
 	if len(days) == 0 {
-		return u.Bot.SendText(u.ChatID, "Нет расписания для отображения")
+		return b.loc("no_timetable"), nil
 	}
 
 	var path string
@@ -133,9 +85,14 @@ func (b *Bot) handleImagePayload(u *Update, typeLetter, value string) error {
 		path, err = imagepkg.RenderGroupDays(value, days, "./cache/images")
 	}
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
+		b.log.Error().Err(err).Msg("image render failed")
+		return b.loc("image_failed"), nil
 	}
-	return u.Bot.SendPhoto(u.ChatID, path, "")
+
+	if err := b.sendPhotoReply(u.ChatID, path, u.MessageID); err != nil {
+		return "", err
+	}
+	return "Изображение было отправлено", nil
 }
 
 type cancelCb struct{ bot *Bot }

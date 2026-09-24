@@ -170,6 +170,15 @@ func (s *Store) Token(key *Key) (string, error) {
 	return s.tool.Encode(key.ID, key.IV)
 }
 
+func (s *Store) Counts() (int, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var total, active int
+	err := s.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(last_used > 0), 0) FROM api_keys`).Scan(&total, &active)
+	return total, active, err
+}
+
 func (s *Store) SystemToken() (string, error) {
 	key, _, err := s.FindOrCreate(SystemChatID)
 	if err != nil {

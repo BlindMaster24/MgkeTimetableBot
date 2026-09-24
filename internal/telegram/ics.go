@@ -37,12 +37,13 @@ func (c *icsCmd) MatchText(text string) bool {
 	return text == "📅 ICS" || text == "/ics"
 }
 func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
-	if !c.bot.cfg.Calendar.ICS.Enabled {
-		return u.Bot.SendText(u.ChatID, "ICS отключен в конфиге.")
-	}
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
+	}
+
+	if !c.bot.cfg.Calendar.ICS.Enabled {
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "ICS отключен в конфиге.", replyMainMenu(c.bot, chat))
 	}
 
 	week := c.bot.relevantWeekIndex()
@@ -66,11 +67,11 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 
 func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
 	if bot.archive == nil {
-		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Архив недоступен", replyMainMenu(bot, chat))
 	}
 
-	builder := calendar.NewICSBuilder()
 	weekNum := week.AcademicWeekNumber()
+	builder := calendar.NewICSBuilder(bot.cache.GetCallsWeekdays(), bot.cache.GetCallsSaturday(), weekNum)
 
 	switch typeName {
 	case "group":
@@ -92,18 +93,12 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 	}
 
 	ics := builder.Build()
-	var filename string
-	switch typeName {
-	case "group":
-		filename = fmt.Sprintf("schedule-group-%s-week-%02d.ics", value, weekNum)
-	case "teacher":
-		filename = fmt.Sprintf("schedule-teacher-%s-week-%02d.ics", value, weekNum)
-	}
+	filename := fmt.Sprintf("schedule-%s-%s-week-%02d.ics", typeName, value, weekNum)
 
 	_, err := bot.client.SendDocument(context.Background(), &telego.SendDocumentParams{
-		ChatID:   telego.ChatID{ID: u.ChatID},
-		Document: telego.InputFile{File: namedReader{name: filename, reader: strings.NewReader(ics)}},
-		Caption:  fmt.Sprintf("📅 Расписание %s %s, учебная неделя №%d", typeName, value, weekNum),
+		ChatID:      telego.ChatID{ID: u.ChatID},
+		Document:    telego.InputFile{File: namedReader{name: filename, reader: strings.NewReader(ics)}},
+		ReplyMarkup: replyMainMenu(bot, chat),
 	})
 	return err
 }

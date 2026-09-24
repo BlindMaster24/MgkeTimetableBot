@@ -152,6 +152,7 @@ func (p *TeacherParser) parseTable(table *goquery.Selection, teacherName string)
 	})
 
 	for i := range days {
+		mergeTeacherElectives(&days[i].Lessons)
 		clearEndingTeacherNulls(&days[i].Lessons)
 	}
 
@@ -159,6 +160,42 @@ func (p *TeacherParser) parseTable(table *goquery.Selection, teacherName string)
 		Teacher: teacherName,
 		Days:    days,
 	}
+}
+
+func mergeTeacherElectives(lessons *[]model.TeacherLesson) {
+	all := *lessons
+	for i := 0; i < len(all); i++ {
+		lesson := all[i]
+		if lesson == nil || !isElective(lesson.Type) || lesson.Comment != nil {
+			continue
+		}
+
+		similarIndex := -1
+		for j := len(all) - 1; j > i; j-- {
+			other := all[j]
+			if other == nil {
+				continue
+			}
+			if sameString(lesson.Type, other.Type) && lesson.Lesson == other.Lesson &&
+				lesson.Group == other.Group && sameInt(lesson.Subgroup, other.Subgroup) {
+				similarIndex = j
+				break
+			}
+		}
+
+		if similarIndex >= 0 {
+			comment := twoHoursComment
+			lesson.Comment = &comment
+			all[similarIndex] = nil
+		}
+	}
+}
+
+func sameInt(a, b *int) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 func teacherHasLessons(teacher *model.Teacher) bool {

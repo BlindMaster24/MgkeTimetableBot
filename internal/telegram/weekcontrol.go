@@ -150,7 +150,10 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 	week := utils.WeekIndexFromNumber(p.WeekIndex)
 
 	if !b.hasCachedValue(typeName, p.Value) {
-		return u.Bot.SendText(u.ChatID, b.loc("group_not_exists"))
+		if typeName == "teacher" {
+			return b.sendOrEdit(u, b.loc("teacher_not_exists"), nil)
+		}
+		return b.sendOrEdit(u, b.loc("group_not_exists"), nil)
 	}
 
 	days := b.weekDays(daysFromArchive, typeName, p.Value, week)

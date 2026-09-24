@@ -504,6 +504,47 @@ func (c *RaspCache) Stats() Stats {
 	}
 }
 
+type EntryMeta struct {
+	Update        int64  `json:"update"`
+	Changed       int64  `json:"changed"`
+	LastWeekIndex int    `json:"lastWeekIndex"`
+	Hash          string `json:"hash"`
+}
+
+type TeamMeta struct {
+	Update  int64    `json:"update"`
+	Changed int64    `json:"changed"`
+	Hash    []string `json:"hash"`
+}
+
+func entryMeta(entry *RaspEntry[map[string]any]) EntryMeta {
+	return EntryMeta{Update: entry.Update, Changed: entry.Changed, LastWeekIndex: entry.LastWeekIndex, Hash: entry.Hash}
+}
+
+func (c *RaspCache) GetGroupsMeta() EntryMeta {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return entryMeta(c.Groups)
+}
+
+func (c *RaspCache) GetTeachersMeta() EntryMeta {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return entryMeta(c.Teachers)
+}
+
+func (c *RaspCache) GetTeamMeta() TeamMeta {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return TeamMeta{Update: c.Team.Update, Changed: c.Team.Changed, Hash: c.Team.Hash}
+}
+
+func (c *RaspCache) LastSuccess() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.SuccessUpdate
+}
+
 func (c *RaspCache) RecordHit()  { c.hits.Add(1) }
 func (c *RaspCache) RecordMiss() { c.misses.Add(1) }
 func (c *RaspCache) Reset() {

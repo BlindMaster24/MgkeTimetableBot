@@ -9,6 +9,9 @@ type VisualFormatter struct{}
 
 func (f *VisualFormatter) Name() string  { return "visual" }
 func (f *VisualFormatter) Label() string { return "🌈 Визуальный" }
+func (f *VisualFormatter) NoTimetable() string {
+	return "🚫 Нет расписания для отображения"
+}
 
 func (f *VisualFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
 	daysInfo := parseDaysFromSlice(days)
@@ -38,11 +41,14 @@ func (f *VisualFormatter) formatFull(name string, teacher string, days []DayInfo
 	if len(days) > 0 {
 		for _, day := range days {
 			dayText := f.formatDayHeader(day, opts)
-			lessonsText := f.formatLessons(day.Lessons, opts)
+			lessonsText := f.formatTeacherLessons(day.Lessons, opts)
+			if isGroup {
+				lessonsText = f.formatGroupLessons(day.Lessons, opts)
+			}
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, notTimetable())
+		text = append(text, f.NoTimetable())
 	}
 
 	footer := formatFooter(opts)
@@ -63,7 +69,7 @@ func (f *VisualFormatter) formatDayHeader(day DayInfo, opts FormatOptions) strin
 
 var smileNumbers = []string{"0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"}
 
-func (f *VisualFormatter) formatLessons(lessons []any, opts FormatOptions) string {
+func (f *VisualFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
 		return "🚫 Нет пар на этот день"
 	}
@@ -79,79 +85,124 @@ func (f *VisualFormatter) formatLessons(lessons []any, opts FormatOptions) strin
 			continue
 		}
 
-		numStr := ""
-		if i+1 < len(smileNumbers) {
-			numStr = smileNumbers[i+1]
-		}
-		text = append(text, "\n"+numStr+" Пара:")
+		header := f.lessonHeader(i)
 
-		withSubgroups := len(subs) > 1
-		lessonsEqual := allEqual(func(p LessonPart) string { return p.Lesson }, subs)
-		typeEqual := lessonsEqual && allEqual(func(p LessonPart) string { return p.Type }, subs)
-		teacherEqual := typeEqual && allEqual(func(p LessonPart) string { return p.Teacher }, subs)
-		cabinetEqual := teacherEqual && allEqual(func(p LessonPart) string { return p.Cabinet }, subs)
-		commentEqual := allEqual(func(p LessonPart) string { return p.Comment }, subs)
+		withSubgroups := isSubgroupList(lesson)
+		showOpts := groupLessonOptions(subs, withSubgroups)
 
-		showOpts := map[string]bool{
-			"subgroup": !withSubgroups,
-			"lesson":   !withSubgroups || lessonsEqual,
-			"type":     !withSubgroups || typeEqual,
-			"teacher":  !withSubgroups || teacherEqual,
-			"cabinet":  !withSubgroups || cabinetEqual,
-			"comment":  !withSubgroups || commentEqual,
-		}
-
-		mainLesson := f.formatLessonLine(subs[0], showOpts, opts)
-		text = append(text, mainLesson)
+		main := f.formatGroupLesson(subs[0], showOpts)
+		text = append(text, f.lessonHeaderBlock(header, main, withSubgroups))
 
 		if withSubgroups {
-			reverseOpts := map[string]bool{}
-			for k, v := range showOpts {
-				reverseOpts[k] = !v
-			}
+			reverseOpts := reverseGroupLessonOptions(showOpts)
+			lines := make([]string, 0, len(subs))
 			for j, sub := range subs {
-				value := f.formatLessonLine(sub, reverseOpts, opts)
+				value := f.formatGroupLesson(sub, reverseOpts)
 				if j > 0 {
 					value = "\n" + value
 				}
-				text = append(text, value)
+				lines = append(lines, value)
 			}
-			text = append(text, "")
+			text = append(text, strings.Join(lines, "\n"))
 		}
 	}
 
-	return strings.Join(text, "\n")
+	return strings.TrimSpace(strings.Join(text, "\n"))
 }
 
-func (f *VisualFormatter) formatLessonLine(p LessonPart, show map[string]bool, opts FormatOptions) string {
-	var parts []string
+func (f *VisualFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
+	if len(lessons) == 0 {
+		return "🚫 Нет пар на этот день"
+	}
+
+	var text []string
+	for i, lesson := range lessons {
+		if lesson == nil {
+			continue
+		}
+
+		subs := getSubgroups(lesson)
+		if len(subs) == 0 {
+			continue
+		}
+
+		text = append(text, f.lessonHeaderBlock(f.lessonHeader(i), f.formatTeacherLesson(subs[0]), false))
+	}
+
+	return strings.TrimSpace(strings.Join(text, "\n"))
+}
+
+func (f *VisualFormatter) lessonHeaderBlock(header, main string, withSubgroups bool) string {
+	if main == "" {
+		if withSubgroups {
+			return header + "\n"
+		}
+		return header
+	}
+	if withSubgroups {
+		return header + "\n" + main + "\n"
+	}
+	return header + "\n" + main
+}
+
+func (f *VisualFormatter) lessonHeader(i int) string {
+	num := ""
+	if i+1 < len(smileNumbers) {
+		num = smileNumbers[i+1]
+	}
+	return "\n" + num + " Пара:"
+}
+
+func (f *VisualFormatter) formatGroupLesson(p LessonPart, show map[string]bool) string {
+	var lines []string
 
 	if show["subgroup"] && p.Subgroup > 0 {
-		parts = append(parts, fmt.Sprintf("    🎒 Подгруппа %d:", p.Subgroup))
+		lines = append(lines, fmt.Sprintf("    🎒 Подгруппа %d:", p.Subgroup))
 	}
 
-	lessonPart := ""
 	if show["lesson"] {
-		lessonPart = p.Lesson
-	}
-	if show["type"] && p.Type != "" {
-		lessonPart += " (" + p.Type + ")"
-	}
-	if lessonPart != "" {
-		parts = append(parts, "    📚 "+lessonPart)
+		lesson := "    📚 " + p.Lesson
+		if show["type"] && p.Type != "" {
+			lesson += " (" + p.Type + ")"
+		}
+		lines = append(lines, lesson)
 	}
 
 	if show["teacher"] && p.Teacher != "" {
-		parts = append(parts, "    🎓 "+p.Teacher)
+		lines = append(lines, "    🎓 "+p.Teacher)
 	}
 
 	if show["cabinet"] && p.Cabinet != "" {
-		parts = append(parts, "    🏫 "+p.Cabinet)
+		lines = append(lines, "    🏫 "+p.Cabinet)
 	}
 
 	if show["comment"] && p.Comment != "" {
-		parts = append(parts, "    // "+p.Comment)
+		lines = append(lines, "// "+p.Comment)
 	}
 
-	return strings.Join(parts, "\n")
+	return strings.Join(lines, "\n")
+}
+
+func (f *VisualFormatter) formatTeacherLesson(p LessonPart) string {
+	var lines []string
+
+	if p.Subgroup > 0 {
+		lines = append(lines, fmt.Sprintf("    🎒 Подгруппа %d:", p.Subgroup))
+	}
+
+	lesson := "    📚 " + p.Group + "-" + p.Lesson
+	if p.Type != "" {
+		lesson += " (" + p.Type + ")"
+	}
+	lines = append(lines, lesson)
+
+	if p.Cabinet != "" {
+		lines = append(lines, "    🏫 "+p.Cabinet)
+	}
+
+	if p.Comment != "" {
+		lines = append(lines, "// "+p.Comment)
+	}
+
+	return strings.Join(lines, "\n")
 }

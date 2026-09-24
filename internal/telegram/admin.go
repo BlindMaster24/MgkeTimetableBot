@@ -109,6 +109,15 @@ func (b *Bot) debugLines() []string {
 	if err == nil {
 		lines = append(lines, fmt.Sprintf("Всего чатов: %d", total))
 	}
+	tgTotal, tgAllowed, err := b.chatRepo.CountTGChats()
+	if err == nil {
+		lines = append(lines, fmt.Sprintf("Чатов бота Telegram: %d (allow: %d)", tgTotal, tgAllowed))
+	}
+	if b.keys != nil {
+		if keys, active, err := b.keys.Counts(); err == nil {
+			lines = append(lines, fmt.Sprintf("API ключей: %d (active: %d)", keys, active))
+		}
+	}
 	notifyCount := 0
 	notifyChats, err := b.chatRepo.FindAllWithNotifications("telegram")
 	if err == nil {

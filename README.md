@@ -244,7 +244,7 @@ parser:
 
 Доступны только ID из `telegram.admin_ids` — в меню команд Telegram они показываются только им и с пометкой `[адм]`:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` рассылает сообщение всем чатам с ограничением 25 сообщений в минуту, чтобы не упереться в лимиты Telegram.
 
@@ -260,12 +260,12 @@ parser:
 
 | Метод | Путь | Описание |
 |-------|------|----------|
-| GET | `/api/info` | Сведения о сервисе, версия и данные сборки (коммит, дата, toolchain) |
-| GET | `/api/groups` | Список групп |
-| GET | `/api/teachers` | Список преподавателей |
-| GET | `/api/group/:name` | Расписание группы |
-| GET | `/api/teacher/:name` | Расписание преподавателя |
-| GET | `/api/parser-health` | Счётчики кэша: попадания, промахи, время обновления |
+| GET | `/api/info` | Сведения о сервисе, версия и данные сборки, плюс конверты кэша `groups`/`teachers`/`team` (`update`, `changed`, `hash`) и флаг `lastSuccess` — как в старом TS API |
+| GET | `/api/groups` | Список групп (числовые имена идут первыми по возрастанию, как в старом API) |
+| GET | `/api/teachers` | Список преподавателей (та же сортировка) |
+| GET | `/api/group/:name` | Расписание группы: `days` (у каждого дня поле `weekday`), `update`, `changed`, `lastSuccess`; неизвестное имя — `404` |
+| GET | `/api/teacher/:name` | Расписание преподавателя в том же формате |
+| GET | `/api/parser-health` | Состояние парсера: `ok`, `lastSuccessUpdate`, конверты `groups`/`teachers`, `metrics` и счётчики кэша (попадания, промахи) |
 | GET | `/api/health` | Метрики здоровья (парсер, календари, API) и активные алерты; 503, если есть алерты |
 
 `google.url` (по умолчанию `/google/oauth`) — callback OAuth Google, сюда возвращается пользователь после авторизации.
@@ -567,7 +567,7 @@ internal/
     calls_edit.go        — ручная правка звонков из чата
     compare_groups.go    — /comparegroups
     test_subscriptions.go— тестовый прогон подписок
-    debug_commands.go    — служебные /chat, /id, /error, /test
+    debug_commands.go    — служебные /chat, /id, /error, /test, /indexToStrDate, /strToIndex
     admin.go, admin_commands.go — админские команды и утилиты
     google_calendar.go, google_store.go — меню Google Calendar и его состояние в базе
   utils/                 — учебные недели, предметы

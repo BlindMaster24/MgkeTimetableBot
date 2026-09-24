@@ -371,7 +371,7 @@ func (c *forceParseCmd) Handler(ctx context.Context, u *Update) error {
 	if c.bot.parseFunc == nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("parse_not_available"))
 	}
-	if err := u.Bot.SendText(u.ChatID, c.bot.loc("force_parse_started")); err != nil {
+	if err := u.Bot.SendText(u.ChatID, c.bot.loc("force_parse_queued")); err != nil {
 		return err
 	}
 	go func() {
@@ -547,6 +547,10 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 
 	b.sendEulaOnce(u, chat)
 
+	if len(u.Text) > 1 && u.Text[0] == '!' {
+		u.Text = "/" + u.Text[1:]
+	}
+
 	if b.dispatchTextCommand(ctx, u, chat) {
 		return
 	}
@@ -560,9 +564,20 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	b.SendTextWithReplyKeyboard(u.ChatID, "Команда не найдена", replyMainMenu(b, chat))
 }
 
+func (b *Bot) allowsCommand(cmd Command, userID int64) bool {
+	ac, ok := cmd.(AdminCommand)
+	if !ok || !ac.AdminOnly() {
+		return true
+	}
+	return b.isAdmin(userID)
+}
+
 func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bool {
 	if cmd, ok := b.commands[u.Text]; ok {
 		if sm, ok := cmd.(SceneMatcher); ok && sm.Scene() != "" && sm.Scene() != chat.Scene {
+			return false
+		}
+		if !b.allowsCommand(cmd, u.UserID) {
 			return false
 		}
 		if err := cmd.Handler(ctx, u); err != nil {
@@ -580,7 +595,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if cmd == nil {
 			cmd = b.commandByName(cmdName)
 		}
-		if cmd != nil {
+		if cmd != nil && b.allowsCommand(cmd, u.UserID) {
 			if err := cmd.Handler(ctx, u); err != nil {
 				b.log.Error().Err(err).Str("cmd", cmdName).Msg("command error")
 			}
@@ -592,6 +607,9 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if !matchesText(cmd, u.Text, chat) {
 			continue
 		}
+		if !b.allowsCommand(cmd, u.UserID) {
+			continue
+		}
 		if err := cmd.Handler(ctx, u); err != nil {
 			b.log.Error().Err(err).Msg("text match error")
 		}
@@ -600,6 +618,9 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 
 	for _, cmd := range b.textCommands {
 		if !matchesText(cmd, u.Text, chat) {
+			continue
+		}
+		if !b.allowsCommand(cmd, u.UserID) {
 			continue
 		}
 		if err := cmd.Handler(ctx, u); err != nil {
@@ -686,7 +707,7 @@ func (c *devCmd) Hidden() bool { return true }
 func (c *devCmd) Name() string        { return "/dev" }
 func (c *devCmd) Description() string { return "Исходный код бота" }
 func (c *devCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendText(u.ChatID, "Привет! Хочешь помочь сделать бота лучше?\n\nhttps://github.com/BlindMaster24/MgkeTimetableBot")
+	return u.Bot.SendText(u.ChatID, "Привет! Хочешь помочь сделать бота лучше? Окей, бегом на гитхаб) Там всё расписано.\n\nhttps://github.com/BlindMaster24/MgkeTimetableBot")
 }
 
 type mathCmd struct{ bot *Bot }

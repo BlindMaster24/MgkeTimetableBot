@@ -257,6 +257,8 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&idCmd{bot: b})
 	b.RegisterCommand(&errorCmd{bot: b})
 	b.RegisterCommand(&testCmd{bot: b})
+	b.RegisterCommand(&indexToStrDateCmd{bot: b})
+	b.RegisterCommand(&strToIndexCmd{bot: b})
 	b.RegisterCommand(&sqlCmd{bot: b})
 	b.RegisterCommand(&restartCmd{bot: b})
 	b.RegisterCommand(&parserHealthCmd{bot: b})
@@ -519,6 +521,14 @@ func (b *Bot) SendDocument(chatID int64, filename string, data []byte, caption s
 }
 
 func (b *Bot) SendPhoto(chatID int64, filePath string, caption string) error {
+	return b.sendPhoto(chatID, filePath, caption, 0)
+}
+
+func (b *Bot) sendPhotoReply(chatID int64, filePath string, replyTo int) error {
+	return b.sendPhoto(chatID, filePath, "", replyTo)
+}
+
+func (b *Bot) sendPhoto(chatID int64, filePath string, caption string, replyTo int) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -531,6 +541,9 @@ func (b *Bot) SendPhoto(chatID int64, filePath string, caption string) error {
 	if caption != "" {
 		params.Caption = caption
 		params.ParseMode = "HTML"
+	}
+	if replyTo > 0 {
+		params.ReplyParameters = &telego.ReplyParameters{MessageID: replyTo}
 	}
 	_, err = b.client.SendPhoto(context.Background(), params)
 	return err

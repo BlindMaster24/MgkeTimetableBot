@@ -8,6 +8,9 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
 
+const electiveType = "ф-в"
+const twoHoursComment = "2 часа"
+
 var groupNumberRe = regexp.MustCompile(`(?i)^Группа\s*[-–—:]?\s*(.+)$`)
 var groupLooseRe = regexp.MustCompile(`(?i)Группа\s*[-–—:]?\s*(.+)$`)
 var subgroupPrefixRe = regexp.MustCompile(`^(\d+)\.`)
@@ -153,6 +156,7 @@ func (p *GroupParser) parseTable(table *goquery.Selection, groupNum string) *mod
 	})
 
 	for i := range days {
+		mergeGroupElectives(&days[i].Lessons)
 		clearEndingNulls(&days[i].Lessons)
 	}
 
@@ -376,6 +380,88 @@ func removeDashes(text string) string {
 	text = strings.TrimSpace(text)
 	text = dashOnlyRe.ReplaceAllString(text, "")
 	return strings.TrimSpace(text)
+}
+
+func mergeGroupElectives(lessons *[]model.GroupLesson) {
+	all := *lessons
+	for i := 0; i < len(all); i++ {
+		current := electiveParts(all[i])
+		if len(current) == 0 || !allElectives(current) {
+			continue
+		}
+
+		similarIndex := -1
+		firstNotNull := false
+		for j := len(all) - 1; j > i; j-- {
+			other := all[j]
+			if firstNotNull && other == nil {
+				break
+			}
+			if other == nil {
+				continue
+			}
+			firstNotNull = true
+
+			candidate := electiveParts(other)
+			if len(candidate) != len(current) {
+				continue
+			}
+
+			matched := false
+			for k := range current {
+				if sameLessonType(current[k], candidate[k]) && current[k].Lesson == candidate[k].Lesson && sameString(current[k].Teacher, candidate[k].Teacher) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				similarIndex = j
+				break
+			}
+		}
+
+		if similarIndex >= 0 {
+			for _, part := range current {
+				comment := twoHoursComment
+				part.Comment = &comment
+			}
+			all[similarIndex] = nil
+		}
+	}
+}
+
+func electiveParts(lesson model.GroupLesson) []*model.GroupLessonExplain {
+	if parts := model.AsArray(lesson); len(parts) > 0 {
+		return parts
+	}
+	if single := model.AsSingle(lesson); single != nil {
+		return []*model.GroupLessonExplain{single}
+	}
+	return nil
+}
+
+func allElectives(parts []*model.GroupLessonExplain) bool {
+	for _, part := range parts {
+		if !isElective(part.Type) || part.Comment != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func sameLessonType(a, b *model.GroupLessonExplain) bool {
+	return sameString(a.Type, b.Type)
+}
+
+func sameString(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+func isElective(lessonType *string) bool {
+	return lessonType != nil && *lessonType == electiveType
 }
 
 func clearEndingNulls(lessons *[]model.GroupLesson) {

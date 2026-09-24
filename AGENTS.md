@@ -116,7 +116,7 @@
 
 ## Current Features Snapshot
 - Telegram bot via telego long polling.
-- Commands: 64 total — schedule and setup (`/start`, `/help`, `/setup`, `/day`, `/week`, `/calls`, `/group`, `/teacher`, `/image`, `/cabinet`, `/history`, `/archive`, `/alias`, `/comparegroups`, `/groups`, `/teachers`, `/ics`, `/google_calendar`, …), admin (`/debug`, `/send`, `/trigger`, `/forceparse`, `/noticedebug`, `/sql`, `/restart`, …) and menu text pseudo-commands. The full list is in `README.md` and enforced by `scripts/paritycheck`.
+- Commands: 67 total — schedule and setup (`/start`, `/help`, `/setup`, `/day`, `/week`, `/calls`, `/group`, `/teacher`, `/image`, `/cabinet`, `/history`, `/archive`, `/alias`, `/comparegroups`, `/groups`, `/teachers`, `/ics`, `/google_calendar`, …), admin (`/debug`, `/send`, `/trigger`, `/forceparse`, `/noticedebug`, `/sql`, `/restart`, …) and menu text pseudo-commands. The full list is in `README.md` and enforced by `scripts/paritycheck`.
 - Keyboard buttons match command text via i18n keys.
 - Parser (table-based) for groups, teachers and the bell schedule, with change detection.
 - File-backed cache with JSON persistence in `cache/rasp/`.

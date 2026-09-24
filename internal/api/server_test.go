@@ -442,13 +442,18 @@ func TestHandleParserHealth(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body cache.Stats
-	json.Unmarshal(w.Body.Bytes(), &body)
-	if body.GroupsCount != 2 {
-		t.Errorf("expected 2 groups in stats, got %d", body.GroupsCount)
+	var body struct {
+		Cache struct {
+			GroupsCount   int `json:"groupsCount"`
+			TeachersCount int `json:"teachersCount"`
+		} `json:"cache"`
 	}
-	if body.TeachersCount != 1 {
-		t.Errorf("expected 1 teacher in stats, got %d", body.TeachersCount)
+	json.Unmarshal(w.Body.Bytes(), &body)
+	if body.Cache.GroupsCount != 2 {
+		t.Errorf("expected 2 groups in stats, got %d", body.Cache.GroupsCount)
+	}
+	if body.Cache.TeachersCount != 1 {
+		t.Errorf("expected 1 teacher in stats, got %d", body.Cache.TeachersCount)
 	}
 }
 

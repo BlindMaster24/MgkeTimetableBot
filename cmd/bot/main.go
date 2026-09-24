@@ -291,6 +291,8 @@ func main() {
 			parseErr = errors.Join(parseErr, fetcher.Team(cfg.Parser.Endpoints.Team))
 		}
 
+		raspCache.SetSuccessUpdate(parseErr == nil)
+
 		if parseErr != nil {
 			metrics.ParserFailure(parseErr)
 			bot.AddParseLog(false, parseErr.Error())

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,10 +29,11 @@ func (c *regexpCmd) MatchText(text string) bool {
 	return text == "/regexp"
 }
 func (c *regexpCmd) Handler(ctx context.Context, u *Update) error {
-	var lines []string
+	lines := make([]string, 0, len(c.bot.commands))
 	for name := range c.bot.commands {
 		lines = append(lines, name)
 	}
+	sort.Strings(lines)
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
 
@@ -48,7 +50,7 @@ func (c *vanishCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.chatRepo.mu.Lock()
 	c.bot.chatRepo.db.Exec("VACUUM")
 	c.bot.chatRepo.mu.Unlock()
-	return u.Bot.SendText(u.ChatID, "БД почищена")
+	return u.Bot.SendText(u.ChatID, "Бд почищена")
 }
 
 type parserLogsCmd struct{ bot *Bot }
@@ -445,20 +447,31 @@ func (c *createApiKeyCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
 
+func trimSqlPrefix(text string) string {
+	lower := strings.ToLower(text)
+	for _, prefix := range []string{"/sql_run", "/sqlrun", "/db_run", "/dbrun", "/sql", "/db"} {
+		if strings.HasPrefix(lower, prefix) {
+			return text[len(prefix):]
+		}
+	}
+	return text
+}
+
 type sqlCmd struct{ bot *Bot }
 
 func (c *sqlCmd) AdminOnly() bool { return true }
 
 func (c *sqlCmd) Name() string        { return "/sql" }
-func (c *sqlCmd) Description() string { return "Выполнить SQL запрос" }
+func (c *sqlCmd) Description() string { return "Выполнить SQL (sqlite) запрос" }
 func (c *sqlCmd) MatchText(text string) bool {
-	return strings.HasPrefix(strings.ToLower(text), "/sql")
+	lower := strings.ToLower(text)
+	return strings.HasPrefix(lower, "/sql") || strings.HasPrefix(lower, "/db")
 }
 func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
-	query := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(u.Text, "/sql"), "/SQL"))
+	query := strings.TrimSpace(trimSqlPrefix(u.Text))
 	if query == "" {
 		return u.Bot.SendText(u.ChatID, "Укажите SQL запрос после /sql")
 	}

@@ -306,7 +306,7 @@ func TestCreateApiKeyIsAdminOnly(t *testing.T) {
 	b, _, store, caller := setupApiKeyBot(t, admin)
 
 	sendMessage(t, b, 8005, "private", "/createApiKey 4245")
-	if caller.last() != "⛔ Доступ запрещён" {
+	if caller.last() != "Команда не найдена" {
 		t.Fatalf("unexpected answer: %q", caller.last())
 	}
 	if _, err := store.ByChatID(4245); !errors.Is(err, apikey.ErrKeyNotFound) {

@@ -199,8 +199,9 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	dc.SetColor(color.RGBA{R: 150, G: 150, B: 150, A: 255})
 	dc.LoadFontFace(fontPath, float64(8*dpr))
 	fy := float64((totalH - footerH/2) * dpr)
-	dc.DrawString("TG: https://t.me/mgkect_info_bot", float64(padding*dpr), fy)
-	dc.DrawString(fmt.Sprintf("Сгенерировано: %s", time.Now().Format("02.01.2006 15:04")), float64(totalW*dpr-padding*dpr), fy)
+	dc.DrawString("TG: https://t.me/mgke_slave_bot", float64(padding*dpr), fy)
+	dc.DrawString(fmt.Sprintf("Сгенерированно в: %s", time.Now().Format("02.01.2006 15:04:05,000")), float64(totalW*dpr-padding*dpr), fy)
+	dc.DrawString("Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы", float64(totalW*dpr-padding*dpr), fy+float64(9*dpr))
 
 	fname := fmt.Sprintf("timetable_%d.png", time.Now().UnixNano())
 	outPath := filepath.Join(r.outputDir, fname)

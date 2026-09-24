@@ -110,6 +110,16 @@ func goldenDay(offset int) map[string]any {
 	}
 }
 
+func goldenTeacherDay(offset int) map[string]any {
+	return map[string]any{
+		"day": time.Now().AddDate(0, 0, offset).Format("02.01.2006"),
+		"lessons": []any{
+			map[string]any{"lesson": "Математика", "type": "Лек", "group": "63", "cabinet": "101"},
+			map[string]any{"lesson": "Физика", "type": "ЛР", "group": "77", "cabinet": "202"},
+		},
+	}
+}
+
 func goldenChats() []*EventChat {
 	return []*EventChat{{
 		ID:             1,
@@ -169,7 +179,7 @@ func notificationScenarios() []messageScenario {
 					Teacher:       "Сидоров С.С.",
 					NoticeChanges: true,
 				}}
-				n.UpdateDay(&cache.DayEvent{Kind: cache.KindTeachers, Value: "Иванов И.И.", Day: goldenDay(1)})
+				n.UpdateDay(&cache.DayEvent{Kind: cache.KindTeachers, Value: "Иванов И.И.", Day: goldenTeacherDay(1)})
 			},
 		},
 		{

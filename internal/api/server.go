@@ -206,9 +206,13 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) handleInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"name":    "MgkeTimetableBot API",
-		"version": "2.0",
-		"build":   s.build,
+		"name":        "MgkeTimetableBot API",
+		"version":     "2.0",
+		"build":       s.build,
+		"groups":      s.cache.GetGroupsMeta(),
+		"teachers":    s.cache.GetTeachersMeta(),
+		"team":        s.cache.GetTeamMeta(),
+		"lastSuccess": s.cache.LastSuccess(),
 	})
 }
 
@@ -218,7 +222,7 @@ func (s *Server) handleGroups(c *gin.Context) {
 	for k := range groups {
 		keys = append(keys, k)
 	}
-	c.JSON(http.StatusOK, gin.H{"groups": keys})
+	c.JSON(http.StatusOK, gin.H{"groups": sortNames(keys)})
 }
 
 func (s *Server) handleTeachers(c *gin.Context) {
@@ -227,7 +231,7 @@ func (s *Server) handleTeachers(c *gin.Context) {
 	for k := range teachers {
 		keys = append(keys, k)
 	}
-	c.JSON(http.StatusOK, gin.H{"teachers": keys})
+	c.JSON(http.StatusOK, gin.H{"teachers": sortNames(keys)})
 }
 
 func (s *Server) handleGroupByName(c *gin.Context) {
@@ -239,7 +243,14 @@ func (s *Server) handleGroupByName(c *gin.Context) {
 		return
 	}
 	s.cache.RecordHit()
-	c.JSON(http.StatusOK, data)
+	entry, _ := data.(map[string]any)
+	meta := s.cache.GetGroupsMeta()
+	c.JSON(http.StatusOK, gin.H{
+		"days":        decorateDays(entry),
+		"update":      meta.Update,
+		"changed":     meta.Changed,
+		"lastSuccess": s.cache.LastSuccess(),
+	})
 }
 
 func (s *Server) handleTeacherByName(c *gin.Context) {
@@ -251,12 +262,40 @@ func (s *Server) handleTeacherByName(c *gin.Context) {
 		return
 	}
 	s.cache.RecordHit()
-	c.JSON(http.StatusOK, data)
+	entry, _ := data.(map[string]any)
+	meta := s.cache.GetTeachersMeta()
+	c.JSON(http.StatusOK, gin.H{
+		"days":        decorateDays(entry),
+		"update":      meta.Update,
+		"changed":     meta.Changed,
+		"lastSuccess": s.cache.LastSuccess(),
+	})
 }
 
 func (s *Server) handleParserHealth(c *gin.Context) {
 	stats := s.cache.Stats()
-	c.JSON(http.StatusOK, stats)
+	groups := s.cache.GetGroupsMeta()
+	teachers := s.cache.GetTeachersMeta()
+	lastSuccessUpdate := int64(0)
+	if stats.SuccessUpdate {
+		lastSuccessUpdate = groups.Update
+		if lastSuccessUpdate == 0 {
+			lastSuccessUpdate = teachers.Update
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"ok":                stats.SuccessUpdate,
+		"lastSuccessUpdate": lastSuccessUpdate,
+		"groups":            gin.H{"update": groups.Update, "changed": groups.Changed, "hash": groups.Hash},
+		"teachers":          gin.H{"update": teachers.Update, "changed": teachers.Changed, "hash": teachers.Hash},
+		"metrics":           gin.H{"student": nil, "teacher": nil},
+		"cache": gin.H{
+			"hits":          stats.Hits,
+			"misses":        stats.Misses,
+			"groupsCount":   stats.GroupsCount,
+			"teachersCount": stats.TeachersCount,
+		},
+	})
 }
 
 func (s *Server) handleHealth(c *gin.Context) {

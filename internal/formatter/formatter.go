@@ -2,6 +2,7 @@ package formatter
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 )
@@ -13,6 +14,7 @@ type Formatter interface {
 	Label() string
 	FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string
 	FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string
+	NoTimetable() string
 }
 
 type FormatOptions struct {
@@ -133,11 +135,41 @@ func allEqual(fn func(LessonPart) string, parts []LessonPart) bool {
 	return true
 }
 
+func isSubgroupList(lesson any) bool {
+	_, ok := lesson.([]any)
+	return ok
+}
+
+func groupLessonOptions(subs []LessonPart, withSubgroups bool) map[string]bool {
+	lessonsEqual := allEqual(func(p LessonPart) string { return p.Lesson }, subs)
+	typeEqual := lessonsEqual && allEqual(func(p LessonPart) string { return p.Type }, subs)
+	teacherEqual := len(subs) > 1 && typeEqual && allEqual(func(p LessonPart) string { return p.Teacher }, subs)
+	cabinetEqual := teacherEqual && allEqual(func(p LessonPart) string { return p.Cabinet }, subs)
+	commentEqual := allEqual(func(p LessonPart) string { return p.Comment }, subs)
+
+	return map[string]bool{
+		"subgroup": !withSubgroups,
+		"lesson":   !withSubgroups || lessonsEqual,
+		"type":     !withSubgroups || typeEqual,
+		"teacher":  !withSubgroups || teacherEqual,
+		"cabinet":  !withSubgroups || cabinetEqual,
+		"comment":  !withSubgroups || commentEqual,
+	}
+}
+
+func reverseGroupLessonOptions(show map[string]bool) map[string]bool {
+	reversed := make(map[string]bool, len(show))
+	for key, value := range show {
+		reversed[key] = !value
+	}
+	return reversed
+}
+
 func formatFooter(opts FormatOptions) string {
 	var text []string
 
 	if opts.ShowParserTime && opts.ParserUpdateTime > 0 {
-		secs := (time.Now().UnixMilli() - opts.ParserUpdateTime) / 1000
+		secs := int64(math.Ceil(float64(time.Now().UnixMilli()-opts.ParserUpdateTime) / 1000))
 		text = append(text, fmt.Sprintf("Информация была загружена %s назад", FormatSeconds(secs)))
 	}
 
@@ -150,20 +182,38 @@ func formatFooter(opts FormatOptions) string {
 	return strings.Join(text, "\n\n")
 }
 
+var secondsPeriods = []int64{60, 3600, 86400, 31536000}
+var secondsSuffixes = []string{"сек.", "мин.", "ч.", "д.", "г."}
+
 func FormatSeconds(secs int64) string {
-	if secs < 60 {
-		return fmt.Sprintf("%d сек", secs)
+	if secs < 0 {
+		secs = 0
 	}
-	if secs < 3600 {
-		return fmt.Sprintf("%d мин %d сек", secs/60, secs%60)
+
+	values := 3
+	times := make([]int64, len(secondsSuffixes))
+	filled := make([]bool, len(secondsSuffixes))
+	rest := secs
+	countZero := false
+
+	for i := values; i >= 0; i-- {
+		period := rest / secondsPeriods[i]
+		if period > 0 || countZero {
+			times[i+1] = period
+			filled[i+1] = true
+			rest -= period * secondsPeriods[i]
+			countZero = true
+		}
 	}
-	return fmt.Sprintf("%d ч %d мин", secs/3600, (secs%3600)/60)
-}
+	times[0] = rest
+	filled[0] = true
 
-func notLessons() string {
-	return "🚫 Нет пар на этот день"
-}
-
-func notTimetable() string {
-	return "Нет расписания для отображения"
+	var parts []string
+	for i := len(times) - 1; i >= 0; i-- {
+		if !filled[i] {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", times[i], secondsSuffixes[i]))
+	}
+	return strings.Join(parts, " ")
 }

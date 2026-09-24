@@ -245,7 +245,7 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits.
 
@@ -261,12 +261,12 @@ The server listens on `0.0.0.0:http.port`:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/info` | Service information, version and build metadata (commit, date, toolchain) |
-| GET | `/api/groups` | Group list |
-| GET | `/api/teachers` | Teacher list |
-| GET | `/api/group/:name` | Group timetable |
-| GET | `/api/teacher/:name` | Teacher timetable |
-| GET | `/api/parser-health` | Cache counters: hits, misses, last update time |
+| GET | `/api/info` | Service information, version and build metadata, plus the `groups`/`teachers`/`team` cache envelopes (`update`, `changed`, `hash`) and the `lastSuccess` flag — matching the old TS API |
+| GET | `/api/groups` | Group list (numeric names sort first, ascending — as in the old API) |
+| GET | `/api/teachers` | Teacher list (same ordering) |
+| GET | `/api/group/:name` | Group timetable: `days` (each day carries `weekday`), `update`, `changed`, `lastSuccess`; an unknown name gets `404` |
+| GET | `/api/teacher/:name` | Teacher timetable in the same shape |
+| GET | `/api/parser-health` | Parser state: `ok`, `lastSuccessUpdate`, `groups`/`teachers` envelopes, `metrics` and cache counters (hits, misses) |
 | GET | `/api/health` | Health metrics (parser, calendars, API) and active alerts; 503 while alerting |
 
 `google.url` (default `/google/oauth`) is the Google OAuth callback the user returns to after authorization.
@@ -569,7 +569,7 @@ internal/
     calls_edit.go        — manual bell schedule editing from the chat
     compare_groups.go    — /comparegroups
     test_subscriptions.go— the subscription test run
-    debug_commands.go    — the /chat, /id, /error and /test helpers
+    debug_commands.go    — the /chat, /id, /error, /test, /indexToStrDate and /strToIndex helpers
     admin.go, admin_commands.go — admin commands and utilities
     google_calendar.go, google_store.go — the Google Calendar menu and its database state
   utils/                 — academic weeks, subjects

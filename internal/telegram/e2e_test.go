@@ -329,6 +329,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/cabinet", "/groups", "/teachers", "/comparegroups",
 		"/ping", "/ics", "/subscriptions", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
+		"/indexToStrDate", "/strToIndex",
 		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
 		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats",
 		"/noticedebug", "/parserhealth", "/incidents",

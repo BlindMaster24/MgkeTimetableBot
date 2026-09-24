@@ -102,13 +102,15 @@ func (s *CalendarService) SyncDay(ctx context.Context, calendarID string, date s
 	}
 
 	for _, lesson := range lessons {
-		start, end, err := lessonTimes(calls, day, lesson.Index)
+		spans, err := lessonTimeSpans(calls, day, lesson.Index)
 		if err != nil {
 			return err
 		}
 
-		if _, err := service.Events.Insert(calendarID, buildEvent(lesson, start, end)).Context(ctx).Do(); err != nil {
-			return fmt.Errorf("insert event: %w", err)
+		for _, span := range spans {
+			if _, err := service.Events.Insert(calendarID, buildEvent(lesson, span.start, span.end)).Context(ctx).Do(); err != nil {
+				return fmt.Errorf("insert event: %w", err)
+			}
 		}
 	}
 
@@ -136,25 +138,35 @@ func clearDay(ctx context.Context, service *calendar.Service, calendarID string,
 	return nil
 }
 
-func lessonTimes(calls Schedule, day time.Time, index int) (time.Time, time.Time, error) {
+type eventSpan struct {
+	start time.Time
+	end   time.Time
+}
+
+func lessonTimeSpans(calls Schedule, day time.Time, index int) ([]eventSpan, error) {
 	bounds := lessonBounds(calls, day, index)
-	if bounds[0][0] == "" || bounds[1][1] == "" {
-		return time.Time{}, time.Time{}, fmt.Errorf("no calls schedule for %s", day.Format(dateLayout))
+	var spans []eventSpan
+	for _, bound := range bounds {
+		if bound[0] == "" || bound[1] == "" {
+			continue
+		}
+		start, err := parseClock(day, bound[0])
+		if err != nil {
+			return nil, err
+		}
+		end, err := parseClock(day, bound[1])
+		if err != nil {
+			return nil, err
+		}
+		if !end.After(start) {
+			end = start.Add(45 * time.Minute)
+		}
+		spans = append(spans, eventSpan{start: start, end: end})
 	}
-
-	start, err := parseClock(day, bounds[0][0])
-	if err != nil {
-		return time.Time{}, time.Time{}, err
+	if len(spans) == 0 {
+		return nil, fmt.Errorf("no calls schedule for %s", day.Format(dateLayout))
 	}
-	end, err := parseClock(day, bounds[1][1])
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	if !end.After(start) {
-		end = start.Add(45 * time.Minute)
-	}
-
-	return start, end, nil
+	return spans, nil
 }
 
 func lessonBounds(calls Schedule, day time.Time, index int) [2][2]string {
