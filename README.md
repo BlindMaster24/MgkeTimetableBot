@@ -104,7 +104,7 @@ go version   # ожидается go1.27.1 или новее
 
 Бот в одном процессе поднимает Telegram long polling, HTTP-сервер (API + OAuth-callback Google) и горутину парсера.
 
-Остановить бота можно сочетанием Ctrl+C или сигналами `SIGTERM`, `SIGHUP`, `SIGQUIT` (в Windows — Ctrl+C, Ctrl+Break, `SIGTERM`): он выходит из long polling, сохраняет метрики и кэш и пишет в лог `shutdown complete`. Второй сигнал завершает процесс сразу.
+Остановить бота можно сочетанием Ctrl+C или сигналами `SIGTERM`, `SIGHUP`, `SIGQUIT` (в Windows — Ctrl+C, Ctrl+Break, `SIGTERM`): он выходит из long polling или закрывает webhook-сервер, дожидаясь уже принятых запросов (до 5 секунд), сохраняет метрики и кэш и пишет в лог `shutdown complete`. Второй сигнал завершает процесс сразу.
 
 ## Конфигурация
 

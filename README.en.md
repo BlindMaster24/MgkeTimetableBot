@@ -104,7 +104,7 @@ The config path can also come from the `CONFIG_PATH` environment variable — th
 
 A single process hosts Telegram long polling, the HTTP server (API plus the Google OAuth callback) and the parser goroutine.
 
-Stop the bot with Ctrl+C or with `SIGTERM`, `SIGHUP`, `SIGQUIT` (on Windows: Ctrl+C, Ctrl+Break, `SIGTERM`): it leaves long polling, flushes the metrics and the cache and logs `shutdown complete`. A second signal exits immediately.
+Stop the bot with Ctrl+C or with `SIGTERM`, `SIGHUP`, `SIGQUIT` (on Windows: Ctrl+C, Ctrl+Break, `SIGTERM`): it leaves long polling or closes the webhook server, draining the requests already accepted (up to 5 seconds), flushes the metrics and the cache and logs `shutdown complete`. A second signal exits immediately.
 
 ## Configuration
 

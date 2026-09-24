@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -315,6 +316,182 @@ func TestBotOverRealHTTPWebhookReplies(t *testing.T) {
 	}
 	if registered.Body["secret_token"] != settings.SecretToken {
 		t.Errorf("unexpected secret token %v", registered.Body["secret_token"])
+	}
+}
+
+func freeLoopbackAddress(t *testing.T) string {
+	t.Helper()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve a port: %v", err)
+	}
+	address := listener.Addr().String()
+	listener.Close()
+
+	return address
+}
+
+func TestBotOverRealHTTPWebhookTransportStopsWithTheContext(t *testing.T) {
+	const userID = int64(5450)
+
+	api := newFakeTelegramAPI(t)
+	b, repo := setupE2EBotWithFakeAPI(t, api, 999)
+
+	chat, err := repo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat.Group = "100"
+	chat.Mode = ModeStudent
+	repo.Save(chat)
+
+	address := freeLoopbackAddress(t)
+	b.cfg.Telegram.Webhook.Enabled = true
+	b.cfg.Telegram.Webhook.URL = "https://mgke.example.com"
+	b.cfg.Telegram.Webhook.SecretToken = "webhook-secret"
+	b.cfg.Telegram.Webhook.Listen = address
+
+	post := func(secret, body string) (int, error) {
+		request, err := http.NewRequest(http.MethodPost, "http://"+address+webhookDefaultPath, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set(telego.WebhookSecretTokenHeader, secret)
+
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			return 0, err
+		}
+		defer response.Body.Close()
+		_, _ = io.Copy(io.Discard, response.Body)
+
+		return response.StatusCode, nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- b.Run(ctx) }()
+
+	registered := api.waitFor(t, "setWebhook", 5*time.Second)
+	if registered.Body["secret_token"] != "webhook-secret" {
+		t.Errorf("the transport registered the webhook without the secret token: %v", registered.Body["secret_token"])
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		status, err := post("", "")
+		if err == nil {
+			if status != http.StatusUnauthorized {
+				t.Fatalf("a POST with a foreign secret answered %d, want 401", status)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the webhook listener never came up: %v", err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	status, err := post("webhook-secret", fakeUpdateJSON(t, 3, userID, "/start"))
+	if err != nil {
+		t.Fatalf("post an update: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("the webhook answered %d", status)
+	}
+	api.waitForText(t, "sendMessage", "Математика", 5*time.Second)
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("the webhook transport stopped with an error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the bot did not stop after the context was cancelled")
+	}
+
+	if connection, err := net.DialTimeout("tcp", address, time.Second); err == nil {
+		connection.Close()
+		t.Error("the webhook listener is still open after the shutdown finished")
+	}
+}
+
+func TestWebhookTransportDrainsTheInFlightUpdateBeforeStopping(t *testing.T) {
+	api := newFakeTelegramAPI(t)
+	b, _ := setupE2EBotWithFakeAPI(t, api)
+
+	address := freeLoopbackAddress(t)
+	b.cfg.Telegram.Webhook.Enabled = true
+	b.cfg.Telegram.Webhook.URL = "https://mgke.example.com"
+	b.cfg.Telegram.Webhook.SecretToken = "webhook-secret"
+	b.cfg.Telegram.Webhook.Listen = address
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- b.Run(ctx) }()
+	api.waitFor(t, "setWebhook", 5*time.Second)
+
+	reader, writer := io.Pipe()
+	defer writer.Close()
+
+	slow := make(chan *http.Response, 1)
+	failure := make(chan error, 1)
+	go func() {
+		request, err := http.NewRequest(http.MethodPost, "http://"+address+webhookDefaultPath, reader)
+		if err != nil {
+			failure <- err
+			return
+		}
+		request.Header.Set(telego.WebhookSecretTokenHeader, "webhook-secret")
+		request.ContentLength = 64
+
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			failure <- err
+			return
+		}
+		slow <- response
+	}()
+
+	if _, err := writer.Write([]byte(`{"update_id":9,`)); err != nil {
+		t.Fatalf("start the slow request: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+
+	select {
+	case err := <-done:
+		t.Fatalf("the transport stopped while a webhook request was still in flight: %v", err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("finish the slow request: %v", err)
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("the webhook transport stopped with an error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the bot did not stop after the in-flight request finished")
+	}
+
+	select {
+	case response := <-slow:
+		response.Body.Close()
+	case <-failure:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the truncated request never finished on the client side")
 	}
 }
 

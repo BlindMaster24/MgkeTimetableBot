@@ -379,8 +379,14 @@ func (b *Bot) runWebhook(ctx context.Context) error {
 		}
 	}()
 
+	stopServer := make(chan struct{})
+	shutdownDone := make(chan struct{})
 	go func() {
-		<-ctx.Done()
+		defer close(shutdownDone)
+		select {
+		case <-ctx.Done():
+		case <-stopServer:
+		}
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), webhookShutdownTimeout)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -388,13 +394,18 @@ func (b *Bot) runWebhook(ctx context.Context) error {
 		}
 	}()
 
+	consumeErr := make(chan error, 1)
+	go func() { consumeErr <- b.consumeUpdates(ctx, updates) }()
+
 	select {
 	case err := <-serveErr:
+		close(stopServer)
+		<-shutdownDone
 		return fmt.Errorf("telegram webhook server: %w", err)
-	default:
+	case err := <-consumeErr:
+		<-shutdownDone
+		return err
 	}
-
-	return b.consumeUpdates(ctx, updates)
 }
 
 const webhookResetCallback = "webhook:reset"
