@@ -413,7 +413,7 @@ docker run -d --name mgke-bot \
   ghcr.io/blindmaster24/mgketimetablebot:latest
 ```
 
-`:latest` и `:1.2` — это последний релизный тег, `:edge` — образ, собранный из текущего `main`, `:main` — тот же `edge` под именем ветки.
+Теги образа зависят от того, чем он собран: `:latest` — последний выпущенный релиз, `:<major>.<minor>` и `:<major>.<minor>.<patch>` — постоянные теги того же релиза, `:edge` — сборка из текущего `main`, `:main` — тот же `edge` под именем ветки. Конкретный номер версии в документации не зашит: актуальный релиз виден на [странице релизов](https://github.com/BlindMaster24/MgkeTimetableBot/releases), а полный список опубликованных тегов образа — в [пакете GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
 ## Разработка
 
@@ -562,7 +562,7 @@ go run ./scripts/racecheck -pkgs ./internal/telegram/...
 `.github/workflows/release.yml` — доставка. Перед публикацией job `verify` прогоняет сборку, vet и тесты на том же коммите на всех трёх ОС, поэтому сломанный тег или push в `main` не публикуется:
 
 - push в `main` → multi-arch образ (`linux/amd64`, `linux/arm64`) публикуется в GHCR с тегами `:edge` и `:main`;
-- тег вида `v1.2.3` → собираются бинарники под `linux/amd64`, `linux/arm64`, `windows/amd64` и `darwin/arm64`, публикуются в GitHub Release вместе с автоматическими release notes, а образ получает постоянные теги `:1.2.3`, `:1.2` и `:latest`.
+- тег вида `v<major>.<minor>.<patch>` → собираются бинарники под `linux/amd64`, `linux/arm64`, `windows/amd64` и `darwin/arm64`, публикуются в GitHub Release вместе с автоматическими release notes, а образ получает постоянные теги `:<major>.<minor>.<patch>`, `:<major>.<minor>` и `:latest`.
 
 Версия сборки подставляется линкером (`-X main.version`) и печатается в логе первой строкой при старте — по ней всегда видно, какой именно бинарник работает.
 

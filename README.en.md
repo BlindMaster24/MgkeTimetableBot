@@ -412,7 +412,7 @@ docker run -d --name mgke-bot \
   ghcr.io/blindmaster24/mgketimetablebot:latest
 ```
 
-`:latest` and `:1.2` point at the newest release, `:edge` is the image built from the current `main`, and `:main` is the same `edge` under the branch name.
+Image tags follow what built the image: `:latest` is the newest release, `:<major>.<minor>` and `:<major>.<minor>.<patch>` are the persistent tags of that same release, `:edge` is the build of the current `main`, and `:main` is the same `edge` under the branch name. The concrete version is not hardcoded in the docs: the current release is on the [releases page](https://github.com/BlindMaster24/MgkeTimetableBot/releases) and every published image tag is listed in the [GHCR package](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
 ## Development
 
@@ -561,7 +561,7 @@ Runners are used in their `-latest` flavour (`ubuntu-latest`, `windows-latest`, 
 `.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision on all three operating systems before anything is published, so a broken tag or `main` push never ships:
 
 - a push to `main` publishes a multi-arch image (`linux/amd64`, `linux/arm64`) to GHCR tagged `:edge` and `:main`;
-- a tag like `v1.2.3` builds binaries for `linux/amd64`, `linux/arm64`, `windows/amd64` and `darwin/arm64`, attaches them to a GitHub Release with generated release notes, and gives the image the persistent tags `:1.2.3`, `:1.2` and `:latest`.
+- a tag like `v<major>.<minor>.<patch>` builds binaries for `linux/amd64`, `linux/arm64`, `windows/amd64` and `darwin/arm64`, attaches them to a GitHub Release with generated release notes, and gives the image the persistent tags `:<major>.<minor>.<patch>`, `:<major>.<minor>` and `:latest`.
 
 The build version is injected by the linker (`-X main.version`) and logged on the first line at startup, so you can always tell which binary is running.
 
