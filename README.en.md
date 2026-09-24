@@ -146,7 +146,7 @@ telegram:
     key: ""                          # TLS private key, together with certificate
     ip_address: ""                   # MGKE_TELEGRAM_WEBHOOK_IP_ADDRESS
     max_connections: 40              # MGKE_TELEGRAM_WEBHOOK_MAX_CONNECTIONS (1-100)
-    buffer: 128                      # MGKE_TELEGRAM_WEBHOOK_BUFFER
+    buffer: 128                      # MGKE_TELEGRAM_WEBHOOK_BUFFER (1-10000)
     drop_pending_updates: false      # MGKE_TELEGRAM_WEBHOOK_DROP_PENDING_UPDATES
     allowed_updates: []              # MGKE_TELEGRAM_WEBHOOK_ALLOWED_UPDATES=message,callback_query
 ```
@@ -154,6 +154,7 @@ telegram:
 - the address must be `https`, otherwise the bot refuses to start with a clear error; the path comes from the `url` when it has one, and from `path` otherwise;
 - `secret_token` accepts only `A-Z a-z 0-9 _ -` (up to 256 characters): Telegram sends it in the `X-Telegram-Bot-Api-Secret-Token` header, and requests with a foreign or missing header are answered with `401` — the comparison is constant-time;
 - without `certificate`/`key` the TLS session is terminated by a reverse proxy (nginx, Caddy) and the bot only listens on a loopback address; with that pair the bot serves TLS itself and uploads the certificate to Telegram;
+- `path` is checked with the parser of `http.ServeMux` itself: a path the server cannot serve (a space, an unclosed wildcard) is refused at startup with a clear error instead of a panic;
 - the request body is capped at 1 MB, an unknown path answers `404`, a non-POST request `405`, and a handler failure `500`, so Telegram retries the delivery;
 - at startup the bot logs the webhook address, the number of pending updates, the enabled update types and the last delivery error from `getWebhookInfo`;
 - when switching back to long polling the bot deletes the webhook first (`deleteWebhook`) — otherwise Telegram answers `409 Conflict` to `getUpdates`;

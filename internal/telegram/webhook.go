@@ -26,6 +26,7 @@ const (
 	webhookDefaultPath           = "/telegram/webhook"
 	webhookDefaultMaxConnections = 40
 	webhookDefaultBuffer         = 128
+	webhookMaxBuffer             = 10000
 	webhookMaxBodyBytes          = 1 << 20
 	webhookReadHeaderTimeout     = 10 * time.Second
 	webhookReadTimeout           = 30 * time.Second
@@ -86,6 +87,9 @@ func webhookSettingsFrom(cfg *config.Config) (webhookSettings, error) {
 	if settings.MaxConnections > 100 {
 		return webhookSettings{}, fmt.Errorf("telegram.webhook.max_connections must be between 1 and 100, got %d", settings.MaxConnections)
 	}
+	if settings.Buffer > webhookMaxBuffer {
+		return webhookSettings{}, fmt.Errorf("telegram.webhook.buffer must be between 1 and %d, got %d", webhookMaxBuffer, settings.Buffer)
+	}
 	if !strings.HasPrefix(settings.Path, "/") {
 		return webhookSettings{}, fmt.Errorf("telegram.webhook.path must start with /, got %q", settings.Path)
 	}
@@ -115,8 +119,24 @@ func webhookSettingsFrom(cfg *config.Config) (webhookSettings, error) {
 	if parsed, err := url.Parse(endpoint); err == nil {
 		settings.Path = parsed.Path
 	}
+	if err := validateWebhookPath(settings.Path); err != nil {
+		return webhookSettings{}, err
+	}
 
 	return settings, nil
+}
+
+func validateWebhookPath(path string) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("telegram.webhook.path %q cannot be served: %v", path, recovered)
+		}
+	}()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc(path, func(http.ResponseWriter, *http.Request) {})
+
+	return nil
 }
 
 func webhookEndpoint(raw, path string) (string, error) {

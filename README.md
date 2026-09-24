@@ -169,7 +169,7 @@ telegram:
     key: ""                          # приватный ключ TLS — вместе с certificate
     ip_address: ""                   # MGKE_TELEGRAM_WEBHOOK_IP_ADDRESS
     max_connections: 40              # MGKE_TELEGRAM_WEBHOOK_MAX_CONNECTIONS (1–100)
-    buffer: 128                      # MGKE_TELEGRAM_WEBHOOK_BUFFER
+    buffer: 128                      # MGKE_TELEGRAM_WEBHOOK_BUFFER (1–10000)
     drop_pending_updates: false      # MGKE_TELEGRAM_WEBHOOK_DROP_PENDING_UPDATES
     allowed_updates: []              # MGKE_TELEGRAM_WEBHOOK_ALLOWED_UPDATES=message,callback_query
 ```
@@ -177,6 +177,7 @@ telegram:
 - адрес обязан быть `https` — иначе бот не стартует и пишет понятную ошибку; путь берётся из `url`, если он там есть, иначе добавляется из `path`;
 - `secret_token` принимает только символы `A-Z a-z 0-9 _ -` (до 256): Telegram присылает его в заголовке `X-Telegram-Bot-Api-Secret-Token`, а запросы с чужим или пустым заголовком бот отбивает `401` — сравнение идёт в постоянном времени;
 - без `certificate`/`key` TLS завершает обратный прокси (nginx, Caddy), а сам бот слушает локальный адрес; с этой парой бот поднимает TLS сам и отдаёт сертификат Telegram;
+- `path` проверяется парсером самого `http.ServeMux`: путь, который сервер не сможет обслужить (например, с пробелом), бот отбивает при старте с понятной ошибкой, а не падает с паникой;
 - размер тела запроса ограничен 1 МБ, неизвестный путь отдаёт `404`, не-POST — `405`, а ошибка обработки — `500`, чтобы Telegram повторил доставку;
 - при старте бот логирует адрес webhook, число накопившихся обновлений, список типов и последнюю ошибку доставки из `getWebhookInfo`;
 - при переключении обратно на long polling бот сначала снимает webhook (`deleteWebhook`) — иначе Telegram отвечает `409 Conflict` на `getUpdates`;

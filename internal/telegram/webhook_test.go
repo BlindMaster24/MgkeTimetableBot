@@ -58,9 +58,24 @@ func TestWebhookSettingsRejectBrokenConfiguration(t *testing.T) {
 			cfg.Telegram.Webhook.MaxConnections = 101
 			return cfg
 		}()},
+		{"too large buffer", func() *config.Config {
+			cfg := webhookConfig("https://mgke.example.com", "secret")
+			cfg.Telegram.Webhook.Buffer = 1 << 24
+			return cfg
+		}()},
 		{"path without slash", func() *config.Config {
 			cfg := webhookConfig("https://mgke.example.com", "secret")
 			cfg.Telegram.Webhook.Path = "telegram"
+			return cfg
+		}()},
+		{"path with a space", func() *config.Config {
+			cfg := webhookConfig("https://mgke.example.com", "secret")
+			cfg.Telegram.Webhook.Path = "/telegram webhook"
+			return cfg
+		}()},
+		{"path with an unclosed wildcard", func() *config.Config {
+			cfg := webhookConfig("https://mgke.example.com", "secret")
+			cfg.Telegram.Webhook.Path = "/telegram/{"
 			return cfg
 		}()},
 	}
@@ -94,6 +109,25 @@ func TestWebhookSettingsApplyDefaultsAndDeriveEndpoint(t *testing.T) {
 	}
 	if settings.MaxConnections != webhookDefaultMaxConnections {
 		t.Errorf("unexpected max connections %d", settings.MaxConnections)
+	}
+}
+
+func TestRunReportsAnUnservableWebhookPathInsteadOfPanicking(t *testing.T) {
+	caller := &recordingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 999)
+
+	b.cfg.Telegram.Webhook.Enabled = true
+	b.cfg.Telegram.Webhook.URL = "https://mgke.example.com"
+	b.cfg.Telegram.Webhook.Path = "/telegram webhook"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := b.Run(ctx); err == nil {
+		t.Fatal("expected the transport to refuse a path http.ServeMux cannot serve")
+	}
+	if len(caller.methods()) != 0 {
+		t.Errorf("the bot talked to Telegram before validating the path: %v", caller.methods())
 	}
 }
 
