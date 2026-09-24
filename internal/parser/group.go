@@ -8,6 +8,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
+	"golang.org/x/net/html"
 )
 
 const electiveType = "ф-в"
@@ -62,7 +63,11 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 		}
 		labelled++
 
-		group := p.parseTable(table, match.Value)
+		label := match.Label
+		if label == "" {
+			label = match.Value
+		}
+		group := p.parseTable(table, label)
 		if group == nil {
 			skipped++
 			return
@@ -102,15 +107,23 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 func groupLabel(text string) labelMatch {
 	if match := groupNumberRe.FindStringSubmatch(text); match != nil {
 		if name := normalizeGroupName(match[1]); name != "" {
-			return labelMatch{Value: name, OK: true}
+			return labelMatch{Value: name, Label: groupLabelText(match[1]), OK: true}
 		}
 	}
 	if match := groupLooseRe.FindStringSubmatch(text); match != nil {
 		if name := normalizeGroupName(match[1]); name != "" {
-			return labelMatch{Value: name, Loose: true, OK: true}
+			return labelMatch{Value: name, Label: groupLabelText(match[1]), Loose: true, OK: true}
 		}
 	}
 	return labelMatch{}
+}
+
+func groupLabelText(raw string) string {
+	name := trimSeparators(strings.TrimSpace(raw))
+	if name == "" {
+		return raw
+	}
+	return name
 }
 
 func normalizeGroupName(raw string) string {
@@ -191,11 +204,12 @@ func groupHasLessons(group *model.Group) bool {
 
 func parseGridLessonRow(row *goquery.Selection, columns []DayColumn, days []model.GroupDay) {
 	cells, _, _ := rowCellIndexes(row)
+	pair := pairNumber(cells[0])
 
 	for i, column := range columns {
 		lessonCell, ok := cells[column.LessonCol]
 		if !ok {
-			return
+			continue
 		}
 
 		cabinetCell := lessonCell
@@ -205,8 +219,25 @@ func parseGridLessonRow(row *goquery.Selection, columns []DayColumn, days []mode
 			}
 		}
 
+		if pair > 0 {
+			for float64(len(days[i].Lessons)+1) < pair {
+				days[i].Lessons = append(days[i].Lessons, nil)
+			}
+		}
+
 		days[i].Lessons = append(days[i].Lessons, parseGridLessonCell(lessonCell, cabinetCell, column.HasCabinet))
 	}
+}
+
+func pairNumber(cell *goquery.Selection) float64 {
+	if cell == nil {
+		return 0
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(cell.Text()), 64)
+	if err != nil || value != value {
+		return 0
+	}
+	return value
 }
 
 func parseGridLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet bool) model.GroupLesson {
@@ -249,14 +280,11 @@ func parseGridLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet 
 		return buildSubgroups(chunks, cabLines)
 	}
 
-	return buildSingleLesson(chunks, cabinetText)
+	return buildSingleLesson(textNodes(lessonCell), cabinetText)
 }
 
 func splitCellLines(cell *goquery.Selection) []string {
-	cell.Find("br").ReplaceWithHtml("\n")
-	cell.Find("p").AppendHtml("\n")
-	text := cell.Text()
-	lines := strings.Split(text, "\n")
+	lines := strings.Split(cellTextWithBreaks(cell), "\n")
 	var result []string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -265,6 +293,35 @@ func splitCellLines(cell *goquery.Selection) []string {
 		}
 	}
 	return result
+}
+
+func cellTextWithBreaks(cell *goquery.Selection) string {
+	var builder strings.Builder
+	var walk func(sel *goquery.Selection)
+	walk = func(sel *goquery.Selection) {
+		sel.Contents().Each(func(_ int, node *goquery.Selection) {
+			dom := node.Get(0)
+			if dom == nil {
+				return
+			}
+			switch dom.Type {
+			case html.TextNode:
+				builder.WriteString(node.Text())
+			case html.ElementNode:
+				switch strings.ToLower(dom.Data) {
+				case "br":
+					builder.WriteString("\n")
+				case "p":
+					walk(node)
+					builder.WriteString("\n")
+				default:
+					walk(node)
+				}
+			}
+		})
+	}
+	walk(cell)
+	return builder.String()
 }
 
 func chunkLines(lines []string, size int) [][]string {
@@ -279,26 +336,22 @@ func chunkLines(lines []string, size int) [][]string {
 	return chunks
 }
 
-func buildSingleLesson(chunks [][]string, cabinet string) model.GroupLesson {
-	if len(chunks) == 0 || len(chunks[0]) == 0 {
+func buildSingleLesson(data []string, cabinet string) model.GroupLesson {
+	if len(data) == 0 {
 		return nil
 	}
 
-	chunk := chunks[0]
-	name := ""
+	name := data[0]
 	lessonType := ""
 	teacher := ""
 
-	if len(chunk) >= 1 {
-		name = strings.TrimSpace(chunk[0])
-	}
-	if len(chunk) >= 2 {
-		if typeMatch := typeInParensRe.FindStringSubmatch(strings.TrimSpace(chunk[1])); typeMatch != nil {
+	if len(data) >= 2 {
+		if typeMatch := typeRe.FindStringSubmatch(data[1]); typeMatch != nil {
 			lessonType = typeMatch[1]
 		}
 	}
-	if len(chunk) >= 3 {
-		teacher = strings.TrimSpace(chunk[2])
+	if len(data) >= 3 {
+		teacher = data[2]
 	}
 
 	name = shortenSubjectName(name)

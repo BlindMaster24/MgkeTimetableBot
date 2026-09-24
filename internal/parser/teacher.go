@@ -225,71 +225,34 @@ func parseTeacherGridRow(row *goquery.Selection, columns []DayColumn, days []mod
 			}
 		}
 
-		days[i].Lessons = append(days[i].Lessons, parseTeacherLessonCell(lessonCell, cabinetCell, column.HasCabinet)...)
+		days[i].Lessons = append(days[i].Lessons, parseTeacherLessonCell(lessonCell, cabinetCell, column.HasCabinet))
 	}
 }
 
-func parseTeacherLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet bool) []model.TeacherLesson {
+func parseTeacherLessonCell(lessonCell, cabinetCell *goquery.Selection, hasCabinet bool) model.TeacherLesson {
 	lessonText := cleanCellText(lessonCell)
 	if lessonText == "" || lessonText == "-" || lessonText == "\u2014" {
 		return nil
 	}
 
-	cabinetText := ""
+	cabinet := ""
 	if hasCabinet {
-		cabinetText = removeDashes(cleanCellText(cabinetCell))
+		cabinet = removeDashes(cleanCellText(cabinetCell))
 	}
 
-	lines := splitCellLines(lessonCell)
-	cabLines := splitCellLines(cabinetCell)
-
-	if !hasCabinet {
-		var inline string
-		lines, inline = splitInlineCabinet(lines)
-		cabinetText = inline
-		cabLines = []string{inline}
-		if len(lines) == 0 {
-			return nil
-		}
-	}
-
-	return buildTeacherLessons(lines, cabLines, cabinetText)
-}
-
-func buildTeacherLessons(lines, cabLines []string, cabinetText string) []model.TeacherLesson {
-	var result []model.TeacherLesson
-
-	for i := 0; i < len(lines); {
-		nameLine := lines[i]
-		i++
-		typeLine := ""
-		if i < len(lines) && typeOnlyRe.MatchString(lines[i]) {
-			typeLine = lines[i]
-			i++
-		}
-		if !strings.Contains(nameLine, "-") {
-			continue
-		}
-		result = append(result, buildTeacherEntry(nameLine, typeLine, teacherCabinet(cabLines, cabinetText, len(result))))
-	}
-
-	if len(result) == 0 {
+	data := textNodes(lessonCell)
+	if len(data) == 0 {
 		return nil
 	}
-	return result
+
+	return buildTeacherEntry(data[0], dataAt(data, 1), cabinet)
 }
 
-func teacherCabinet(cabLines []string, cabinetText string, pairIndex int) string {
-	switch {
-	case len(cabLines) == 0:
-		return cabinetText
-	case len(cabLines) == 1:
-		return removeDashes(cabLines[0])
-	case pairIndex < len(cabLines):
-		return removeDashes(cabLines[pairIndex])
-	default:
-		return ""
+func dataAt(data []string, index int) string {
+	if index < len(data) {
+		return data[index]
 	}
+	return ""
 }
 
 func buildTeacherEntry(nameLine, typeLine, cabinet string) model.TeacherLesson {
@@ -300,9 +263,9 @@ func buildTeacherEntry(nameLine, typeLine, cabinet string) model.TeacherLesson {
 
 	groupPart := nameLine
 	lesson := ""
-	if idx := strings.Index(nameLine, "-"); idx >= 0 {
-		groupPart = nameLine[:idx]
-		lesson = strings.TrimSpace(nameLine[idx+1:])
+	if parts := strings.SplitN(nameLine, "-", 3); len(parts) > 1 {
+		groupPart = parts[0]
+		lesson = parts[1]
 	}
 
 	group := strings.Join(strings.Fields(groupPart), "")

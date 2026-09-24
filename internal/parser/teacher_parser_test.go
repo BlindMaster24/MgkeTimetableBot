@@ -128,8 +128,14 @@ func TestTeacherParserEmptyDay(t *testing.T) {
 	ivanov := teachers["Иванов Иван Иванович"]
 	tuesday := ivanov.Days[1]
 
-	if len(tuesday.Lessons) != 1 {
-		t.Errorf("expected 1 lesson for Tuesday (64ТП Физика), got %d", len(tuesday.Lessons))
+	if len(tuesday.Lessons) != 2 {
+		t.Fatalf("one slot per row, Tuesday lessons = %d", len(tuesday.Lessons))
+	}
+	if tuesday.Lessons[0] != nil {
+		t.Errorf("an empty cell keeps its slot as null, got %#v", tuesday.Lessons[0])
+	}
+	if tuesday.Lessons[1] == nil || tuesday.Lessons[1].Lesson != "Химия" {
+		t.Errorf("second slot = %#v", tuesday.Lessons[1])
 	}
 }
 

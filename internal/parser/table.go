@@ -22,6 +22,7 @@ type DayColumn struct {
 
 type labelMatch struct {
 	Value string
+	Label string
 	Loose bool
 	OK    bool
 }

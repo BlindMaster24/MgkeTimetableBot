@@ -126,13 +126,13 @@ func TestTeacherCellsParseLikeTheOldParser(t *testing.T) {
 	if second == nil || second.Subgroup == nil || *second.Subgroup != 1 {
 		t.Fatalf("the leading number is the subgroup, got %#v", second)
 	}
-	if second.Group != "81" || second.Lesson != "Веб-програмСерв" {
-		t.Fatalf("a dash in the subject must survive: group %q lesson %q", second.Group, second.Lesson)
+	if second.Group != "81" || second.Lesson != "Веб" {
+		t.Fatalf("the old parser cuts the subject at the second dash: group %q lesson %q", second.Group, second.Lesson)
 	}
 
 	saturday := entry.Days[1].Lessons
-	if len(saturday) != 3 {
-		t.Fatalf("saturday lessons = %d", len(saturday))
+	if len(saturday) != 2 {
+		t.Fatalf("one slot per row, saturday lessons = %d", len(saturday))
 	}
 	plain := saturday[0]
 	if plain == nil || plain.Subgroup != nil {
@@ -143,7 +143,7 @@ func TestTeacherCellsParseLikeTheOldParser(t *testing.T) {
 	}
 }
 
-func TestTeacherCellWithTwoEntries(t *testing.T) {
+func TestTeacherCellKeepsOnlyTheFirstEntry(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(mockTeacherShapeHTML))
 	if err != nil {
 		t.Fatal(err)
@@ -155,24 +155,19 @@ func TestTeacherCellWithTwoEntries(t *testing.T) {
 
 	entry := teachers["Агеенкова Д. Д."]
 	saturday := entry.Days[1].Lessons
-	if len(saturday) != 3 {
-		t.Fatalf("saturday lessons = %d", len(saturday))
+	if len(saturday) != 2 {
+		t.Fatalf("one slot per row, saturday lessons = %d", len(saturday))
 	}
 
-	if saturday[1].Subgroup == nil || *saturday[1].Subgroup != 1 {
-		t.Fatalf("first entry subgroup = %v", saturday[1].Subgroup)
+	second := saturday[1]
+	if second == nil || second.Subgroup == nil || *second.Subgroup != 1 {
+		t.Fatalf("first entry subgroup = %#v", second)
 	}
-	if saturday[1].Cabinet == nil || *saturday[1].Cabinet != "3-111 (к)" {
-		t.Fatalf("first entry cabinet = %v", saturday[1].Cabinet)
+	if second.Group != "98" || second.Lesson != "Инструмент ПО" {
+		t.Fatalf("the old parser reads only the first entry of a cell: group %q lesson %q", second.Group, second.Lesson)
 	}
-	if saturday[2].Subgroup == nil || *saturday[2].Subgroup != 2 {
-		t.Fatalf("second entry subgroup = %v", saturday[2].Subgroup)
-	}
-	if saturday[2].Group != "99" {
-		t.Fatalf("second entry group = %q", saturday[2].Group)
-	}
-	if saturday[2].Cabinet == nil || *saturday[2].Cabinet != "3-113 (к)" {
-		t.Fatalf("second entry cabinet = %v", saturday[2].Cabinet)
+	if second.Cabinet == nil || *second.Cabinet != "3-111 (к)3-113 (к)" {
+		t.Fatalf("the cabinet is the raw cell text: %v", second.Cabinet)
 	}
 }
 

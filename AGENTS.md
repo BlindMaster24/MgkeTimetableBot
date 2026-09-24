@@ -103,6 +103,7 @@
 - The old bot lives on the `old` branch; `scripts/paritycheck` reads it straight from git (`-ts-ref`, default `old`).
 - It compares four surfaces: Telegram command names, callback roots, every keyboard button label, and user-visible message texts (every old text must exist in the Go sources or be documented). `-dump-go` prints the live Go surface, `-allowlist` overrides the known-differences file.
 - `internal/telegram/testdata/parity/ts_surface.json` is the TypeScript fixture; `go run ./scripts/paritycheck -update` regenerates it.
+- `internal/parser/testdata/old_parser/` holds gzipped snapshots of the live group and teacher pages next to the JSON the old TypeScript parsers produced for them; `old_parser_golden_test.go` parses the snapshots offline and fails on any difference, so the schedule parsers stay byte-identical to the old bot without a network or a Node toolchain.
 - For side-by-side reading, export the branch once into a gitignored `old/` (`rm -rf old && mkdir old && git archive old | tar -x -C old`) and use the node helpers in `old/_tools` (`label-diff.js`, `string-diff.js`, `near-diff.js`, `command-diff.js`); `SURFACE_DUMP=old/_tools/go-commands.txt go test ./internal/telegram -run TestSurfaceDump` dumps the Go commands with their descriptions.
 - Every accepted difference must be listed in `internal/telegram/testdata/parity/known_differences.json` with a reason; an entry without a reason is an error.
 - `internal/telegram/parity_test.go` re-checks the same surface offline, so plain `go test` catches drift.
