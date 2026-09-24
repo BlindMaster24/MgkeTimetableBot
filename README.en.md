@@ -157,7 +157,7 @@ telegram:
 - the request body is capped at 1 MB, an unknown path answers `404`, a non-POST request `405`, and a handler failure `500`, so Telegram retries the delivery;
 - at startup the bot logs the webhook address, the number of pending updates, the enabled update types and the last delivery error from `getWebhookInfo`;
 - when switching back to long polling the bot deletes the webhook first (`deleteWebhook`) — otherwise Telegram answers `409 Conflict` to `getUpdates`;
-- every key can be overridden by an environment variable, lists included (comma-separated).
+- ready-to-run examples with an automatic certificate live in the repository: `docker-compose.webhook.yml` with Caddy and `docker-compose.webhook-nginx.yml` with nginx and certbot (see “Docker deployment”).
 
 ### Environment variables
 
@@ -416,6 +416,64 @@ docker run -d --name mgke-bot \
 
 Image tags follow what built the image: `:latest` is the newest release, `:<major>.<minor>` and `:<major>.<minor>.<patch>` are the persistent tags of that same release, `:edge` is the build of the current `main`, and `:main` is the same `edge` under the branch name. The concrete version is not hardcoded in the docs: the current release is on the [releases page](https://github.com/BlindMaster24/MgkeTimetableBot/releases) and every published image tag is listed in the [GHCR package](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
+### Webhook mode behind a reverse proxy
+
+In the webhook mode Telegram pushes updates with a POST request, so only ports `80` and `443` face the internet and the reverse proxy terminates TLS. The bot itself listens on `0.0.0.0:8082` inside the compose network, the HTTP API stays bound to the host loopback, and the proxy serves a single path (`telegram.webhook.path`) — everything else answers `404`. The repository ships two examples: both obtain a Let's Encrypt certificate, Caddy handles issuance and renewal entirely on its own, and in the nginx variant certbot does it.
+
+| Compose file | Reverse proxy | Certificate |
+| --- | --- | --- |
+| `docker-compose.webhook.yml` + `deploy/caddy/Caddyfile` | Caddy | obtained and renewed by Caddy itself |
+| `docker-compose.webhook-nginx.yml` + `deploy/nginx/default.conf.template` | nginx | issued by certbot, the `certbot` service renews it every 12 hours |
+
+Both need a domain whose A/AAAA record points at the host, open ports `80` and `443`, and three environment variables: `BOT_DOMAIN`, `ACME_EMAIL` and `MGKE_TELEGRAM_TOKEN`. Generate the webhook secret yourself — Telegram accepts only `A-Z a-z 0-9 _ -`, and without it the bot answers `401` to every POST.
+
+Caddy obtains the certificate on the first request and keeps it in the `caddy-data` volume:
+
+```bash
+export BOT_DOMAIN=bot.example.com
+export ACME_EMAIL=admin@example.com
+export MGKE_TELEGRAM_TOKEN=123:ABC
+export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+
+docker compose -f docker-compose.webhook.yml up -d --build
+```
+
+With nginx the first certificate comes from certbot, and the Let's Encrypt challenge needs something on port `80` — nginx itself refuses to start without a certificate:
+
+```bash
+export BOT_DOMAIN=bot.example.com
+export ACME_EMAIL=admin@example.com
+export MGKE_TELEGRAM_TOKEN=123:ABC
+export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+
+# first issuance: a throwaway nginx serves the challenge file from the same volume
+docker run --rm -d --name mgke-acme -p 80:80 \
+  -v mgke-certbot-webroot:/usr/share/nginx/html:ro nginx:stable-alpine
+docker run --rm \
+  -v mgke-letsencrypt:/etc/letsencrypt \
+  -v mgke-certbot-webroot:/var/www/certbot \
+  certbot/certbot certonly --webroot -w /var/www/certbot \
+  -d "$BOT_DOMAIN" --email "$ACME_EMAIL" --agree-tos --no-eff-email
+docker rm -f mgke-acme
+
+docker compose -f docker-compose.webhook-nginx.yml up -d --build
+```
+
+- nginx renders `deploy/nginx/default.conf.template` with `envsubst` at startup, substituting `BOT_DOMAIN` into `server_name` and the certificate paths, so there is no template to edit;
+- issuance goes through `--webroot`, so the `certbot` service renews the certificate the same way every 12 hours; nginx only reads the file on a reload, so a renewal needs `docker compose -f docker-compose.webhook-nginx.yml exec nginx nginx -s reload` — a monthly cron job is enough, Let's Encrypt renews 30 days before expiry;
+- in both examples the proxy forwards the `X-Telegram-Bot-Api-Secret-Token` header unchanged, and the nginx `client_max_body_size` matches the 1 MB limit of the bot;
+- if you change `telegram.webhook.path`, change the path in `deploy/caddy/Caddyfile` / `deploy/nginx/default.conf.template` too — the proxy must hand the bot exactly the path the bot expects.
+
+What to check after the start:
+
+```bash
+curl -s -o /dev/null -w 'GET  %{http_code}\n' "https://$BOT_DOMAIN/telegram/webhook"      # 405: the proxy reaches the bot and a non-POST is rejected
+curl -s -o /dev/null -w 'POST %{http_code}\n' -X POST "https://$BOT_DOMAIN/telegram/webhook" # 401: no secret was sent
+curl -s -o /dev/null -w 'ROOT %{http_code}\n' "https://$BOT_DOMAIN/"                          # 404: only the webhook is exposed
+```
+
+In Telegram the admin command `/webhook` shows the delivery state: the address, the number of pending updates, the last error reported by Telegram and a button to re-register the webhook.
+
 ## Development
 
 ```bash
@@ -619,6 +677,11 @@ internal/
     google_calendar.go, google_store.go — the Google Calendar menu and its database state
   utils/                 — academic weeks, subjects
 configs/config.example.yaml — configuration template
+docker-compose.yml          — long polling (the default)
+docker-compose.webhook.yml  — webhook behind Caddy: TLS and the Let's Encrypt certificate automatic
+docker-compose.webhook-nginx.yml — webhook behind nginx, the certificate comes from certbot
+deploy/caddy/Caddyfile      — Caddy configuration
+deploy/nginx/default.conf.template — nginx configuration template (envsubst)
 docs/google-calendar.md     — Google Calendar guide
 scripts/paritycheck/        — TypeScript parity checker
 scripts/preflight/          — the pre-deploy check

@@ -1,0 +1,20 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$BOT_DOMAIN} {
+	encode zstd gzip
+
+	handle /telegram/webhook* {
+		reverse_proxy bot:8082
+	}
+
+	handle {
+		respond 404
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

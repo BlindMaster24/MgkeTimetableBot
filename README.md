@@ -180,7 +180,8 @@ telegram:
 - размер тела запроса ограничен 1 МБ, неизвестный путь отдаёт `404`, не-POST — `405`, а ошибка обработки — `500`, чтобы Telegram повторил доставку;
 - при старте бот логирует адрес webhook, число накопившихся обновлений, список типов и последнюю ошибку доставки из `getWebhookInfo`;
 - при переключении обратно на long polling бот сначала снимает webhook (`deleteWebhook`) — иначе Telegram отвечает `409 Conflict` на `getUpdates`;
-- все ключи переопределяются переменными окружения, включая списки через запятую.
+- все ключи переопределяются переменными окружения, включая списки через запятую;
+- готовые примеры с автоматическим сертификатом лежат в репозитории: `docker-compose.webhook.yml` с Caddy и `docker-compose.webhook-nginx.yml` с nginx и certbot (см. «Развёртывание в Docker»).
 
 ### Парсер
 
@@ -417,6 +418,64 @@ docker run -d --name mgke-bot \
 
 Теги образа зависят от того, чем он собран: `:latest` — последний выпущенный релиз, `:<major>.<minor>` и `:<major>.<minor>.<patch>` — постоянные теги того же релиза, `:edge` — сборка из текущего `main`, `:main` — тот же `edge` под именем ветки. Конкретный номер версии в документации не зашит: актуальный релиз виден на [странице релизов](https://github.com/BlindMaster24/MgkeTimetableBot/releases), а полный список опубликованных тегов образа — в [пакете GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
+### Webhook-режим за обратным прокси
+
+В режиме webhook Telegram сам присылает обновления POST-запросом, поэтому наружу нужны только порты `80` и `443`, а TLS завершает обратный прокси. Сам бот слушает `0.0.0.0:8082` внутри compose-сети, HTTP API остаётся привязанным к loopback хоста, а через прокси отдаётся единственный путь `telegram.webhook.path` — всё остальное отвечает `404`. В репозитории два готовых примера: оба выпускают сертификат Let's Encrypt, Caddy делает это полностью сам, а в nginx-варианте выпуском и продлением занимается certbot.
+
+| Compose-файл | Reverse proxy | Сертификат |
+| --- | --- | --- |
+| `docker-compose.webhook.yml` + `deploy/caddy/Caddyfile` | Caddy | выпускает и продлевает сам Caddy |
+| `docker-compose.webhook-nginx.yml` + `deploy/nginx/default.conf.template` | nginx | выпускает certbot, служба `certbot` продлевает его каждые 12 часов |
+
+Общие требования: домен с A/AAAA-записью на этот хост, открытые `80` и `443`, а также три переменные окружения — `BOT_DOMAIN`, `ACME_EMAIL` и `MGKE_TELEGRAM_TOKEN`. Секрет webhook генерируйте сами: Telegram принимает только `A-Z a-z 0-9 _ -`, и без него бот отвечает `401` на любой POST.
+
+Caddy сам получает сертификат при первом запросе и хранит его в томе `caddy-data`:
+
+```bash
+export BOT_DOMAIN=bot.example.com
+export ACME_EMAIL=admin@example.com
+export MGKE_TELEGRAM_TOKEN=123:ABC
+export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+
+docker compose -f docker-compose.webhook.yml up -d --build
+```
+
+У nginx первый сертификат выпускает certbot, и для проверки Let's Encrypt на `80`-м порту нужен временный веб-сервер — сам nginx без сертификата не стартует:
+
+```bash
+export BOT_DOMAIN=bot.example.com
+export ACME_EMAIL=admin@example.com
+export MGKE_TELEGRAM_TOKEN=123:ABC
+export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+
+# первый выпуск: файл проверки отдаёт временный nginx из того же тома
+docker run --rm -d --name mgke-acme -p 80:80 \
+  -v mgke-certbot-webroot:/usr/share/nginx/html:ro nginx:stable-alpine
+docker run --rm \
+  -v mgke-letsencrypt:/etc/letsencrypt \
+  -v mgke-certbot-webroot:/var/www/certbot \
+  certbot/certbot certonly --webroot -w /var/www/certbot \
+  -d "$BOT_DOMAIN" --email "$ACME_EMAIL" --agree-tos --no-eff-email
+docker rm -f mgke-acme
+
+docker compose -f docker-compose.webhook-nginx.yml up -d --build
+```
+
+- nginx рендерит `deploy/nginx/default.conf.template` через `envsubst` при старте, подставляя `BOT_DOMAIN` в `server_name` и в пути сертификатов, — отдельный шаблон править не нужно;
+- выпуск идёт через `--webroot`, поэтому служба `certbot` продлевает сертификат тем же способом каждые 12 часов; но nginx читает файл только при перезагрузке, так что после продления нужен `docker compose -f docker-compose.webhook-nginx.yml exec nginx nginx -s reload` — например, раз в месяц по cron (Let's Encrypt продлевает за 30 дней до истечения);
+- в обоих примерах прокси передаёт заголовок `X-Telegram-Bot-Api-Secret-Token` без изменений, а `client_max_body_size` у nginx совпадает с пределом бота в 1 МБ;
+- если меняете `telegram.webhook.path`, поменяйте и путь в `deploy/caddy/Caddyfile` / `deploy/nginx/default.conf.template` — прокси должен отдавать боту ровно тот путь, который ждёт бот.
+
+Что проверить после запуска:
+
+```bash
+curl -s -o /dev/null -w 'GET  %{http_code}\n' "https://$BOT_DOMAIN/telegram/webhook"      # 405: прокси доходит до бота и не-POST отбит
+curl -s -o /dev/null -w 'POST %{http_code}\n' -X POST "https://$BOT_DOMAIN/telegram/webhook" # 401: секрет не передан
+curl -s -o /dev/null -w 'ROOT %{http_code}\n' "https://$BOT_DOMAIN/"                          # 404: наружу торчит только webhook
+```
+
+В Telegram состояние доставки показывает административная команда `/webhook`: адрес, число накопившихся обновлений, последнюю ошибку от Telegram и кнопка переустановки.
+
 ## Разработка
 
 ```bash
@@ -617,6 +676,11 @@ internal/
     google_calendar.go, google_store.go — меню Google Calendar и его состояние в базе
   utils/                 — учебные недели, предметы
 configs/config.example.yaml — шаблон конфигурации
+docker-compose.yml          — long polling (по умолчанию)
+docker-compose.webhook.yml  — webhook за Caddy: TLS и сертификат Let's Encrypt автоматически
+docker-compose.webhook-nginx.yml — webhook за nginx, сертификат выпускает certbot
+deploy/caddy/Caddyfile      — конфигурация Caddy
+deploy/nginx/default.conf.template — шаблон конфигурации nginx (envsubst)
 docs/google-calendar.md     — инструкция по Google Calendar
 scripts/paritycheck/        — чекер паритета с TS-ботом
 scripts/preflight/          — предстартовая проверка перед деплоем

@@ -579,3 +579,24 @@ func TestRunDropsAStaleWebhookBeforePolling(t *testing.T) {
 		t.Fatal("the bot did not stop after the context was cancelled")
 	}
 }
+
+func TestDeployExamplesRouteTheDefaultWebhookTarget(t *testing.T) {
+	port := strings.TrimPrefix(webhookDefaultListen, "127.0.0.1:")
+
+	for _, name := range []string{
+		filepath.Join("..", "..", "deploy", "caddy", "Caddyfile"),
+		filepath.Join("..", "..", "deploy", "nginx", "default.conf.template"),
+	} {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		content := string(data)
+		if !strings.Contains(content, webhookDefaultPath) {
+			t.Errorf("%s must forward %s to the bot", name, webhookDefaultPath)
+		}
+		if !strings.Contains(content, "bot:"+port) {
+			t.Errorf("%s must forward to the webhook listener port %s", name, port)
+		}
+	}
+}

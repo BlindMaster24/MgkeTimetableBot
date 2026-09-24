@@ -27,6 +27,7 @@
 - `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/preflight/` — pre-deploy check; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic).
 - `README.md` / `README.en.md` — mirrored documentation, kept in sync by `tests/docs_test.go`.
 - `Dockerfile`, `docker-compose.yml`, `.dockerignore` — container build; runtime config comes from env vars, state lives in the `/data` volume.
+- `docker-compose.webhook.yml` + `deploy/caddy/Caddyfile` and `docker-compose.webhook-nginx.yml` + `deploy/nginx/default.conf.template` — the two webhook-mode deploys: the reverse proxy terminates TLS with an automatically renewed Let's Encrypt certificate, forwards only the webhook path to the bot's listener and answers `404` everywhere else. `tests/deploy_test.go` checks the compose invariants and `internal/telegram/webhook_test.go` pins both examples to the default webhook path and listen port, so renaming either in the code cannot leave the examples broken.
 - `.github/workflows/ci.yml` — quality gates on Linux, Windows and macOS; `.github/workflows/release.yml` — releases and the GHCR image; `.github/workflows/security.yml` — the scheduled `govulncheck` scan; `.github/dependabot.yml` — weekly dependency bumps.
 
 ## Architecture Overview (Flow)
