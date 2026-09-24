@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
@@ -196,6 +197,85 @@ func TestFetchAndParseCalls(t *testing.T) {
 
 	if len(schedule.Weekdays) != 7 {
 		t.Errorf("expected 7 weekday slots, got %d", len(schedule.Weekdays))
+	}
+}
+
+func TestCallsParserIgnoresDatesAndImpossibleTimes(t *testing.T) {
+	html := `<html><body>
+<div class="entry"><div class="content">
+<h1>Расписание звонков с 01.09.2026</h1>
+<table class="table table-bordered">
+<tr><th>Понедельник, 24.09.2026</th><th>Вторник, 25.09.2026</th><th>Среда, 26.09.2026</th><th>Четверг, 27.09.2026</th></tr>
+<tr><td>1 пара</td><td>8.00 – 8.45<br>8.55 – 9.40</td></tr>
+<tr><td>2 пара</td><td>9.50 – 10.35<br>10.45 – 11.30</td></tr>
+</table>
+</div></div>
+</body></html>`
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	variants, _ := ParseCallsVariants(doc)
+	if len(variants) == 0 {
+		t.Fatal("expected a parsed bell schedule")
+	}
+
+	for _, variant := range variants {
+		for _, slot := range append(append([][2][2]string{}, variant.Schedule.Weekdays...), variant.Schedule.Saturday...) {
+			for _, pair := range slot {
+				for _, value := range pair {
+					if _, err := time.Parse("15:04", value); err != nil {
+						t.Errorf("a date was parsed as a time: %q (%v)", value, err)
+					}
+				}
+			}
+		}
+	}
+
+	weekdays := variants[0].Schedule.Weekdays
+	if len(weekdays) != 2 {
+		t.Fatalf("expected the two real bell schedule rows, got %d", len(weekdays))
+	}
+	if weekdays[0][0] != [2]string{"08:00", "08:45"} {
+		t.Errorf("unexpected first slot %v", weekdays[0])
+	}
+}
+
+func TestParseCallSlotRejectsImpossiblePairs(t *testing.T) {
+	cases := []struct {
+		name string
+		text string
+		want bool
+	}{
+		{"regular pair", "8.00 – 8.45", true},
+		{"reversed pair", "10:00 00:00", true},
+		{"reversed with a real end", "11:00 10:00", false},
+		{"pair ending at midnight", "22:00 00:00", true},
+		{"impossible hour", "24:09 25:09", false},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := parseCallSlot(testCase.text) != nil; got != testCase.want {
+				t.Fatalf("parseCallSlot(%q) parsed = %v, want %v", testCase.text, got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestParseCallSlotIgnoresDates(t *testing.T) {
+	if slot := parseCallSlot("24.09.2026 25.09.2026 26.09.2026 27.09.2026"); slot != nil {
+		t.Fatalf("dates were parsed as a slot: %v", *slot)
+	}
+
+	slot := parseCallSlot("Понедельник, 24.09.2026 8.00 – 8.45 8.55 – 9.40")
+	if slot == nil {
+		t.Fatal("expected the real times of the row")
+	}
+	if *slot != [2][2]string{{"08:00", "08:45"}, {"08:55", "09:40"}} {
+		t.Fatalf("unexpected slot %v", *slot)
 	}
 }
 

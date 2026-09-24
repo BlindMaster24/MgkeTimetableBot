@@ -3,6 +3,7 @@ package parser
 import (
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 )
 
 var callsTimeRe = regexp.MustCompile(`\b(\d{1,2})[.:](\d{2})\b`)
+var callsDateRe = regexp.MustCompile(`\d{1,2}\.\d{2}\.\d{2,4}`)
 var callsUpdatedAtRe = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})(?:\s+(\d{2}:\d{2}))?`)
 
 type CallsUpdatedAt struct {
@@ -302,24 +304,61 @@ func parseCallSlot(text string) *[2][2]string {
 	text = strings.ReplaceAll(text, "&ndash;", " ")
 	text = strings.ReplaceAll(text, "&mdash;", " ")
 
+	text = callsDateRe.ReplaceAllString(text, " ")
+
 	matches := callsTimeRe.FindAllStringSubmatch(text, -1)
 	if len(matches) < 2 {
 		return nil
 	}
 
 	if len(matches) >= 4 {
-		start1 := normalizeCallsTime(matches[0][1], matches[0][2])
-		end1 := normalizeCallsTime(matches[1][1], matches[1][2])
-		start2 := normalizeCallsTime(matches[2][1], matches[2][2])
-		end2 := normalizeCallsTime(matches[3][1], matches[3][2])
-		slot := [2][2]string{{start1, end1}, {start2, end2}}
+		times := make([]string, 0, 4)
+		for _, match := range matches[:4] {
+			value, ok := validCallsTime(match[1], match[2])
+			if !ok {
+				return nil
+			}
+			times = append(times, value)
+		}
+		if !validCallsPair(times[0], times[1]) || !validCallsPair(times[2], times[3]) {
+			return nil
+		}
+		slot := [2][2]string{{times[0], times[1]}, {times[2], times[3]}}
 		return &slot
 	}
 
-	start := normalizeCallsTime(matches[0][1], matches[0][2])
-	end := normalizeCallsTime(matches[1][1], matches[1][2])
+	start, ok := validCallsTime(matches[0][1], matches[0][2])
+	if !ok {
+		return nil
+	}
+	end, ok := validCallsTime(matches[1][1], matches[1][2])
+	if !ok {
+		return nil
+	}
+	if !validCallsPair(start, end) {
+		return nil
+	}
 	slot := [2][2]string{{start, end}, {start, end}}
 	return &slot
+}
+
+func validCallsPair(start, end string) bool {
+	if end == "00:00" {
+		return true
+	}
+	return start < end
+}
+
+func validCallsTime(h, m string) (string, bool) {
+	hour, err := strconv.Atoi(h)
+	if err != nil || hour > 23 {
+		return "", false
+	}
+	minute, err := strconv.Atoi(m)
+	if err != nil || minute > 59 {
+		return "", false
+	}
+	return normalizeCallsTime(h, m), true
 }
 
 func normalizeCallsTime(h, m string) string {
