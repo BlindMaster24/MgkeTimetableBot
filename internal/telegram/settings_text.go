@@ -24,19 +24,28 @@ func (c *btnToggleTextCmd) Description() string { return "" }
 func (c *btnToggleTextCmd) Scene() string       { return sceneSettings }
 
 func (c *btnToggleTextCmd) MatchText(text string) bool {
-	switch c.kind {
-	case "daily":
-		return text == `✅ Кнопка "📄 На день"` || text == `🚫 Кнопка "📄 На день"`
-	case "weekly":
-		return text == `✅ Кнопка "📑 На неделю"` || text == `🚫 Кнопка "📑 На неделю"`
-	case "calls":
-		return text == `✅ Кнопка "🕐 Звонки"` || text == `🚫 Кнопка "🕐 Звонки"`
-	case "about":
-		return text == `✅ Кнопка "💡 О боте"` || text == `🚫 Кнопка "💡 О боте"`
-	case "fast_group":
-		return text == `✅ Кнопка "👩‍🎓 Группа"` || text == `🚫 Кнопка "👩‍🎓 Группа"`
-	case "fast_teacher":
-		return text == `✅ Кнопка "👩‍🏫 Преподаватель"` || text == `🚫 Кнопка "👩‍🏫 Преподаватель"`
+	pairs := map[string][2]string{
+		"daily":        {"📄", "На день"},
+		"weekly":       {"📑", "На неделю"},
+		"calls":        {"🕐", "Звонки"},
+		"about":        {"💡", "О боте"},
+		"fast_group":   {"👩‍🎓", "Группа"},
+		"fast_teacher": {"👩‍🏫", "Преподаватель"},
+	}
+	pair, ok := pairs[c.kind]
+	if !ok {
+		return false
+	}
+	variants := []string{
+		`✅ Кнопка "` + pair[0] + ` ` + pair[1] + `"`,
+		`🚫 Кнопка "` + pair[0] + ` ` + pair[1] + `"`,
+		`✅ Кнопка "` + pair[1] + `"`,
+		`🚫 Кнопка "` + pair[1] + `"`,
+	}
+	for _, variant := range variants {
+		if strings.EqualFold(text, variant) {
+			return true
+		}
 	}
 	return false
 }
@@ -245,7 +254,7 @@ func (c *formatterSelectTextCmd) Scene() string       { return sceneSettings }
 
 func (c *formatterSelectTextCmd) MatchText(text string) bool {
 	for _, f := range formatter.AllFormatters {
-		if text == f.Label() || text == f.Label()+" (выбран)" {
+		if strings.EqualFold(text, f.Label()) || strings.EqualFold(text, f.Label()+" (выбран)") {
 			return true
 		}
 	}

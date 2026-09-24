@@ -79,6 +79,28 @@ func TestMathEvaluatesFractionsAndPowers(t *testing.T) {
 	}
 }
 
+func TestMathWhitespaceOnlyInput(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+
+	caller.reset()
+	runMath(t, b, userID, "/math ")
+	if got := caller.last(); got != "/math <some>\n<some> - математический пример" {
+		t.Errorf("single trailing space → %q", got)
+	}
+
+	caller.reset()
+	runMath(t, b, userID, "/math   ")
+	if got := caller.last(); got != "Пример записан неправильно" {
+		t.Errorf("multiple trailing spaces → %q", got)
+	}
+
+	caller.reset()
+	runMath(t, b, userID, "/math 0/0")
+	if got := caller.last(); got != "NaN" {
+		t.Errorf("0/0 → %q", got)
+	}
+}
+
 func TestFormatMathResultMatchesJavaScript(t *testing.T) {
 	cases := []struct {
 		value float64

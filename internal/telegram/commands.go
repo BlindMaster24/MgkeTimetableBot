@@ -720,8 +720,8 @@ func (c *mathCmd) Description() string { return "Математический к
 const mathAllowedCharacters = "0123456789+-*/():^×÷ekк,."
 
 func (c *mathCmd) Handler(ctx context.Context, u *Update) error {
-	command := strings.SplitN(u.Text, " ", 2)[0]
-	text := strings.TrimSpace(strings.TrimPrefix(u.Text, command))
+	command := strings.Split(u.Text, " ")[0]
+	text := strings.Join(strings.Split(u.Text, " ")[1:], " ")
 	if text == "" {
 		return u.Bot.SendText(u.ChatID, command+" <some>\n<some> - математический пример")
 	}
