@@ -21,7 +21,7 @@
   - `notification/` — cron scheduler (robfig/cron), event-to-message mapping and health alert dispatch.
   - `formatter/` — output formats: default, compact, visual, litolax.
   - `parity/` — TS ↔ Go surface comparator used by `scripts/paritycheck` and the offline parity test.
-  - `preflight/` — pre-deploy checks: config keys, credentials, locale keys, storage, the live site (dates, calls), a rendered PNG; `scripts/preflight` prints the report.
+  - `preflight/` — pre-deploy checks: config keys, credentials, the webhook configuration, locale keys, storage, the live site (dates, calls), a rendered PNG; `scripts/preflight` prints the report.
   - `testgolden/` — golden-text normalization (dates, week numbers, callback data) shared by the message golden tests; tests only.
   - `utils/` — academic week index, subject list.
 - `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/preflight/` — pre-deploy check; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic).
@@ -32,6 +32,7 @@
 ## Architecture Overview (Flow)
 - External inputs arrive via Telegram bot (long polling) or HTTP API.
 - Bot commands are routed in `internal/telegram/bot.go` via command name or text matching; messages landing in an input scene go through the scene registry in `internal/telegram/scenes.go`.
+- `Bot.Run` picks the update transport: `internal/telegram/webhook.go` serves the `telegram.webhook` configuration (secret-token check, optional self-signed TLS, `setWebhook` from `getUpdates`-free mode) and `runPolling` deletes a stale webhook first, so switching modes never hits the Telegram `409 Conflict`.
 - Parser fetches HTML from the college site, normalizes via goquery, emits events into `cache/`.
 - `cmd/bot/main.go` drains those events after every parse into `internal/notification`, then syncs only the changed days into Google Calendar and finally reconciles calendars that fell behind.
 - `internal/health` records parser, calendar and API outcomes; the scheduler polls it and messages admins while an alert is active.
@@ -116,7 +117,7 @@
 - Adding a menu means adding one spec; menus without a scene or with items outside their scene fail `menus_test.go`.
 
 ## Current Features Snapshot
-- Telegram bot via telego long polling.
+- Telegram bot via telego — long polling by default, an optional webhook mode (`telegram.webhook`, secret token, own TLS or a reverse proxy) configured entirely from the config or environment.
 - Commands: 67 total — schedule and setup (`/start`, `/help`, `/setup`, `/day`, `/week`, `/calls`, `/group`, `/teacher`, `/image`, `/cabinet`, `/history`, `/archive`, `/alias`, `/comparegroups`, `/groups`, `/teachers`, `/ics`, `/google_calendar`, …), admin (`/debug`, `/send`, `/trigger`, `/forceparse`, `/noticedebug`, `/sql`, `/restart`, …) and menu text pseudo-commands. The full list is in `README.md` and enforced by `scripts/paritycheck`.
 - Keyboard buttons match command text via i18n keys.
 - Parser (table-based) for groups, teachers and the bell schedule, with change detection.

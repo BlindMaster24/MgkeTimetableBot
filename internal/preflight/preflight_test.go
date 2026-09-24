@@ -562,6 +562,60 @@ func TestRenderCheckReportsAFailureWithoutFonts(t *testing.T) {
 	}
 }
 
+func webhookCheck(t *testing.T, enabled bool, url, secret string) Check {
+	t.Helper()
+
+	site := startSite(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)))
+	path := siteConfig(t, site)
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := fmt.Sprintf("  webhook:\n    enabled: %v\n    url: %q\n    secret_token: %q\n", enabled, url, secret)
+	patched := strings.Replace(string(body), "  admin_ids: [1]\n", "  admin_ids: [1]\n"+block, 1)
+	if err := os.WriteFile(path, []byte(patched), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report := Run(Options{ConfigPath: path, SkipSite: true, SkipImage: true})
+	return findCheck(t, report, "webhook")
+}
+
+func TestRun_SkipsTheWebhookCheckForLongPolling(t *testing.T) {
+	check := webhookCheck(t, false, "", "")
+	if check.Level != LevelSkip {
+		t.Fatalf("expected a skip, got %s: %s", check.Level, check.Detail)
+	}
+}
+
+func TestRun_FailsTheWebhookCheckOnABrokenConfiguration(t *testing.T) {
+	check := webhookCheck(t, true, "http://mgke.example.com", "secret")
+	if check.Level != LevelFail {
+		t.Fatalf("expected a failure, got %s: %s", check.Level, check.Detail)
+	}
+	if !strings.Contains(check.Detail, "https") {
+		t.Errorf("expected the https requirement in the detail: %q", check.Detail)
+	}
+}
+
+func TestRun_WarnsAboutAMissingWebhookSecret(t *testing.T) {
+	check := webhookCheck(t, true, "https://mgke.example.com", "")
+	if check.Level != LevelWarn {
+		t.Fatalf("expected a warning, got %s: %s", check.Level, check.Detail)
+	}
+	if !containsHint(check.Hints, "secret_token") {
+		t.Errorf("expected a secret token hint, got %v", check.Hints)
+	}
+}
+
+func TestRun_AcceptsACompleteWebhookConfiguration(t *testing.T) {
+	check := webhookCheck(t, true, "https://mgke.example.com", "webhook-secret")
+	if check.Level != LevelOK {
+		t.Fatalf("expected a pass, got %s: %s %v", check.Level, check.Detail, check.Hints)
+	}
+}
+
 func containsHint(hints []string, needle string) bool {
 	for _, hint := range hints {
 		if strings.Contains(hint, needle) {

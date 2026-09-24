@@ -18,6 +18,19 @@ telegram:
   token: ""
   admin_ids: [804594266]
   noticer: true
+  webhook:
+    enabled: false
+    url: ""
+    listen: "127.0.0.1:8082"
+    path: "/telegram/webhook"
+    secret_token: ""
+    certificate: ""
+    key: ""
+    ip_address: ""
+    max_connections: 40
+    buffer: 128
+    drop_pending_updates: false
+    allowed_updates: []
 
 api:
   url: "/api"

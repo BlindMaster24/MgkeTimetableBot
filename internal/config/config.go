@@ -63,6 +63,20 @@ type Config struct {
 		Token    string  `yaml:"token" env:"TG_TOKEN"`
 		AdminIDs []int64 `yaml:"admin_ids"`
 		Noticer  bool    `yaml:"noticer"`
+		Webhook  struct {
+			Enabled            bool     `yaml:"enabled"`
+			Listen             string   `yaml:"listen"`
+			URL                string   `yaml:"url"`
+			Path               string   `yaml:"path"`
+			SecretToken        string   `yaml:"secret_token"`
+			Certificate        string   `yaml:"certificate"`
+			Key                string   `yaml:"key"`
+			IPAddress          string   `yaml:"ip_address"`
+			MaxConnections     int      `yaml:"max_connections"`
+			Buffer             int      `yaml:"buffer"`
+			DropPendingUpdates bool     `yaml:"drop_pending_updates"`
+			AllowedUpdates     []string `yaml:"allowed_updates"`
+		} `yaml:"webhook"`
 	} `yaml:"telegram"`
 
 	API struct {

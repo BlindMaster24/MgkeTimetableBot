@@ -117,7 +117,7 @@ go version   # ожидается go1.27.1 или новее
 | `cache_dir` | Каталог файлового кэша расписания (по умолчанию `./cache/rasp`) |
 | `logging` | Уровень, файл лога, параметры ротации |
 | `http` | Порт HTTP-сервера (API и Google OAuth) |
-| `telegram` | Токен бота, ID администраторов, флаг `noticer` |
+| `telegram` | Токен бота, ID администраторов, флаг `noticer`, режим получения обновлений (`telegram.webhook`) |
 | `api` | Базовый путь REST API |
 | `google` | OAuth-клиент и service account для Google Calendar |
 | `calendar.ics.enabled` | Включить экспорт ICS и кнопку в меню |
@@ -152,6 +152,35 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 ```
 
 Полный список имён можно получить из кода: `config.EnvNames()` возвращает все поддерживаемые переменные.
+
+### Получение обновлений: long polling и webhook
+
+По умолчанию бот забирает обновления сам (long polling) — наружу достаточно открыть HTTP-порт API, входящие соединения от Telegram не нужны. Если удобнее, чтобы Telegram сам доставлял обновления POST-запросом на ваш HTTPS-адрес, включите webhook:
+
+```yaml
+telegram:
+  webhook:
+    enabled: true                    # MGKE_TELEGRAM_WEBHOOK_ENABLED
+    url: "https://bot.example.com"   # публичный HTTPS-адрес: к нему добавится path
+    listen: "127.0.0.1:8082"         # MGKE_TELEGRAM_WEBHOOK_LISTEN, по умолчанию 127.0.0.1:8082
+    path: "/telegram/webhook"        # MGKE_TELEGRAM_WEBHOOK_PATH
+    secret_token: ""                 # MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN
+    certificate: ""                  # публичная часть своего сертификата (PEM)
+    key: ""                          # приватный ключ TLS — вместе с certificate
+    ip_address: ""                   # MGKE_TELEGRAM_WEBHOOK_IP_ADDRESS
+    max_connections: 40              # MGKE_TELEGRAM_WEBHOOK_MAX_CONNECTIONS (1–100)
+    buffer: 128                      # MGKE_TELEGRAM_WEBHOOK_BUFFER
+    drop_pending_updates: false      # MGKE_TELEGRAM_WEBHOOK_DROP_PENDING_UPDATES
+    allowed_updates: []              # MGKE_TELEGRAM_WEBHOOK_ALLOWED_UPDATES=message,callback_query
+```
+
+- адрес обязан быть `https` — иначе бот не стартует и пишет понятную ошибку; путь берётся из `url`, если он там есть, иначе добавляется из `path`;
+- `secret_token` принимает только символы `A-Z a-z 0-9 _ -` (до 256): Telegram присылает его в заголовке `X-Telegram-Bot-Api-Secret-Token`, а запросы с чужим или пустым заголовком бот отбивает `401` — сравнение идёт в постоянном времени;
+- без `certificate`/`key` TLS завершает обратный прокси (nginx, Caddy), а сам бот слушает локальный адрес; с этой парой бот поднимает TLS сам и отдаёт сертификат Telegram;
+- размер тела запроса ограничен 1 МБ, неизвестный путь отдаёт `404`, не-POST — `405`, а ошибка обработки — `500`, чтобы Telegram повторил доставку;
+- при старте бот логирует адрес webhook, число накопившихся обновлений, список типов и последнюю ошибку доставки из `getWebhookInfo`;
+- при переключении обратно на long polling бот сначала снимает webhook (`deleteWebhook`) — иначе Telegram отвечает `409 Conflict` на `getUpdates`;
+- все ключи переопределяются переменными окружения, включая списки через запятую.
 
 ### Парсер
 
@@ -357,15 +386,18 @@ services:
       MGKE_TELEGRAM_TOKEN: "123:ABC"
       MGKE_TELEGRAM_ADMIN_IDS: "1,2"
       MGKE_DB_PATH: /data/sqlite3.db
+      # MGKE_TELEGRAM_WEBHOOK_ENABLED: "true"
+      # MGKE_TELEGRAM_WEBHOOK_URL: "https://bot.example.com"
+      # MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN: "change-me"
 ```
 
 Что важно знать про образ:
 
-- многостудийная сборка: бинарник собирается на `golang:1.27.1`, в рантайм-образ попадает только бинарник, конфиг-шаблон и сертификаты;
+- многостудийная сборка: бинарник собирается на `golang:1.27.1`, а в рантайм-образ попадают только бинарник, шаблон конфига и корневые сертификаты `ca-certificates` — без этого набора HTTPS к Telegram, сайту колледжа и Google не работает;
 - build-стадия идёт на архитектуре раннера и кросс-компилирует бинарник под `TARGETARCH`, поэтому образ для `linux/arm64` собирается без QEMU — обычно за минуты, а не за десятки минут;
 - процесс запускается от непривилегированного пользователя, CGO не нужен (SQLite и рендер картинок — чистый Go);
 - встроенный `HEALTHCHECK` каждые 30 секунд обращается к `GET /api/health` и переводит контейнер в `unhealthy` при алертах;
-- наружу отдаётся только HTTP-порт (`http.port`), Telegram работает через long polling — входящие порты больше не нужны;
+- наружу отдаётся только HTTP-порт (`http.port`), а Telegram по умолчанию работает через long polling — входящие порты не нужны; в режиме webhook (`telegram.webhook.enabled`) дополнительно открывается порт webhook (`telegram.webhook.listen`, по умолчанию только локальный адрес — TLS обычно завершает обратный прокси);
 - образ ставит `tzdata` и задаёт `TZ=Europe/Minsk`, а `docker-compose.yml` прокидывает `TZ` (по умолчанию тот же Минск) — от часового пояса зависят «сегодня», номер учебной недели и время уведомлений, поэтому контейнер не должен жить в UTC;
 - образ ставит `font-dejavu`: картинки расписания рисует `fogleman/gg`, а шрифт он ищет среди известных путей Debian/Alpine, macOS и Windows и дополнительно просматривает каталоги шрифтов системы, поэтому кнопка «Сгенерировать изображение» работает и в контейнере, и локально на всех трёх платформах;
 - данные живут в томе `/data`, конфиг можно подменить через `CONFIG_PATH`; версия, коммит и дата сборки инжектятся линкером (`-X main.*`) и видны в `/api/health` и `/debug`.
@@ -469,6 +501,7 @@ go run ./scripts/preflight -groups-url http://localhost:8080/groups   # подм
 |----------|-------------------|
 | `config` | обязательные ключи: токен бота, адреса групп, преподавателей и звонков, `db_path`, `http.port`; предупреждения — пустые `admin_ids`, выключенный парсер или здоровье |
 | `credentials` | форма токена Telegram, разбор приватного ключа Google service account (PEM, PKCS#1/PKCS#8/EC, `Validate`), полнота пары OAuth, пустой `encrypt_key` |
+| `webhook` | режим доставки обновлений: при `telegram.webhook.enabled` адрес обязан быть `https`, секрет — только `A-Z a-z 0-9 _ -`, сертификат и ключ — вместе; без секрета — предупреждение; в long polling проверка пропускается |
 | `locale` | `locales/ru.json` корректен, без пустых значений, и **каждый** ключ `loc(...)`/`locData(...)` из кода в нём есть |
 | `storage` | запись в каталоги базы, чатов и кэша (создаёт недостающие каталоги) |
 | `timetable` | слоты звонков из конфига: начало раньше конца, пары не пересекаются |
@@ -545,7 +578,7 @@ internal/
   notification/          — планировщик и события уведомлений
   parity/                — компаратор поверхностей TS ↔ Go
   parser/                — парсер расписания (группы, преподаватели, звонки, диагностика)
-  preflight/             — предстартовая проверка: конфиг, ключи, локаль, сайт, картинка
+  preflight/             — предстартовая проверка: конфиг, ключи, webhook, локаль, сайт, картинка
   testgolden/            — нормализация golden-текстов (только для тестов)
   telegram/              — telego: команды, колбэки, меню, клавиатуры, сцены
     bot.go               — регистрация команд, колбэков, текстовых обработчиков и меню

@@ -279,15 +279,10 @@ func (b *Bot) registerAll() {
 }
 
 func (b *Bot) Run(ctx context.Context) error {
-	updates, err := b.client.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{
-		Timeout: 30,
-	})
-	if err != nil {
-		return fmt.Errorf("start polling: %w", err)
+	if b.cfg.Telegram.Webhook.Enabled {
+		return b.runWebhook(ctx)
 	}
-
-	b.log.Info().Msg("bot started, listening for updates")
-	return b.consumeUpdates(ctx, updates)
+	return b.runPolling(ctx)
 }
 
 func (b *Bot) consumeUpdates(ctx context.Context, updates <-chan telego.Update) error {

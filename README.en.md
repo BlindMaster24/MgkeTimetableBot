@@ -118,7 +118,7 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `cache_dir` | Directory of the file-backed timetable cache (default `./cache/rasp`) |
 | `logging` | Level, log file, rotation settings |
 | `http` | HTTP port of the server (API and Google OAuth) |
-| `telegram` | Bot token, admin IDs, the `noticer` flag |
+| `telegram` | Bot token, admin IDs, the `noticer` flag, the update delivery mode (`telegram.webhook`) |
 | `api` | Base path of the REST API |
 | `google` | OAuth client and service account for Google Calendar |
 | `calendar.ics.enabled` | Enable the ICS export and its menu button |
@@ -129,6 +129,35 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `encrypt_key` | Encryption key: it signs the REST API keys and encrypts the stored Google OAuth tokens, so it must be at least 32 characters long |
 
 The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQLite (see `db_path`); the archive schema is embedded into the binary (`internal/archive/migrations/`).
+
+### Update delivery: long polling and webhook
+
+By default the bot fetches updates itself (long polling), so publishing the HTTP API port is enough and no inbound connections from Telegram are needed. If you prefer Telegram to push updates with a POST request to your own HTTPS address, enable the webhook:
+
+```yaml
+telegram:
+  webhook:
+    enabled: true                    # MGKE_TELEGRAM_WEBHOOK_ENABLED
+    url: "https://bot.example.com"   # public HTTPS address; the path is appended to it
+    listen: "127.0.0.1:8082"         # MGKE_TELEGRAM_WEBHOOK_LISTEN, 127.0.0.1:8082 by default
+    path: "/telegram/webhook"        # MGKE_TELEGRAM_WEBHOOK_PATH
+    secret_token: ""                 # MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN
+    certificate: ""                  # public half of your own certificate (PEM)
+    key: ""                          # TLS private key, together with certificate
+    ip_address: ""                   # MGKE_TELEGRAM_WEBHOOK_IP_ADDRESS
+    max_connections: 40              # MGKE_TELEGRAM_WEBHOOK_MAX_CONNECTIONS (1-100)
+    buffer: 128                      # MGKE_TELEGRAM_WEBHOOK_BUFFER
+    drop_pending_updates: false      # MGKE_TELEGRAM_WEBHOOK_DROP_PENDING_UPDATES
+    allowed_updates: []              # MGKE_TELEGRAM_WEBHOOK_ALLOWED_UPDATES=message,callback_query
+```
+
+- the address must be `https`, otherwise the bot refuses to start with a clear error; the path comes from the `url` when it has one, and from `path` otherwise;
+- `secret_token` accepts only `A-Z a-z 0-9 _ -` (up to 256 characters): Telegram sends it in the `X-Telegram-Bot-Api-Secret-Token` header, and requests with a foreign or missing header are answered with `401` — the comparison is constant-time;
+- without `certificate`/`key` the TLS session is terminated by a reverse proxy (nginx, Caddy) and the bot only listens on a loopback address; with that pair the bot serves TLS itself and uploads the certificate to Telegram;
+- the request body is capped at 1 MB, an unknown path answers `404`, a non-POST request `405`, and a handler failure `500`, so Telegram retries the delivery;
+- at startup the bot logs the webhook address, the number of pending updates, the enabled update types and the last delivery error from `getWebhookInfo`;
+- when switching back to long polling the bot deletes the webhook first (`deleteWebhook`) — otherwise Telegram answers `409 Conflict` to `getUpdates`;
+- every key can be overridden by an environment variable, lists included (comma-separated).
 
 ### Environment variables
 
@@ -356,15 +385,18 @@ services:
       MGKE_TELEGRAM_TOKEN: "123:ABC"
       MGKE_TELEGRAM_ADMIN_IDS: "1,2"
       MGKE_DB_PATH: /data/sqlite3.db
+      # MGKE_TELEGRAM_WEBHOOK_ENABLED: "true"
+      # MGKE_TELEGRAM_WEBHOOK_URL: "https://bot.example.com"
+      # MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN: "change-me"
 ```
 
 What to know about the image:
 
-- multi-stage build: the binary is compiled on `golang:1.27.1` and the runtime image only carries the binary, the config template and the certificates;
+- multi-stage build: the binary is compiled on `golang:1.27.1` and the runtime image only carries the binary, the config template and the `ca-certificates` trust store — without those roots HTTPS to Telegram, the college site and Google would not work;
 - the build stage runs on the runner's architecture and cross-compiles for `TARGETARCH`, so the `linux/arm64` image needs no QEMU and finishes in minutes instead of tens of minutes;
 - the process runs as an unprivileged user, CGO is not needed (SQLite and image rendering are pure Go);
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
-- only the HTTP port (`http.port`) is published — Telegram works over long polling, so no inbound ports are required;
+- only the HTTP port (`http.port`) is published — Telegram works over long polling by default, so no inbound ports are required; with the webhook mode (`telegram.webhook.enabled`) the webhook port is opened too (`telegram.webhook.listen`, a loopback address by default, since TLS normally terminates on a reverse proxy);
 - the image installs `tzdata` and sets `TZ=Europe/Minsk`, and `docker-compose.yml` passes `TZ` through (same Minsk default) — “today”, the academic week number and the notification times all depend on the timezone, so the container must not run in UTC;
 - the image installs `font-dejavu`: the schedule pictures are drawn by `fogleman/gg`, which looks for a font among the known Debian/Alpine, macOS and Windows paths and otherwise scans the system font directories, so the “generate an image” button works inside the container and locally on all three platforms;
 - state lives in the `/data` volume, and the config can be replaced through `CONFIG_PATH`; the version, commit and build date are injected by the linker (`-X main.*`) and surfaced in `/api/health` and `/debug`.
@@ -468,6 +500,7 @@ What it checks:
 |-------|------------------|
 | `config` | required keys: the bot token, the group, teacher and bell schedule URLs, `db_path`, `http.port`; warnings cover empty `admin_ids`, a disabled parser or health tracker |
 | `credentials` | the Telegram token shape, the Google service account private key (PEM, PKCS#1/PKCS#8/EC, `Validate`), a complete OAuth pair, an empty `encrypt_key` |
+| `webhook` | the update delivery mode: with `telegram.webhook.enabled` the address must be `https`, the secret may only use `A-Z a-z 0-9 _ -`, and the certificate and key must come as a pair; a missing secret is a warning; long polling skips the check |
 | `locale` | `locales/ru.json` is valid, has no empty values and carries **every** key referenced by `loc(...)`/`locData(...)` in the code |
 | `storage` | the database, chat and cache directories are writable (missing ones are created) |
 | `timetable` | configured bell schedule slots: the start precedes the end and lessons do not overlap |
@@ -547,7 +580,7 @@ internal/
   notification/          — scheduler, events and health alerts
   parity/                — TypeScript ↔ Go surface comparator
   parser/                — timetable parser (groups, teachers, bell schedule, diagnostics)
-  preflight/             — pre-deploy check: config, credentials, locale, live site, image
+  preflight/             — pre-deploy check: config, credentials, webhook, locale, live site, image
   testgolden/            — golden text normalization (tests only)
   telegram/              — telego: commands, callbacks, menus, keyboards, scenes
     bot.go               — command, callback, text-handler and menu registration

@@ -21,6 +21,7 @@ import (
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/parser"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
@@ -97,6 +98,7 @@ func Run(opts Options) Report {
 
 	report.add(checkConfig(cfg, opts.ConfigPath))
 	report.add(checkCredentials(cfg))
+	report.add(checkWebhook(cfg))
 	report.add(checkLocale(findRepoRoot()))
 	report.add(checkStorage(cfg))
 	report.add(checkTimetable(cfg))
@@ -253,6 +255,36 @@ func checkConfig(cfg *config.Config, path string) Check {
 		Detail: fmt.Sprintf("%d required keys present, %d optional warnings", len(keys), len(warnings)),
 		Hints:  hints,
 	}
+}
+
+func checkWebhook(cfg *config.Config) Check {
+	if !cfg.Telegram.Webhook.Enabled {
+		return Check{Name: "webhook", Level: LevelSkip, Detail: "long polling is used, no public address required"}
+	}
+
+	if err := telegram.ValidateWebhook(cfg); err != nil {
+		return Check{
+			Name:   "webhook",
+			Level:  LevelFail,
+			Detail: err.Error(),
+			Hints: []string{
+				"warning: set telegram.webhook.url to the public https address of this bot",
+				"warning: the secret token is sent in the X-Telegram-Bot-Api-Secret-Token header, use A-Z a-z 0-9 _ - only",
+			},
+		}
+	}
+
+	detail := fmt.Sprintf("webhook enabled, listen %s", cfg.Telegram.Webhook.Listen)
+	if strings.TrimSpace(cfg.Telegram.Webhook.SecretToken) == "" {
+		return Check{
+			Name:   "webhook",
+			Level:  LevelWarn,
+			Detail: detail,
+			Hints:  []string{"warning: without telegram.webhook.secret_token anyone who knows the address can post updates"},
+		}
+	}
+
+	return Check{Name: "webhook", Level: LevelOK, Detail: detail}
 }
 
 func checkCredentials(cfg *config.Config) Check {
