@@ -204,6 +204,7 @@ Long polling is the default; `telegram.webhook` makes Telegram push updates to a
 - HTTP-level bot tests talk real HTTP to a fake Telegram Bot API (`internal/telegram/fakeapi_test.go`) instead of stubbing the caller: use it for a transport change or a reply path.
 - Fuzz targets live in `internal/parser/fuzz_test.go` (seeded with the real page snapshots) and `internal/telegram/webhook_test.go`: `go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/`. A crasher is written to `testdata/fuzz/<target>/` and is kept as a permanent seed, so it runs on every plain `go test`.
 - Fix test-first: write the failing test, watch it fail for the right reason, then fix. A defect found by fuzzing keeps its corpus file as the regression test.
+- Never assign the process-global `time.Local`: every goroutine that calls `time.Now()` reads it (a leftover fasthttp dialer from an HTTP-level test, a cron tick, a notification cron), so the write is a real data race that fails the `race` job. Inject the clock instead — `Bot.SetNow` and `notification.EventNotifier.SetNow` — and pass an explicit `time.Time` into the date helpers (`getDayPhrase`, `todayDayOf`, `futureDays`); `tests/timezone_test.go` fails the suite if an assignment comes back. The timezone behaviour stays covered by `TestDayNoticeWorksInEveryTimeZone`, `TestSchedulerBindsTheCronToTheProcessTimezone` and the `TZ=... go test` runs.
 - Use `httptest` for API handler tests.
 - If you add a new test file, list the exact `go test ./path/...` command in the PR description.
 

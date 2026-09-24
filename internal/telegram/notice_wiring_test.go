@@ -156,12 +156,9 @@ func TestDayNoticeWorksInEveryTimeZone(t *testing.T) {
 		time.FixedZone("Pacific/Midway", -11*60*60),
 	}
 
-	saved := time.Local
-	t.Cleanup(func() { time.Local = saved })
-
 	for _, zone := range zones {
 		t.Run(zone.String(), func(t *testing.T) {
-			time.Local = zone
+			now := time.Date(2026, time.September, 16, 10, 0, 0, 0, zone)
 
 			const userID = int64(9207)
 			caller := &capturingCaller{}
@@ -180,7 +177,6 @@ func TestDayNoticeWorksInEveryTimeZone(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			now := time.Now()
 			b.cache.SetGroups(map[string]any{"100": groupDays("100",
 				lessonDay(now.Format("02.01.2006"), "Математика", "Физика", "Информатика"),
 				lessonDay(now.AddDate(0, 0, 1).Format("02.01.2006"), "Химия"),
@@ -188,6 +184,7 @@ func TestDayNoticeWorksInEveryTimeZone(t *testing.T) {
 			b.cache.DrainEvents()
 
 			notifier := noticeNotifier(b, repo)
+			notifier.SetNow(func() time.Time { return now })
 			notifier.CronDayAll(2)
 
 			sent := caller.textsFor(userID)

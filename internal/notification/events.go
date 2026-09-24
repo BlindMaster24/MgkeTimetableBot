@@ -74,20 +74,30 @@ type EventNotifier struct {
 	log    *logger.Logger
 	sender EventSender
 	chats  EventChatFinder
+	now    func() time.Time
 }
 
 func NewEventNotifier(c *cache.RaspCache, cfg *config.Config, log *logger.Logger, sender EventSender, chats EventChatFinder) *EventNotifier {
 	return &EventNotifier{cache: c, cfg: cfg, log: log, sender: sender, chats: chats}
 }
 
-func getDayPhrase(day string, nextDayPhrase string) string {
+func (n *EventNotifier) SetNow(fn func() time.Time) { n.now = fn }
+
+func (n *EventNotifier) nowTime() time.Time {
+	if n.now != nil {
+		return n.now()
+	}
+	return time.Now()
+}
+
+func getDayPhrase(now time.Time, day string, nextDayPhrase string) string {
 	t, err := time.Parse("02.01.2006", day)
 	if err != nil {
 		return nextDayPhrase
 	}
 
 	dayIdx := utils.DayIndexFromDate(t)
-	todayIdx := utils.DayIndexFromDate(time.Now())
+	todayIdx := utils.DayIndexFromDate(now)
 
 	if dayIdx == todayIdx {
 		return "сегодня"
@@ -234,7 +244,7 @@ func (n *EventNotifier) AddDay(ev *cache.DayEvent) {
 		return
 	}
 
-	phrase := getDayPhrase(dayString(ev.Day), "следующий день")
+	phrase := getDayPhrase(n.nowTime(), dayString(ev.Day), "следующий день")
 	n.sendDay(ev.Kind, ev.Value, false, phrase, ev.Day, chats)
 }
 
@@ -271,7 +281,7 @@ func (n *EventNotifier) UpdateDay(ev *cache.DayEvent) {
 		return
 	}
 
-	phrase := getDayPhrase(dayString(ev.Day), "день")
+	phrase := getDayPhrase(n.nowTime(), dayString(ev.Day), "день")
 	n.sendDay(ev.Kind, ev.Value, true, phrase, ev.Day, chats)
 }
 
@@ -306,7 +316,7 @@ func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 		if !ok {
 			continue
 		}
-		todayDay, lessonsLen := todayDayOf(entry)
+		todayDay, lessonsLen := todayDayOf(n.nowTime(), entry)
 		if todayDay == nil {
 			continue
 		}
@@ -354,7 +364,7 @@ func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 			continue
 		}
 
-		nextDays := futureDays(entry)
+		nextDays := futureDays(n.nowTime(), entry)
 		if len(nextDays) == 0 {
 			continue
 		}
@@ -379,7 +389,7 @@ func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 
 		n.cache.SetLastNoticedDay(kind, value, int64(dayIdx))
 
-		phrase := getDayPhrase(dayString(day), "следующий день")
+		phrase := getDayPhrase(n.nowTime(), dayString(day), "следующий день")
 
 		for _, chat := range groupChats {
 			if chat.PeerID != 0 {
@@ -398,9 +408,9 @@ func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 	}
 }
 
-func todayDayOf(entry map[string]any) (map[string]any, int) {
+func todayDayOf(now time.Time, entry map[string]any) (map[string]any, int) {
 	days, _ := entry["days"].([]any)
-	todayIdx := utils.DayIndexFromDate(time.Now())
+	todayIdx := utils.DayIndexFromDate(now)
 
 	var today map[string]any
 	maxLessons := 0
@@ -420,9 +430,9 @@ func todayDayOf(entry map[string]any) (map[string]any, int) {
 	return today, maxLessons
 }
 
-func futureDays(entry map[string]any) []map[string]any {
+func futureDays(now time.Time, entry map[string]any) []map[string]any {
 	days, _ := entry["days"].([]any)
-	todayIdx := utils.DayIndexFromDate(time.Now())
+	todayIdx := utils.DayIndexFromDate(now)
 
 	for i, d := range days {
 		m, ok := d.(map[string]any)

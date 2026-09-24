@@ -103,32 +103,32 @@ func futureWeekStr() string {
 }
 
 func TestGetDayPhrase_Today(t *testing.T) {
-	if got := getDayPhrase(todayStr(), "день"); got != "сегодня" {
+	if got := getDayPhrase(time.Now(), todayStr(), "день"); got != "сегодня" {
 		t.Errorf("expected 'сегодня', got %q", got)
 	}
 }
 
 func TestGetDayPhrase_Tomorrow(t *testing.T) {
-	if got := getDayPhrase(tomorrowStr(), "день"); got != "завтра" {
+	if got := getDayPhrase(time.Now(), tomorrowStr(), "день"); got != "завтра" {
 		t.Errorf("expected 'завтра', got %q", got)
 	}
 }
 
 func TestGetDayPhrase_FutureWeek(t *testing.T) {
-	if got := getDayPhrase(futureWeekStr(), "день"); got != "следующую неделю" {
+	if got := getDayPhrase(time.Now(), futureWeekStr(), "день"); got != "следующую неделю" {
 		t.Errorf("expected 'следующую неделю', got %q", got)
 	}
 }
 
 func TestGetDayPhrase_Other(t *testing.T) {
 	past := time.Now().AddDate(0, 0, -3).Format("02.01.2006")
-	if got := getDayPhrase(past, "день"); got != "день" {
+	if got := getDayPhrase(time.Now(), past, "день"); got != "день" {
 		t.Errorf("expected fallback phrase, got %q", got)
 	}
 }
 
 func TestGetDayPhrase_Invalid(t *testing.T) {
-	if got := getDayPhrase("not-a-date", "день"); got != "день" {
+	if got := getDayPhrase(time.Now(), "not-a-date", "день"); got != "день" {
 		t.Errorf("expected fallback phrase, got %q", got)
 	}
 }
@@ -212,7 +212,7 @@ func TestFutureDays(t *testing.T) {
 			map[string]any{"day": tomorrowStr(), "lessons": []any{map[string]any{"lesson": "X"}}},
 		},
 	}
-	future := futureDays(entry)
+	future := futureDays(time.Now(), entry)
 	if len(future) != 1 {
 		t.Fatalf("expected 1 future day, got %d", len(future))
 	}
@@ -227,7 +227,7 @@ func TestFutureDays_None(t *testing.T) {
 			map[string]any{"day": todayStr(), "lessons": []any{}},
 		},
 	}
-	if got := futureDays(entry); got != nil {
+	if got := futureDays(time.Now(), entry); got != nil {
 		t.Errorf("expected nil, got %v", got)
 	}
 }
@@ -239,7 +239,7 @@ func TestTodayDayOf(t *testing.T) {
 			map[string]any{"day": tomorrowStr(), "lessons": []any{map[string]any{"lesson": "C"}}},
 		},
 	}
-	day, maxLessons := todayDayOf(entry)
+	day, maxLessons := todayDayOf(time.Now(), entry)
 	if day == nil {
 		t.Fatal("expected today day found")
 	}
@@ -758,11 +758,6 @@ func TestNotificationTimeIsInterpretedInTheEvaluationZone(t *testing.T) {
 }
 
 func TestSchedulerBindsTheCronToTheProcessTimezone(t *testing.T) {
-	original := time.Local
-	minsk := time.FixedZone("Europe/Minsk", 3*60*60)
-	time.Local = minsk
-	t.Cleanup(func() { time.Local = original })
-
 	c, err := cache.New(t.TempDir())
 	if err != nil {
 		t.Fatalf("cache: %v", err)
@@ -772,7 +767,7 @@ func TestSchedulerBindsTheCronToTheProcessTimezone(t *testing.T) {
 
 	s := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, nil, nil)
 
-	if s.Location() != minsk {
+	if s.Location() != time.Local {
 		t.Errorf("the scheduler must follow the process zone, got %v", s.Location())
 	}
 }
