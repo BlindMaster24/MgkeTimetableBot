@@ -482,6 +482,16 @@ go test ./internal/telegram -update       # тексты сообщений и �
 go test ./internal/notification -update   # тексты уведомлений
 ```
 
+Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым:
+
+```bash
+go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
+go test -fuzz FuzzTeacherParserStaysStableAndClean -fuzztime 30s ./internal/parser/
+go test -fuzz FuzzWebhookHandlerKeepsStatusesSane -fuzztime 30s ./internal/telegram/
+```
+
+Найденный падающий вход Go сам сохраняет в `testdata/fuzz/<цель>/`, и он остаётся навсегда обычным сид-корпусом: дальше его гоняет любой `go test`. Так закрыты, например, разбор даты «24.09.2026» как времени звонка и пары, у которой конец раньше начала.
+
 ### Проверка перед запуском
 
 `scripts/preflight` — одна команда, которая проверяет всё, что должно быть в порядке до деплоя, и печатает отчёт с кодами выхода: `0` — всё хорошо, `1` — есть провал. Она разбирает **живой сайт** теми же парсерами, что и бот, и проверяет остальное окружение.

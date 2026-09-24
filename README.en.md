@@ -481,6 +481,16 @@ go test ./internal/telegram -update       # message texts and layouts
 go test ./internal/notification -update   # notification texts
 ```
 
+Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible:
+
+```bash
+go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
+go test -fuzz FuzzTeacherParserStaysStableAndClean -fuzztime 30s ./internal/parser/
+go test -fuzz FuzzWebhookHandlerKeepsStatusesSane -fuzztime 30s ./internal/telegram/
+```
+
+Every crashing input Go finds is written to `testdata/fuzz/<target>/` and stays there as a permanent seed corpus, so a plain `go test` keeps covering it — that is how reading `24.09.2026` as a bell time, or a pair ending before it starts, are now locked down.
+
 ### Pre-flight check
 
 `scripts/preflight` is a single command that verifies everything that must hold before a deploy and prints a report with exit codes: `0` — fine, `1` — something failed. It parses the **live site** with the very parsers the bot uses and checks the rest of the environment.

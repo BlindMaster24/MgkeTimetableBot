@@ -23,7 +23,17 @@ func setupE2EBot(t *testing.T, adminIDs ...int64) (*Bot, *Repository) {
 	return setupE2EBotWithCaller(t, stubCaller{}, adminIDs...)
 }
 
+const e2eBotToken = "123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
 func setupE2EBotWithCaller(t *testing.T, caller telegoapi.Caller, adminIDs ...int64) (*Bot, *Repository) {
+	t.Helper()
+
+	return setupE2EBotWithClient(t, func() (*telego.Bot, error) {
+		return telego.NewBot(e2eBotToken, telego.WithAPICaller(caller), telego.WithDiscardLogger())
+	}, adminIDs...)
+}
+
+func setupE2EBotWithClient(t *testing.T, newClient func() (*telego.Bot, error), adminIDs ...int64) (*Bot, *Repository) {
 	t.Helper()
 	cfg := &config.Config{}
 	cfg.Telegram.Token = "test:token"
@@ -88,7 +98,7 @@ func setupE2EBotWithCaller(t *testing.T, caller telegoapi.Caller, adminIDs ...in
 	}
 	raspCache.SetCalls(site, cache.Schedule{}, "site")
 
-	bClient, err := telego.NewBot("123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", telego.WithAPICaller(caller), telego.WithDiscardLogger())
+	bClient, err := newClient()
 	if err != nil {
 		t.Fatal(err)
 	}

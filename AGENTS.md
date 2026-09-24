@@ -165,6 +165,9 @@
 - Name tests `*_test.go` co-located with source files.
 - Keep tests deterministic and offline — no network/API calls.
 - Prefer pure-function tests for parser, cache, and utility functions.
+- HTTP-level bot tests talk real HTTP to a fake Telegram Bot API (`internal/telegram/fakeapi_test.go`) instead of stubbing the caller: use it for a transport change or a reply path.
+- Fuzz targets live in `internal/parser/fuzz_test.go` (seeded with the real page snapshots) and `internal/telegram/webhook_test.go`: `go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/`. A crasher is written to `testdata/fuzz/<target>/` and is kept as a permanent seed, so it runs on every plain `go test`.
+- Fix test-first: write the failing test, watch it fail for the right reason, then fix. A defect found by fuzzing keeps its corpus file as the regression test.
 - Use `httptest` for API handler tests.
 - If you add a new test file, list the exact `go test ./path/...` command in the PR description.
 

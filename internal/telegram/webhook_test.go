@@ -315,6 +315,40 @@ func TestWebhookSettingsComeFromTheEnvironment(t *testing.T) {
 	}
 }
 
+func FuzzWebhookHandlerKeepsStatusesSane(f *testing.F) {
+	f.Add("secret", "secret", `{"update_id":1}`)
+	f.Add("", "secret", `{}`)
+	f.Add("other", "secret", `not json`)
+	f.Add("secret", "", ``)
+
+	f.Fuzz(func(t *testing.T, header, secret, body string) {
+		handler := webhookHTTPHandler(func(_ context.Context, data []byte) error {
+			var update telego.Update
+			if err := json.Unmarshal(data, &update); err != nil {
+				return err
+			}
+			return nil
+		}, secret)
+
+		request := httptest.NewRequest(http.MethodPost, "/telegram/webhook", strings.NewReader(body))
+		if header != "" {
+			request.Header.Set(telego.WebhookSecretTokenHeader, header)
+		}
+		recorder := httptest.NewRecorder()
+		handler(recorder, request)
+
+		switch recorder.Code {
+		case http.StatusOK, http.StatusBadRequest, http.StatusUnauthorized, http.StatusInternalServerError, http.StatusRequestEntityTooLarge:
+		default:
+			t.Fatalf("unexpected status %d for header %q", recorder.Code, header)
+		}
+
+		if secret != "" && header != secret && recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("a foreign secret %q was accepted with status %d", header, recorder.Code)
+		}
+	})
+}
+
 func webhookUpdateJSON(t *testing.T, userID int64, text string) []byte {
 	t.Helper()
 
