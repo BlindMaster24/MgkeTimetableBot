@@ -21,10 +21,12 @@ type fakeAPIRequest struct {
 }
 
 type fakeTelegramAPI struct {
-	server  *httptest.Server
-	mu      sync.Mutex
-	calls   []fakeAPIRequest
-	updates []string
+	server      *httptest.Server
+	mu          sync.Mutex
+	calls       []fakeAPIRequest
+	updates     []string
+	webhookInfo string
+	infoFails   bool
 }
 
 func newFakeTelegramAPI(t *testing.T) *fakeTelegramAPI {
@@ -74,7 +76,20 @@ func (api *fakeTelegramAPI) handle(writer http.ResponseWriter, request *http.Req
 
 	switch method {
 	case "getWebhookInfo":
-		writeFakeResult(writer, `{"url":"","pending_update_count":0}`)
+		api.mu.Lock()
+		info, fails := api.webhookInfo, api.infoFails
+		api.mu.Unlock()
+
+		if fails {
+			writer.Header().Set("Content-Type", "application/json")
+			writer.WriteHeader(http.StatusBadGateway)
+			_, _ = fmt.Fprint(writer, `{"ok":false,"error_code":502,"description":"Bad Gateway"}`)
+			return
+		}
+		if info == "" {
+			info = `{"url":"","pending_update_count":0}`
+		}
+		writeFakeResult(writer, info)
 	case "setWebhook", "deleteWebhook", "setMyCommands", "answerCallbackQuery", "sendChatAction":
 		writeFakeResult(writer, "true")
 	default:
@@ -85,6 +100,20 @@ func (api *fakeTelegramAPI) handle(writer http.ResponseWriter, request *http.Req
 func writeFakeResult(writer http.ResponseWriter, result string) {
 	writer.Header().Set("Content-Type", "application/json")
 	_, _ = fmt.Fprintf(writer, `{"ok":true,"result":%s}`, result)
+}
+
+func (api *fakeTelegramAPI) setWebhookInfo(payload string) {
+	api.mu.Lock()
+	defer api.mu.Unlock()
+
+	api.webhookInfo = payload
+}
+
+func (api *fakeTelegramAPI) failWebhookInfo(fail bool) {
+	api.mu.Lock()
+	defer api.mu.Unlock()
+
+	api.infoFails = fail
 }
 
 func (api *fakeTelegramAPI) queueUpdate(update string) {
@@ -133,7 +162,14 @@ func (api *fakeTelegramAPI) waitForText(t *testing.T, method, needle string, tim
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("no %s call carried %q", method, needle)
+	api.mu.Lock()
+	var seen []string
+	for _, call := range api.calls {
+		seen = append(seen, fmt.Sprintf("%s=%v", call.Method, call.Body["text"]))
+	}
+	api.mu.Unlock()
+
+	t.Fatalf("no %s call carried %q, recorded: %v", method, needle, seen)
 	return nil
 }
 

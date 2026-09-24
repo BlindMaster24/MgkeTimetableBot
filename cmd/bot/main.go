@@ -192,6 +192,7 @@ func main() {
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)
 	calendarSyncEnabled := googleService.SyncEnabled()
+	apiServer.SetWebhookStatus(func(ctx context.Context) any { return bot.WebhookStatus(ctx) })
 	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(cfg, googleService, chatRepo, bot, log))
 
 	go func() {

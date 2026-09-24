@@ -274,13 +274,15 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/webhook`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits.
 
 `/parserhealth` prints a live parser health snapshot — state, run and error counts, the last success and failure, run duration, the layout problems and guard trips it found, the active alerts and the cache size — and can start a parse immediately instead of waiting for the next cycle.
 
 `/incidents` prints the history of parser, calendar and API incidents — what broke, when, how long it lasted, how it ended and what fixed it. On top it prints a live API slice: which endpoints answer 5xx, how often, with what error text and with what response time (slow ones are marked `🐌`), plus the most recent failures with their time — the same data the `api_errors` alert carries, so the message alone says where to look. The history lives in the chat database (`bot_state` table, `health.incidents` key) because the question "when did this start" is asked after a restart, and an in-memory list would have lost exactly that; the last 100 records are kept. A `⚠️` record is still open, `🔧` carries a recorded manual fix (for example the reparse button), `✅` recovered on its own; a manual fix shows up in the outcome right away, before the alert clears. When an open incident has a fix button, the command shows it under the message.
+
+`/webhook` shows an admin the update delivery state without digging into logs: the mode (long polling or webhook), the public address and the listening address, whether a secret is set, how many updates Telegram is holding back, whether it delivers anywhere at all (`getWebhookInfo`) and when the last delivery error happened, with its text. Under the message sits a `🔄 Переустановить webhook` button that registers the address and the secret again when delivery broke after a domain or certificate change. The same state is served by `GET /api/info` in the `webhook` block, so it can be wired into monitoring. When Telegram is unreachable the command says so honestly and still shows the last known state instead of an empty screen.
 
 API incidents also record what helped beyond "recovered on its own": at startup the bot compares the running build and a fingerprint of the config file with the ones the incident started under and writes "after a bot restart", "after a config edit" (with the short file fingerprint) or "after a new build was deployed" (with version, commit and date). The fingerprint is the first 8 characters of the config file's SHA-256, so no secrets enter the history. That tells "it healed by itself" apart from "a rollout, a settings change or a restart fixed it".
 
@@ -290,7 +292,7 @@ The server listens on `0.0.0.0:http.port`:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/info` | Service information, version and build metadata, plus the `groups`/`teachers`/`team` cache envelopes (`update`, `changed`, `hash`) and the `lastSuccess` flag — matching the old TS API |
+| GET | `/api/info` | Service information, version and build metadata, plus the `groups`/`teachers`/`team` cache envelopes (`update`, `changed`, `hash`) and the `lastSuccess` flag — matching the old TS API; a `webhook` block with the update delivery mode (address, pending updates, last delivery error) |
 | GET | `/api/groups` | Group list (numeric names sort first, ascending — as in the old API) |
 | GET | `/api/teachers` | Teacher list (same ordering) |
 | GET | `/api/group/:name` | Group timetable: `days` (each day carries `weekday`), `update`, `changed`, `lastSuccess`; an unknown name gets `404` |

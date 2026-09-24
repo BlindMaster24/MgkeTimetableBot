@@ -21,6 +21,7 @@
     { "section": "commands", "kind": "extra_in_go", "value": "setgroup", "reason": "TS keeps /setGroup in the deprecated folder without a Telegram command entry; the Go port keeps it as a working command" },
     { "section": "commands", "kind": "extra_in_go", "value": "setteacher", "reason": "TS keeps /setTeacher in the deprecated folder without a Telegram command entry; the Go port keeps it as a working command" },
     { "section": "commands", "kind": "extra_in_go", "value": "test", "reason": "Go port adds a test command rendering a sample timetable" },
+    { "section": "commands", "kind": "extra_in_go", "value": "webhook", "reason": "TS only ever used long polling, so it had no update transport to inspect; the Go port can serve updates over its own webhook and shows an admin its address, pending updates and the last delivery error, plus a button to re-register it" },
     { "section": "commands", "kind": "extra_in_go", "value": "indextostrdate", "reason": "the old bot keeps the day index converter as a regexp-only command without a Telegram menu entry (/indexToDate, /dayIndexToStrDate, ...); the Go port registers it as a hidden command with the same aliases and the same answer" },
     { "section": "commands", "kind": "extra_in_go", "value": "strtoindex", "reason": "the old bot keeps the date converter as a regexp-only command without a Telegram menu entry (/dateToIndex, /strDateToDayIndex, ...); the Go port registers it as a hidden command with the same aliases and the same answer" },
     { "section": "commands", "kind": "extra_in_go", "value": "trigger", "reason": "Go port keeps /trigger for the day notification run (NextDayUpdater) and adds a manual parser run through /forceparse; the day run is wired only while telegram.noticer is on, so with notifications disabled the command answers 'not found' instead of running the updater like TS always could" },
@@ -30,6 +31,7 @@
     { "section": "callbacks", "kind": "extra_in_go", "value": "parser", "reason": "Go parser alerts carry a manual reparse button; TS health notifications were text only" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "calendar", "reason": "Go calendar alerts carry a manual sync button; TS health notifications were text only" },
     { "section": "callbacks", "kind": "extra_in_go", "value": "api", "reason": "Go API alerts carry a live endpoint probe button; TS health notifications were text only" },
+    { "section": "callbacks", "kind": "extra_in_go", "value": "webhook", "reason": "the /webhook admin screen carries a button that re-registers the webhook; TS had no webhook mode at all" },
 
     { "section": "commands", "kind": "description_differs", "value": "archive", "reason": "the checker compares command names, not descriptions: the old bot describes /archive as 'Архив расписания за прощедшие дни' (typo), the Go port spells it 'прошедшие'" },
     { "section": "commands", "kind": "description_differs", "value": "teacher", "reason": "the checker compares command names, not descriptions: the old bot describes /teacher as 'Узнать расписаниена день указанного преподавателя' (missing space), the Go port spells it correctly" },
@@ -74,6 +76,7 @@
     { "section": "buttons", "kind": "extra_in_go", "value": "Источник: вручную", "reason": "Go-only calls source switcher (site/manual/config/auto) in the calls settings menu" },
     { "section": "buttons", "kind": "extra_in_go", "value": "Источник: конфиг", "reason": "Go-only calls source switcher (site/manual/config/auto) in the calls settings menu" },
     { "section": "buttons", "kind": "extra_in_go", "value": "Источник: сайт", "reason": "Go-only calls source switcher (site/manual/config/auto) in the calls settings menu" },
+    { "section": "buttons", "kind": "extra_in_go", "value": "🔄 Переустановить webhook", "reason": "the Go webhook status screen can re-register the webhook with Telegram in one tap; TS had no webhook mode" },
 
     { "section": "api", "kind": "differs", "value": "missing_name_404", "reason": "the old getGroup/getTeacher API methods answered 200 with {days: null} for an unknown name, the Go API answers 404 with an error body — the documented REST contract of the Go API, which apiprobe and API clients expect" },
     { "section": "api", "kind": "differs", "value": "array_envelope", "reason": "the old getGroups/getTeachers returned a bare JSON array, the Go API wraps it as {\"groups\": [...]} / {\"teachers\": [...]} — documented Go contract; the sort order inside matches the old sort()" },

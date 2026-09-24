@@ -50,35 +50,37 @@ type archiveStore interface {
 }
 
 type Bot struct {
-	client       *telego.Bot
-	cfg          *config.Config
-	log          *logger.Logger
-	i18n         *i18n.Localizer
-	chatRepo     *Repository
-	cache        *cache.RaspCache
-	cacheMu      sync.Mutex
-	commands     map[string]Command
-	commandOrder []Command
-	callbacks    map[string]Callback
-	parseFunc    func() error
-	startTime    time.Time
-	buildInfo    build.Info
-	archive      archiveStore
-	aliasRepo    *AliasRepository
-	parseLogs    []parseLogEntry
-	reportsMu    sync.Mutex
-	reports      map[string]parser.Report
-	textCommands []Command
-	scenes       []sceneRoute
-	google       googleService
-	googleSyncMu sync.Mutex
-	health       healthSource
-	keys         *apikey.Store
-	noticeDay    func(index int)
-	calendarSync func(ctx context.Context) (int, error)
-	apiProbe     func(ctx context.Context) []apiprobe.Result
-	incidents    *health.IncidentLog
-	now          func() time.Time
+	client        *telego.Bot
+	cfg           *config.Config
+	log           *logger.Logger
+	i18n          *i18n.Localizer
+	chatRepo      *Repository
+	cache         *cache.RaspCache
+	cacheMu       sync.Mutex
+	commands      map[string]Command
+	commandOrder  []Command
+	callbacks     map[string]Callback
+	parseFunc     func() error
+	startTime     time.Time
+	buildInfo     build.Info
+	archive       archiveStore
+	aliasRepo     *AliasRepository
+	parseLogs     []parseLogEntry
+	reportsMu     sync.Mutex
+	reports       map[string]parser.Report
+	textCommands  []Command
+	scenes        []sceneRoute
+	google        googleService
+	googleSyncMu  sync.Mutex
+	health        healthSource
+	keys          *apikey.Store
+	noticeDay     func(index int)
+	calendarSync  func(ctx context.Context) (int, error)
+	apiProbe      func(ctx context.Context) []apiprobe.Result
+	incidents     *health.IncidentLog
+	now           func() time.Time
+	webhookMu     sync.Mutex
+	webhookStatus WebhookStatus
 }
 
 type Update struct {
@@ -263,6 +265,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&restartCmd{bot: b})
 	b.RegisterCommand(&parserHealthCmd{bot: b})
 	b.RegisterCommand(&incidentsCmd{bot: b})
+	b.RegisterCommand(&webhookCmd{bot: b})
 
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
@@ -276,6 +279,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCallback(&reparseCb{bot: b})
 	b.RegisterCallback(&calendarSyncCb{bot: b})
 	b.RegisterCallback(&apiProbeCb{bot: b})
+	b.RegisterCallback(&webhookResetCb{bot: b})
 }
 
 func (b *Bot) Run(ctx context.Context) error {

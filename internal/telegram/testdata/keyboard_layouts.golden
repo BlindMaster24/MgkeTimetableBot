@@ -102,6 +102,8 @@
 🔄 Синхронизировать сейчас
 === apiAlertKeyboard ===
 🔌 Проверить API
+=== webhookStatusKeyboard ===
+🔄 Переустановить webhook
 === replyCallsSettings(admin) ===
 📊 Показать
 ✅ Обновить с сайта

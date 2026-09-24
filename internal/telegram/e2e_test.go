@@ -341,8 +341,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
 		"/indexToStrDate", "/strToIndex",
 		"/groupweek", "/groupimage", "/teacherweek", "/teacherimage",
-		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats",
-		"/noticedebug", "/parserhealth", "/incidents",
+		"/setgroup", "/setteacher", "/vychetkaDlyaBrovkiDSOnline", "/sql", "/restart", "/archivestats", "/noticedebug", "/parserhealth", "/incidents", "/webhook",
 	}
 	if len(b.commands) != len(expected) {
 		t.Errorf("expected %d commands, got %d", len(expected), len(b.commands))

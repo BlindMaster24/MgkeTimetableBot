@@ -19,6 +19,9 @@ import (
 )
 
 const (
+	webhookModeLongPolling = "long_polling"
+	webhookModeWebhook     = "webhook"
+
 	webhookDefaultListen         = "127.0.0.1:8082"
 	webhookDefaultPath           = "/telegram/webhook"
 	webhookDefaultMaxConnections = 40
@@ -161,6 +164,116 @@ func (s webhookSettings) setParams() (*telego.SetWebhookParams, func() error, er
 	return params, file.Close, nil
 }
 
+type WebhookStatus struct {
+	Enabled           bool     `json:"enabled"`
+	Mode              string   `json:"mode"`
+	Endpoint          string   `json:"endpoint,omitempty"`
+	Listen            string   `json:"listen,omitempty"`
+	Path              string   `json:"path,omitempty"`
+	SecretToken       bool     `json:"secretToken"`
+	Certificate       bool     `json:"certificate"`
+	MaxConnections    int      `json:"maxConnections,omitempty"`
+	AllowedUpdates    []string `json:"allowedUpdates,omitempty"`
+	URL               string   `json:"url,omitempty"`
+	PendingUpdates    int      `json:"pendingUpdates"`
+	CustomCertificate bool     `json:"customCertificate,omitempty"`
+	LastError         string   `json:"lastError,omitempty"`
+	LastErrorAt       int64    `json:"lastErrorAt,omitempty"`
+	InfoError         string   `json:"infoError,omitempty"`
+	CheckedAt         int64    `json:"checkedAt,omitempty"`
+}
+
+const webhookStatusTimeout = 3 * time.Second
+
+func (b *Bot) WebhookStatus(ctx context.Context) WebhookStatus {
+	status := WebhookStatus{
+		Enabled: b.cfg.Telegram.Webhook.Enabled,
+		Mode:    webhookModeLongPolling,
+	}
+
+	if status.Enabled {
+		status.Mode = webhookModeWebhook
+		if settings, err := webhookSettingsFrom(b.cfg); err == nil {
+			status.Endpoint = settings.Endpoint
+			status.Listen = settings.Listen
+			status.Path = settings.Path
+			status.MaxConnections = settings.MaxConnections
+			status.AllowedUpdates = settings.AllowedUpdates
+			status.SecretToken = settings.SecretToken != ""
+			status.Certificate = settings.Certificate != ""
+		} else {
+			status.InfoError = err.Error()
+		}
+	}
+
+	cached := b.cachedWebhookStatus()
+
+	checkCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), webhookStatusTimeout)
+	defer cancel()
+
+	info, err := b.client.GetWebhookInfo(checkCtx)
+	if err != nil {
+		status.URL = cached.URL
+		status.PendingUpdates = cached.PendingUpdates
+		status.CustomCertificate = cached.CustomCertificate
+		status.LastError = cached.LastError
+		status.LastErrorAt = cached.LastErrorAt
+		status.CheckedAt = cached.CheckedAt
+		if status.InfoError == "" {
+			status.InfoError = err.Error()
+		}
+		return status
+	}
+
+	status.URL = info.URL
+	status.PendingUpdates = info.PendingUpdateCount
+	status.CustomCertificate = info.HasCustomCertificate
+	status.LastError = info.LastErrorMessage
+	status.LastErrorAt = info.LastErrorDate
+	if len(info.AllowedUpdates) > 0 {
+		status.AllowedUpdates = info.AllowedUpdates
+	}
+	if info.MaxConnections > 0 {
+		status.MaxConnections = info.MaxConnections
+	}
+	status.CheckedAt = time.Now().Unix()
+
+	b.webhookMu.Lock()
+	b.webhookStatus = status
+	b.webhookMu.Unlock()
+
+	return status
+}
+
+func (b *Bot) cachedWebhookStatus() WebhookStatus {
+	b.webhookMu.Lock()
+	defer b.webhookMu.Unlock()
+
+	return b.webhookStatus
+}
+
+func (b *Bot) ResetWebhook(ctx context.Context) (WebhookStatus, error) {
+	if !b.cfg.Telegram.Webhook.Enabled {
+		return WebhookStatus{}, errors.New("telegram.webhook.enabled is off")
+	}
+
+	settings, err := webhookSettingsFrom(b.cfg)
+	if err != nil {
+		return WebhookStatus{}, err
+	}
+	params, closeCertificate, err := settings.setParams()
+	if err != nil {
+		return WebhookStatus{}, err
+	}
+	defer func() { _ = closeCertificate() }()
+
+	if err := b.client.SetWebhook(ctx, params); err != nil {
+		return WebhookStatus{}, err
+	}
+
+	return b.WebhookStatus(ctx), nil
+}
+
 func webhookHTTPHandler(handler telego.WebhookHandler, secretToken string) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
@@ -251,7 +364,7 @@ func (b *Bot) runWebhook(ctx context.Context) error {
 		return fmt.Errorf("start webhook: %w", err)
 	}
 
-	b.logWebhookInfo(ctx, settings)
+	b.logWebhookInfo(ctx)
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -284,24 +397,134 @@ func (b *Bot) runWebhook(ctx context.Context) error {
 	return b.consumeUpdates(ctx, updates)
 }
 
-func (b *Bot) logWebhookInfo(ctx context.Context, settings webhookSettings) {
-	logger := b.log.Info().
-		Str("endpoint", settings.Endpoint).
-		Str("listen", settings.Listen).
-		Int("max_connections", settings.MaxConnections).
-		Bool("custom_certificate", settings.Certificate != "").
-		Bool("secret_token", settings.SecretToken != "")
+const webhookResetCallback = "webhook:reset"
 
-	info, err := b.client.GetWebhookInfo(ctx)
-	if err != nil {
-		logger.Msg("bot started, listening for updates via webhook, webhook info unavailable")
+type webhookCmd struct{ bot *Bot }
+
+func (c *webhookCmd) Name() string { return "/webhook" }
+
+func (c *webhookCmd) AdminOnly() bool { return true }
+func (c *webhookCmd) Description() string {
+	return c.bot.loc("cmd_webhook")
+}
+func (c *webhookCmd) Handler(ctx context.Context, u *Update) error {
+	if !c.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+
+	status := c.bot.WebhookStatus(ctx)
+
+	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.webhookStatusText(status), c.bot.webhookStatusKeyboard())
+}
+
+func (b *Bot) webhookStatusKeyboard() *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{{Text: b.loc("webhook_reset_button"), CallbackData: webhookResetCallback}},
+		},
+	}
+}
+
+func (b *Bot) webhookStatusText(status WebhookStatus) string {
+	lines := []string{b.loc("webhook_header")}
+
+	if status.Enabled {
+		lines = append(lines, b.loc("webhook_mode_webhook"))
+		lines = append(lines, b.locData("webhook_endpoint", map[string]interface{}{"Endpoint": status.Endpoint}))
+		lines = append(lines, b.locData("webhook_listen", map[string]interface{}{"Listen": status.Listen}))
+	} else {
+		lines = append(lines, b.loc("webhook_mode_long_polling"))
+	}
+
+	if status.SecretToken {
+		lines = append(lines, b.loc("webhook_secret_set"))
+	} else if status.Enabled {
+		lines = append(lines, b.loc("webhook_secret_missing"))
+	}
+	if status.Certificate {
+		lines = append(lines, b.loc("webhook_certificate_set"))
+	}
+
+	if status.InfoError != "" {
+		lines = append(lines, b.locData("webhook_info_unavailable", map[string]interface{}{"Error": status.InfoError}))
+	} else {
+		lines = append(lines, b.locData("webhook_pending", map[string]interface{}{"Count": status.PendingUpdates}))
+		lines = append(lines, b.locData("webhook_delivered_to", map[string]interface{}{"URL": status.URL}))
+	}
+
+	if status.LastError != "" {
+		lines = append(lines, b.locData("webhook_last_error", map[string]interface{}{
+			"Error": status.LastError,
+			"At":    webhookMoment(status.LastErrorAt),
+		}))
+	} else if status.InfoError == "" {
+		lines = append(lines, b.loc("webhook_no_error"))
+	}
+
+	if status.MaxConnections > 0 {
+		lines = append(lines, b.locData("webhook_connections", map[string]interface{}{"Count": status.MaxConnections}))
+	}
+	if len(status.AllowedUpdates) > 0 {
+		lines = append(lines, b.locData("webhook_updates", map[string]interface{}{"List": strings.Join(status.AllowedUpdates, ", ")}))
+	}
+
+	if !status.Enabled {
+		lines = append(lines, "", b.loc("webhook_disabled_hint"))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func webhookMoment(at int64) string {
+	if at <= 0 {
+		return ""
+	}
+	return time.Unix(at, 0).Format("02.01 15:04")
+}
+
+type webhookResetCb struct{ bot *Bot }
+
+func (cb *webhookResetCb) Prefix() string { return "webhook" }
+
+func (cb *webhookResetCb) Handler(ctx context.Context, u *Update) error {
+	if u.Callback != nil {
+		cb.bot.AnswerCallback(u.Callback.ID, "")
+	}
+	if !cb.bot.isAdmin(u.UserID) {
+		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+	}
+	if u.Data != webhookResetCallback {
+		return nil
+	}
+
+	if _, err := cb.bot.ResetWebhook(ctx); err != nil {
+		cb.bot.log.Error().Err(err).Msg("manual webhook reset failed")
+		return u.Bot.SendText(u.ChatID, cb.bot.locData("webhook_reset_failed", map[string]interface{}{"Error": err.Error()}))
+	}
+
+	status := cb.bot.WebhookStatus(ctx)
+	return u.Bot.SendText(u.ChatID, cb.bot.locData("webhook_reset_done", map[string]interface{}{"Endpoint": status.Endpoint}))
+}
+
+func (b *Bot) logWebhookInfo(ctx context.Context) {
+	status := b.WebhookStatus(ctx)
+
+	logger := b.log.Info().
+		Str("endpoint", status.Endpoint).
+		Str("listen", status.Listen).
+		Int("max_connections", status.MaxConnections).
+		Bool("custom_certificate", status.Certificate).
+		Bool("secret_token", status.SecretToken)
+
+	if status.InfoError != "" {
+		logger.Str("info_error", status.InfoError).Msg("bot started, listening for updates via webhook, webhook info unavailable")
 		return
 	}
 
 	logger.
-		Int("pending_updates", info.PendingUpdateCount).
-		Str("webhook_url", info.URL).
-		Strs("allowed_updates", info.AllowedUpdates).
-		Str("last_error", info.LastErrorMessage).
+		Int("pending_updates", status.PendingUpdates).
+		Str("webhook_url", status.URL).
+		Strs("allowed_updates", status.AllowedUpdates).
+		Str("last_error", status.LastError).
 		Msg("bot started, listening for updates via webhook")
 }

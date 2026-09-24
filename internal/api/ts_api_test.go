@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -59,6 +60,42 @@ func TestInfoCarriesTSCacheEnvelope(t *testing.T) {
 
 	if body["lastSuccess"] != true {
 		t.Errorf("lastSuccess = %v", body["lastSuccess"])
+	}
+}
+
+func TestInfoCarriesTheWebhookStatusWhenWired(t *testing.T) {
+	srv := setupTestServer(t)
+
+	if body := decodeBody(t, call(t, srv, "GET", "/api/info")); body["webhook"] != nil {
+		t.Fatalf("webhook must be absent while it is not wired: %v", body["webhook"])
+	}
+
+	srv.SetWebhookStatus(func(_ context.Context) any {
+		return map[string]any{
+			"enabled":        true,
+			"mode":           "webhook",
+			"endpoint":       "https://mgke.example.com/telegram/webhook",
+			"pendingUpdates": 7,
+			"lastError":      "Wrong response from the webhook: 500 Internal Server Error",
+		}
+	})
+
+	body := decodeBody(t, call(t, srv, "GET", "/api/info"))
+	webhook, ok := body["webhook"].(map[string]any)
+	if !ok {
+		t.Fatalf("webhook block missing: %v", body)
+	}
+	for key, want := range map[string]any{
+		"mode":           "webhook",
+		"endpoint":       "https://mgke.example.com/telegram/webhook",
+		"pendingUpdates": float64(7),
+	} {
+		if webhook[key] != want {
+			t.Errorf("webhook.%s = %v, want %v", key, webhook[key], want)
+		}
+	}
+	if webhook["lastError"] == "" || webhook["lastError"] == nil {
+		t.Errorf("webhook.lastError = %v", webhook["lastError"])
 	}
 }
 

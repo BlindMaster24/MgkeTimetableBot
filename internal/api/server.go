@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -32,6 +33,7 @@ type Server struct {
 	loc      *i18n.Localizer
 	public   map[string]bool
 	publicMu sync.RWMutex
+	webhook  func(ctx context.Context) any
 }
 
 func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info, keys *apikey.Store, loc *i18n.Localizer) *Server {
@@ -204,8 +206,12 @@ func (s *Server) Handler() http.Handler {
 	return s.engine
 }
 
+func (s *Server) SetWebhookStatus(status func(ctx context.Context) any) {
+	s.webhook = status
+}
+
 func (s *Server) handleInfo(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	info := gin.H{
 		"name":        "MgkeTimetableBot API",
 		"version":     "2.0",
 		"build":       s.build,
@@ -213,7 +219,13 @@ func (s *Server) handleInfo(c *gin.Context) {
 		"teachers":    s.cache.GetTeachersMeta(),
 		"team":        s.cache.GetTeamMeta(),
 		"lastSuccess": s.cache.LastSuccess(),
-	})
+	}
+
+	if s.webhook != nil {
+		info["webhook"] = s.webhook(c.Request.Context())
+	}
+
+	c.JSON(http.StatusOK, info)
 }
 
 func (s *Server) handleGroups(c *gin.Context) {
