@@ -1,0 +1,16 @@
+{
+  "update_id": 2,
+  "callback_query": {
+    "id": "ci-callback-1",
+    "from": {"id": 424242, "is_bot": false, "first_name": "CI"},
+    "message": {
+      "message_id": 909090,
+      "date": 1758000000,
+      "chat": {"id": 424242, "type": "private"},
+      "from": {"id": 123456789, "is_bot": true, "first_name": "Stub", "username": "ci_stub_bot"},
+      "text": "calls"
+    },
+    "chat_instance": "ci-instance",
+    "data": "calls_full"
+  }
+}

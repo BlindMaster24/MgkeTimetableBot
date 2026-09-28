@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -418,6 +420,91 @@ func TestBotOverRealHTTPWebhookTransportStopsWithTheContext(t *testing.T) {
 	if connection, err := net.DialTimeout("tcp", address, time.Second); err == nil {
 		connection.Close()
 		t.Error("the webhook listener is still open after the shutdown finished")
+	}
+}
+
+const webhookCallbackPayloadPath = "testdata/webhook_callback_query.json"
+
+func TestWebhookDeliversACallbackQueryToTheInlineEditPath(t *testing.T) {
+	const userID = int64(424242)
+
+	payload, err := os.ReadFile(webhookCallbackPayloadPath)
+	if err != nil {
+		t.Fatalf("read the callback payload the container job also posts: %v", err)
+	}
+
+	api := newFakeTelegramAPI(t)
+	b, repo := setupE2EBotWithFakeAPI(t, api, 999)
+	repo.SetDefaultAccepted(true)
+
+	if _, err := repo.FindOrCreate("telegram", userID); err != nil {
+		t.Fatal(err)
+	}
+
+	address := freeLoopbackAddress(t)
+	b.cfg.Telegram.Webhook.Enabled = true
+	b.cfg.Telegram.Webhook.URL = "https://mgke.example.com"
+	b.cfg.Telegram.Webhook.SecretToken = "webhook-secret"
+	b.cfg.Telegram.Webhook.Listen = address
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- b.Run(ctx) }()
+	api.waitFor(t, "setWebhook", 5*time.Second)
+
+	post := func() int {
+		request, err := http.NewRequest(http.MethodPost, "http://"+address+webhookDefaultPath, bytes.NewReader(payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set(telego.WebhookSecretTokenHeader, "webhook-secret")
+
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			return 0
+		}
+		defer response.Body.Close()
+		_, _ = io.Copy(io.Discard, response.Body)
+
+		return response.StatusCode
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		status := post()
+		if status == http.StatusOK {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the webhook answered %d for the signed callback query, want 200", status)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	edit := api.waitFor(t, "editMessageText", 5*time.Second)
+	if got := fmt.Sprint(edit.Body["message_id"]); got != "909090" {
+		t.Errorf("the callback edited message %s, want the message id the update carried", got)
+	}
+	if got := fmt.Sprint(edit.Body["chat_id"]); got != "424242" {
+		t.Errorf("the edit went to chat %s, want the chat of the update", got)
+	}
+
+	answered := api.waitFor(t, "answerCallbackQuery", 5*time.Second)
+	if answered.Body["callback_query_id"] != "ci-callback-1" {
+		t.Errorf("answered callback query %v, want the id of the update", answered.Body["callback_query_id"])
+	}
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("the webhook transport stopped with an error: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the bot did not stop after the context was cancelled")
 	}
 }
 

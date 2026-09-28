@@ -108,6 +108,8 @@ func resultFor(method string, body map[string]any, webhook string) any {
 		return map[string]any{"url": webhook, "pending_update_count": 0, "max_connections": 40}
 	case "getUpdates":
 		return []any{}
+	case "answerCallbackQuery":
+		return true
 	case "sendMessage", "editMessageText", "copyMessage", "sendPhoto", "sendDocument", "sendVideo":
 		return messageResult(body)
 	default:
@@ -126,8 +128,13 @@ func messageResult(body map[string]any) map[string]any {
 		text = ""
 	}
 
+	messageID := any(1)
+	if number, ok := body["message_id"].(float64); ok {
+		messageID = int64(number)
+	}
+
 	return map[string]any{
-		"message_id": 1,
+		"message_id": messageID,
 		"date":       time.Now().Unix(),
 		"chat":       map[string]any{"id": chatID, "type": "private"},
 		"text":       text,

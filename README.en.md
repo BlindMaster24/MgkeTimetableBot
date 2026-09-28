@@ -161,7 +161,7 @@ telegram:
 - when switching back to long polling the bot deletes the webhook first (`deleteWebhook`) — otherwise Telegram answers `409 Conflict` to `getUpdates`;
 - ready-to-run examples with an automatic certificate live in the repository: `docker-compose.webhook.yml` with Caddy and `docker-compose.webhook-nginx.yml` with nginx and certbot (see “Docker deployment”).
 
-Separately from the webhook, `telegram.api_base_url` points the bot at another Bot API server (a local bot-api, a proxy or a stub): an empty value keeps the official `https://api.telegram.org`, and a configured address must be `http`/`https` with a host — otherwise the bot refuses to start with a clear error. The container smoke test in CI uses exactly that: it starts a stub Bot API (`scripts/tgstub`), checks the webhook registration, the `405`/`401`/`200` statuses on the live socket and the reply of the bot through `sendMessage`.
+Separately from the webhook, `telegram.api_base_url` points the bot at another Bot API server (a local bot-api, a proxy or a stub): an empty value keeps the official `https://api.telegram.org`, and a configured address must be `http`/`https` with a host — otherwise the bot refuses to start with a clear error. The container smoke test in CI uses exactly that: it starts a stub Bot API (`scripts/tgstub`), checks the webhook registration, the `405`/`401`/`200` statuses on the live socket, the reply of the bot through `sendMessage` and then delivers a signed `callback_query` that must come back as an `answerCallbackQuery` plus an `editMessageText` of the message id the update carried.
 
 ### Environment variables
 
@@ -545,7 +545,7 @@ go test ./internal/telegram -update       # message texts and layouts
 go test ./internal/notification -update   # notification texts
 ```
 
-Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The `container` CI job runs the image itself in webhook mode against the standalone stub Bot API in `internal/tgstub` (binary: `scripts/tgstub`), which records the calls the bot makes and answers them like Telegram would. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible:
+Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The `container` CI job runs the image itself in webhook mode against the standalone stub Bot API in `internal/tgstub` (binary: `scripts/tgstub`), which records the calls the bot makes and answers them like Telegram would. The inline button path is covered over the same HTTP: `TestWebhookDeliversACallbackQueryToTheInlineEditPath` posts the signed `callback_query` from `internal/telegram/testdata/webhook_callback_query.json` — the very file the `container` job posts — into a live `Bot.Run` socket and fails if the bot edited a message other than the one the update pointed at. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible:
 
 ```bash
 go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/

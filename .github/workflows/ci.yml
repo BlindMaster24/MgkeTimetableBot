@@ -409,6 +409,33 @@ jobs:
           docker logs mgke-webhook >&2 || true
           exit 1
 
+      - name: Deliver a callback query through the webhook
+        run: |
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'X-Telegram-Bot-Api-Secret-Token: ci-webhook-secret' \
+            -H 'Content-Type: application/json' \
+            --data @internal/telegram/testdata/webhook_callback_query.json \
+            http://127.0.0.1:8082/telegram/webhook)"
+          if [ "$code" != "200" ]; then
+            echo "the signed callback query answered $code, want 200" >&2
+            docker logs mgke-webhook >&2 || true
+            exit 1
+          fi
+
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:18090/_stub/calls > /tmp/webhook-calls.json \
+              && jq -e '[.calls[] | select(.method == "answerCallbackQuery" and (.body.callback_query_id == "ci-callback-1"))] | length > 0' /tmp/webhook-calls.json > /dev/null \
+              && jq -e '[.calls[] | select(.method == "editMessageText" and (.body.chat_id == 424242) and (.body.message_id == 909090))] | length > 0' /tmp/webhook-calls.json > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the bot never edited the message the callback query pointed at" >&2
+          docker logs mgke-webhook >&2 || true
+          cat /tmp/webhook-calls.json >&2 || true
+          exit 1
+
       - name: Show the webhook container logs
         if: failure()
         run: docker logs mgke-webhook || true

@@ -120,6 +120,60 @@ func TestStubServesTheBotAPIAOverHTTP(t *testing.T) {
 	}
 }
 
+func TestStubEchoesTheEditedMessageIDAndAnswersCallbacks(t *testing.T) {
+	_, server := startStub(t)
+
+	client, err := telego.NewBot(stubToken, telego.WithAPIServer(server.URL), telego.WithDiscardLogger())
+	if err != nil {
+		t.Fatalf("create bot: %v", err)
+	}
+
+	ctx := context.Background()
+	edit := &telego.EditMessageTextParams{
+		ChatID:    telego.ChatID{ID: stubChatID},
+		MessageID: 909090,
+		Text:      "calls",
+	}
+	edited, err := client.EditMessageText(ctx, edit)
+	if err != nil {
+		t.Fatalf("editMessageText: %v", err)
+	}
+	if edited.MessageID != edit.MessageID {
+		t.Errorf("reply message id = %d, want the edited id %d", edited.MessageID, edit.MessageID)
+	}
+	if edited.Chat.ID != stubChatID {
+		t.Errorf("reply chat id = %d, want %d", edited.Chat.ID, stubChatID)
+	}
+
+	if err := client.AnswerCallbackQuery(ctx, &telego.AnswerCallbackQueryParams{CallbackQueryID: "ci-callback-1"}); err != nil {
+		t.Fatalf("answerCallbackQuery: %v", err)
+	}
+
+	edits := callsOf(t, server, "editMessageText")
+	if len(edits) != 1 {
+		t.Fatalf("recorded %d editMessageText calls, want 1", len(edits))
+	}
+	if edits[0].Body["message_id"] != float64(909090) {
+		t.Errorf("recorded message_id = %v, want the id of the edited message", edits[0].Body["message_id"])
+	}
+
+	answers := callsOf(t, server, "answerCallbackQuery")
+	if len(answers) != 1 {
+		t.Fatalf("recorded %d answerCallbackQuery calls, want 1", len(answers))
+	}
+	if answers[0].Body["callback_query_id"] != "ci-callback-1" {
+		t.Errorf("recorded callback_query_id = %v", answers[0].Body["callback_query_id"])
+	}
+
+	sent, err := client.SendMessage(ctx, &telego.SendMessageParams{ChatID: telego.ChatID{ID: stubChatID}, Text: "ci"})
+	if err != nil {
+		t.Fatalf("sendMessage: %v", err)
+	}
+	if sent.MessageID != 1 {
+		t.Errorf("a fresh message id = %d, want the default 1", sent.MessageID)
+	}
+}
+
 func TestStubForgetsTheWebhookWhenItIsDeleted(t *testing.T) {
 	stub, server := startStub(t)
 

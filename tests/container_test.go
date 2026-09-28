@@ -93,10 +93,22 @@ func TestContainerSmokeTestRunsTheWebhookTransport(t *testing.T) {
 		"scripts/tgstub",
 		"setWebhook",
 		"sendMessage",
+		"answerCallbackQuery",
+		"editMessageText",
+		"testdata/webhook_callback_query.json",
 	} {
 		if !strings.Contains(workflow, token) {
 			t.Errorf("the container job must also run the webhook transport, missing %q", token)
 		}
+	}
+
+	if !strings.Contains(workflow, "(.body.message_id == 909090)") {
+		t.Error("the container job must prove the inline button edited the message id carried by the update, not a stored one")
+	}
+
+	payload := readFile(t, filepath.Join("internal", "telegram", "testdata", "webhook_callback_query.json"))
+	if !strings.Contains(payload, "\"message_id\": 909090") {
+		t.Error("the callback payload the container job posts must carry the message id the job waits for")
 	}
 
 	if strings.Count(workflow, "docker stop --time") < 2 {

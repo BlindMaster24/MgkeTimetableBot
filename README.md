@@ -185,7 +185,7 @@ telegram:
 - все ключи переопределяются переменными окружения, включая списки через запятую;
 - готовые примеры с автоматическим сертификатом лежат в репозитории: `docker-compose.webhook.yml` с Caddy и `docker-compose.webhook-nginx.yml` с nginx и certbot (см. «Развёртывание в Docker»).
 
-Отдельно от webhook, `telegram.api_base_url` переводит бота на другой сервер Bot API (локальный bot-api, прокси или заглушка): пустое значение оставляет официальный `https://api.telegram.org`, а указанный адрес обязан быть `http`/`https` с хостом — иначе бот не стартует и пишет понятную ошибку. Этим пользуется smoke-тест контейнера в CI: он поднимает заглушку Bot API (`scripts/tgstub`), проверяет регистрацию webhook, коды `405`/`401`/`200` на живом сокете и ответ бота через `sendMessage`.
+Отдельно от webhook, `telegram.api_base_url` переводит бота на другой сервер Bot API (локальный bot-api, прокси или заглушка): пустое значение оставляет официальный `https://api.telegram.org`, а указанный адрес обязан быть `http`/`https` с хостом — иначе бот не стартует и пишет понятную ошибку. Этим пользуется smoke-тест контейнера в CI: он поднимает заглушку Bot API (`scripts/tgstub`), проверяет регистрацию webhook, коды `405`/`401`/`200` на живом сокете, ответ бота через `sendMessage`, а затем доставляет подписанный `callback_query` и ждёт `answerCallbackQuery` вместе с `editMessageText` того сообщения, чей id пришёл в апдейте.
 
 ### Парсер
 
@@ -547,7 +547,7 @@ go test ./internal/telegram -update       # тексты сообщений и �
 go test ./internal/notification -update   # тексты уведомлений
 ```
 
-Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Джоба `container` в CI запускает сам образ в режиме webhook против отдельной заглушки Bot API (`internal/tgstub`, бинарник `scripts/tgstub`), которая записывает вызовы бота и отвечает так же, как Telegram. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым:
+Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Джоба `container` в CI запускает сам образ в режиме webhook против отдельной заглушки Bot API (`internal/tgstub`, бинарник `scripts/tgstub`), которая записывает вызовы бота и отвечает так же, как Telegram. Путь инлайн-кнопки проверяется на том же HTTP: `TestWebhookDeliversACallbackQueryToTheInlineEditPath` доставляет подписанный `callback_query` из `internal/telegram/testdata/webhook_callback_query.json` — тот же файл отправляет и джоба `container` — в живой сокет `Bot.Run` и падает, если бот отредактировал не то сообщение, которое пришло в апдейте. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым:
 
 ```bash
 go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
