@@ -16,6 +16,7 @@ http:
 
 telegram:
   token: ""
+  api_base_url: ""
   admin_ids: [804594266]
   noticer: true
   webhook:

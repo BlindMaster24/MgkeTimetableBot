@@ -117,7 +117,7 @@ go version   # ожидается go1.27.1 или новее
 | `cache_dir` | Каталог файлового кэша расписания (по умолчанию `./cache/rasp`) |
 | `logging` | Уровень, файл лога, параметры ротации |
 | `http` | Порт HTTP-сервера (API и Google OAuth) |
-| `telegram` | Токен бота, ID администраторов, флаг `noticer`, режим получения обновлений (`telegram.webhook`) |
+| `telegram` | Токен бота, адрес Bot API (`telegram.api_base_url`), ID администраторов, флаг `noticer`, режим получения обновлений (`telegram.webhook`) |
 | `api` | Базовый путь REST API |
 | `google` | OAuth-клиент и service account для Google Calendar |
 | `calendar.ics.enabled` | Включить экспорт ICS и кнопку в меню |
@@ -159,6 +159,7 @@ MGKE_TELEGRAM_ADMIN_IDS=1,2,3 \
 
 ```yaml
 telegram:
+  api_base_url: ""                   # MGKE_TELEGRAM_API_BASE_URL, по умолчанию https://api.telegram.org
   webhook:
     enabled: true                    # MGKE_TELEGRAM_WEBHOOK_ENABLED
     url: "https://bot.example.com"   # публичный HTTPS-адрес: к нему добавится path
@@ -183,6 +184,8 @@ telegram:
 - при переключении обратно на long polling бот сначала снимает webhook (`deleteWebhook`) — иначе Telegram отвечает `409 Conflict` на `getUpdates`;
 - все ключи переопределяются переменными окружения, включая списки через запятую;
 - готовые примеры с автоматическим сертификатом лежат в репозитории: `docker-compose.webhook.yml` с Caddy и `docker-compose.webhook-nginx.yml` с nginx и certbot (см. «Развёртывание в Docker»).
+
+Отдельно от webhook, `telegram.api_base_url` переводит бота на другой сервер Bot API (локальный bot-api, прокси или заглушка): пустое значение оставляет официальный `https://api.telegram.org`, а указанный адрес обязан быть `http`/`https` с хостом — иначе бот не стартует и пишет понятную ошибку. Этим пользуется smoke-тест контейнера в CI: он поднимает заглушку Bot API (`scripts/tgstub`), проверяет регистрацию webhook, коды `405`/`401`/`200` на живом сокете и ответ бота через `sendMessage`.
 
 ### Парсер
 
@@ -544,7 +547,7 @@ go test ./internal/telegram -update       # тексты сообщений и �
 go test ./internal/notification -update   # тексты уведомлений
 ```
 
-Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым:
+Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Джоба `container` в CI запускает сам образ в режиме webhook против отдельной заглушки Bot API (`internal/tgstub`, бинарник `scripts/tgstub`), которая записывает вызовы бота и отвечает так же, как Telegram. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым:
 
 ```bash
 go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
@@ -574,6 +577,7 @@ go run ./scripts/preflight -groups-url http://localhost:8080/groups   # подм
 | `config` | обязательные ключи: токен бота, адреса групп, преподавателей и звонков, `db_path`, `http.port`; предупреждения — пустые `admin_ids`, выключенный парсер или здоровье |
 | `credentials` | форма токена Telegram, разбор приватного ключа Google service account (PEM, PKCS#1/PKCS#8/EC, `Validate`), полнота пары OAuth, пустой `encrypt_key` |
 | `webhook` | режим доставки обновлений: при `telegram.webhook.enabled` адрес обязан быть `https`, секрет — только `A-Z a-z 0-9 _ -`, сертификат и ключ — вместе; без секрета — предупреждение; в long polling проверка пропускается |
+| `telegram-api` | адрес Bot API из `telegram.api_base_url`: без него — официальный `https://api.telegram.org`, с ним — обязан быть `http`/`https` с хостом, а сам факт подмены даёт предупреждение (чтобы заглушка не уехала в прод незамеченной) |
 | `locale` | `locales/ru.json` корректен, без пустых значений, и **каждый** ключ `loc(...)`/`locData(...)` из кода в нём есть |
 | `storage` | запись в каталоги базы, чатов и кэша (создаёт недостающие каталоги) |
 | `timetable` | слоты звонков из конфига: начало раньше конца, пары не пересекаются |
@@ -650,7 +654,8 @@ internal/
   notification/          — планировщик и события уведомлений
   parity/                — компаратор поверхностей TS ↔ Go
   parser/                — парсер расписания (группы, преподаватели, звонки, диагностика)
-  preflight/             — предстартовая проверка: конфиг, ключи, webhook, локаль, сайт, картинка
+  preflight/             — предстартовая проверка: конфиг, ключи, webhook, Bot API, локаль, сайт, картинка
+  tgstub/                — заглушка Telegram Bot API для smoke-теста контейнера: пишет вызовы бота, отвечает как Telegram
   testgolden/            — нормализация golden-текстов (только для тестов)
   telegram/              — telego: команды, колбэки, меню, клавиатуры, сцены
     bot.go               — регистрация команд, колбэков, текстовых обработчиков и меню
@@ -686,6 +691,7 @@ docs/google-calendar.md     — инструкция по Google Calendar
 scripts/paritycheck/        — чекер паритета с TS-ботом
 scripts/preflight/          — предстартовая проверка перед деплоем
 scripts/racecheck/          — прогон набора под детектором гонок
+scripts/tgstub/             — заглушка Bot API, которую запускает smoke-тест контейнера
 tests/                      — интеграционные и сквозные тесты (парсер, кэш, архив, уведомления, доки)
 cache/rasp/                 — JSON-кэш расписания (создаётся в рантайме)
 ```

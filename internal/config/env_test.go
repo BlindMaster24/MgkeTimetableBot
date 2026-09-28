@@ -58,6 +58,7 @@ func TestEnvOverridesFileValues(t *testing.T) {
 		"TG_TOKEN": "legacy-token",
 
 		"MGKE_TELEGRAM_ADMIN_IDS":     "7,8,9",
+		"MGKE_TELEGRAM_API_BASE_URL":  "http://127.0.0.1:18090",
 		"MGKE_TELEGRAM_NOTICER":       "yes",
 		"MGKE_GOOGLE_OAUTH_CLIENT_ID": "env-client", "MGKE_PARSER_ENABLED": "on",
 		"MGKE_PARSER_ACTIVITY":          "8,20",
@@ -92,6 +93,9 @@ func TestEnvOverridesFileValues(t *testing.T) {
 	}
 	if !cfg.Telegram.Noticer {
 		t.Error("MGKE_TELEGRAM_NOTICER should turn the noticer on")
+	}
+	if cfg.Telegram.APIBaseURL != "http://127.0.0.1:18090" {
+		t.Errorf("telegram api base url = %q", cfg.Telegram.APIBaseURL)
 	}
 	if cfg.Google.OAuth.ClientID != "env-client" {
 		t.Errorf("google client id = %q", cfg.Google.OAuth.ClientID)
@@ -267,6 +271,7 @@ func TestEnvNamesCoverEveryLeaf(t *testing.T) {
 	for _, expected := range []string{
 		"MGKE_HTTP_PORT",
 		"MGKE_TELEGRAM_TOKEN",
+		"MGKE_TELEGRAM_API_BASE_URL",
 		"MGKE_PARSER_ENABLED",
 		"MGKE_PARSER_ENDPOINTS_BELL_SCHEDULE",
 		"MGKE_HEALTH_PARSER_STALE_MINUTES",

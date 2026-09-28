@@ -179,6 +179,55 @@ func TestLoadConfigWithoutHealthSection(t *testing.T) {
 	}
 }
 
+func TestTelegramAPIServerDefaultsToTheOfficialOne(t *testing.T) {
+	server, err := (&Config{}).TelegramAPIServer()
+	if err != nil {
+		t.Fatalf("an empty api base url must keep the Telegram default: %v", err)
+	}
+	if server != "" {
+		t.Errorf("api server = %q, want it empty so telego keeps api.telegram.org", server)
+	}
+}
+
+func TestTelegramAPIServerAcceptsOverrides(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"plain", "http://127.0.0.1:18090", "http://127.0.0.1:18090"},
+		{"trailing slash", "https://api.example.test/", "https://api.example.test"},
+		{"padded", "  https://api.example.test  ", "https://api.example.test"},
+		{"with a path", "http://127.0.0.1:18090/api", "http://127.0.0.1:18090/api"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			cfg := &Config{}
+			cfg.Telegram.APIBaseURL = testCase.raw
+
+			server, err := cfg.TelegramAPIServer()
+			if err != nil {
+				t.Fatalf("resolve %q: %v", testCase.raw, err)
+			}
+			if server != testCase.want {
+				t.Errorf("api server = %q, want %q", server, testCase.want)
+			}
+		})
+	}
+}
+
+func TestTelegramAPIServerRejectsBrokenOverrides(t *testing.T) {
+	for _, raw := range []string{"api.example.test", "ftp://api.example.test", "http://", "http://[::1", "://broken"} {
+		cfg := &Config{}
+		cfg.Telegram.APIBaseURL = raw
+
+		if server, err := cfg.TelegramAPIServer(); err == nil {
+			t.Errorf("api base url %q resolved to %q, want an error", raw, server)
+		}
+	}
+}
+
 func TestLoadConfigMissing(t *testing.T) {
 	_, err := Load("/nonexistent/config.yaml")
 	if err == nil {

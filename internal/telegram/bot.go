@@ -123,7 +123,17 @@ type healthSource interface {
 }
 
 func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archiveRepo archiveStore) (*Bot, error) {
-	client, err := telego.NewBot(cfg.Telegram.Token, telego.WithDefaultDebugLogger())
+	apiServer, err := cfg.TelegramAPIServer()
+	if err != nil {
+		return nil, err
+	}
+
+	options := []telego.BotOption{telego.WithDefaultDebugLogger()}
+	if apiServer != "" {
+		options = append(options, telego.WithAPIServer(apiServer))
+	}
+
+	client, err := telego.NewBot(cfg.Telegram.Token, options...)
 	if err != nil {
 		return nil, fmt.Errorf("create bot: %w", err)
 	}

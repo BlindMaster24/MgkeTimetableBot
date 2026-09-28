@@ -616,6 +616,53 @@ func TestRun_AcceptsACompleteWebhookConfiguration(t *testing.T) {
 	}
 }
 
+func telegramAPICheck(t *testing.T, baseURL string) Check {
+	t.Helper()
+
+	site := startSite(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)))
+	path := siteConfig(t, site)
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := fmt.Sprintf("  api_base_url: %q\n", baseURL)
+	patched := strings.Replace(string(body), "  admin_ids: [1]\n", block+"  admin_ids: [1]\n", 1)
+	if err := os.WriteFile(path, []byte(patched), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	report := Run(Options{ConfigPath: path, SkipSite: true, SkipImage: true})
+	return findCheck(t, report, "telegram-api")
+}
+
+func TestRun_AcceptsTheOfficialBotAPI(t *testing.T) {
+	check := telegramAPICheck(t, "")
+	if check.Level != LevelOK {
+		t.Fatalf("expected a pass, got %s: %s %v", check.Level, check.Detail, check.Hints)
+	}
+}
+
+func TestRun_WarnsAboutACustomBotAPI(t *testing.T) {
+	check := telegramAPICheck(t, "http://127.0.0.1:18090")
+	if check.Level != LevelWarn {
+		t.Fatalf("expected a warning, got %s: %s", check.Level, check.Detail)
+	}
+	if !strings.Contains(check.Detail, "127.0.0.1:18090") {
+		t.Errorf("expected the configured address in the detail: %q", check.Detail)
+	}
+}
+
+func TestRun_FailsOnABrokenBotAPI(t *testing.T) {
+	check := telegramAPICheck(t, "api.example.com")
+	if check.Level != LevelFail {
+		t.Fatalf("expected a failure, got %s: %s", check.Level, check.Detail)
+	}
+	if !containsHint(check.Hints, "api_base_url") {
+		t.Errorf("expected an api_base_url hint, got %v", check.Hints)
+	}
+}
+
 func containsHint(hints []string, needle string) bool {
 	for _, hint := range hints {
 		if strings.Contains(hint, needle) {

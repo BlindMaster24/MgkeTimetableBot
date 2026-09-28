@@ -99,6 +99,7 @@ func Run(opts Options) Report {
 	report.add(checkConfig(cfg, opts.ConfigPath))
 	report.add(checkCredentials(cfg))
 	report.add(checkWebhook(cfg))
+	report.add(checkTelegramAPI(cfg))
 	report.add(checkLocale(findRepoRoot()))
 	report.add(checkStorage(cfg))
 	report.add(checkTimetable(cfg))
@@ -285,6 +286,29 @@ func checkWebhook(cfg *config.Config) Check {
 	}
 
 	return Check{Name: "webhook", Level: LevelOK, Detail: detail}
+}
+
+func checkTelegramAPI(cfg *config.Config) Check {
+	server, err := cfg.TelegramAPIServer()
+	if err != nil {
+		return Check{
+			Name:   "telegram-api",
+			Level:  LevelFail,
+			Detail: err.Error(),
+			Hints:  []string{"warning: leave telegram.api_base_url empty to talk to https://api.telegram.org"},
+		}
+	}
+
+	if server == "" {
+		return Check{Name: "telegram-api", Level: LevelOK, Detail: "official https://api.telegram.org"}
+	}
+
+	return Check{
+		Name:   "telegram-api",
+		Level:  LevelWarn,
+		Detail: fmt.Sprintf("telegram.api_base_url is %s", server),
+		Hints:  []string{"warning: the bot talks to this Bot API server instead of https://api.telegram.org"},
+	}
 }
 
 func checkCredentials(cfg *config.Config) Check {

@@ -1,7 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -60,10 +63,11 @@ type Config struct {
 	} `yaml:"http"`
 
 	Telegram struct {
-		Token    string  `yaml:"token" env:"TG_TOKEN"`
-		AdminIDs []int64 `yaml:"admin_ids"`
-		Noticer  bool    `yaml:"noticer"`
-		Webhook  struct {
+		Token      string  `yaml:"token" env:"TG_TOKEN"`
+		APIBaseURL string  `yaml:"api_base_url"`
+		AdminIDs   []int64 `yaml:"admin_ids"`
+		Noticer    bool    `yaml:"noticer"`
+		Webhook    struct {
 			Enabled            bool     `yaml:"enabled"`
 			Listen             string   `yaml:"listen"`
 			URL                string   `yaml:"url"`
@@ -156,6 +160,26 @@ func (c *Config) ResolvedChatDBPath() string {
 
 func (c *Config) ResolvedCacheDir() string {
 	return pathOr(c.CacheDir, DefaultCacheDir)
+}
+
+func (c *Config) TelegramAPIServer() (string, error) {
+	raw := strings.TrimSpace(c.Telegram.APIBaseURL)
+	if raw == "" {
+		return "", nil
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("telegram.api_base_url: %w", err)
+	}
+	if !strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https") {
+		return "", fmt.Errorf("telegram.api_base_url must be an http or https URL, got %q", raw)
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("telegram.api_base_url has no host: %q", raw)
+	}
+
+	return strings.TrimRight(parsed.String(), "/"), nil
 }
 
 func pathOr(value, fallback string) string {

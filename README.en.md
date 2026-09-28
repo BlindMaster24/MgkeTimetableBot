@@ -118,7 +118,7 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `cache_dir` | Directory of the file-backed timetable cache (default `./cache/rasp`) |
 | `logging` | Level, log file, rotation settings |
 | `http` | HTTP port of the server (API and Google OAuth) |
-| `telegram` | Bot token, admin IDs, the `noticer` flag, the update delivery mode (`telegram.webhook`) |
+| `telegram` | Bot token, the Bot API base URL (`telegram.api_base_url`), admin IDs, the `noticer` flag, the update delivery mode (`telegram.webhook`) |
 | `api` | Base path of the REST API |
 | `google` | OAuth client and service account for Google Calendar |
 | `calendar.ics.enabled` | Enable the ICS export and its menu button |
@@ -136,6 +136,7 @@ By default the bot fetches updates itself (long polling), so publishing the HTTP
 
 ```yaml
 telegram:
+  api_base_url: ""                   # MGKE_TELEGRAM_API_BASE_URL, https://api.telegram.org by default
   webhook:
     enabled: true                    # MGKE_TELEGRAM_WEBHOOK_ENABLED
     url: "https://bot.example.com"   # public HTTPS address; the path is appended to it
@@ -159,6 +160,8 @@ telegram:
 - at startup the bot logs the webhook address, the number of pending updates, the enabled update types and the last delivery error from `getWebhookInfo`;
 - when switching back to long polling the bot deletes the webhook first (`deleteWebhook`) — otherwise Telegram answers `409 Conflict` to `getUpdates`;
 - ready-to-run examples with an automatic certificate live in the repository: `docker-compose.webhook.yml` with Caddy and `docker-compose.webhook-nginx.yml` with nginx and certbot (see “Docker deployment”).
+
+Separately from the webhook, `telegram.api_base_url` points the bot at another Bot API server (a local bot-api, a proxy or a stub): an empty value keeps the official `https://api.telegram.org`, and a configured address must be `http`/`https` with a host — otherwise the bot refuses to start with a clear error. The container smoke test in CI uses exactly that: it starts a stub Bot API (`scripts/tgstub`), checks the webhook registration, the `405`/`401`/`200` statuses on the live socket and the reply of the bot through `sendMessage`.
 
 ### Environment variables
 
@@ -542,7 +545,7 @@ go test ./internal/telegram -update       # message texts and layouts
 go test ./internal/notification -update   # notification texts
 ```
 
-Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible:
+Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The `container` CI job runs the image itself in webhook mode against the standalone stub Bot API in `internal/tgstub` (binary: `scripts/tgstub`), which records the calls the bot makes and answers them like Telegram would. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible:
 
 ```bash
 go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
@@ -572,6 +575,7 @@ What it checks:
 | `config` | required keys: the bot token, the group, teacher and bell schedule URLs, `db_path`, `http.port`; warnings cover empty `admin_ids`, a disabled parser or health tracker |
 | `credentials` | the Telegram token shape, the Google service account private key (PEM, PKCS#1/PKCS#8/EC, `Validate`), a complete OAuth pair, an empty `encrypt_key` |
 | `webhook` | the update delivery mode: with `telegram.webhook.enabled` the address must be `https`, the secret may only use `A-Z a-z 0-9 _ -`, and the certificate and key must come as a pair; a missing secret is a warning; long polling skips the check |
+| `telegram-api` | the Bot API address from `telegram.api_base_url`: without it the official `https://api.telegram.org` is used, with it the address must be `http`/`https` with a host, and the override itself is a warning so a stub never reaches production unnoticed |
 | `locale` | `locales/ru.json` is valid, has no empty values and carries **every** key referenced by `loc(...)`/`locData(...)` in the code |
 | `storage` | the database, chat and cache directories are writable (missing ones are created) |
 | `timetable` | configured bell schedule slots: the start precedes the end and lessons do not overlap |
@@ -651,7 +655,8 @@ internal/
   notification/          — scheduler, events and health alerts
   parity/                — TypeScript ↔ Go surface comparator
   parser/                — timetable parser (groups, teachers, bell schedule, diagnostics)
-  preflight/             — pre-deploy check: config, credentials, webhook, locale, live site, image
+  preflight/             — pre-deploy check: config, credentials, webhook, Bot API, locale, live site, image
+  tgstub/                — stub Telegram Bot API for the container smoke test: records the bot calls and answers like Telegram
   testgolden/            — golden text normalization (tests only)
   telegram/              — telego: commands, callbacks, menus, keyboards, scenes
     bot.go               — command, callback, text-handler and menu registration
@@ -687,6 +692,7 @@ docs/google-calendar.md     — Google Calendar guide
 scripts/paritycheck/        — TypeScript parity checker
 scripts/preflight/          — the pre-deploy check
 scripts/racecheck/          — the local run under the race detector
+scripts/tgstub/             — the stub Bot API the container smoke test starts
 tests/                      — integration and end-to-end tests (parser, cache, archive, notifications, docs)
 cache/rasp/                 — JSON timetable cache (created at runtime)
 ```

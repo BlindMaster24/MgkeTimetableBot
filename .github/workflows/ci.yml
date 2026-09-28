@@ -65,6 +65,7 @@ jobs:
           go build -o "$out/" ./cmd/migrate-pg/
           go build -o "$out/" ./scripts/paritycheck/
           go build -o "$out/" ./scripts/preflight/
+          go build -o "$out/" ./scripts/tgstub/
           ls -l "$out"
 
       - name: Cross-compile the release targets
@@ -293,6 +294,144 @@ jobs:
       - name: Remove the container
         if: always()
         run: docker rm -f mgke-smoke || true
+
+      - name: Setup Go for the stub Bot API
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Start the stub Bot API
+        run: |
+          go build -o /tmp/tgstub ./scripts/tgstub
+          nohup /tmp/tgstub -listen 127.0.0.1:18090 > /tmp/tgstub.log 2>&1 &
+          echo "$!" > /tmp/tgstub.pid
+
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:18090/_stub/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the stub Bot API never answered" >&2
+          cat /tmp/tgstub.log >&2 || true
+          exit 1
+
+      - name: Start the bot in webhook mode
+        run: |
+          docker run -d --name mgke-webhook \
+            --network host \
+            -e MGKE_TELEGRAM_TOKEN="123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" \
+            -e MGKE_TELEGRAM_API_BASE_URL="http://127.0.0.1:18090" \
+            -e MGKE_TELEGRAM_WEBHOOK_ENABLED=true \
+            -e MGKE_TELEGRAM_WEBHOOK_URL="https://bot.example.test" \
+            -e MGKE_TELEGRAM_WEBHOOK_LISTEN="127.0.0.1:8082" \
+            -e MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="ci-webhook-secret" \
+            -e MGKE_ACCEPT_PRIVATE=true \
+            -e MGKE_PARSER_ENABLED=false \
+            -e MGKE_HTTP_PORT=8080 \
+            mgke-timetable-bot:ci
+
+      - name: Wait for the webhook registration
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:18090/_stub/calls > /tmp/webhook-calls.json \
+              && jq -e '[.calls[] | select(.method == "setWebhook")] | length > 0' /tmp/webhook-calls.json > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "the bot never registered its webhook" >&2
+          docker logs mgke-webhook >&2 || true
+          curl -s http://127.0.0.1:18090/_stub/calls >&2 || true
+          exit 1
+
+      - name: Check the registered webhook
+        run: |
+          url="$(jq -r '[.calls[] | select(.method == "setWebhook")][0].body.url' /tmp/webhook-calls.json)"
+          if [ "$url" != "https://bot.example.test/telegram/webhook" ]; then
+            echo "the registered webhook url is $url" >&2
+            exit 1
+          fi
+
+          secret="$(jq -r '[.calls[] | select(.method == "setWebhook")][0].body.secret_token' /tmp/webhook-calls.json)"
+          if [ "$secret" != "ci-webhook-secret" ]; then
+            echo "the registered secret token is $secret" >&2
+            exit 1
+          fi
+
+      - name: Check the webhook listener statuses
+        run: |
+          url="http://127.0.0.1:8082/telegram/webhook"
+
+          code="$(curl -s -o /dev/null -w '%{http_code}' "$url")"
+          if [ "$code" != "405" ]; then
+            echo "a GET of the webhook path answered $code, want 405" >&2
+            exit 1
+          fi
+
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'X-Telegram-Bot-Api-Secret-Token: foreign-secret' \
+            -H 'Content-Type: application/json' -d '{}' "$url")"
+          if [ "$code" != "401" ]; then
+            echo "a POST with a foreign secret answered $code, want 401" >&2
+            exit 1
+          fi
+
+      - name: Deliver an update through the webhook
+        run: |
+          cat > /tmp/update.json <<'JSON'
+          {"update_id":1,"message":{"message_id":1,"date":1758000000,"chat":{"id":424242,"type":"private"},"from":{"id":424242,"is_bot":false,"first_name":"CI"},"text":"/help"}}
+          JSON
+
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'X-Telegram-Bot-Api-Secret-Token: ci-webhook-secret' \
+            -H 'Content-Type: application/json' \
+            --data @/tmp/update.json \
+            http://127.0.0.1:8082/telegram/webhook)"
+          if [ "$code" != "200" ]; then
+            echo "the signed update answered $code, want 200" >&2
+            docker logs mgke-webhook >&2 || true
+            exit 1
+          fi
+
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:18090/_stub/calls > /tmp/webhook-calls.json \
+              && jq -e '[.calls[] | select(.method == "sendMessage" and (.body.chat_id == 424242))] | length > 0' /tmp/webhook-calls.json > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the bot never answered the update it received over the webhook" >&2
+          docker logs mgke-webhook >&2 || true
+          exit 1
+
+      - name: Show the webhook container logs
+        if: failure()
+        run: docker logs mgke-webhook || true
+
+      - name: Stop the webhook bot gracefully
+        run: |
+          docker stop --time 20 mgke-webhook > /dev/null
+          logs="$(docker logs mgke-webhook 2>&1)"
+          printf '%s\n' "$logs" | tail -20
+          if ! grep -q "stop signal received" <<< "$logs"; then
+            echo "the webhook bot did not log the stop signal it received" >&2
+            exit 1
+          fi
+          if ! grep -q "shutdown complete" <<< "$logs"; then
+            echo "the webhook bot did not close its listener before exiting" >&2
+            exit 1
+          fi
+
+      - name: Remove the webhook container
+        if: always()
+        run: |
+          docker rm -f mgke-webhook || true
+          kill "$(cat /tmp/tgstub.pid)" 2>/dev/null || true
 
   workflow-lint:
     name: workflow lint

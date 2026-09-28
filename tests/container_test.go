@@ -81,6 +81,32 @@ func TestComposePassesTheTimezone(t *testing.T) {
 	}
 }
 
+func TestContainerSmokeTestRunsTheWebhookTransport(t *testing.T) {
+	workflow := readFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	for _, token := range []string{
+		"mgke-webhook",
+		"MGKE_TELEGRAM_API_BASE_URL",
+		"MGKE_TELEGRAM_WEBHOOK_ENABLED",
+		"MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN",
+		"X-Telegram-Bot-Api-Secret-Token",
+		"scripts/tgstub",
+		"setWebhook",
+		"sendMessage",
+	} {
+		if !strings.Contains(workflow, token) {
+			t.Errorf("the container job must also run the webhook transport, missing %q", token)
+		}
+	}
+
+	if strings.Count(workflow, "docker stop --time") < 2 {
+		t.Error("both container runs must stop the bot with a timeout so SIGTERM has a chance to arrive")
+	}
+	if strings.Count(workflow, "shutdown complete") < 2 {
+		t.Error("both container runs must assert the graceful shutdown, the webhook listener included")
+	}
+}
+
 func TestReleaseWorkflowsInjectTheBuildMetadata(t *testing.T) {
 	release := readFile(t, filepath.Join(".github", "workflows", "release.yml"))
 
