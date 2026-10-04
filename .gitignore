@@ -18,7 +18,10 @@ coverage.out
 .cache/
 
 # Local reference copy of the old TypeScript bot (script: git archive old)
-# excluded through .git/info/exclude so the reference stays out of git
+old/
+
+# Local runtime volumes
+/data/
 
 # Config with secrets
 configs/config.yaml
