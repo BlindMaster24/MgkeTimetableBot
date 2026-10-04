@@ -4,8 +4,15 @@ go 1.27.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
-	github.com/fogleman/gg v1.3.0
+	// gin stays the HTTP router for the REST API; stdlib net/http alone would
+	// reimplement its routing, middleware and panic recovery for no gain.
 	github.com/gin-gonic/gin v1.12.0
+	// fogleman/gg stays the timetable PNG renderer: pure Go, no CGO, and the
+	// container font lookup in internal/image is built around it.
+	github.com/fogleman/gg v1.3.0
+	// lib/pq verdict: kept only for cmd/migrate-pg, the one-off PostgreSQL to
+	// SQLite chat migration. The bot itself uses modernc.org/sqlite (pure Go,
+	// no CGO) for the archive and chat databases; do not add new lib/pq uses.
 	github.com/lib/pq v1.12.3
 	github.com/mymmrac/telego v1.11.2
 	github.com/nicksnyder/go-i18n/v2 v2.6.1

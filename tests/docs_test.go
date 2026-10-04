@@ -161,6 +161,26 @@ func TestDocsCoverEveryConfigKey(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentReminders(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "configs", "config.example.yaml"))
+	if err != nil {
+		t.Fatalf("read config example: %v", err)
+	}
+	for _, token := range []string{"reminder_lead_minutes", "reminder_jitter_seconds"} {
+		if !strings.Contains(string(data), token) {
+			t.Errorf("config.example.yaml does not carry the %s key", token)
+		}
+	}
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{"reminder_lead_minutes", "reminder_jitter_seconds"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the %s config key", doc, token)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentTheRaceDetector(t *testing.T) {
 	for _, doc := range docs {
 		content := readDoc(t, doc)
