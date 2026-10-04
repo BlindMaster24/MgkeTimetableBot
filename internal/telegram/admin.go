@@ -419,8 +419,8 @@ func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
-	var total, withGroup, withTeacher int
-	if err := c.bot.archive.DB().QueryRow("SELECT COUNT(*), COUNT(\"group\"), COUNT(teacher) FROM timetable_archive").Scan(&total, &withGroup, &withTeacher); err != nil {
+	stats, err := c.bot.archive.Stats()
+	if err != nil {
 		return u.Bot.SendText(u.ChatID, "Ошибка чтения архива: "+err.Error())
 	}
 
@@ -434,7 +434,7 @@ func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 	} else {
 		lines = append(lines, "Дни: архив пуст")
 	}
-	lines = append(lines, fmt.Sprintf("Записей: %d (группы: %d, преподаватели: %d)", total, withGroup, withTeacher))
+	lines = append(lines, fmt.Sprintf("Записей: %d (группы: %d, преподаватели: %d)", stats.Total, stats.WithGroup, stats.WithTeacher))
 
 	if groups, err := c.bot.archive.Groups(); err == nil && len(groups) > 0 {
 		lines = append(lines, fmt.Sprintf("Групп в архиве: %d", len(groups)))

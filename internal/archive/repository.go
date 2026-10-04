@@ -89,6 +89,18 @@ func (r *Repository) Groups() ([]string, error) {
 	return result, rows.Err()
 }
 
+type Stats struct {
+	Total       int
+	WithGroup   int
+	WithTeacher int
+}
+
+func (r *Repository) Stats() (Stats, error) {
+	var stats Stats
+	err := r.db.QueryRow("SELECT COUNT(*), COUNT(\"group\"), COUNT(teacher) FROM timetable_archive").Scan(&stats.Total, &stats.WithGroup, &stats.WithTeacher)
+	return stats, err
+}
+
 func (r *Repository) Teachers() ([]string, error) {
 	rows, err := r.db.Query("SELECT DISTINCT teacher FROM timetable_archive WHERE teacher IS NOT NULL")
 	if err != nil {
