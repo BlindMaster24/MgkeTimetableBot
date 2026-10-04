@@ -3,19 +3,15 @@ package app
 import (
 	"net/http"
 
-	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
 
-func googleOAuthHandler(cfg *config.Config, service *google.CalendarService, chats *telegrambot.Repository, bot *telegrambot.Bot, log *logger.Logger, loc *i18n.Localizer) http.HandlerFunc {
+func googleOAuthHandler(service *google.CalendarService, chats *telegrambot.Repository, bot *telegrambot.Bot, log *logger.Logger, loc *i18n.Localizer) http.HandlerFunc {
 	text := func(key string) string {
-		if loc != nil {
-			return loc.T("ru", key, nil)
-		}
-		return i18n.New("ru").T("ru", key, nil)
+		return loc.T("ru", key, nil)
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")

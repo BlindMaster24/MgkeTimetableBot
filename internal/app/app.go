@@ -153,7 +153,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	bot.SetGoogleService(googleService)
 	calendarSyncEnabled := googleService.SyncEnabled()
 	apiServer.SetWebhookStatus(func(ctx context.Context) any { return bot.WebhookStatus(ctx) })
-	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(cfg, googleService, chatRepo, bot, log, loc))
+	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(googleService, chatRepo, bot, log, loc))
 
 	go func() {
 		log.Info().Int("port", cfg.HTTP.Port).Msg("API server starting")

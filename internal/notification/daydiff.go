@@ -14,10 +14,6 @@ func (n *EventNotifier) SetLocalizer(loc *i18n.Localizer) {
 	n.localizer = loc
 }
 
-func (n *EventNotifier) loc(key string) string {
-	return n.locData(key, nil)
-}
-
 func (n *EventNotifier) locData(key string, data map[string]any) string {
 	if n.localizer != nil {
 		return n.localizer.T("ru", key, data)
@@ -29,7 +25,7 @@ func (n *EventNotifier) changeSummary(ev *cache.DayEvent) string {
 	if ev.Diff == nil || ev.Diff.Empty() {
 		return ""
 	}
-	lines := []string{n.loc("notify_diff_header")}
+	lines := []string{n.locData("notify_diff_header", nil)}
 	for _, change := range ev.Diff.Of(schedulediff.Added) {
 		lines = append(lines, n.locData("notify_diff_added", map[string]any{"Subject": change.New.Subject}))
 	}
