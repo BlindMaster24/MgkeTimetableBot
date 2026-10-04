@@ -1,14 +1,18 @@
-package main
+package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
@@ -161,6 +165,20 @@ func TestParserGuardComesFromConfig(t *testing.T) {
 	}
 }
 
+func TestResolveConfigPathPrefersTheFlag(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "env.yaml")
+	if got := ResolveConfigPath("custom.yaml"); got != "custom.yaml" {
+		t.Errorf("path = %q, want custom.yaml", got)
+	}
+	if got := ResolveConfigPath(""); got != "env.yaml" {
+		t.Errorf("path = %q, want env.yaml", got)
+	}
+	t.Setenv("CONFIG_PATH", "")
+	if got := ResolveConfigPath(""); got != "configs/config.yaml" {
+		t.Errorf("path = %q, want the default", got)
+	}
+}
+
 type recordingMessage struct {
 	text    string
 	buttons []notification.KeyboardButton
@@ -303,7 +321,7 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	notifier := notification.NewHealthNotifier(tracker, logger.New("error", nil), sender, adminFinder{}, time.Minute, nil)
 	notifier.SetIncidents(incidents)
 
-	if err := fetcher.Timetable(srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 	if len(raspper.GetGroups()) != 35 || len(raspper.GetTeachers()) != 35 {
@@ -320,7 +338,7 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	page.teachers = 3
 	page.Unlock()
 
-	if err := fetcher.Timetable(srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 	if len(raspper.GetGroups()) != 35 || len(raspper.GetTeachers()) != 35 {
@@ -360,7 +378,7 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	page.teachers = 35
 	page.Unlock()
 
-	if err := fetcher.Timetable(srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 	notifier.Check()
@@ -371,6 +389,22 @@ func TestGuardTripReachesTheAdminChatsEndToEnd(t *testing.T) {
 	}
 	if records[0].Resolution != health.ResolutionAuto {
 		t.Errorf("resolution = %q, want %q", records[0].Resolution, health.ResolutionAuto)
+	}
+}
+
+func TestRunRejectsAMissingConfigFile(t *testing.T) {
+	if code := Run(context.Background(), filepath.Join(t.TempDir(), "absent.yaml"), build.New("", "", "")); code != 1 {
+		t.Errorf("Run() = %d, want 1 for a missing config file", code)
+	}
+}
+
+func TestRunRejectsAnInvalidConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("http:\n  port: 0\ntelegram:\n  token: \"x\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if code := Run(context.Background(), path, build.New("", "", "")); code != 1 {
+		t.Errorf("Run() = %d, want 1 for an invalid config", code)
 	}
 }
 
