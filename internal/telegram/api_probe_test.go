@@ -249,7 +249,7 @@ func TestAPIProbeTargetsComeFromTheCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cache: %v", err)
 	}
-	raspCache.SetGroups(map[string]any{"ИС-21": map[string]any{}}, "hash")
+	raspCache.SetGroups(t.Context(), map[string]any{"ИС-21": map[string]any{}}, "hash")
 
 	targets := apiprobe.Targets(raspCache)
 	found := false

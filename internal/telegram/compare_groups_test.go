@@ -20,7 +20,7 @@ func TestCompareGroupsPrintsPairsSubjectsAndWindows(t *testing.T) {
 
 	groups := b.cache.GetGroups()
 	groups["101"] = map[string]any{"group": "101", "days": []any{}}
-	b.cache.SetGroups(groups, "gHash")
+	b.cache.SetGroups(t.Context(), groups, "gHash")
 
 	week := b.relevantWeekIndex()
 	first, _ := week.WeekRange()

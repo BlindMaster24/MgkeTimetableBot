@@ -194,7 +194,7 @@ func notificationScenarios() []messageScenario {
 					Group:          "77",
 					NoticeNextWeek: true,
 				}}
-				n.cache.SetGroups(map[string]any{
+				n.cache.SetGroups(t.Context(), map[string]any{
 					"63": map[string]any{"days": []any{goldenDay(1)}},
 					"77": map[string]any{"days": []any{goldenDay(1)}},
 				}, "golden")
@@ -245,7 +245,7 @@ func notificationScenarios() []messageScenario {
 			run: func(t *testing.T, n *EventNotifier, _ *mockEventSender, finder *mockEventChatFinder) {
 				finder.byGroups = goldenChats()
 				n.cfg.Parser.LessonIndexIfEmpty = 2
-				n.cache.SetGroups(map[string]any{
+				n.cache.SetGroups(t.Context(), map[string]any{
 					"63": map[string]any{"days": []any{
 						map[string]any{"day": time.Now().Format("02.01.2006"), "lessons": []any{
 							map[string]any{"lesson": "Математика", "type": "Лек", "cabinet": "101"},

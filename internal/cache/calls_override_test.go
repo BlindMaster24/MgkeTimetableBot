@@ -24,7 +24,7 @@ func TestCallsAutoPrefersSiteWhenFresh(t *testing.T) {
 	}
 
 	site := testSiteSchedule()
-	c.SetCalls(site, Schedule{}, "site")
+	c.SetCalls(t.Context(), site, Schedule{}, "site")
 
 	calls := c.GetCalls()
 	if calls.Active.Source != "site" {
@@ -42,7 +42,7 @@ func TestCallsOverrideSiteAndReset(t *testing.T) {
 	}
 
 	site := testSiteSchedule()
-	c.SetCalls(site, Schedule{}, "site")
+	c.SetCalls(t.Context(), site, Schedule{}, "site")
 
 	c.SetCallsOverride("manual")
 	calls := c.GetCalls()
@@ -69,7 +69,7 @@ func TestCallsOverrideConfigKeepsSourceOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.SetCalls(testSiteSchedule(), Schedule{}, "site")
+	c.SetCalls(t.Context(), testSiteSchedule(), Schedule{}, "site")
 	c.SetCallsOverride("config")
 
 	calls := c.GetCalls()
@@ -87,7 +87,7 @@ func TestCallsParseKeepsOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.SetCalls(testSiteSchedule(), Schedule{}, "site")
+	c.SetCalls(t.Context(), testSiteSchedule(), Schedule{}, "site")
 	c.SetCallsOverride("site")
 
 	updated := Schedule{
@@ -97,7 +97,7 @@ func TestCallsParseKeepsOverride(t *testing.T) {
 		},
 		Saturday: testSiteSchedule().Saturday,
 	}
-	c.SetCalls(updated, Schedule{}, "site")
+	c.SetCalls(t.Context(), updated, Schedule{}, "site")
 
 	calls := c.GetCalls()
 	if calls.OverrideSource != "site" {
@@ -117,8 +117,8 @@ func TestCallsManualOverrideSelectsManualData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.SetCalls(testSiteSchedule(), Schedule{}, "site")
-	c.DrainEvents()
+	c.SetCalls(t.Context(), testSiteSchedule(), Schedule{}, "site")
+	c.DrainEvents(t.Context())
 
 	manual, _ := testManualSchedule()
 	c.SetCallsManualNotify(manual.Weekdays, manual.Saturday, "репетиция", false)
@@ -136,7 +136,7 @@ func TestCallsManualOverrideSelectsManualData(t *testing.T) {
 	if calls.ManualReason != "репетиция" {
 		t.Errorf("manual reason: got %q", calls.ManualReason)
 	}
-	if len(c.DrainEvents()) != 0 {
+	if len(c.DrainEvents(t.Context())) != 0 {
 		t.Error("notify=false must not emit a calls event")
 	}
 }
@@ -147,13 +147,13 @@ func TestCallsManualNotifyEmitsEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.SetCalls(testSiteSchedule(), Schedule{}, "site")
-	c.DrainEvents()
+	c.SetCalls(t.Context(), testSiteSchedule(), Schedule{}, "site")
+	c.DrainEvents(t.Context())
 
 	manual, _ := testManualSchedule()
 	c.SetCallsManualNotify(manual.Weekdays, manual.Saturday, "приказ", true)
 
-	events := c.DrainEvents()
+	events := c.DrainEvents(t.Context())
 	if len(events) != 1 || events[0].Calls == nil {
 		t.Fatalf("expected one calls event, got %d", len(events))
 	}
@@ -173,7 +173,7 @@ func TestCallsPreferSiteFalseFavoursManual(t *testing.T) {
 	c.SetCallsPreferSite(false)
 
 	manual, _ := testManualSchedule()
-	c.SetCalls(testSiteSchedule(), manual, "site")
+	c.SetCalls(t.Context(), testSiteSchedule(), manual, "site")
 
 	calls := c.GetCalls()
 	if calls.Active.Source != "manual" {

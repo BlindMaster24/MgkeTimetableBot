@@ -31,7 +31,7 @@ func seedDayViewBot(t *testing.T) (*Bot, *recordingCaller) {
 			},
 		}),
 	}
-	b.cache.SetGroups(groups, "day-view")
+	b.cache.SetGroups(t.Context(), groups, "day-view")
 
 	teachers := map[string]any{
 		"Орлов О.О.": e2eJsonRoundTrip(map[string]any{
@@ -46,7 +46,7 @@ func seedDayViewBot(t *testing.T) (*Bot, *recordingCaller) {
 			},
 		}),
 	}
-	b.cache.SetTeachers(teachers, "day-view")
+	b.cache.SetTeachers(t.Context(), teachers, "day-view")
 
 	chat, err := repo.FindOrCreate("telegram", 4242)
 	if err != nil {
@@ -104,8 +104,8 @@ func TestE2E_WeekViewStaysInsideOneWeek(t *testing.T) {
 		)
 	}
 
-	b.cache.SetGroups(map[string]any{"777": e2eJsonRoundTrip(map[string]any{"group": "777", "days": days})}, "two-weeks")
-	b.cache.SetTeachers(map[string]any{"Орлов О.О.": e2eJsonRoundTrip(map[string]any{"teacher": "Орлов О.О.", "days": days})}, "two-weeks")
+	b.cache.SetGroups(t.Context(), map[string]any{"777": e2eJsonRoundTrip(map[string]any{"group": "777", "days": days})}, "two-weeks")
+	b.cache.SetTeachers(t.Context(), map[string]any{"Орлов О.О.": e2eJsonRoundTrip(map[string]any{"teacher": "Орлов О.О.", "days": days})}, "two-weeks")
 
 	group, ok := b.cache.GetGroups()["777"].(map[string]any)
 	if !ok {

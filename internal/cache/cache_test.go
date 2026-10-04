@@ -16,16 +16,16 @@ func TestCacheSaveLoadRoundtrip(t *testing.T) {
 	groups := map[string]any{
 		"63": map[string]any{"group": "63"},
 	}
-	c.SetGroups(groups, "hash123")
+	c.SetGroups(t.Context(), groups, "hash123")
 
 	teachers := map[string]any{
 		"Ivanov": map[string]any{"teacher": "Ivanov"},
 	}
-	c.SetTeachers(teachers, "hash456")
+	c.SetTeachers(t.Context(), teachers, "hash456")
 
-	c.SetTeam(map[string]string{"63": "63TP"}, []string{"teamhash"})
+	c.SetTeam(t.Context(), map[string]string{"63": "63TP"}, []string{"teamhash"})
 
-	if err := c.Save(); err != nil {
+	if err := c.Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,8 +64,8 @@ func TestCacheStats(t *testing.T) {
 	c.RecordHit()
 	c.RecordMiss()
 
-	c.SetGroups(map[string]any{"A": 1, "B": 2}, "h")
-	c.SetTeachers(map[string]any{"T1": 1}, "h2")
+	c.SetGroups(t.Context(), map[string]any{"A": 1, "B": 2}, "h")
+	c.SetTeachers(t.Context(), map[string]any{"T1": 1}, "h2")
 
 	stats := c.Stats()
 	if stats.Hits != 2 {
@@ -97,7 +97,7 @@ func TestCacheConcurrent(t *testing.T) {
 		go func(n int) {
 			defer func() { done <- struct{}{} }()
 			for j := 0; j < 100; j++ {
-				c.SetGroups(map[string]any{string(rune('A' + n)): j}, "hash")
+				c.SetGroups(t.Context(), map[string]any{string(rune('A' + n)): j}, "hash")
 				c.GetGroups()
 				c.RecordHit()
 			}
@@ -151,7 +151,7 @@ func TestCacheSetCalls(t *testing.T) {
 	}
 	manual := Schedule{}
 
-	c.SetCalls(site, manual, "site")
+	c.SetCalls(t.Context(), site, manual, "site")
 
 	calls := c.GetCalls()
 	if calls.Active.Source != "site" {
@@ -173,7 +173,7 @@ func TestCacheSuccessUpdate(t *testing.T) {
 		t.Error("expected successUpdate true by default")
 	}
 
-	c.SetSuccessUpdate(false)
+	c.SetSuccessUpdate(t.Context(), false)
 	if c.Stats().SuccessUpdate {
 		t.Error("expected successUpdate false after set")
 	}
@@ -186,15 +186,36 @@ func TestCacheTeachersSaveLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.SetTeachers(map[string]any{"T1": "data1", "T2": "data2"}, "thash")
-	c.Save()
+	c.SetTeachers(t.Context(), map[string]any{
+		"T1": map[string]any{"teacher": "T1", "days": []any{
+			map[string]any{"day": "07.09.2026", "lessons": []any{
+				map[string]any{"lesson": "Математика", "group": "100"},
+			}},
+		}},
+		"T2": map[string]any{"teacher": "T2"},
+	}, "thash")
+	c.Save(t.Context())
 
 	c2, _ := New(dir)
 	te := c2.GetTeachers()
 	if len(te) != 2 {
-		t.Errorf("expected 2 teachers, got %d", len(te))
+		t.Fatalf("expected 2 teachers, got %d", len(te))
 	}
-	if te["T1"] != "data1" {
-		t.Errorf("expected teacher T1 data, got %v", te["T1"])
+	entry, ok := te["T1"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected teacher T1 entry, got %v", te["T1"])
+	}
+	days, _ := entry["days"].([]any)
+	if len(days) != 1 {
+		t.Fatalf("expected T1 to keep its day, got %v", entry)
+	}
+	day, _ := days[0].(map[string]any)
+	lessons, _ := day["lessons"].([]any)
+	if len(lessons) != 1 {
+		t.Fatalf("expected T1 to keep its lesson, got %v", day)
+	}
+	lesson, _ := lessons[0].(map[string]any)
+	if lesson["lesson"] != "Математика" || lesson["group"] != "100" {
+		t.Errorf("expected T1 lesson data, got %v", lesson)
 	}
 }

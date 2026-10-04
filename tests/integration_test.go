@@ -141,23 +141,23 @@ func TestIntegrationParseToCacheToDisplay(t *testing.T) {
 		t.Fatal("expected groups from HTML")
 	}
 	t.Logf("parsed %d groups, hash: %s", len(groups), hash)
-	c.SetGroups(groups, hash)
+	c.SetGroups(t.Context(), groups, hash)
 
 	teachers, tHash := parseTeachersFromHTML(t, testTeacherHTML)
 	if len(teachers) == 0 {
 		t.Fatal("expected teachers from HTML")
 	}
 	t.Logf("parsed %d teachers, hash: %s", len(teachers), tHash)
-	c.SetTeachers(teachers, tHash)
+	c.SetTeachers(t.Context(), teachers, tHash)
 
 	calls := parseCallsFromHTML(t, testCallsHTML)
 	t.Logf("parsed %d weekday call slots", len(calls.Weekdays))
 	if len(calls.Weekdays) == 0 {
 		t.Fatal("expected call slots from HTML")
 	}
-	c.SetCalls(*calls, cache.Schedule{}, "site")
+	c.SetCalls(t.Context(), *calls, cache.Schedule{}, "site")
 
-	if err := c.Save(); err != nil {
+	if err := c.Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -291,18 +291,18 @@ func TestIntegrationCacheSaveLoadFullCycle(t *testing.T) {
 	c, _ := cache.New(dir + "/cache")
 
 	groups, gHash := parseGroupsFromHTML(t, testGroupHTML)
-	c.SetGroups(groups, gHash)
+	c.SetGroups(t.Context(), groups, gHash)
 
 	teachers, tHash := parseTeachersFromHTML(t, testTeacherHTML)
-	c.SetTeachers(teachers, tHash)
+	c.SetTeachers(t.Context(), teachers, tHash)
 
 	calls := parseCallsFromHTML(t, testCallsHTML)
-	c.SetCalls(*calls, cache.Schedule{}, "site")
+	c.SetCalls(t.Context(), *calls, cache.Schedule{}, "site")
 
-	c.SetTeam(map[string]string{"100": "Тест"}, []string{"team_hash"})
-	c.SetSuccessUpdate(true)
+	c.SetTeam(t.Context(), map[string]string{"100": "Тест"}, []string{"team_hash"})
+	c.SetSuccessUpdate(t.Context(), true)
 
-	if err := c.Save(); err != nil {
+	if err := c.Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -334,7 +334,7 @@ func TestIntegrationFormatAllGroupsAllFormatters(t *testing.T) {
 	}
 
 	c, _ := cache.New(t.TempDir() + "/cache")
-	c.SetGroups(groups, hash)
+	c.SetGroups(t.Context(), groups, hash)
 
 	for i, f := range formatter.AllFormatters {
 		for name, data := range groups {
@@ -372,7 +372,7 @@ func TestIntegrationCacheConcurrentAccess(t *testing.T) {
 			defer func() { done <- struct{}{} }()
 			for j := 0; j < 50; j++ {
 				groups, hash := parseGroupsFromHTML(t, testGroupHTML)
-				c.SetGroups(groups, hash)
+				c.SetGroups(t.Context(), groups, hash)
 				c.GetGroups()
 				c.GetTeachers()
 				c.GetCalls()

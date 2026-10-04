@@ -32,7 +32,7 @@ func TestTeachersListingShowsFullNamesAndPageTimestamps(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeStudent, "100", "")
 
 	rasp := b.GetRaspCache()
-	rasp.SetTeam(map[string]string{"Иванов И.И.": "Иванов Иван Иванович"}, []string{"hash"})
+	rasp.SetTeam(t.Context(), map[string]string{"Иванов И.И.": "Иванов Иван Иванович"}, []string{"hash"})
 
 	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
 	start, _ := week.WeekRange()

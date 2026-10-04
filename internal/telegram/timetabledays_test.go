@@ -23,7 +23,7 @@ func seedGroupCache(t *testing.T, b *Bot, value string, days ...map[string]any) 
 	for _, day := range days {
 		entries = append(entries, day)
 	}
-	b.cache.SetGroups(map[string]any{
+	b.cache.SetGroups(t.Context(), map[string]any{
 		value: e2eJsonRoundTrip(map[string]any{"group": value, "days": entries}),
 	}, "group-hash")
 }
@@ -35,7 +35,7 @@ func seedTeacherCache(t *testing.T, b *Bot, value string, days ...map[string]any
 	for _, day := range days {
 		entries = append(entries, day)
 	}
-	b.cache.SetTeachers(map[string]any{
+	b.cache.SetTeachers(t.Context(), map[string]any{
 		value: e2eJsonRoundTrip(map[string]any{"teacher": value, "days": entries}),
 	}, "teacher-hash")
 }

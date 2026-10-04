@@ -1,9 +1,11 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/schedulediff"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
@@ -20,6 +22,7 @@ type DayEvent struct {
 	Value string
 	Day   map[string]any
 	Type  string
+	Diff  *schedulediff.Result
 }
 
 type DayChange struct {
@@ -95,7 +98,7 @@ func mergeDays(newDays, oldDays []any) (merged, added, changed []any) {
 		od, existed := days[date]
 		if !existed {
 			added = append(added, nd)
-		} else if lessonsJSON(nm["lessons"]) != lessonsJSON(od.(map[string]any)["lessons"]) {
+		} else if dayLessonsChanged(od.(map[string]any), nm) {
 			changed = append(changed, nd)
 		}
 		if _, seen := days[date]; !seen {
@@ -110,19 +113,6 @@ func mergeDays(newDays, oldDays []any) (merged, added, changed []any) {
 		}
 	}
 	return merged, added, changed
-}
-
-func entryLastNoticedDay(entry *RaspEntry[map[string]any], value string) int64 {
-	v, ok := entry.Timetable[value]
-	if !ok {
-		return 0
-	}
-	m, ok := v.(map[string]any)
-	if !ok {
-		return 0
-	}
-	last, _ := m["lastNoticedDay"].(float64)
-	return int64(last)
 }
 
 type dayEventOut struct {
@@ -154,6 +144,17 @@ func collectEntryDayEvents(kind, value string, oldEntry, newEntry map[string]any
 
 	lastNoticed := entryLastNoticedDayFromMap(oldEntry)
 
+	oldByDate := make(map[string]map[string]any, len(oldDays))
+	for _, d := range oldDays {
+		m, ok := d.(map[string]any)
+		if !ok {
+			continue
+		}
+		if date, _ := m["day"].(string); date != "" {
+			oldByDate[date] = m
+		}
+	}
+
 	var out []dayEventOut
 	for _, cd := range changed {
 		cm, _ := cd.(map[string]any)
@@ -174,7 +175,13 @@ func collectEntryDayEvents(kind, value string, oldEntry, newEntry map[string]any
 			}
 		}
 		if evType != "" {
-			out = append(out, dayEventOut{ev: Event{Day: &DayEvent{Kind: kind, Value: value, Day: cm, Type: evType}}, evType: evType})
+			var diff *schedulediff.Result
+			if old, ok := oldByDate[date]; ok {
+				if result, comparable := diffDayLessons(old, cm); comparable && !result.Empty() {
+					diff = &result
+				}
+			}
+			out = append(out, dayEventOut{ev: Event{Day: &DayEvent{Kind: kind, Value: value, Day: cm, Type: evType, Diff: diff}}, evType: evType})
 		}
 	}
 	return out, changes
@@ -192,33 +199,51 @@ func (c *RaspCache) LastNoticedDay(kind, value string) int64 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	entry := c.Groups
+	view := c.groupsAny
 	if kind == KindTeachers {
-		entry = c.Teachers
+		view = c.teachersAny
 	}
-	return entryLastNoticedDay(entry, value)
+	entry, _ := view[value].(map[string]any)
+	return entryLastNoticedDayFromMap(entry)
 }
 
 func (c *RaspCache) SetLastNoticedDay(kind, value string, dayIdx int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	entry := c.Groups
 	if kind == KindTeachers {
-		entry = c.Teachers
-	}
-	v, ok := entry.Timetable[value]
-	if !ok {
+		if m, ok := c.teachersAny[value].(map[string]any); ok {
+			cp := make(map[string]any, len(m)+1)
+			for k, v := range m {
+				cp[k] = v
+			}
+			cp["lastNoticedDay"] = float64(dayIdx)
+			c.teachersAny[value] = cp
+		}
+		if schedule, ok := c.Teachers.Timetable[value]; ok {
+			schedule.LastNoticed = dayIdx
+			c.Teachers.Timetable[value] = schedule
+		}
 		return
 	}
-	m, ok := v.(map[string]any)
-	if !ok {
-		return
+	if m, ok := c.groupsAny[value].(map[string]any); ok {
+		cp := make(map[string]any, len(m)+1)
+		for k, v := range m {
+			cp[k] = v
+		}
+		cp["lastNoticedDay"] = float64(dayIdx)
+		c.groupsAny[value] = cp
 	}
-	m["lastNoticedDay"] = float64(dayIdx)
+	if schedule, ok := c.Groups.Timetable[value]; ok {
+		schedule.LastNoticed = dayIdx
+		c.Groups.Timetable[value] = schedule
+	}
 }
 
-func (c *RaspCache) DrainEvents() []Event {
+func (c *RaspCache) DrainEvents(ctx context.Context) []Event {
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -230,7 +255,10 @@ func (c *RaspCache) DrainEvents() []Event {
 	return evs
 }
 
-func (c *RaspCache) DrainDayChanges() []DayChange {
+func (c *RaspCache) DrainDayChanges(ctx context.Context) []DayChange {
+	if err := ctx.Err(); err != nil {
+		return nil
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -284,10 +312,10 @@ func (c *RaspCache) TeacherKeys() []string {
 	return keys
 }
 
-func collectWeekEvents(kind string, oldEntry *RaspEntry[map[string]any], data map[string]any) (events []Event, maxWeek int) {
+func collectWeekEvents(kind string, previousWeekIndex int, data map[string]any) (events []Event, maxWeek int) {
 	maxWeek = weekOfTimetable(data)
 
-	if oldEntry != nil && oldEntry.LastWeekIndex > 0 && maxWeek > oldEntry.LastWeekIndex {
+	if previousWeekIndex > 0 && maxWeek > previousWeekIndex {
 		events = append(events, Event{Week: &WeekEvent{Kind: kind, Week: maxWeek}})
 	}
 	return events, maxWeek

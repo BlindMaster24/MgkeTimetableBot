@@ -249,7 +249,7 @@ func TestRun_SkipSiteUsesTheCachedData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cached.SetGroups(map[string]any{
+	cached.SetGroups(t.Context(), map[string]any{
 		"777": map[string]any{
 			"group": "777",
 			"days": []any{
@@ -259,7 +259,7 @@ func TestRun_SkipSiteUsesTheCachedData(t *testing.T) {
 			},
 		},
 	}, "hash")
-	if err := cached.Save(); err != nil {
+	if err := cached.Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 

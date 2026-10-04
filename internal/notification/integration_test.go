@@ -54,8 +54,8 @@ func TestIntegration_TwoDayParseSequence(t *testing.T) {
 			dayMap(tomorrow, dayWith("Математика", "08:00 - 08:45")),
 		),
 	}
-	c.SetGroups(firstParse, "hash1")
-	n.HandleEvents(c.DrainEvents())
+	c.SetGroups(t.Context(), firstParse, "hash1")
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
 	if len(sender.sent) != 0 {
 		t.Fatalf("brand-new entry must not notify (TS: no events without currentEntry), got %d", len(sender.sent))
@@ -72,8 +72,8 @@ func TestIntegration_TwoDayParseSequence(t *testing.T) {
 			}),
 		),
 	}
-	c.SetGroups(secondParse, "hash2")
-	n.HandleEvents(c.DrainEvents())
+	c.SetGroups(t.Context(), secondParse, "hash2")
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
 	if len(sender.sent) != 1 {
 		t.Fatalf("expected 1 add notification after second parse, got %d", len(sender.sent))
@@ -98,8 +98,8 @@ func TestIntegration_TwoDayParseSequence(t *testing.T) {
 			dayMap(tomorrowAfter, dayWith("История", "08:00 - 08:45")),
 		),
 	}
-	c.SetGroups(thirdParse, "hash3")
-	n.HandleEvents(c.DrainEvents())
+	c.SetGroups(t.Context(), thirdParse, "hash3")
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
 	if len(sender.sent) != 2 {
 		t.Fatalf("expected exactly 1 update notification (day-after-tomorrow add must not fire), got %d", len(sender.sent))
@@ -114,8 +114,8 @@ func TestIntegration_TwoDayParseSequence(t *testing.T) {
 		t.Fatalf("lastNoticedDay must stay at tomorrow after update, got %d", last)
 	}
 
-	c.SetGroups(thirdParse, "hash4")
-	if events := c.DrainEvents(); len(events) != 0 {
+	c.SetGroups(t.Context(), thirdParse, "hash4")
+	if events := c.DrainEvents(t.Context()); len(events) != 0 {
 		t.Fatalf("identical re-parse must produce no events, got %d", len(events))
 	}
 	if len(sender.sent) != 2 {
@@ -148,18 +148,18 @@ func TestIntegration_TwoDayParseSequence_NoChats(t *testing.T) {
 	n, sender, _, c := newTestNotifier(t)
 
 	tomorrow := tomorrowStr()
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": entryWithDays(dayMap(tomorrow, dayWith("Математика", "08:00 - 08:45"))),
 	}, "hash1")
-	n.HandleEvents(c.DrainEvents())
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": entryWithDays(dayMap(tomorrow, []any{
 			map[string]any{"lesson": "Математика", "time": "08:00 - 08:45"},
 			map[string]any{"lesson": "Физика", "time": "09:00 - 09:45"},
 		})),
 	}, "hash2")
-	n.HandleEvents(c.DrainEvents())
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
 	if len(sender.sent) != 0 {
 		t.Fatalf("no matched chats, expected no sends, got %d", len(sender.sent))
@@ -175,15 +175,15 @@ func TestIntegration_TwoDayParseSequence_FilteredLessons(t *testing.T) {
 	n.cfg.Parser.AlertableIgnoreFilter.Group = []config.LessonFilter{{Lesson: "Физика"}}
 
 	tomorrow := tomorrowStr()
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": entryWithDays(dayMap(tomorrow, dayWith("Физика", "08:00 - 08:45"))),
 	}, "hash1")
-	n.HandleEvents(c.DrainEvents())
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": entryWithDays(dayMap(tomorrow, dayWith("Физика", "09:00 - 09:45"))),
 	}, "hash2")
-	n.HandleEvents(c.DrainEvents())
+	n.HandleEvents(c.DrainEvents(t.Context()))
 
 	if len(sender.sent) != 0 {
 		t.Fatalf("all-filtered day must not notify, got %d", len(sender.sent))

@@ -146,12 +146,12 @@ func seedGoldenCache(t *testing.T, b *Bot) {
 		messageGoldenNow.AddDate(0, 0, 3).Format("02.01.2006"),
 	}
 
-	b.cache.SetGroups(map[string]any{
+	b.cache.SetGroups(t.Context(), map[string]any{
 		weekGroup: e2eJsonRoundTrip(map[string]any{"group": weekGroup, "days": goldenDays(weekDates, 3)}),
 		dayGroup:  e2eJsonRoundTrip(map[string]any{"group": dayGroup, "days": goldenDays(dayDates, 3)}),
 	}, "golden-groups")
 
-	b.cache.SetTeachers(map[string]any{
+	b.cache.SetTeachers(t.Context(), map[string]any{
 		weekTeacher: e2eJsonRoundTrip(map[string]any{"teacher": weekTeacher, "days": teacherDays(weekDates, 1)}),
 		dayTeacher:  e2eJsonRoundTrip(map[string]any{"teacher": dayTeacher, "days": teacherDays(dayDates[:1], 1)}),
 	}, "golden-teachers")
@@ -311,7 +311,7 @@ func messageScenarios() []messageScenario {
 		chat.Group = "404"
 	}
 	parserError := func(b *Bot) {
-		b.cache.SetSuccessUpdate(false)
+		b.cache.SetSuccessUpdate(context.Background(), false)
 	}
 	formatter := func(index int) func(chat *Chat) {
 		return func(chat *Chat) {

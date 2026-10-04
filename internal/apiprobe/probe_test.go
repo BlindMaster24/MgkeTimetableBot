@@ -16,8 +16,8 @@ func TestTargetsCoverTheReadOnlyRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cache: %v", err)
 	}
-	raspCache.SetGroups(map[string]any{"ИС-21": map[string]any{}}, "hash")
-	raspCache.SetTeachers(map[string]any{"Иванов И.И.": map[string]any{}}, "hash")
+	raspCache.SetGroups(t.Context(), map[string]any{"ИС-21": map[string]any{}}, "hash")
+	raspCache.SetTeachers(t.Context(), map[string]any{"Иванов И.И.": map[string]any{}}, "hash")
 
 	targets := Targets(raspCache)
 	if len(targets) != 7 {

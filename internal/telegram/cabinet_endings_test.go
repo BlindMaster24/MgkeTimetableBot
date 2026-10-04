@@ -46,7 +46,7 @@ func TestCabinetCommandListsLessonsInOrder(t *testing.T) {
 			}},
 		},
 	})
-	b.cache.SetTeachers(map[string]any{"Иванов И.И.": teacher}, "tHash")
+	b.cache.SetTeachers(t.Context(), map[string]any{"Иванов И.И.": teacher}, "tHash")
 
 	u := makeUpdate(4242, "/cabinet 101")
 	u.Bot = b
@@ -100,7 +100,7 @@ func TestEndingsCountsOnlyTheNearestDayOfEachGroup(t *testing.T) {
 		"200": groupWeek("200", groupDay(next, 2), groupDay(next2, 5)),
 		"300": groupWeek("300", groupDay(next2, 5)),
 	}
-	b.cache.SetGroups(groups, "gHash")
+	b.cache.SetGroups(t.Context(), groups, "gHash")
 
 	for i := 0; i < 5; i++ {
 		caller.reset()

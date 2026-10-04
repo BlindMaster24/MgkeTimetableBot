@@ -84,7 +84,7 @@ func seedTestData(t *testing.T, c *cache.RaspCache) {
 			},
 		},
 	}
-	c.SetGroups(groups, "gHash")
+	c.SetGroups(t.Context(), groups, "gHash")
 
 	teachers := map[string]any{
 		"Иванов И.И.": map[string]any{
@@ -98,9 +98,9 @@ func seedTestData(t *testing.T, c *cache.RaspCache) {
 			},
 		},
 	}
-	c.SetTeachers(teachers, "tHash")
+	c.SetTeachers(t.Context(), teachers, "tHash")
 
-	c.SetCalls(cache.Schedule{
+	c.SetCalls(t.Context(), cache.Schedule{
 		Weekdays: [][2][2]string{
 			{{"08:00", "08:45"}, {"08:55", "09:40"}},
 			{{"09:50", "10:35"}, {"10:45", "11:30"}},
@@ -604,7 +604,7 @@ func TestBuildWeekLabelVariousDates(t *testing.T) {
 
 func TestGetFormatterOptsHasParserError(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
-	b.cache.SetSuccessUpdate(false)
+	b.cache.SetSuccessUpdate(t.Context(), false)
 	chat := &Chat{Mode: ModeStudent, Group: "100", ShowHints: true}
 	opts := b.getFormatterOpts(chat)
 	if !opts.HasParserError {
@@ -1060,7 +1060,7 @@ func TestCacheCallsRoundTrip(t *testing.T) {
 			{{"09:00", "09:45"}, {"09:55", "10:40"}},
 		},
 	}
-	c.SetCalls(site, cache.Schedule{}, "site")
+	c.SetCalls(t.Context(), site, cache.Schedule{}, "site")
 
 	calls := c.GetCalls()
 	if len(calls.Active.Schedule.Weekdays) != 2 {
@@ -1080,7 +1080,7 @@ func TestCacheCallsRoundTrip(t *testing.T) {
 		t.Errorf("expected 1 GetCallsSaturday, got %d", len(sa))
 	}
 
-	c.Save()
+	c.Save(t.Context())
 	c2, _ := cache.New(dir)
 	calls2 := c2.GetCalls()
 	if len(calls2.Active.Schedule.Weekdays) != 2 {
@@ -1111,8 +1111,8 @@ func TestCacheSetCallsFromCache(t *testing.T) {
 func TestCacheReset(t *testing.T) {
 	dir := t.TempDir() + "/cache"
 	c, _ := cache.New(dir)
-	c.SetGroups(map[string]any{"100": "data"}, "h")
-	c.SetTeachers(map[string]any{"T1": "data"}, "h2")
+	c.SetGroups(t.Context(), map[string]any{"100": "data"}, "h")
+	c.SetTeachers(t.Context(), map[string]any{"T1": "data"}, "h2")
 
 	c.Reset()
 

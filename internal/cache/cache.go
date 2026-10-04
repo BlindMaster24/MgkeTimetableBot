@@ -1,11 +1,11 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -75,14 +75,18 @@ type CallsCache struct {
 
 type RaspCache struct {
 	mu            sync.RWMutex
+	saveMu        sync.Mutex
 	dir           string
-	Groups        *RaspEntry[map[string]any] `json:"groups"`
-	Teachers      *RaspEntry[map[string]any] `json:"teachers"`
-	Team          TeamCacheEntry             `json:"team"`
-	Calls         CallsCache                 `json:"calls"`
-	SuccessUpdate bool                       `json:"successUpdate"`
+	Groups        *RaspEntry[GroupTimetable]   `json:"groups"`
+	Teachers      *RaspEntry[TeacherTimetable] `json:"teachers"`
+	Team          TeamCacheEntry               `json:"team"`
+	Calls         CallsCache                   `json:"calls"`
+	SuccessUpdate bool                         `json:"successUpdate"`
 
-	callsPreferSite bool
+	callsPreferSite atomic.Bool
+
+	groupsAny   map[string]any
+	teachersAny map[string]any
 
 	events     []Event
 	dayChanges []DayChange
@@ -110,19 +114,21 @@ func New(dir string) (*RaspCache, error) {
 
 	c := &RaspCache{
 		dir: dir,
-		Groups: &RaspEntry[map[string]any]{
-			Timetable: make(map[string]any),
+		Groups: &RaspEntry[GroupTimetable]{
+			Timetable: make(GroupTimetable),
 		},
-		Teachers: &RaspEntry[map[string]any]{
-			Timetable: make(map[string]any),
+		Teachers: &RaspEntry[TeacherTimetable]{
+			Timetable: make(TeacherTimetable),
 		},
+		groupsAny:   make(map[string]any),
+		teachersAny: make(map[string]any),
 		Team: TeamCacheEntry{
 			Names: make(map[string]string),
 		},
-		SuccessUpdate:   true,
-		callsPreferSite: true,
+		SuccessUpdate: true,
 	}
 
+	c.callsPreferSite.Store(true)
 	c.load()
 	return c, nil
 }
@@ -130,13 +136,13 @@ func New(dir string) (*RaspCache, error) {
 func (c *RaspCache) GetGroups() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.Groups.Timetable
+	return c.groupsAny
 }
 
 func (c *RaspCache) GetTeachers() map[string]any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.Teachers.Timetable
+	return c.teachersAny
 }
 
 func (c *RaspCache) GetTeamNames() map[string]string {
@@ -211,24 +217,45 @@ func (c *RaspCache) GetTeachersUpdateTime() time.Time {
 	return time.UnixMilli(c.Teachers.Update)
 }
 
-func (c *RaspCache) SetGroups(groups map[string]any, hash string) {
+func (c *RaspCache) SetGroups(ctx context.Context, groups map[string]any, hash string) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setTimetable(KindGroups, c.Groups, groups, hash)
-}
-
-func (c *RaspCache) SetTeachers(teachers map[string]any, hash string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.setTimetable(KindTeachers, c.Teachers, teachers, hash)
-}
-
-func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], data map[string]any, hash string) {
 	now := time.Now().UnixMilli()
-	old := entry.Timetable
+	merged, maxWeek, changed := c.setTimetable(KindGroups, c.groupsAny, groups, c.Groups.LastWeekIndex)
+	c.groupsAny = merged
+	c.Groups.Timetable = GroupTimetableFromAny(merged)
+	c.Groups.Update = now
+	c.Groups.Hash = hash
+	if changed {
+		c.Groups.Changed = now
+	}
+	c.Groups.LastWeekIndex = maxWeek
+}
 
+func (c *RaspCache) SetTeachers(ctx context.Context, teachers map[string]any, hash string) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now().UnixMilli()
+	merged, maxWeek, changed := c.setTimetable(KindTeachers, c.teachersAny, teachers, c.Teachers.LastWeekIndex)
+	c.teachersAny = merged
+	c.Teachers.Timetable = TeacherTimetableFromAny(merged)
+	c.Teachers.Update = now
+	c.Teachers.Hash = hash
+	if changed {
+		c.Teachers.Changed = now
+	}
+	c.Teachers.LastWeekIndex = maxWeek
+}
+
+func (c *RaspCache) setTimetable(kind string, old map[string]any, data map[string]any, previousWeekIndex int) (map[string]any, int, bool) {
 	todayIdx := utils.DayIndexFromDate(time.Now())
 
 	var newEvents []Event
@@ -249,8 +276,7 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 		newChanges = append(newChanges, changes...)
 	}
 
-	previousWeekIndex := entry.LastWeekIndex
-	weekEvents, maxWeek := collectWeekEvents(kind, entry, data)
+	weekEvents, maxWeek := collectWeekEvents(kind, previousWeekIndex, data)
 	newEvents = append(newEvents, weekEvents...)
 
 	var withdrawnEntries []string
@@ -280,8 +306,12 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 		}
 		if _, exists := data[k]; !exists {
 			md, _, _ := mergeDays(nil, entryDays(v))
-			om["days"] = md
-			mergedTimetable[k] = om
+			cp := make(map[string]any, len(om)+1)
+			for fk, fv := range om {
+				cp[fk] = fv
+			}
+			cp["days"] = md
+			mergedTimetable[k] = cp
 		}
 	}
 	for k, v := range data {
@@ -300,21 +330,18 @@ func (c *RaspCache) setTimetable(kind string, entry *RaspEntry[map[string]any], 
 		mergedTimetable[k] = v
 	}
 
-	entry.Timetable = mergedTimetable
-	entry.Update = now
-	entry.Hash = hash
-
-	if !mapsEqual(old, mergedTimetable) {
-		entry.Changed = now
-	}
-
-	entry.LastWeekIndex = maxWeek
+	changed := !mapsEqual(old, mergedTimetable)
 
 	c.events = append(c.events, newEvents...)
 	c.dayChanges = append(c.dayChanges, newChanges...)
+
+	return mergedTimetable, maxWeek, changed
 }
 
-func (c *RaspCache) SetTeam(names map[string]string, hashes []string) {
+func (c *RaspCache) SetTeam(ctx context.Context, names map[string]string, hashes []string) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -323,15 +350,18 @@ func (c *RaspCache) SetTeam(names map[string]string, hashes []string) {
 	c.Team.Hash = hashes
 }
 
-func (c *RaspCache) SetCalls(site Schedule, manual Schedule, source string) {
-	c.setCallsInternal(site, manual, source, "", false)
+func (c *RaspCache) SetCalls(ctx context.Context, site Schedule, manual Schedule, source string) {
+	c.setCallsInternal(ctx, site, manual, source, "", false)
 }
 
-func (c *RaspCache) SetCallsNotify(site Schedule, manual Schedule, source string, reason string) {
-	c.setCallsInternal(site, manual, source, reason, true)
+func (c *RaspCache) SetCallsNotify(ctx context.Context, site Schedule, manual Schedule, source string, reason string) {
+	c.setCallsInternal(ctx, site, manual, source, reason, true)
 }
 
-func (c *RaspCache) setCallsInternal(site Schedule, manual Schedule, source, reason string, skipNotify bool) {
+func (c *RaspCache) setCallsInternal(ctx context.Context, site Schedule, manual Schedule, source, reason string, skipNotify bool) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -357,7 +387,10 @@ func (c *RaspCache) setCallsInternal(site Schedule, manual Schedule, source, rea
 	c.selectActiveCallsLocked(skipNotify, reason)
 }
 
-func (c *RaspCache) SetCallsSiteUpdatedAt(raw string, at int64) {
+func (c *RaspCache) SetCallsSiteUpdatedAt(ctx context.Context, raw string, at int64) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -374,7 +407,10 @@ func (c *RaspCache) SetCallsSiteUpdatedAt(raw string, at int64) {
 	}
 }
 
-func (c *RaspCache) SetCallsSiteVariants(variants []CallsVariant) {
+func (c *RaspCache) SetCallsSiteVariants(ctx context.Context, variants []CallsVariant) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -394,12 +430,11 @@ func (c *RaspCache) GetCallsVariant(name string) (CallsSchedule, bool) {
 }
 
 func (c *RaspCache) SetCallsPreferSite(v bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.callsPreferSite = v
+	c.callsPreferSite.Store(v)
 }
 
 func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
+	preferSite := c.callsPreferSite.Load()
 	configSchedule := CallsSchedule{}
 
 	activeSource := "config"
@@ -424,7 +459,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 	case "config":
 		activeSource = "config"
 	default:
-		if c.callsPreferSite && c.Calls.Site.UpdatedAt > 0 {
+		if preferSite && c.Calls.Site.UpdatedAt > 0 {
 			activeSource = "site"
 			activeSchedule = c.Calls.Site.Schedule
 			activeUpdatedAt = c.Calls.Site.UpdatedAt
@@ -432,7 +467,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 		}
 		if c.Calls.Manual.UpdatedAt > 0 {
 			manualIsNewer := c.Calls.Manual.UpdatedAt >= c.Calls.Site.UpdatedAt
-			if !c.callsPreferSite || manualIsNewer {
+			if !preferSite || manualIsNewer {
 				activeSource = "manual"
 				activeSchedule = c.Calls.Manual.Schedule
 				activeUpdatedAt = c.Calls.Manual.UpdatedAt
@@ -482,7 +517,10 @@ type Schedule struct {
 	Saturday [][2][2]string
 }
 
-func (c *RaspCache) SetSuccessUpdate(ok bool) {
+func (c *RaspCache) SetSuccessUpdate(ctx context.Context, ok bool) {
+	if err := ctx.Err(); err != nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.SuccessUpdate = ok
@@ -494,8 +532,8 @@ func (c *RaspCache) Stats() Stats {
 	return Stats{
 		Hits:           c.hits.Load(),
 		Misses:         c.misses.Load(),
-		GroupsCount:    len(c.Groups.Timetable),
-		TeachersCount:  len(c.Teachers.Timetable),
+		GroupsCount:    len(c.groupsAny),
+		TeachersCount:  len(c.teachersAny),
 		SuccessUpdate:  c.SuccessUpdate,
 		GroupsUpdate:   c.Groups.Update,
 		TeachersUpdate: c.Teachers.Update,
@@ -517,7 +555,7 @@ type TeamMeta struct {
 	Hash    []string `json:"hash"`
 }
 
-func entryMeta(entry *RaspEntry[map[string]any]) EntryMeta {
+func entryMeta[T any](entry *RaspEntry[T]) EntryMeta {
 	return EntryMeta{Update: entry.Update, Changed: entry.Changed, LastWeekIndex: entry.LastWeekIndex, Hash: entry.Hash}
 }
 
@@ -550,14 +588,21 @@ func (c *RaspCache) RecordMiss() { c.misses.Add(1) }
 func (c *RaspCache) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.Groups = &RaspEntry[map[string]any]{Timetable: make(map[string]any)}
-	c.Teachers = &RaspEntry[map[string]any]{Timetable: make(map[string]any)}
+	c.Groups = &RaspEntry[GroupTimetable]{Timetable: make(GroupTimetable)}
+	c.Teachers = &RaspEntry[TeacherTimetable]{Timetable: make(TeacherTimetable)}
+	c.groupsAny = make(map[string]any)
+	c.teachersAny = make(map[string]any)
 	c.Team = TeamCacheEntry{Names: make(map[string]string)}
 	c.events = nil
 	c.dayChanges = nil
 }
 
-func (c *RaspCache) Save() error {
+func (c *RaspCache) Save(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	c.saveMu.Lock()
+	defer c.saveMu.Unlock()
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -579,12 +624,37 @@ func (c *RaspCache) Save() error {
 		if err != nil {
 			return fmt.Errorf("marshal %s: %w", e.name, err)
 		}
-		if err := os.WriteFile(path, data, 0644); err != nil {
+		if err := writeFileAtomic(path, data, 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", e.name, err)
 		}
 	}
 
 	return nil
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func (c *RaspCache) load() {
@@ -605,40 +675,8 @@ func (c *RaspCache) load() {
 	loadFile("team.json", &c.Team)
 	loadFile("calls.json", &c.Calls)
 
-	normalizeTimetableDays(c.Groups)
-	normalizeTimetableDays(c.Teachers)
-}
-
-var cachedDateRe = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})`)
-
-func normalizeTimetableDays(entry *RaspEntry[map[string]any]) {
-	if entry == nil {
-		return
-	}
-
-	for _, value := range entry.Timetable {
-		record, ok := value.(map[string]any)
-		if !ok {
-			continue
-		}
-		days, ok := record["days"].([]any)
-		if !ok {
-			continue
-		}
-		for _, rawDay := range days {
-			day, ok := rawDay.(map[string]any)
-			if !ok {
-				continue
-			}
-			stored, ok := day["day"].(string)
-			if !ok {
-				continue
-			}
-			if match := cachedDateRe.FindString(stored); match != "" {
-				day["day"] = match
-			}
-		}
-	}
+	c.groupsAny = c.Groups.Timetable.AnyView()
+	c.teachersAny = c.Teachers.Timetable.AnyView()
 }
 
 func mapsEqual(a, b map[string]any) bool {

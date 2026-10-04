@@ -74,11 +74,11 @@ func TestNextWeekNoticeReachesTheSubscribedChats(t *testing.T) {
 	currentDay := current.FirstDayDate().Format("02.01.2006")
 	nextDay := next.FirstDayDate().Format("02.01.2006")
 
-	b.cache.SetGroups(map[string]any{"100": groupDays("100", lessonDay(currentDay, "Математика"))}, "week-1")
-	b.cache.DrainEvents()
+	b.cache.SetGroups(t.Context(), map[string]any{"100": groupDays("100", lessonDay(currentDay, "Математика"))}, "week-1")
+	b.cache.DrainEvents(t.Context())
 
-	b.cache.SetGroups(map[string]any{"100": groupDays("100", lessonDay(currentDay, "Математика"), lessonDay(nextDay, "Физика"))}, "week-2")
-	events := b.cache.DrainEvents()
+	b.cache.SetGroups(t.Context(), map[string]any{"100": groupDays("100", lessonDay(currentDay, "Математика"), lessonDay(nextDay, "Физика"))}, "week-2")
+	events := b.cache.DrainEvents(t.Context())
 	if len(events) == 0 {
 		t.Fatal("a new published week must reach the event bus")
 	}
@@ -118,11 +118,11 @@ func TestTriggerRunsTheDayNoticeThroughTheWiredFunction(t *testing.T) {
 
 	today := time.Now()
 	tomorrow := today.AddDate(0, 0, 1)
-	b.cache.SetGroups(map[string]any{"100": groupDays("100",
+	b.cache.SetGroups(t.Context(), map[string]any{"100": groupDays("100",
 		lessonDay(today.Format("02.01.2006"), "Математика", "Физика", "Информатика"),
 		lessonDay(tomorrow.Format("02.01.2006"), "Химия"),
 	)}, "day-1")
-	b.cache.DrainEvents()
+	b.cache.DrainEvents(t.Context())
 
 	notifier := noticeNotifier(b, repo)
 	b.SetNoticeDayFunc(notifier.CronDayAll)
@@ -177,11 +177,11 @@ func TestDayNoticeWorksInEveryTimeZone(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			b.cache.SetGroups(map[string]any{"100": groupDays("100",
+			b.cache.SetGroups(t.Context(), map[string]any{"100": groupDays("100",
 				lessonDay(now.Format("02.01.2006"), "Математика", "Физика", "Информатика"),
 				lessonDay(now.AddDate(0, 0, 1).Format("02.01.2006"), "Химия"),
 			)}, "day-zone")
-			b.cache.DrainEvents()
+			b.cache.DrainEvents(t.Context())
 
 			notifier := noticeNotifier(b, repo)
 			notifier.SetNow(func() time.Time { return now })
@@ -193,13 +193,13 @@ func TestDayNoticeWorksInEveryTimeZone(t *testing.T) {
 			}
 
 			nextWeekDay := utils.WeekIndexFromDate(now.AddDate(0, 0, 1)).Next().FirstDayDate()
-			b.cache.SetGroups(map[string]any{"100": groupDays("100",
+			b.cache.SetGroups(t.Context(), map[string]any{"100": groupDays("100",
 				lessonDay(now.Format("02.01.2006"), "Математика", "Физика", "Информатика"),
 				lessonDay(now.AddDate(0, 0, 1).Format("02.01.2006"), "Химия"),
 				lessonDay(nextWeekDay.Format("02.01.2006"), "Астрономия"),
 			)}, "week-zone")
 			caller.reset()
-			notifier.HandleEvents(b.cache.DrainEvents())
+			notifier.HandleEvents(b.cache.DrainEvents(t.Context()))
 
 			week := caller.textsFor(userID)
 			if len(week) != 1 || !strings.Contains(week[0], "Доступно расписание на следующую неделю") {

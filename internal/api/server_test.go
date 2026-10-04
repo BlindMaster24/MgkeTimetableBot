@@ -79,11 +79,11 @@ func setupTestServerWith(t *testing.T, tracker *health.Tracker) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{"group": "63", "days": []any{}},
 		"64": map[string]any{"group": "64", "days": []any{}},
 	}, "hash1")
-	c.SetTeachers(map[string]any{
+	c.SetTeachers(t.Context(), map[string]any{
 		"Иванов": map[string]any{"teacher": "Иванов"},
 	}, "hash2")
 	gin.SetMode(gin.TestMode)

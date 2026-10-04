@@ -356,7 +356,7 @@ func TestEventNotifier_CronDay_SendsNextFutureDay(t *testing.T) {
 	n, sender, finder, c := newTestNotifier(t)
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{
@@ -390,7 +390,7 @@ func TestEventNotifier_CronDay_Dedup(t *testing.T) {
 	n, sender, finder, c := newTestNotifier(t)
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{
@@ -420,7 +420,7 @@ func TestEventNotifier_CronDay_IndexMatch(t *testing.T) {
 	n, sender, finder, c := newTestNotifier(t)
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{
@@ -455,7 +455,7 @@ func TestEventNotifier_CronDay_EmptyLessonIndexIfEmpty(t *testing.T) {
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
 	n.cfg.Parser.LessonIndexIfEmpty = 1
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{"day": todayStr(), "lessons": []any{}},
@@ -474,7 +474,7 @@ func TestEventNotifier_CronDay_AllFutureEmpty(t *testing.T) {
 	n, sender, finder, c := newTestNotifier(t)
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
 
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{"day": todayStr(), "lessons": []any{map[string]any{"lesson": "A"}}},
@@ -494,7 +494,7 @@ func TestEventNotifier_UpdateWeek(t *testing.T) {
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student", NoticeNextWeek: true}}
 
 	nextWeek := utils.WeekIndexFromDate(time.Now()).Value() + 1
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{
@@ -531,7 +531,7 @@ func TestEventNotifier_UpdateWeek_NoNotice(t *testing.T) {
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student", NoticeNextWeek: false}}
 
 	nextWeek := utils.WeekIndexFromDate(time.Now()).Value() + 1
-	c.SetGroups(map[string]any{
+	c.SetGroups(t.Context(), map[string]any{
 		"63": map[string]any{
 			"days": []any{
 				map[string]any{"day": futureWeekStr(), "lessons": []any{map[string]any{"lesson": "X"}}},

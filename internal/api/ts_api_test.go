@@ -20,9 +20,9 @@ func decodeBody(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 
 func TestInfoCarriesTSCacheEnvelope(t *testing.T) {
 	srv := setupTestServer(t)
-	srv.cache.SetGroups(map[string]any{"63": map[string]any{"days": []any{}}}, "groups-hash")
-	srv.cache.SetTeachers(map[string]any{"T": map[string]any{"days": []any{}}}, "teachers-hash")
-	srv.cache.SetTeam(map[string]string{"A": "A Full"}, []string{"team-hash"})
+	srv.cache.SetGroups(t.Context(), map[string]any{"63": map[string]any{"days": []any{}}}, "groups-hash")
+	srv.cache.SetTeachers(t.Context(), map[string]any{"T": map[string]any{"days": []any{}}}, "teachers-hash")
+	srv.cache.SetTeam(t.Context(), map[string]string{"A": "A Full"}, []string{"team-hash"})
 
 	w := call(t, srv, "GET", "/api/info")
 	if w.Code != http.StatusOK {
@@ -101,7 +101,7 @@ func TestInfoCarriesTheWebhookStatusWhenWired(t *testing.T) {
 
 func TestGroupsSortedNumericAware(t *testing.T) {
 	srv := setupTestServer(t)
-	srv.cache.SetGroups(map[string]any{
+	srv.cache.SetGroups(t.Context(), map[string]any{
 		"100": map[string]any{"days": []any{}},
 		"99":  map[string]any{"days": []any{}},
 		"ПСМ": map[string]any{"days": []any{}},
@@ -119,7 +119,7 @@ func TestGroupsSortedNumericAware(t *testing.T) {
 
 func TestGroupByNameEnvelope(t *testing.T) {
 	srv := setupTestServer(t)
-	srv.cache.SetGroups(map[string]any{
+	srv.cache.SetGroups(t.Context(), map[string]any{
 		"100": map[string]any{"days": []any{map[string]any{"day": "01.09.2026", "lessons": []any{}}}},
 	}, "h")
 
@@ -143,7 +143,7 @@ func TestGroupByNameEnvelope(t *testing.T) {
 		t.Errorf("lastSuccess = %v", body["lastSuccess"])
 	}
 
-	srv.cache.SetSuccessUpdate(false)
+	srv.cache.SetSuccessUpdate(t.Context(), false)
 	w = call(t, srv, "GET", "/api/group/100")
 	body = decodeBody(t, w)
 	if body["lastSuccess"] != false {
@@ -204,7 +204,7 @@ func TestParserHealthEnvelope(t *testing.T) {
 		t.Errorf("cache counters missing: %v", cacheBlock)
 	}
 
-	srv.cache.SetSuccessUpdate(false)
+	srv.cache.SetSuccessUpdate(t.Context(), false)
 	w = call(t, srv, "GET", "/api/parser-health")
 	body = decodeBody(t, w)
 	if body["ok"] != false {

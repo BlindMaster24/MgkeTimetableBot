@@ -157,20 +157,20 @@ func TestE2E_ChangedDayReachesOnlyInterestedChats(t *testing.T) {
 
 	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
 
-	raspCache.SetGroups(map[string]any{
+	raspCache.SetGroups(t.Context(), map[string]any{
 		"100": groupEntry(groupDay(tomorrow, "Математика")),
 		"200": groupEntry(groupDay(tomorrow, "Физика")),
 	}, "hash-1")
-	notifier.HandleEvents(raspCache.DrainEvents())
+	notifier.HandleEvents(raspCache.DrainEvents(t.Context()))
 	if len(sender.sent) != 0 {
 		t.Fatalf("the first parse must not notify, got %+v", sender.sent)
 	}
 
-	raspCache.SetGroups(map[string]any{
+	raspCache.SetGroups(t.Context(), map[string]any{
 		"100": groupEntry(groupDay(tomorrow, "Математика", "Информатика")),
 		"200": groupEntry(groupDay(tomorrow, "Физика", "Химия")),
 	}, "hash-2")
-	notifier.HandleEvents(raspCache.DrainEvents())
+	notifier.HandleEvents(raspCache.DrainEvents(t.Context()))
 
 	if got := sender.textsFor(5001); len(got) != 1 {
 		t.Errorf("the group owner must get one notice, got %v", got)

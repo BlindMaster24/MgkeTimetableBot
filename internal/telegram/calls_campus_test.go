@@ -11,7 +11,7 @@ import (
 func withCampusVariants(t *testing.T, b *Bot) {
 	t.Helper()
 
-	b.cache.SetCallsSiteVariants([]cache.CallsVariant{
+	b.cache.SetCallsSiteVariants(t.Context(), []cache.CallsVariant{
 		{
 			Name: "Казинца",
 			Schedule: cache.CallsSchedule{
@@ -44,7 +44,7 @@ func TestCallsScheduleFollowsTheChatCampus(t *testing.T) {
 	b, _, c := setupTestBotWithData(t)
 	withCampusVariants(t, b)
 
-	c.SetCallsNotify(cache.Schedule{
+	c.SetCallsNotify(t.Context(), cache.Schedule{
 		Weekdays: [][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}},
 		Saturday: [][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}},
 	}, cache.Schedule{}, "site", "")

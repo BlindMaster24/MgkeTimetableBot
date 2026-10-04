@@ -356,7 +356,7 @@ func TestOldBot_DebugCountsChatsAndApiKeys(t *testing.T) {
 func TestOldBot_TeacherHintSpellingFollowsTheOldCommands(t *testing.T) {
 	caller := &recordingCaller{}
 	b, repo := setupE2EBotWithCaller(t, caller, 4242)
-	b.cache.SetTeachers(map[string]any{"Иванов И.И.": map[string]any{"days": []any{}}}, "hint-teachers")
+	b.cache.SetTeachers(t.Context(), map[string]any{"Иванов И.И.": map[string]any{"days": []any{}}}, "hint-teachers")
 
 	const userID int64 = 9001
 	chat, err := repo.FindOrCreate("telegram", userID)
