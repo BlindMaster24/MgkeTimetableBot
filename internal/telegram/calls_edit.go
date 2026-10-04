@@ -69,9 +69,7 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 		return u.Bot.SendText(u.ChatID, "Не удалось распознать расписание. Проверьте формат.")
 	}
 
-	s.bot.cacheMu.Lock()
 	s.bot.cache.SetCallsManualNotify(parsed.Weekdays, parsed.Saturday, reason, notifyNow)
-	s.bot.cacheMu.Unlock()
 
 	chat.Scene = ""
 	chat.CallsEditInput = ""

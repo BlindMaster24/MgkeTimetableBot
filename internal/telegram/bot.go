@@ -2,13 +2,11 @@ package telegram
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,42 +43,17 @@ type archiveStore interface {
 	WeekIndexBounds() (archive.Bounds, error)
 	Groups() ([]string, error)
 	Teachers() ([]string, error)
+	Stats() (archive.Stats, error)
 	FlushCache(groups, teachers map[string]any) (int, error)
-	DB() *sql.DB
 }
 
 type Bot struct {
-	client        *telego.Bot
-	cfg           *config.Config
-	log           *logger.Logger
-	i18n          *i18n.Localizer
-	chatRepo      *Repository
-	cache         *cache.RaspCache
-	cacheMu       sync.Mutex
-	commands      map[string]Command
-	commandOrder  []Command
-	callbacks     map[string]Callback
-	parseFunc     func() error
-	startTime     time.Time
-	buildInfo     build.Info
-	archive       archiveStore
-	aliasRepo     *AliasRepository
-	parseLogs     []parseLogEntry
-	reportsMu     sync.Mutex
-	reports       map[string]parser.Report
-	textCommands  []Command
-	scenes        []sceneRoute
-	google        googleService
-	googleSyncMu  sync.Mutex
-	health        healthSource
-	keys          *apikey.Store
-	noticeDay     func(index int)
-	calendarSync  func(ctx context.Context) (int, error)
-	apiProbe      func(ctx context.Context) []apiprobe.Result
-	incidents     *health.IncidentLog
-	now           func() time.Time
-	webhookMu     sync.Mutex
-	webhookStatus WebhookStatus
+	botDeps
+	handlerRegistry
+	sessionStore
+	botState
+	client       *telego.Bot
+	googleSyncMu sync.Mutex
 }
 
 type Update struct {
@@ -143,16 +116,21 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	}
 
 	b := &Bot{
-		client:   client,
-		cfg:      cfg,
-		log:      log,
-		i18n:     loc,
-		chatRepo: chatRepo,
-		cache:    cache,
-		archive:  archiveRepo, commands: make(map[string]Command),
-		callbacks: make(map[string]Callback),
-		startTime: time.Now(),
-		buildInfo: build.New("", "", ""),
+		botDeps: botDeps{
+			cfg:       cfg,
+			log:       log,
+			i18n:      loc,
+			cache:     cache,
+			archive:   archiveRepo,
+			startTime: time.Now(),
+			buildInfo: build.New("", "", ""),
+		},
+		handlerRegistry: handlerRegistry{
+			commands:  make(map[string]Command),
+			callbacks: make(map[string]Callback),
+		},
+		sessionStore: sessionStore{chatRepo: chatRepo},
+		client:       client,
 	}
 
 	b.aliasRepo = NewAliasRepository(chatRepo)
@@ -194,21 +172,6 @@ func (b *Bot) markIncidentFix(scope, note string) {
 	if b.incidents.MarkManual(scope, note) {
 		b.log.Info().Str("scope", scope).Msg("manual fix recorded in the incident history")
 	}
-}
-
-func (b *Bot) RegisterCommand(cmd Command) {
-	if _, exists := b.commands[cmd.Name()]; !exists {
-		b.commandOrder = append(b.commandOrder, cmd)
-	}
-	b.commands[cmd.Name()] = cmd
-}
-
-func (b *Bot) RegisterTextCommand(cmd Command) {
-	b.textCommands = append(b.textCommands, cmd)
-}
-
-func (b *Bot) RegisterCallback(cb Callback) {
-	b.callbacks[cb.Prefix()] = cb
 }
 
 func (b *Bot) registerAll() {
@@ -399,18 +362,6 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 	}
 }
 
-func (b *Bot) findCallback(data string) (string, Callback) {
-	bestPrefix := ""
-	var bestHandler Callback
-	for prefix, handler := range b.callbacks {
-		if strings.HasPrefix(data, prefix) && len(prefix) > len(bestPrefix) {
-			bestPrefix = prefix
-			bestHandler = handler
-		}
-	}
-	return bestPrefix, bestHandler
-}
-
 func (b *Bot) SetMyCommands() error {
 	params := &telego.SetMyCommandsParams{
 		Commands: b.botCommands(false),
@@ -437,44 +388,6 @@ func (b *Bot) SetMyCommands() error {
 	}
 
 	return errors.Join(errs...)
-}
-
-func (b *Bot) commandByName(name string) Command {
-	name = strings.ToLower(strings.TrimPrefix(name, "/"))
-	for _, cmd := range b.commandOrder {
-		if strings.ToLower(strings.TrimPrefix(cmd.Name(), "/")) == name {
-			return cmd
-		}
-	}
-	return nil
-}
-
-func (b *Bot) botCommands(includeAdmin bool) []telego.BotCommand {
-	cmds := make([]telego.BotCommand, 0, len(b.commandOrder))
-	for _, cmd := range b.commandOrder {
-		if hidden, ok := cmd.(HiddenCommand); ok && hidden.Hidden() {
-			continue
-		}
-
-		admin := false
-		if ac, ok := cmd.(AdminCommand); ok {
-			admin = ac.AdminOnly()
-		}
-		if admin && !includeAdmin {
-			continue
-		}
-
-		description := cmd.Description()
-		if admin {
-			description = "[адм] " + description
-		}
-
-		cmds = append(cmds, telego.BotCommand{
-			Command:     strings.ToLower(strings.TrimPrefix(cmd.Name(), "/")),
-			Description: description,
-		})
-	}
-	return cmds
 }
 
 func (b *Bot) SendText(chatID int64, text string) error {
@@ -652,30 +565,11 @@ func (b *Bot) CleanupTempFiles(dir string, maxAge time.Duration) {
 }
 
 func (b *Bot) RecordParserReport(report parser.Report) {
-	b.reportsMu.Lock()
-	defer b.reportsMu.Unlock()
-
-	if b.reports == nil {
-		b.reports = make(map[string]parser.Report)
-	}
-	b.reports[report.Source] = report
+	b.recordReport(report)
 }
 
 func (b *Bot) ParserReports() []parser.Report {
-	b.reportsMu.Lock()
-	defer b.reportsMu.Unlock()
-
-	sources := make([]string, 0, len(b.reports))
-	for source := range b.reports {
-		sources = append(sources, source)
-	}
-	sort.Strings(sources)
-
-	reports := make([]parser.Report, 0, len(sources))
-	for _, source := range sources {
-		reports = append(reports, b.reports[source])
-	}
-	return reports
+	return b.reportsSnapshot()
 }
 
 func (b *Bot) parserDiagnostics() []string {
@@ -720,13 +614,9 @@ func (b *Bot) parserDiagnostics() []string {
 }
 
 func (b *Bot) AddParseLog(success bool, msg string) {
-	entry := parseLogEntry{time: time.Now(), success: success, msg: msg}
-	b.parseLogs = append(b.parseLogs, entry)
-	if len(b.parseLogs) > 50 {
-		b.parseLogs = b.parseLogs[len(b.parseLogs)-50:]
-	}
+	b.appendParseLog(parseLogEntry{time: time.Now(), success: success, msg: msg})
 }
 
 func (b *Bot) GetParseLogs() []parseLogEntry {
-	return b.parseLogs
+	return b.parseLogsSnapshot()
 }

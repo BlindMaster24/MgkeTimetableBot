@@ -258,18 +258,13 @@ func (b *Bot) WebhookStatus(ctx context.Context) WebhookStatus {
 	}
 	status.CheckedAt = time.Now().Unix()
 
-	b.webhookMu.Lock()
-	b.webhookStatus = status
-	b.webhookMu.Unlock()
+	b.setWebhookStatus(status)
 
 	return status
 }
 
 func (b *Bot) cachedWebhookStatus() WebhookStatus {
-	b.webhookMu.Lock()
-	defer b.webhookMu.Unlock()
-
-	return b.webhookStatus
+	return b.getWebhookStatus()
 }
 
 func (b *Bot) ResetWebhook(ctx context.Context) (WebhookStatus, error) {
