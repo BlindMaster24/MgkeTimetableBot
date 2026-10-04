@@ -393,7 +393,7 @@ func (c *resetCacheCmd) Name() string        { return "/resetcache" }
 func (c *resetCacheCmd) Description() string { return c.bot.loc("cmd_resetcache") }
 func (c *resetCacheCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.cache.Reset()
-	if err := c.bot.cache.Save(); err != nil {
+	if err := c.bot.cache.Save(ctx); err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("reset_cache_error"))
 	}
 	return u.Bot.SendText(u.ChatID, c.bot.loc("reset_cache_done"))
@@ -514,7 +514,7 @@ func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 		return err
 	}
 
-	if err := c.bot.cache.Save(); err != nil {
+	if err := c.bot.cache.Save(ctx); err != nil {
 		return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
 	}
 
@@ -642,20 +642,6 @@ func matchesText(cmd Command, text string, chat *Chat) bool {
 	return true
 }
 
-func findClosest(input string, candidates map[string]any) (string, bool) {
-	for key := range candidates {
-		if strings.EqualFold(key, input) {
-			return key, true
-		}
-	}
-	for key := range candidates {
-		if strings.Contains(strings.ToLower(key), strings.ToLower(input)) {
-			return key, true
-		}
-	}
-	return "", false
-}
-
 func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	groups := b.GetRaspCache().GetGroups()
 	if len(groups) == 0 {
@@ -663,9 +649,9 @@ func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-	matched, _ := findClosest(input, groups)
+	matched, ok := b.lookupGroup(input, u.UserID)
 
-	if matched == "" {
+	if !ok {
 		b.SendText(u.ChatID, b.loc("invalid_group_number"))
 		return
 	}
@@ -685,14 +671,13 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-	matched, _ := findClosest(input, teachers)
+	matched, _ := matchTeacherList(input, teachers, b.cache.GetTeamNames(), b.searchAliases(u.UserID))
 
-	if matched == "" {
+	if len(matched) == 0 {
 		b.SendText(u.ChatID, b.loc("teacher_not_found"))
 		return
 	}
-
-	chat.Teacher = matched
+	chat.Teacher = matched[0]
 	chat.Mode = ModeTeacher
 	chat.Group = ""
 	chat.Scene = ""

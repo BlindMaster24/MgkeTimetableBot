@@ -61,6 +61,9 @@ func (b *Bot) findGroupWithKeyboard(u *Update, chat *Chat, input string, keyboar
 		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", keyboard)
 		return "", false
 	}
+	if group, ok := b.lookupGroup(normalized, u.UserID); ok {
+		return group, true
+	}
 	for _, ch := range normalized {
 		if ch < '0' || ch > '9' {
 			u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", keyboard)
@@ -71,12 +74,8 @@ func (b *Bot) findGroupWithKeyboard(u *Update, chat *Chat, input string, keyboar
 		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Номер группы введён неверно", keyboard)
 		return "", false
 	}
-	if _, ok := b.cache.GetGroups()[normalized]; !ok {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данной учебной группы не существует", keyboard)
-		return "", false
-	}
-
-	return normalized, true
+	u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данной учебной группы не существует", keyboard)
+	return "", false
 }
 
 func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keyboard *telego.ReplyKeyboardMarkup) (string, bool, bool) {
@@ -85,7 +84,7 @@ func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keybo
 		return "", false, false
 	}
 
-	matched, tooMany := matchTeacherList(input, b.cache.GetTeachers(), b.cache.GetTeamNames())
+	matched, tooMany := matchTeacherList(input, b.cache.GetTeachers(), b.cache.GetTeamNames(), b.searchAliases(u.UserID))
 	if len(matched) == 0 {
 		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данный преподаватель не найден", keyboard)
 		return "", false, false

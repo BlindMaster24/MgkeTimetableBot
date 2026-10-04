@@ -2,6 +2,7 @@ package notification
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ type Scheduler struct {
 	sender        EventSender
 	chats         EventChatFinder
 	notifier      *EventNotifier
+	rand          *rand.Rand
 	healthTracker *health.Tracker
 	health        *HealthNotifier
 	store         health.StateStore
@@ -45,6 +47,30 @@ func (s *Scheduler) Location() *time.Location {
 	return s.location
 }
 
+func (s *Scheduler) SetRand(r *rand.Rand) {
+	s.rand = r
+}
+
+func reminderLead(cfg *config.Config) (time.Duration, time.Duration) {
+	if cfg == nil {
+		return 0, 0
+	}
+	return time.Duration(cfg.Timetable.ReminderLeadMinutes) * time.Minute,
+		time.Duration(cfg.Timetable.ReminderJitterSeconds) * time.Second
+}
+
+func (s *Scheduler) RemindNow(now time.Time) {
+	lead, window := reminderLead(s.cfg)
+	if lead <= 0 || s.notifier == nil {
+		return
+	}
+	r := s.rand
+	if r == nil {
+		r = rand.New(rand.NewSource(now.UnixNano()))
+	}
+	s.notifier.RemindUpcoming(now, lead, window, r)
+}
+
 func (s *Scheduler) SetIncidents(incidents *health.IncidentLog) {
 	s.incidents = incidents
 	if s.health != nil {
@@ -57,9 +83,28 @@ func (s *Scheduler) Start() {
 
 	s.registerSlots(s.cfg.Timetable.Weekdays, "1-5")
 	s.registerSlots(s.cfg.Timetable.Saturday, "6")
+	s.registerReminders()
 	s.registerHealthCheck()
 
 	s.cron.Start()
+}
+
+func (s *Scheduler) registerReminders() {
+	lead, window := reminderLead(s.cfg)
+	if lead <= 0 {
+		return
+	}
+	if s.rand == nil {
+		s.rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	r := s.rand
+	if _, err := s.cron.AddFunc("0 * * * * *", func() {
+		s.notifier.RemindUpcoming(time.Now(), lead, window, r)
+	}); err != nil {
+		s.log.Error().Err(err).Msg("failed to schedule lesson reminders")
+		return
+	}
+	s.log.Info().Dur("lead", lead).Dur("jitter", window).Msg("lesson reminders scheduled")
 }
 
 func (s *Scheduler) registerHealthCheck() {

@@ -131,31 +131,35 @@ func (b *Bot) resolveGroupInput(u *Update, chat *Chat, input, kind string) error
 
 	normalized := strings.TrimRight(strings.TrimSpace(input), "*")
 
-	invalid := normalized == ""
-	if !invalid {
+	if normalized == "" {
+		message := "Это не число"
+		if kind == "set" {
+			message = fmt.Sprintf("Неправильный синтаксис команды\n\nПример:\n/setGroup %s", randomKey(groups))
+		}
+		return u.Bot.SendText(u.ChatID, message)
+	}
+	if group, ok := b.lookupGroup(normalized, u.UserID); ok {
+		normalized = group
+	} else {
+		invalid := false
 		for _, ch := range normalized {
 			if ch < '0' || ch > '9' {
 				invalid = true
 				break
 			}
 		}
-	}
 
-	message := "Это не число"
-	if !invalid && len(normalized) > 3 {
-		invalid = true
-		message = "Номер группы введён неверно"
-	}
-	if invalid && kind == "set" {
-		message = fmt.Sprintf("Неправильный синтаксис команды\n\nПример:\n/setGroup %s", randomKey(groups))
-	}
-	if invalid {
-		if normalized == "" {
-			return u.Bot.SendText(u.ChatID, message)
+		message := "Это не число"
+		if !invalid && len(normalized) > 3 {
+			invalid = true
+			message = "Номер группы введён неверно"
 		}
-		return b.sendGroupError(u, chat, message)
-	}
-	if _, ok := groups[normalized]; !ok {
+		if invalid && kind == "set" {
+			message = fmt.Sprintf("Неправильный синтаксис команды\n\nПример:\n/setGroup %s", randomKey(groups))
+		}
+		if invalid {
+			return b.sendGroupError(u, chat, message)
+		}
 		return b.sendGroupError(u, chat, "Данной учебной группы не существует")
 	}
 
@@ -216,7 +220,7 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 		return b.sendTeacherError(u, chat, message)
 	}
 
-	matched, tooMany := matchTeacherList(input, teachers, b.cache.GetTeamNames())
+	matched, tooMany := matchTeacherList(input, teachers, b.cache.GetTeamNames(), b.searchAliases(u.UserID))
 	if len(matched) == 0 {
 		return b.sendTeacherError(u, chat, "Данный преподаватель не найден")
 	}
@@ -330,38 +334,6 @@ func (c *setTeacherCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	return c.bot.resolveTeacherInput(u, chat, extractCommandArg(u.Text), "set")
-}
-
-func matchTeacherList(input string, candidates map[string]any, fullNames map[string]string) ([]string, bool) {
-	const matchLimit = 5
-	var matched []string
-	search := strings.ToLower(strings.ReplaceAll(input, ".", ""))
-
-	for _, key := range sortedKeys(candidates) {
-		needle := strings.ToLower(strings.ReplaceAll(key, ".", ""))
-		if !strings.Contains(needle, search) {
-			continue
-		}
-		matched = append(matched, key)
-		if needle == search || len(matched) > matchLimit {
-			break
-		}
-	}
-
-	for _, key := range sortedKeys(fullNames) {
-		if len(matched) > matchLimit {
-			break
-		}
-		if containsString(matched, key) {
-			continue
-		}
-		if !strings.Contains(strings.ToLower(fullNames[key]), strings.ToLower(input)) {
-			continue
-		}
-		matched = append(matched, key)
-	}
-
-	return matched, len(matched) > matchLimit
 }
 
 func sortedKeys[V any](values map[string]V) []string {

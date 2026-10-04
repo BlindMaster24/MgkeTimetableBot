@@ -10,8 +10,10 @@ import (
 )
 
 type TimetableConfig struct {
-	Weekdays [][2][2]string `yaml:"weekdays"`
-	Saturday [][2][2]string `yaml:"saturday"`
+	Weekdays              [][2][2]string `yaml:"weekdays"`
+	Saturday              [][2][2]string `yaml:"saturday"`
+	ReminderLeadMinutes   int            `yaml:"reminder_lead_minutes"`
+	ReminderJitterSeconds int            `yaml:"reminder_jitter_seconds"`
 }
 
 type CallsConfig struct {

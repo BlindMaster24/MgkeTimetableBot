@@ -73,7 +73,7 @@ func setupE2EBotWithClient(t *testing.T, newClient func() (*telego.Bot, error), 
 			},
 		}),
 	}
-	raspCache.SetGroups(groups, "gHash")
+	raspCache.SetGroups(t.Context(), groups, "gHash")
 
 	teachers := map[string]any{
 		"Иванов И.И.": e2eJsonRoundTrip(map[string]any{
@@ -85,7 +85,7 @@ func setupE2EBotWithClient(t *testing.T, newClient func() (*telego.Bot, error), 
 			},
 		}),
 	}
-	raspCache.SetTeachers(teachers, "tHash")
+	raspCache.SetTeachers(t.Context(), teachers, "tHash")
 
 	site := cache.Schedule{
 		Weekdays: [][2][2]string{
@@ -96,7 +96,7 @@ func setupE2EBotWithClient(t *testing.T, newClient func() (*telego.Bot, error), 
 			{{"09:00", "09:45"}, {"09:55", "10:40"}},
 		},
 	}
-	raspCache.SetCalls(site, cache.Schedule{}, "site")
+	raspCache.SetCalls(t.Context(), site, cache.Schedule{}, "site")
 
 	bClient, err := newClient()
 	if err != nil {
@@ -793,7 +793,7 @@ func TestE2E_FormatterOptsEdgeCases(t *testing.T) {
 		t.Error("expected buttons hint")
 	}
 
-	b.cache.SetSuccessUpdate(false)
+	b.cache.SetSuccessUpdate(t.Context(), false)
 	opts = b.getFormatterOpts(chat)
 	if !opts.HasParserError {
 		t.Error("expected HasParserError")
@@ -1160,27 +1160,27 @@ func TestE2E_MatchTeacherList(t *testing.T) {
 		"Сидоров С.С.": "Сидоров Сидор Сидорович",
 	}
 
-	matched, tooMany := matchTeacherList("иванов", candidates, fullNames)
+	matched, tooMany := matchTeacherList("иванов", candidates, fullNames, nil)
 	if len(matched) != 2 || tooMany {
 		t.Fatalf("matched: %v tooMany: %v", matched, tooMany)
 	}
 
-	matched, tooMany = matchTeacherList("петров п.п.", candidates, fullNames)
+	matched, tooMany = matchTeacherList("петров п.п.", candidates, fullNames, nil)
 	if len(matched) != 1 || tooMany {
 		t.Fatalf("exact match failed: %v %v", matched, tooMany)
 	}
 
-	matched, tooMany = matchTeacherList("ов", candidates, fullNames)
+	matched, tooMany = matchTeacherList("ов", candidates, fullNames, nil)
 	if len(matched) != 5 || tooMany {
 		t.Errorf("broad search: %d matches, tooMany=%v", len(matched), tooMany)
 	}
 
-	matched, _ = matchTeacherList("несуществующий", candidates, fullNames)
+	matched, _ = matchTeacherList("несуществующий", candidates, fullNames, nil)
 	if len(matched) != 0 {
 		t.Errorf("expected no match, got %v", matched)
 	}
 
-	matched, _ = matchTeacherList("сидор сидорович", candidates, fullNames)
+	matched, _ = matchTeacherList("сидор сидорович", candidates, fullNames, nil)
 	if len(matched) != 1 || matched[0] != "Сидоров С.С." {
 		t.Errorf("full name search: %v", matched)
 	}

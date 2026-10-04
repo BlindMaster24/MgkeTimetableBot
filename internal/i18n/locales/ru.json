@@ -242,5 +242,18 @@
   "webhook_disabled_hint": "Подсказка: включите telegram.webhook.enabled и укажите публичный https-адрес, чтобы Telegram доставлял обновления сам.",
   "webhook_reset_button": "🔄 Переустановить webhook",
   "webhook_reset_done": "Webhook переустановлен: {{.Endpoint}}",
-  "webhook_reset_failed": "Не удалось переустановить webhook: {{.Error}}"
+  "webhook_reset_failed": "Не удалось переустановить webhook: {{.Error}}",
+  "notify_diff_header": "🔍 Изменения:",
+  "notify_diff_added": "➕ {{.Subject}}",
+  "notify_diff_removed": "➖ {{.Subject}}",
+  "notify_diff_moved": "🔀 {{.Subject}}: {{.From}} → {{.To}}",
+  "notify_diff_room": "🚪 {{.Subject}}: кабинет {{.Room}}",
+  "notify_diff_teacher": "👩‍🏫 {{.Subject}}: {{.Teacher}}",
+  "notify_diff_time": "🕒 {{.Subject}}: {{.Time}}",
+  "notify_lesson_reminder": "⏰ {{.Subject}} в {{.Time}}{{if .Room}} · {{.Room}}{{end}}",
+  "oauth_missing_code": "Auth code not provided",
+  "oauth_missing_state": "State not provided",
+  "oauth_exchange_failed": "Не удалось получить доступ к Google аккаунту",
+  "oauth_save_failed": "Не удалось сохранить Google аккаунт",
+  "oauth_linked_ok": "Аккаунт успешно привязан, можете вернуться обратно в чат"
 }

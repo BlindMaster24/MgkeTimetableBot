@@ -46,7 +46,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 		return u.Bot.SendText(u.ChatID, "Фамилия введена некорректно")
 	}
 
-	matched, tooMany := matchTeacherList(input, teachers, s.bot.cache.GetTeamNames())
+	matched, tooMany := matchTeacherList(input, teachers, s.bot.cache.GetTeamNames(), s.bot.searchAliases(u.UserID))
 	if len(matched) == 0 {
 		return u.Bot.SendText(u.ChatID, "Данный преподаватель не найден")
 	}

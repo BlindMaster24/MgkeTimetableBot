@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
@@ -69,12 +71,16 @@ type EventChatFinder interface {
 }
 
 type EventNotifier struct {
-	cache  *cache.RaspCache
-	cfg    *config.Config
-	log    *logger.Logger
-	sender EventSender
-	chats  EventChatFinder
-	now    func() time.Time
+	cache     *cache.RaspCache
+	cfg       *config.Config
+	log       *logger.Logger
+	sender    EventSender
+	chats     EventChatFinder
+	now       func() time.Time
+	localizer *i18n.Localizer
+	remMu     sync.Mutex
+	remDue    map[reminderKey]time.Time
+	remSent   map[reminderKey]bool
 }
 
 func NewEventNotifier(c *cache.RaspCache, cfg *config.Config, log *logger.Logger, sender EventSender, chats EventChatFinder) *EventNotifier {
@@ -282,7 +288,28 @@ func (n *EventNotifier) UpdateDay(ev *cache.DayEvent) {
 	}
 
 	phrase := getDayPhrase(n.nowTime(), dayString(ev.Day), "день")
-	n.sendDay(ev.Kind, ev.Value, true, phrase, ev.Day, chats)
+	n.sendDayUpdate(ev, phrase, chats)
+}
+
+func (n *EventNotifier) sendDayUpdate(ev *cache.DayEvent, phrase string, chats []*EventChat) {
+	for _, chat := range chats {
+		if chat.PeerID != 0 {
+			chat.ID = chat.PeerID
+		}
+		own := chat.Group
+		if ev.Kind == cache.KindTeachers {
+			own = chat.Teacher
+		}
+		header := n.dayHeader(true, phrase, ev.Kind, ev.Value, own)
+		msg := header
+		if summary := n.changeSummary(ev); summary != "" {
+			msg += summary + "\n"
+		}
+		msg += "\n" + n.formatDay(ev.Kind, ev.Value, ev.Day, chat)
+		if err := n.sender.SendText(chat.ID, msg); err != nil {
+			n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("day notification send failed")
+		}
+	}
 }
 
 func (n *EventNotifier) filtersFor(kind string) []config.LessonFilter {
