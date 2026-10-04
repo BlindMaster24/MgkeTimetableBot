@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -61,7 +62,7 @@ func TestFetchAndParseGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = FetchAndParse(log, c, srv.URL, srv.URL, srv.URL)
+	err = FetchAndParse(t.Context(), log, c, srv.URL, srv.URL, srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestFetchAndParseTeachers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = FetchAndParse(log, c, srv.URL, srv.URL, srv.URL)
+	err = FetchAndParse(t.Context(), log, c, srv.URL, srv.URL, srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +125,7 @@ func TestFetcherUsesProxy(t *testing.T) {
 	}
 
 	fetcher := NewFetcher(log, c, Options{Proxy: proxy.URL})
-	if err := fetcher.Timetable("http://blocked.example.by/groups", "http://blocked.example.by/teachers"); err != nil {
+	if err := fetcher.Timetable(t.Context(), "http://blocked.example.by/groups", "http://blocked.example.by/teachers"); err != nil {
 		t.Fatalf("fetch through the proxy: %v", err)
 	}
 
@@ -155,7 +156,7 @@ func TestFetcherFallsBackOnBrokenProxy(t *testing.T) {
 	}
 
 	fetcher := NewFetcher(log, c, Options{Proxy: "://%%not-a-url"})
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("a broken proxy must not break parsing: %v", err)
 	}
 	if len(c.GetGroups()) == 0 {
@@ -170,14 +171,14 @@ func TestFetchHTMLStatusError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := fetchHTML(&http.Client{}, srv.URL)
+	_, err := fetchHTML(context.Background(), &http.Client{}, srv.URL)
 	if err == nil {
 		t.Error("expected error for 403 status")
 	}
 }
 
 func TestFetchHTMLConnectionRefused(t *testing.T) {
-	_, err := fetchHTML(&http.Client{}, "http://127.0.0.1:1")
+	_, err := fetchHTML(context.Background(), &http.Client{}, "http://127.0.0.1:1")
 	if err == nil {
 		t.Error("expected error for connection refused")
 	}
@@ -198,7 +199,7 @@ func TestFetchAndParseEmptyResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = FetchAndParse(log, c, srv.URL, srv.URL, srv.URL)
+	err = FetchAndParse(t.Context(), log, c, srv.URL, srv.URL, srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +220,7 @@ func TestUserAgent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	fetchHTML(&http.Client{}, srv.URL)
+	fetchHTML(context.Background(), &http.Client{}, srv.URL)
 
 	if capturedUA == "" {
 		t.Error("expected User-Agent header")

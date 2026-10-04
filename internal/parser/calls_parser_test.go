@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -168,7 +169,7 @@ func TestNormalizeCallsTime(t *testing.T) {
 }
 
 func fetchAndParseCalls(client *http.Client, rawURL string) *cache.Schedule {
-	resp, err := fetchHTML(client, rawURL)
+	resp, err := fetchHTML(context.Background(), client, rawURL)
 	if err != nil {
 		return nil
 	}

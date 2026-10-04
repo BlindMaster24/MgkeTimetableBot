@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -52,15 +53,16 @@ func main() {
 	}})
 
 	started := time.Now()
-	if err := fetcher.Timetable(cfg.Parser.Endpoints.TimetableGroup, cfg.Parser.Endpoints.TimetableTeacher); err != nil {
+	ctx := context.Background()
+	if err := fetcher.Timetable(ctx, cfg.Parser.Endpoints.TimetableGroup, cfg.Parser.Endpoints.TimetableTeacher); err != nil {
 		fmt.Println("timetable error:", err)
 		issues++
 	}
-	if err := fetcher.Calls(cfg.Parser.Endpoints.BellSchedule); err != nil {
+	if err := fetcher.Calls(ctx, cfg.Parser.Endpoints.BellSchedule); err != nil {
 		fmt.Println("calls error:", err)
 		issues++
 	}
-	if err := fetcher.Team(cfg.Parser.Endpoints.Team); err != nil {
+	if err := fetcher.Team(ctx, cfg.Parser.Endpoints.Team); err != nil {
 		fmt.Println("team error:", err)
 		issues++
 	}

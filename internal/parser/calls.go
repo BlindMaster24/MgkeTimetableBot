@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"regexp"
 	"sort"
 	"strconv"
@@ -80,6 +81,10 @@ func ParseCallsScheduleReport(doc *goquery.Document) (*cache.Schedule, Report) {
 }
 
 func ParseCallsVariants(doc *goquery.Document) ([]cache.CallsVariant, Report) {
+	return ParseCallsVariantsCtx(context.Background(), doc)
+}
+
+func ParseCallsVariantsCtx(ctx context.Context, doc *goquery.Document) ([]cache.CallsVariant, Report) {
 	builder := newReport(SourceCalls, "")
 
 	scope, selector, scoped := findScope(doc)
@@ -97,8 +102,9 @@ func ParseCallsVariants(doc *goquery.Document) ([]cache.CallsVariant, Report) {
 	var current *callsGroup
 	tablesWithSlots := 0
 
-	tables.Each(func(_ int, table *goquery.Selection) {
-		heading := tableHeading(table, doc)
+	headings := headingIndex(doc)
+	eachTableCtx(ctx, tables, func(table *goquery.Selection) bool {
+		heading := tableHeading(table, headings)
 		isSaturday := saturdayRe.MatchString(heading)
 
 		if !isSaturday {
@@ -107,7 +113,7 @@ func ParseCallsVariants(doc *goquery.Document) ([]cache.CallsVariant, Report) {
 
 		slots := extractCallSlots(table)
 		if len(slots) == 0 {
-			return
+			return true
 		}
 		tablesWithSlots++
 
@@ -116,17 +122,18 @@ func ParseCallsVariants(doc *goquery.Document) ([]cache.CallsVariant, Report) {
 		}
 		if isSaturday {
 			current.saturday = append(current.saturday, slots...)
-			return
+			return true
 		}
 		if len(slots) > len(current.weekdays) {
 			current.weekdays = slots
 		}
+		return true
 	})
 
 	builder.probe("tr with two time ranges", "bell schedule rows", tablesWithSlots, true)
 
 	variants := buildVariants(groups)
-	if len(variants) == 0 {
+	if len(variants) == 0 && ctx.Err() == nil {
 		if extracted := extractCallsFromText(scope, builder); len(extracted) > 0 {
 			variants = []cache.CallsVariant{{
 				Name:     "",

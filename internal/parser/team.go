@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -30,6 +31,10 @@ func ParseTeam(doc *goquery.Document, team map[string]string) map[string]string 
 }
 
 func ParseTeamReport(doc *goquery.Document, team map[string]string) (map[string]string, Report) {
+	return ParseTeamReportCtx(context.Background(), doc, team)
+}
+
+func ParseTeamReportCtx(ctx context.Context, doc *goquery.Document, team map[string]string) (map[string]string, Report) {
 	if team == nil {
 		team = make(map[string]string)
 	}
@@ -52,9 +57,12 @@ func ParseTeamReport(doc *goquery.Document, team map[string]string) (map[string]
 		}
 
 		cardsFound = cards.Length()
-		cards.Each(func(_ int, card *goquery.Selection) {
-			addTeamMember(result, cardName(card, builder))
-		})
+		for i := 0; i < cards.Length(); i++ {
+			if err := ctx.Err(); err != nil {
+				break
+			}
+			addTeamMember(result, cardName(cards.Eq(i), builder))
+		}
 		break
 	}
 
@@ -64,9 +72,12 @@ func ParseTeamReport(doc *goquery.Document, team map[string]string) (map[string]
 			builder.fallback("legacy staff layout")
 			cardsFound = items.Length()
 		}
-		items.Each(func(_ int, item *goquery.Selection) {
-			addTeamMember(result, item.Find("h3").First().Text())
-		})
+		for i := 0; i < items.Length(); i++ {
+			if err := ctx.Err(); err != nil {
+				break
+			}
+			addTeamMember(result, items.Eq(i).Find("h3").First().Text())
+		}
 	}
 
 	builder.probe(".employee-card", "staff cards", cardsFound, true)

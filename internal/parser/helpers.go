@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -75,16 +76,27 @@ func scopedTables(doc *goquery.Document, builder *reportBuilder) *goquery.Select
 	return tables
 }
 
-func eachTable(tables *goquery.Selection, visit func(table *goquery.Selection)) {
+func eachTableCtx(ctx context.Context, tables *goquery.Selection, visit func(table *goquery.Selection) bool) bool {
 	seen := make(map[*html.Node]bool)
+	completed := true
 	tables.Each(func(_ int, table *goquery.Selection) {
+		if !completed {
+			return
+		}
+		if err := ctx.Err(); err != nil {
+			completed = false
+			return
+		}
 		node := table.Get(0)
 		if node == nil || seen[node] {
 			return
 		}
 		seen[node] = true
-		visit(table)
+		if !visit(table) {
+			completed = false
+		}
 	})
+	return completed
 }
 
 func dayDate(day string) (time.Time, bool) {

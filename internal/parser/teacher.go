@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 	"strings"
@@ -33,17 +34,27 @@ func (p *TeacherParser) Report() Report {
 }
 
 func (p *TeacherParser) Run() (model.Teachers, error) {
-	teachers, report := p.Parse()
+	return p.RunContext(context.Background())
+}
+
+func (p *TeacherParser) RunContext(ctx context.Context) (model.Teachers, error) {
+	teachers, report, err := p.ParseContext(ctx)
 	p.report = report
-	return teachers, nil
+	return teachers, err
 }
 
 func (p *TeacherParser) Parse() (model.Teachers, Report) {
+	teachers, report, _ := p.ParseContext(context.Background())
+	return teachers, report
+}
+
+func (p *TeacherParser) ParseContext(ctx context.Context) (model.Teachers, Report, error) {
 	teachers := make(model.Teachers)
 	builder := newReport(SourceTeachers, "")
 
 	tables := scopedTables(p.doc, builder)
 	builder.probe("table", "timetable tables", tables.Length(), true)
+	headings := headingIndex(p.doc)
 
 	labelled := 0
 	blocks := 0
@@ -51,17 +62,17 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 	withDays := 0
 	withLessons := 0
 
-	eachTable(tables, func(table *goquery.Selection) {
-		match, ok := tableLabel(table, p.doc, teacherLabel)
+	completed := eachTableCtx(ctx, tables, func(table *goquery.Selection) bool {
+		match, ok := tableLabel(table, headings, teacherLabel)
 		if !ok {
-			return
+			return true
 		}
 		labelled++
 
 		teacher := p.parseTable(table, match.Value)
 		if teacher == nil {
 			skipped++
-			return
+			return true
 		}
 		if match.Loose {
 			builder.fallback("teacher label without the 'Преподаватель -' prefix: " + match.Value)
@@ -74,9 +85,10 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 		}
 		if existing, ok := teachers[match.Value]; ok {
 			teachers[match.Value] = mergeTeacherDays(existing, teacher)
-			return
+			return true
 		}
 		teachers[match.Value] = teacher
+		return true
 	})
 
 	builder.probe("heading: Преподаватель - <ФИО>", "teacher headings", labelled, true)
@@ -92,7 +104,10 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 		builder.warn("day columns were found, but no lesson cell produced a subject")
 	}
 
-	return teachers, builder.done(len(teachers))
+	if !completed {
+		return teachers, builder.done(len(teachers)), ctx.Err()
+	}
+	return teachers, builder.done(len(teachers)), nil
 }
 
 func teacherDatedDays(teachers model.Teachers) int {
@@ -271,7 +286,7 @@ func buildTeacherEntry(nameLine, typeLine, cabinet string) model.TeacherLesson {
 	group := strings.Join(strings.Fields(groupPart), "")
 	var subgroup *int
 	if parts := strings.SplitN(group, ".", 2); len(parts) == 2 {
-		if number, err := strconv.Atoi(parts[0]); err == nil {
+		if number, err := strconv.Atoi(parts[0]); err == nil && number >= 1 {
 			subgroup = &number
 		}
 		group = parts[1]

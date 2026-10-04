@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,17 +39,27 @@ func (p *GroupParser) Report() Report {
 }
 
 func (p *GroupParser) Run() (model.Groups, error) {
-	groups, report := p.Parse()
+	return p.RunContext(context.Background())
+}
+
+func (p *GroupParser) RunContext(ctx context.Context) (model.Groups, error) {
+	groups, report, err := p.ParseContext(ctx)
 	p.report = report
-	return groups, nil
+	return groups, err
 }
 
 func (p *GroupParser) Parse() (model.Groups, Report) {
+	groups, report, _ := p.ParseContext(context.Background())
+	return groups, report
+}
+
+func (p *GroupParser) ParseContext(ctx context.Context) (model.Groups, Report, error) {
 	groups := make(model.Groups)
 	builder := newReport(SourceGroups, "")
 
 	tables := scopedTables(p.doc, builder)
 	builder.probe("table", "timetable tables", tables.Length(), true)
+	headings := headingIndex(p.doc)
 
 	labelled := 0
 	blocks := 0
@@ -56,10 +67,10 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 	withDays := 0
 	withLessons := 0
 
-	eachTable(tables, func(table *goquery.Selection) {
-		match, ok := tableLabel(table, p.doc, groupLabel)
+	completed := eachTableCtx(ctx, tables, func(table *goquery.Selection) bool {
+		match, ok := tableLabel(table, headings, groupLabel)
 		if !ok {
-			return
+			return true
 		}
 		labelled++
 
@@ -70,7 +81,7 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 		group := p.parseTable(table, label)
 		if group == nil {
 			skipped++
-			return
+			return true
 		}
 		if match.Loose {
 			builder.fallback("group label without the 'Группа -' prefix: " + match.Value)
@@ -83,9 +94,10 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 		}
 		if existing, ok := groups[match.Value]; ok {
 			groups[match.Value] = mergeGroupDays(existing, group)
-			return
+			return true
 		}
 		groups[match.Value] = group
+		return true
 	})
 
 	builder.probe("heading: Группа - <номер>", "group headings", labelled, true)
@@ -101,7 +113,10 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 		builder.warn("day columns were found, but no lesson cell produced a subject")
 	}
 
-	return groups, builder.done(len(groups))
+	if !completed {
+		return groups, builder.done(len(groups)), ctx.Err()
+	}
+	return groups, builder.done(len(groups)), nil
 }
 
 func groupLabel(text string) labelMatch {
@@ -380,7 +395,7 @@ func buildSubgroups(chunks [][]string, cabLines []string) model.GroupLesson {
 		if len(chunk) >= 1 {
 			line := strings.TrimSpace(chunk[0])
 			if match := subgroupPrefixRe.FindStringSubmatch(line); match != nil {
-				if number, err := strconv.Atoi(match[1]); err == nil {
+				if number, err := strconv.Atoi(match[1]); err == nil && number >= 1 {
 					subgroupNum = number
 				}
 				line = strings.TrimSpace(line[len(match[0]):])

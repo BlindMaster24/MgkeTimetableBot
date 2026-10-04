@@ -31,7 +31,7 @@ func seedGroups(t *testing.T, c *cache.RaspCache, count int) {
 			"days":  []any{},
 		}
 	}
-	c.SetGroups(groups, "seed")
+	c.SetGroups(t.Context(), groups, "seed")
 }
 
 func TestFetcherKeepsCacheWhenPageIsEmpty(t *testing.T) {
@@ -49,7 +49,7 @@ func TestFetcherKeepsCacheWhenPageIsEmpty(t *testing.T) {
 		OnReport: func(report Report) { seen = append(seen, report) },
 	})
 
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 
@@ -89,7 +89,7 @@ func TestFetcherKeepsCacheWhenParseShrinks(t *testing.T) {
 	seedGroups(t, c, 40)
 
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{})
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestFetcherAppliesHealthyParse(t *testing.T) {
 	c := newTestCache(t)
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{})
 
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 
@@ -201,7 +201,7 @@ func TestFetcherGuardHonoursTheConfiguredDropLimit(t *testing.T) {
 	srv := serveGroups(t, 8)
 
 	strict := NewFetcher(logger.New("error", nil), c, Options{Guard: Guard{MaxDropPercent: 50}})
-	if err := strict.Timetable(srv.URL, srv.URL); err != nil {
+	if err := strict.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 	if len(c.GetGroups()) != 40 {
@@ -214,7 +214,7 @@ func TestFetcherGuardHonoursTheConfiguredDropLimit(t *testing.T) {
 	relaxedCache := newTestCache(t)
 	seedGroups(t, relaxedCache, 40)
 	relaxed := NewFetcher(logger.New("error", nil), relaxedCache, Options{Guard: Guard{MaxDropPercent: 90}})
-	if err := relaxed.Timetable(srv.URL, srv.URL); err != nil {
+	if err := relaxed.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 	if len(relaxedCache.GetGroups()) <= 40 {
@@ -229,7 +229,7 @@ func TestFetcherGuardIgnoresSmallCaches(t *testing.T) {
 	srv := serveGroups(t, 2)
 
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{Guard: Guard{MinItems: 50}})
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 
@@ -248,7 +248,7 @@ func TestFetcherGuardCanBeDisabled(t *testing.T) {
 	srv := serveGroups(t, 1)
 
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{Guard: Guard{Disabled: true}})
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 
@@ -264,7 +264,7 @@ func TestFetcherReportsStructuredKeep(t *testing.T) {
 	srv := serveGroups(t, 3)
 
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{})
-	if err := fetcher.Timetable(srv.URL, srv.URL); err != nil {
+	if err := fetcher.Timetable(t.Context(), srv.URL, srv.URL); err != nil {
 		t.Fatalf("timetable: %v", err)
 	}
 
@@ -291,13 +291,13 @@ func TestFetcherKeepsCallsWhenPageHasNoSlots(t *testing.T) {
 	defer srv.Close()
 
 	c := newTestCache(t)
-	c.SetCallsNotify(cache.Schedule{
+	c.SetCallsNotify(t.Context(), cache.Schedule{
 		Weekdays: [][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}},
 		Saturday: [][2][2]string{{{"09:00", "09:45"}, {"09:55", "10:40"}}},
 	}, cache.Schedule{}, "site", "")
 
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{})
-	if err := fetcher.Calls(srv.URL); err != nil {
+	if err := fetcher.Calls(t.Context(), srv.URL); err != nil {
 		t.Fatalf("calls: %v", err)
 	}
 
@@ -327,9 +327,9 @@ func TestFetcherReportsEverySource(t *testing.T) {
 	c := newTestCache(t)
 	fetcher := NewFetcher(logger.New("error", nil), c, Options{})
 
-	_ = fetcher.Timetable(srv.URL, srv.URL)
-	_ = fetcher.Calls(srv.URL)
-	_ = fetcher.Team([]string{srv.URL})
+	_ = fetcher.Timetable(t.Context(), srv.URL, srv.URL)
+	_ = fetcher.Calls(t.Context(), srv.URL)
+	_ = fetcher.Team(t.Context(), []string{srv.URL})
 
 	reports := fetcher.Reports()
 	for _, source := range []string{SourceGroups, SourceTeachers, SourceCalls, SourceTeam} {

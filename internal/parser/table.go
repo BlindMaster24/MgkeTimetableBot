@@ -36,53 +36,47 @@ type tableRow struct {
 
 const headingLimit = 8
 
-func precedingHeadings(doc *goquery.Document, el *goquery.Selection, limit int) []string {
-	target := el.Get(0)
+func headingIndex(doc *goquery.Document) map[*html.Node][]string {
+	tables := make(map[*html.Node][]string)
+	if doc == nil {
+		return tables
+	}
 	root := doc.Get(0)
-	if target == nil || root == nil {
-		return nil
+	if root == nil {
+		return tables
 	}
 
 	var seen []string
-	var found bool
 
 	var walk func(node *html.Node)
 	walk = func(node *html.Node) {
-		if found {
-			return
-		}
-
 		if node.Type == html.ElementNode {
 			switch node.Data {
 			case "h1", "h2", "h3", "h4", "h5", "h6", "caption":
 				if text := normalizeLabel(nodeText(node)); text != "" {
 					seen = append(seen, text)
-					if len(seen) > limit {
+					if len(seen) > headingLimit {
 						seen = seen[1:]
 					}
 				}
+			case "table":
+				snapshot := make([]string, len(seen))
+				copy(snapshot, seen)
+				for i, j := 0, len(snapshot)-1; i < j; i, j = i+1, j-1 {
+					snapshot[i], snapshot[j] = snapshot[j], snapshot[i]
+				}
+				tables[node] = snapshot
 			}
 		}
 
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			if child == target {
-				found = true
-				return
-			}
 			walk(child)
-			if found {
-				return
-			}
 		}
 	}
 
 	walk(root)
 
-	reversed := make([]string, 0, len(seen))
-	for i := len(seen) - 1; i >= 0; i-- {
-		reversed = append(reversed, seen[i])
-	}
-	return reversed
+	return tables
 }
 
 func nodeText(node *html.Node) string {
@@ -101,7 +95,7 @@ func nodeText(node *html.Node) string {
 	return builder.String()
 }
 
-func tableHeadings(table *goquery.Selection, doc *goquery.Document) []string {
+func tableHeadings(table *goquery.Selection, headings map[*html.Node][]string) []string {
 	candidates := make([]string, 0, headingLimit)
 
 	if caption := table.Find("caption").First(); caption.Length() > 0 {
@@ -110,7 +104,7 @@ func tableHeadings(table *goquery.Selection, doc *goquery.Document) []string {
 		}
 	}
 
-	for _, text := range precedingHeadings(doc, table, headingLimit) {
+	for _, text := range headings[table.Get(0)] {
 		if len(candidates) > 0 && candidates[len(candidates)-1] == text {
 			continue
 		}
@@ -120,8 +114,8 @@ func tableHeadings(table *goquery.Selection, doc *goquery.Document) []string {
 	return candidates
 }
 
-func tableLabel(table *goquery.Selection, doc *goquery.Document, match func(string) labelMatch) (labelMatch, bool) {
-	for _, text := range tableHeadings(table, doc) {
+func tableLabel(table *goquery.Selection, headings map[*html.Node][]string, match func(string) labelMatch) (labelMatch, bool) {
+	for _, text := range tableHeadings(table, headings) {
 		if found := match(text); found.OK {
 			return found, true
 		}
@@ -129,9 +123,9 @@ func tableLabel(table *goquery.Selection, doc *goquery.Document, match func(stri
 	return labelMatch{}, false
 }
 
-func tableHeading(table *goquery.Selection, doc *goquery.Document) string {
-	if headings := tableHeadings(table, doc); len(headings) > 0 {
-		return headings[0]
+func tableHeading(table *goquery.Selection, headings map[*html.Node][]string) string {
+	if found := tableHeadings(table, headings); len(found) > 0 {
+		return found[0]
 	}
 	return ""
 }

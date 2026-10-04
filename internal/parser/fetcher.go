@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,24 +112,24 @@ func (f *Fetcher) emit(report Report) {
 	}
 }
 
-func (f *Fetcher) Timetable(groupURL, teacherURL string) error {
+func (f *Fetcher) Timetable(ctx context.Context, groupURL, teacherURL string) error {
 	var errs []error
 
-	if err := f.fetchGroups(groupURL); err != nil {
+	if err := f.fetchGroups(ctx, groupURL); err != nil {
 		errs = append(errs, err)
 	}
-	if err := f.fetchTeachers(teacherURL); err != nil {
+	if err := f.fetchTeachers(ctx, teacherURL); err != nil {
 		errs = append(errs, err)
 	}
-	if err := f.cache.Save(); err != nil {
+	if err := f.cache.Save(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("save cache: %w", err))
 	}
 
 	return errors.Join(errs...)
 }
 
-func (f *Fetcher) fetchGroups(groupURL string) error {
-	doc, err := f.document(groupURL)
+func (f *Fetcher) fetchGroups(ctx context.Context, groupURL string) error {
+	doc, err := f.document(ctx, groupURL)
 	if err != nil {
 		f.emit(failedReport(SourceGroups, groupURL, err))
 		f.log.Error().Err(err).Str("url", groupURL).Msg("group parse failed")
@@ -136,7 +137,7 @@ func (f *Fetcher) fetchGroups(groupURL string) error {
 	}
 
 	groupParser := NewGroupParser(doc)
-	groups, err := groupParser.Run()
+	groups, err := groupParser.RunContext(ctx)
 	report := groupParser.Report()
 	report.URL = groupURL
 
@@ -166,15 +167,15 @@ func (f *Fetcher) fetchGroups(groupURL string) error {
 		return nil
 	}
 
-	f.cache.SetGroups(jsonRoundTrip(groups), groupParser.ContentHash())
+	f.cache.SetGroups(ctx, jsonRoundTrip(groups), groupParser.ContentHash())
 	f.emit(report)
 	f.log.Info().Int("groups", len(groups)).Str("hash", groupParser.ContentHash()).Msg("groups parsed")
 
 	return nil
 }
 
-func (f *Fetcher) fetchTeachers(teacherURL string) error {
-	doc, err := f.document(teacherURL)
+func (f *Fetcher) fetchTeachers(ctx context.Context, teacherURL string) error {
+	doc, err := f.document(ctx, teacherURL)
 	if err != nil {
 		f.emit(failedReport(SourceTeachers, teacherURL, err))
 		f.log.Error().Err(err).Str("url", teacherURL).Msg("teacher parse failed")
@@ -182,7 +183,7 @@ func (f *Fetcher) fetchTeachers(teacherURL string) error {
 	}
 
 	teacherParser := NewTeacherParser(doc)
-	teachers, err := teacherParser.Run()
+	teachers, err := teacherParser.RunContext(ctx)
 	report := teacherParser.Report()
 	report.URL = teacherURL
 
@@ -212,26 +213,26 @@ func (f *Fetcher) fetchTeachers(teacherURL string) error {
 		return nil
 	}
 
-	f.cache.SetTeachers(jsonRoundTrip(teachers), teacherParser.ContentHash())
+	f.cache.SetTeachers(ctx, jsonRoundTrip(teachers), teacherParser.ContentHash())
 	f.emit(report)
 	f.log.Info().Int("teachers", len(teachers)).Str("hash", teacherParser.ContentHash()).Msg("teachers parsed")
 
 	return nil
 }
 
-func (f *Fetcher) Calls(bellScheduleURL string) error {
+func (f *Fetcher) Calls(ctx context.Context, bellScheduleURL string) error {
 	if bellScheduleURL == "" {
 		return nil
 	}
 
-	doc, err := f.document(bellScheduleURL)
+	doc, err := f.document(ctx, bellScheduleURL)
 	if err != nil {
 		f.emit(failedReport(SourceCalls, bellScheduleURL, err))
 		f.log.Warn().Err(err).Str("url", bellScheduleURL).Msg("calls parse failed")
 		return nil
 	}
 
-	variants, report := ParseCallsVariants(doc)
+	variants, report := ParseCallsVariantsCtx(ctx, doc)
 	report.URL = bellScheduleURL
 
 	if len(variants) == 0 || len(variants[0].Schedule.Weekdays) == 0 {
@@ -242,24 +243,24 @@ func (f *Fetcher) Calls(bellScheduleURL string) error {
 	}
 
 	schedule := variants[0].Schedule
-	f.cache.SetCallsNotify(cache.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}, cache.Schedule{}, "site", "")
-	f.cache.SetCallsSiteVariants(variants)
+	f.cache.SetCallsNotify(ctx, cache.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}, cache.Schedule{}, "site", "")
+	f.cache.SetCallsSiteVariants(ctx, variants)
 
 	updated := ParseCallsUpdatedAt(doc)
-	f.cache.SetCallsSiteUpdatedAt(updated.Raw, updated.At)
+	f.cache.SetCallsSiteUpdatedAt(ctx, updated.Raw, updated.At)
 	f.emit(report)
 	f.log.Info().
 		Int("weekdays", len(schedule.Weekdays)).
 		Strs("variants", report.Variants).
 		Msg("calls parsed from site")
 
-	if err := f.cache.Save(); err != nil {
+	if err := f.cache.Save(ctx); err != nil {
 		return fmt.Errorf("save cache: %w", err)
 	}
 	return nil
 }
 
-func (f *Fetcher) Team(urls []string) error {
+func (f *Fetcher) Team(ctx context.Context, urls []string) error {
 	if len(urls) == 0 {
 		return nil
 	}
@@ -274,7 +275,7 @@ func (f *Fetcher) Team(urls []string) error {
 	var errs []error
 
 	for _, rawURL := range urls {
-		doc, err := f.document(rawURL)
+		doc, err := f.document(ctx, rawURL)
 		if err != nil {
 			reports = append(reports, failedReport(SourceTeam, rawURL, err))
 			f.log.Error().Err(err).Str("url", rawURL).Msg("team parse failed")
@@ -282,7 +283,7 @@ func (f *Fetcher) Team(urls []string) error {
 			continue
 		}
 
-		updated, report := ParseTeamReport(doc, team)
+		updated, report := ParseTeamReportCtx(ctx, doc, team)
 		report.URL = rawURL
 		reports = append(reports, report)
 		hashes = append(hashes, hashDocument(doc))
@@ -299,22 +300,26 @@ func (f *Fetcher) Team(urls []string) error {
 		return errors.Join(errs...)
 	}
 
-	f.cache.SetTeam(team, hashes)
+	f.cache.SetTeam(ctx, team, hashes)
 	f.emit(merged)
 	f.log.Info().Int("names", len(team)).Int("pages", len(urls)).Msg("team parsed")
 
-	if err := f.cache.Save(); err != nil {
+	if err := f.cache.Save(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("save cache: %w", err))
 	}
 	return errors.Join(errs...)
 }
 
-func (f *Fetcher) document(rawURL string) (*goquery.Document, error) {
-	return FetchDocument(f.client, rawURL)
+func (f *Fetcher) document(ctx context.Context, rawURL string) (*goquery.Document, error) {
+	return FetchDocumentCtx(ctx, f.client, rawURL)
 }
 
 func FetchDocument(client *http.Client, rawURL string) (*goquery.Document, error) {
-	resp, err := fetchHTML(client, rawURL)
+	return FetchDocumentCtx(context.Background(), client, rawURL)
+}
+
+func FetchDocumentCtx(ctx context.Context, client *http.Client, rawURL string) (*goquery.Document, error) {
+	resp, err := fetchHTML(ctx, client, rawURL)
 	if err != nil {
 		return nil, err
 	}
@@ -327,9 +332,9 @@ func FetchDocument(client *http.Client, rawURL string) (*goquery.Document, error
 	return doc, nil
 }
 
-func FetchAndParse(log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL, bellScheduleURL string) error {
+func FetchAndParse(ctx context.Context, log *logger.Logger, c *cache.RaspCache, groupURL, teacherURL, bellScheduleURL string) error {
 	fetcher := NewFetcher(log, c, Options{})
-	return errors.Join(fetcher.Timetable(groupURL, teacherURL), fetcher.Calls(bellScheduleURL))
+	return errors.Join(fetcher.Timetable(ctx, groupURL, teacherURL), fetcher.Calls(ctx, bellScheduleURL))
 }
 
 func failedReport(source, url string, err error) Report {
@@ -338,8 +343,8 @@ func failedReport(source, url string, err error) Report {
 	return report
 }
 
-func fetchHTML(client *http.Client, url string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func fetchHTML(ctx context.Context, client *http.Client, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
