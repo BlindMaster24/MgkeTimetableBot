@@ -1,0 +1,4 @@
+go test fuzz v1
+string("63тп")
+string("63ТП\n63ТП-2\nАгрономия")
+int(5)

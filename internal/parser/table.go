@@ -130,7 +130,14 @@ func tableHeading(table *goquery.Selection, headings map[*html.Node][]string) st
 	return ""
 }
 
+var markupStripper = strings.NewReplacer("<", "", ">", "")
+
+func stripStrayMarkup(text string) string {
+	return markupStripper.Replace(text)
+}
+
 func normalizeLabel(text string) string {
+	text = stripStrayMarkup(text)
 	text = strings.ReplaceAll(text, "\u00a0", " ")
 	text = strings.ReplaceAll(text, "\u200b", "")
 	text = strings.Join(strings.Fields(text), " ")

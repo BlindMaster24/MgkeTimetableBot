@@ -1,0 +1,4 @@
+go test fuzz v1
+string("каб. 101")
+string("101 (к)")
+string("202")

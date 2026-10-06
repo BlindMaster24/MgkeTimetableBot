@@ -558,15 +558,19 @@ go test ./internal/telegram -update       # тексты сообщений и �
 go test ./internal/notification -update   # тексты уведомлений
 ```
 
-Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Джоба `container` в CI запускает сам образ в режиме webhook против отдельной заглушки Bot API (`internal/tgstub`, бинарник `scripts/tgstub`), которая записывает вызовы бота и отвечает так же, как Telegram. Путь инлайн-кнопки проверяется на том же HTTP: `TestWebhookDeliversACallbackQueryToTheInlineEditPath` доставляет подписанный `callback_query` из `internal/telegram/testdata/webhook_callback_query.json` — тот же файл отправляет и джоба `container` — в живой сокет `Bot.Run` и падает, если бот отредактировал не то сообщение, которое пришло в апдейте. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым:
+Тесты бота работают не на заглушках, а на настоящем HTTP: `internal/telegram/fakeapi_test.go` поднимает поддельный Telegram Bot API, поэтому long polling, webhook, кодирование запросов и путь ответа проверяются так же, как в жизни. Джоба `container` в CI запускает сам образ в режиме webhook против отдельной заглушки Bot API (`internal/tgstub`, бинарник `scripts/tgstub`), которая записывает вызовы бота и отвечает так же, как Telegram. Путь инлайн-кнопки проверяется на том же HTTP: `TestWebhookDeliversACallbackQueryToTheInlineEditPath` доставляет подписанный `callback_query` из `internal/telegram/testdata/webhook_callback_query.json` — тот же файл отправляет и джоба `container` — в живой сокет `Bot.Run` и падает, если бот отредактировал не то сообщение, которое пришло в апдейте. Парсеры и webhook дополнительно проверяются фаззингом (Go native fuzzing) — на вход идут настоящие снапшоты страниц, а инварианты держат результат чистым и воспроизводимым. Те же цели есть у чистых библиотек, на которых стоят напоминания, поиск группы и список свободных кабинетов: у `schedulediff` (изменения всегда остаются внутри сравниваемых дней), `search` (результат не длиннее лимита, отсортирован по score и никогда не выдумывает имя), `reminder` (текущая пара идёт раньше следующей, обе внутри дня) и `rooms` (ключ кабинета — идемпотентная нормализация):
 
 ```bash
 go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
 go test -fuzz FuzzTeacherParserStaysStableAndClean -fuzztime 30s ./internal/parser/
 go test -fuzz FuzzWebhookHandlerKeepsStatusesSane -fuzztime 30s ./internal/telegram/
+go test -fuzz FuzzDiffKeepsChangesWithinTheDays -fuzztime 30s ./internal/schedulediff/
+go test -fuzz FuzzSearchStaysOrderedAndBounded -fuzztime 30s ./internal/search/
+go test -fuzz FuzzCurrentAndUpcomingStayInsideTheDay -fuzztime 30s ./internal/reminder/
+go test -fuzz FuzzKeyIsStableAndUniverseKeepsOneLabel -fuzztime 30s ./internal/rooms/
 ```
 
-Найденный падающий вход Go сам сохраняет в `testdata/fuzz/<цель>/`, и он остаётся навсегда обычным сид-корпусом: дальше его гоняет любой `go test`. Так закрыты, например, разбор даты «24.09.2026» как времени звонка и пары, у которой конец раньше начала.
+По 20 секунд на каждую цель прогоняет джоба `fuzz` в CI, а падающий вход Go сам сохраняет в `testdata/fuzz/<цель>/`, и он остаётся навсегда обычным сид-корпусом: дальше его гоняет любой `go test`. Так закрыты, например, разбор даты «24.09.2026» как времени звонка, пары, у которой конец раньше начала, и недописанный префикс «каб» в ключе кабинета.
 
 ### Проверка перед запуском
 

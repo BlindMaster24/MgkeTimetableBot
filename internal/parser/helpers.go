@@ -177,7 +177,7 @@ func textNodes(cell *goquery.Selection) []string {
 	var nodes []string
 	cell.Contents().Each(func(_ int, node *goquery.Selection) {
 		if node.Get(0) != nil && node.Get(0).Type == html.TextNode {
-			nodes = append(nodes, node.Text())
+			nodes = append(nodes, stripStrayMarkup(node.Text()))
 		}
 	})
 	return nodes

@@ -9,7 +9,7 @@
   - `i18n/` — go-i18n with embedded `locales/*.json` (Russian).
   - `model/` — domain types: Group, Teacher, Day, Lesson, CallsSchedule.
   - `parser/` — goquery HTML parser (groups, teachers, bell schedule, calls).
-  - `archive/` — SQLite repository for timetable archive (modernc.org/sqlite, pure Go); `migrations/*.sql` is embedded and applied by `Repository.EnsureSchema` from `New`.
+  - `archive/` — SQLite repository for timetable archive (modernc.org/sqlite, pure Go); `migrations/*.sql` is embedded and applied by `Repository.EnsureSchema` from `New`, and `retention.go` owns the day cutoff, the scoped `timetable_archive` delete and the compaction the backup job calls.
   - `cache/` — file-backed RaspCache with in-memory state, hit/miss metrics and the event bus drained by the notifier.
   - `telegram/` — telego bot. `bot.go` registers everything and declares the `archiveStore` interface the bot depends on; `chat.go` + `chat_queries.go` + `chat_subscriptions.go` hold the chat database; `commands.go`, `settings_text.go`, `callbacks.go`, `menus.go`, `weekcontrol.go` carry the user surface; `timetabledays.go` is the single owner of day selection (the `daySource` choice between cache and archive, the group/teacher target of a chat, `daysToMaps`) and `texthints.go` holds the small label helpers; one file per feature for the rest (`history.go`, `stats.go`, `archive.go`, `ics.go`, `calls_edit.go`, `calls_settings.go`, `calls_campus.go`, `compare_groups.go`, `test_subscriptions.go`, `debug_commands.go`, `google_calendar.go`, `google_store.go`, `admin.go`, `admin_commands.go`).
   - `api/` — gin REST API: info, groups, teachers, group/teacher by name, parser-health, health, Google OAuth callback.
@@ -24,6 +24,12 @@
   - `preflight/` — pre-deploy checks: config keys, credentials, the webhook configuration, locale keys, storage, the live site (dates, calls), a rendered PNG; `scripts/preflight` prints the report.
   - `testgolden/` — golden-text normalization (dates, week numbers, callback data) shared by the message golden tests; tests only.
   - `tgstub/` — stub Telegram Bot API: records every bot call and answers `setWebhook`/`getWebhookInfo`/`sendMessage`/`editMessageText` like Telegram does, an edit echoing the message id it was given; the `container` CI job runs the image against it.
+  - `backup/` — online SQLite snapshot (`VACUUM INTO`), strictly scoped backup-directory retention and the cron entry that runs both.
+  - `timetable/` — typed day/lesson domain (`Day`, `Lesson`, `Week`), the `дд.мм.гггг` date helpers and the raw-to-typed converters every consumer shares.
+  - `reminder/` — picks the running and the next lesson from a day plus the bell schedule, and computes the jittered reminder moment.
+  - `rooms/` — canonical room keys (`Key`, idempotent normalisation) and the free-room set for a pair.
+  - `schedulediff/` — day-to-day change detection: added, removed, moved, room/teacher/time changed.
+  - `search/` — fuzzy group and teacher search with transliteration and per-chat aliases.
   - `utils/` — academic week index, subject list.
 - `docs/` — user-facing instructions (Google Calendar). `scripts/paritycheck/` — parity checker binary; `scripts/preflight/` — pre-deploy check; `scripts/racecheck/` — local race-detector runner that checks the cgo/C-compiler prerequisites first (`internal/racecheck` holds the plan logic); `scripts/tgstub/` — the stub Bot API server the container smoke test starts (`internal/tgstub` holds the handler).
 - `README.md` / `README.en.md` — mirrored documentation, kept in sync by `tests/docs_test.go`.
@@ -77,8 +83,8 @@
 - `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/bot/` — cross-compilation check; repeat for `linux/arm64` and `darwin/arm64` after touching platform-specific code.
 
 ## CI and Releases
-- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (cross-platform build, vet and the tool binaries; gofmt and the release-target cross-compilation only on Linux), `test` (suite plus `coverage.out` artifact), `newest-toolchain` (the suite on the newest stable Go), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata, the container timezone, the graceful `SIGTERM` shutdown and a second container run in webhook mode against the stub Bot API) and `workflow-lint` (`actionlint`).
-- The platform-sensitive jobs (`quality`, `test`, `newest-toolchain`, `race`) carry a matrix over `ubuntu-latest`, `windows-latest` and `macos-latest` with `fail-fast: false`, and every workflow sets `defaults: run: shell: bash` so one command string works on all three. The platform-neutral gates (`parity`, `container`, `workflow-lint`) stay on Linux because they need Docker, a `git fetch` of the `old` branch or `jq`.
+- `.github/workflows/ci.yml` runs on every push to `main` and on every pull request. Independent jobs: `quality` (cross-platform build, vet and the tool binaries; gofmt and the release-target cross-compilation only on Linux), `test` (suite plus `coverage.out` artifact), `newest-toolchain` (the suite on the newest stable Go), `race` (`go run ./scripts/racecheck` — `-race` over the whole suite), `fuzz` (20 s per fuzz target over the pure libraries, the parsers and the webhook), `parity` (surface vs the `old` branch, golden keyboard layouts, docs guard), `container` (image build, container start, `/api/health` 200, build metadata, the container timezone, the graceful `SIGTERM` shutdown and a second container run in webhook mode against the stub Bot API) and `workflow-lint` (`actionlint`).
+- The platform-sensitive jobs (`quality`, `test`, `newest-toolchain`, `race`) carry a matrix over `ubuntu-latest`, `windows-latest` and `macos-latest` with `fail-fast: false`, and every workflow sets `defaults: run: shell: bash` so one command string works on all three. The platform-neutral gates (`fuzz`, `parity`, `container`, `workflow-lint`) stay on Linux because they need Docker, a `git fetch` of the `old` branch or `jq`, or because a fuzzing run only makes sense on a fast throwaway runner — `go test -fuzz` is reproducible on any machine with the same `-fuzztime`.
 - Coverage is measured on all three operating systems but only the Linux run uploads the artifact and the summary, otherwise the artifact names would clash. The race job probes with `racecheck -check` first and, when Windows reports the detector as unavailable, warns instead of failing — `-race` builds through cgo and the Windows runner has no guaranteed C toolchain.
 - `.github/workflows/security.yml` runs `govulncheck` on push to `main`, on a weekly schedule and on demand; it is deliberately outside CI so an advisory never blocks a pull request.
 - Actions are pinned by commit SHA with the release tag in a comment; Dependabot bumps the SHA and the comment together, so keep the `# vN` comment when editing a `uses:` line.
@@ -99,6 +105,7 @@
 - `go test -count=1 ./tests/` to verify the documentation still matches the bot surface, API routes and config keys.
 - `go build ./...`, `go vet ./...` and the suite on Windows and macOS as well (the CI matrix) — a change that only compiles on Linux reaches the platform-specific jobs red.
 - `GOOS=<target> GOARCH=<arch> CGO_ENABLED=0 go build ./cmd/bot/` for the release targets after touching platform-specific code (`cmd/bot/signals_*.go` is the current example).
+- `go test -run FuzzDiff -fuzz FuzzDiffKeepsChangesWithinTheDays -fuzztime 30s ./internal/schedulediff/` after touching a fuzzed package — the same command for `internal/search`, `internal/reminder`, `internal/rooms`, `internal/parser` and the webhook target in `internal/telegram` (the `fuzz` job runs all of them for 20 s each).
 - `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` when dependencies change.
 - The suite on the newest stable Go (the `newest-toolchain` job): install the latest Go release and run `go test -count=1 -p 1 ./internal/... ./tests/... ./cmd/...`.
 - `go run ./cmd/bot/ -config configs/config.yaml` for a smoke run (manual); send `Ctrl+C`/`SIGTERM` and check the log ends with `shutdown complete`.
@@ -208,7 +215,7 @@ Long polling is the default; `telegram.webhook` makes Telegram push updates to a
 - Keep tests deterministic and offline — no network/API calls.
 - Prefer pure-function tests for parser, cache, and utility functions.
 - HTTP-level bot tests talk real HTTP to a fake Telegram Bot API (`internal/telegram/fakeapi_test.go`) instead of stubbing the caller: use it for a transport change or a reply path.
-- Fuzz targets live in `internal/parser/fuzz_test.go` (seeded with the real page snapshots) and `internal/telegram/webhook_test.go`: `go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/`. A crasher is written to `testdata/fuzz/<target>/` and is kept as a permanent seed, so it runs on every plain `go test`.
+- Fuzz targets live in `internal/parser/fuzz_test.go` (seeded with the real page snapshots), `internal/telegram/webhook_test.go` and, for the pure libraries, `internal/schedulediff/fuzz_test.go`, `internal/search/fuzz_test.go`, `internal/reminder/fuzz_test.go` and `internal/rooms/fuzz_test.go`: `go test -run FuzzGroup -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/`; the `fuzz` CI job runs every target for 20 s. A crasher is written to `testdata/fuzz/<target>/` and is kept as a permanent seed, so it runs on every plain `go test`.
 - Fix test-first: write the failing test, watch it fail for the right reason, then fix. A defect found by fuzzing keeps its corpus file as the regression test.
 - Never assign the process-global `time.Local`: every goroutine that calls `time.Now()` reads it (a leftover fasthttp dialer from an HTTP-level test, a cron tick, a notification cron), so the write is a real data race that fails the `race` job. Inject the clock instead — `Bot.SetNow` and `notification.EventNotifier.SetNow` — and pass an explicit `time.Time` into the date helpers (`getDayPhrase`, `todayDayOf`, `futureDays`); `tests/timezone_test.go` fails the suite if an assignment comes back. The timezone behaviour stays covered by `TestDayNoticeWorksInEveryTimeZone`, `TestSchedulerBindsTheCronToTheProcessTimezone` and the `TZ=... go test` runs.
 - Use `httptest` for API handler tests.
@@ -223,6 +230,7 @@ Long polling is the default; `telegram.webhook` makes Telegram push updates to a
 - Full suite: `go test -count=1 -p 1 ./internal/... ./tests/...`
 - Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`; message texts: `go test ./internal/telegram ./internal/notification`
 - Race detector: `go run ./scripts/racecheck` (needs `CGO_ENABLED=1` and a C compiler — gcc on Linux, clang on macOS, mingw-w64 on Windows; `-check` only reports)
+- Fuzz targets: `go test -run Fuzz -fuzz <Target> -fuzztime 30s ./internal/<pkg>/` for `schedulediff`, `search`, `reminder`, `rooms`, `parser` and the webhook target in `telegram`
 - Static analysis: `go vet ./...`
 
 ## Commit & Pull Request Guidelines

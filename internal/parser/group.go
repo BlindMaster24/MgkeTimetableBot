@@ -336,7 +336,7 @@ func cellTextWithBreaks(cell *goquery.Selection) string {
 		})
 	}
 	walk(cell)
-	return builder.String()
+	return stripStrayMarkup(builder.String())
 }
 
 func chunkLines(lines []string, size int) [][]string {
@@ -453,7 +453,7 @@ func subgroupCabinet(cabLines []string, subgroups, index, sgNumber int) string {
 }
 
 func cleanCellText(cell *goquery.Selection) string {
-	text := cell.Text()
+	text := stripStrayMarkup(cell.Text())
 	text = strings.ReplaceAll(text, "\u00a0", "")
 	text = strings.ReplaceAll(text, "&nbsp;", "")
 	return strings.TrimSpace(text)

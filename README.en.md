@@ -556,15 +556,19 @@ go test ./internal/telegram -update       # message texts and layouts
 go test ./internal/notification -update   # notification texts
 ```
 
-Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The `container` CI job runs the image itself in webhook mode against the standalone stub Bot API in `internal/tgstub` (binary: `scripts/tgstub`), which records the calls the bot makes and answers them like Telegram would. The inline button path is covered over the same HTTP: `TestWebhookDeliversACallbackQueryToTheInlineEditPath` posts the signed `callback_query` from `internal/telegram/testdata/webhook_callback_query.json` — the very file the `container` job posts — into a live `Bot.Run` socket and fails if the bot edited a message other than the one the update pointed at. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible:
+Bot tests do not stub the Telegram caller: `internal/telegram/fakeapi_test.go` starts a fake Telegram Bot API server, so long polling, the webhook, request encoding and the reply path are exercised over real HTTP. The `container` CI job runs the image itself in webhook mode against the standalone stub Bot API in `internal/tgstub` (binary: `scripts/tgstub`), which records the calls the bot makes and answers them like Telegram would. The inline button path is covered over the same HTTP: `TestWebhookDeliversACallbackQueryToTheInlineEditPath` posts the signed `callback_query` from `internal/telegram/testdata/webhook_callback_query.json` — the very file the `container` job posts — into a live `Bot.Run` socket and fails if the bot edited a message other than the one the update pointed at. The parsers and the webhook are also fuzzed (Go native fuzzing) with the real page snapshots as seeds, and the invariants keep the output clean and reproducible. The pure libraries behind the reminders, group search and the free-classroom list carry targets too: `schedulediff` (a change never leaves the days that were compared), `search` (the result never exceeds the limit, stays ordered by score and never invents a name), `reminder` (the running lesson precedes the next one and both stay inside the day) and `rooms` (a room key is an idempotent normalisation):
 
 ```bash
 go test -fuzz FuzzGroupParserStaysStableAndClean -fuzztime 30s ./internal/parser/
 go test -fuzz FuzzTeacherParserStaysStableAndClean -fuzztime 30s ./internal/parser/
 go test -fuzz FuzzWebhookHandlerKeepsStatusesSane -fuzztime 30s ./internal/telegram/
+go test -fuzz FuzzDiffKeepsChangesWithinTheDays -fuzztime 30s ./internal/schedulediff/
+go test -fuzz FuzzSearchStaysOrderedAndBounded -fuzztime 30s ./internal/search/
+go test -fuzz FuzzCurrentAndUpcomingStayInsideTheDay -fuzztime 30s ./internal/reminder/
+go test -fuzz FuzzKeyIsStableAndUniverseKeepsOneLabel -fuzztime 30s ./internal/rooms/
 ```
 
-Every crashing input Go finds is written to `testdata/fuzz/<target>/` and stays there as a permanent seed corpus, so a plain `go test` keeps covering it — that is how reading `24.09.2026` as a bell time, or a pair ending before it starts, are now locked down.
+The `fuzz` CI job spends 20 seconds on every target, and a crashing input Go finds is written to `testdata/fuzz/<target>/` and stays there as a permanent seed corpus, so a plain `go test` keeps covering it — that is how reading `24.09.2026` as a bell time, a pair ending before it starts, and a half-stripped `каб` prefix in a room key are now locked down.
 
 ### Pre-flight check
 

@@ -1,0 +1,7 @@
+go test fuzz v1
+int(2026)
+int(9)
+int(7)
+int(11)
+int(0)
+string("1;  \n2;\nnonsense\n9;Out of range\n\n3;History")

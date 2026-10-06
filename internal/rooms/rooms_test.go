@@ -36,6 +36,36 @@ func TestKeyKeepsLettersThatBelongToTheNumber(t *testing.T) {
 	}
 }
 
+func TestKeyReachesAFixpoint(t *testing.T) {
+	for _, room := range []string{"кабкаб101", "каб. каб. 101", "101 (к) (л)", "каб. 101 (левый корпус)", "ка б", "КАБ 101", "101"} {
+		once := Key(room)
+		if twice := Key(once); twice != once {
+			t.Errorf("Key(%q) = %q, but Key(%q) = %q", room, once, once, twice)
+		}
+	}
+	if got := Key("кабкаб101"); got != "101" {
+		t.Errorf("a doubled prefix must be stripped all the way, got %q", got)
+	}
+	if got := Key("101 (к) (л)"); got != "101" {
+		t.Errorf("doubled decorations must be stripped, got %q", got)
+	}
+	if got := Key("ка б"); got != "" {
+		t.Errorf("a collapsed prefix must be stripped too, got %q", got)
+	}
+	if got := Key("КАБ 101"); got != "101" {
+		t.Errorf("Key(%q) = %q, want the room number", "КАБ 101", got)
+	}
+}
+
+func TestKeyDropsBytesThatAreNotText(t *testing.T) {
+	if got := Key("\xb0"); got != "" {
+		t.Errorf("an invalid byte must not turn into a replacement character, got %q", got)
+	}
+	if got := Key("\xff\xfe101"); got != "101" {
+		t.Errorf("Key(%q) = %q, want the room behind the broken bytes", "\xff\xfe101", got)
+	}
+}
+
 func TestUniverseKeepsOneLabelPerRoom(t *testing.T) {
 	universe := Universe([]string{"101", "101 (к)", "101", "202", "  ", "202 (к)"})
 	if len(universe) != 2 {

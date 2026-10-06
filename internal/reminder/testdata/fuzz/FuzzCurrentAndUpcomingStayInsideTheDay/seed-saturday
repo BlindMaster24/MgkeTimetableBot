@@ -1,0 +1,7 @@
+go test fuzz v1
+int(2026)
+int(9)
+int(5)
+int(9)
+int(30)
+string("1;Saturday\n2;Practice")

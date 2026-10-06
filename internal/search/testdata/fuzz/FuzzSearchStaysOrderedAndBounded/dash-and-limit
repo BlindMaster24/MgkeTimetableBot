@@ -1,0 +1,4 @@
+go test fuzz v1
+string("т—123")
+string("Т-123\nт 123\nштрих")
+int(1)

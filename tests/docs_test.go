@@ -184,6 +184,29 @@ func TestDocsDocumentReminders(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentFuzzing(t *testing.T) {
+	targets := []string{
+		"FuzzGroupParserStaysStableAndClean",
+		"FuzzWebhookHandlerKeepsStatusesSane",
+		"FuzzDiffKeepsChangesWithinTheDays",
+		"FuzzSearchStaysOrderedAndBounded",
+		"FuzzCurrentAndUpcomingStayInsideTheDay",
+		"FuzzKeyIsStableAndUniverseKeepsOneLabel",
+	}
+
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		if !strings.Contains(content, "go test -fuzz") {
+			t.Errorf("%s does not document how to fuzz", doc)
+		}
+		for _, target := range targets {
+			if !strings.Contains(content, target) {
+				t.Errorf("%s does not document the %s fuzz target", doc, target)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentArchiveMaintenance(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "configs", "config.example.yaml"))
 	if err != nil {

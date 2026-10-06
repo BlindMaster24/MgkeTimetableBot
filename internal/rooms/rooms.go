@@ -12,10 +12,14 @@ var (
 )
 
 func Key(room string) string {
-	key := strings.TrimSpace(room)
-	key = cabinetPrefixRe.ReplaceAllString(key, "")
-	key = roomDecorationRe.ReplaceAllString(key, "")
-	key = strings.Join(strings.Fields(key), "")
+	key := strings.Join(strings.Fields(strings.ToValidUTF8(room, "")), "")
+	for {
+		trimmed := roomDecorationRe.ReplaceAllString(cabinetPrefixRe.ReplaceAllString(key, ""), "")
+		if trimmed == key {
+			break
+		}
+		key = trimmed
+	}
 	return strings.ToLower(key)
 }
 
