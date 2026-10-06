@@ -20,6 +20,24 @@ type LessonAt struct {
 }
 
 func NextLesson(day timetable.Day, now time.Time, calls Schedule) (LessonAt, bool) {
+	return pick(day, now, calls, func(_, end, now time.Time) bool {
+		return end.After(now)
+	})
+}
+
+func Current(day timetable.Day, now time.Time, calls Schedule) (LessonAt, bool) {
+	return pick(day, now, calls, func(start, end, now time.Time) bool {
+		return !start.After(now) && end.After(now)
+	})
+}
+
+func Upcoming(day timetable.Day, now time.Time, calls Schedule) (LessonAt, bool) {
+	return pick(day, now, calls, func(start, _, now time.Time) bool {
+		return start.After(now)
+	})
+}
+
+func pick(day timetable.Day, now time.Time, calls Schedule, keep func(start, end, now time.Time) bool) (LessonAt, bool) {
 	date, err := timetable.ParseDate(day.Date)
 	if err != nil {
 		return LessonAt{}, false
@@ -36,7 +54,7 @@ func NextLesson(day timetable.Day, now time.Time, calls Schedule) (LessonAt, boo
 			continue
 		}
 		start, end, ok := spanAt(date, loc, table, lesson.Num)
-		if !ok || !end.After(now) {
+		if !ok || !keep(start, end, now) {
 			continue
 		}
 		if !found || start.Before(best.Start) {
@@ -45,6 +63,10 @@ func NextLesson(day timetable.Day, now time.Time, calls Schedule) (LessonAt, boo
 		}
 	}
 	return best, found
+}
+
+func Slot(date time.Time, loc *time.Location, calls Schedule, num int) (time.Time, time.Time, bool) {
+	return spanAt(date, loc, tableFor(calls, date), num)
 }
 
 func LessonSpan(day timetable.Day, index int, loc *time.Location, calls Schedule) (time.Time, time.Time, bool) {

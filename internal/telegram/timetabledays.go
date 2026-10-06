@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
+
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
@@ -56,6 +58,13 @@ func scheduleTargetFor(chat *Chat) (scheduleTarget, bool) {
 		}, true
 	}
 	return scheduleTarget{}, false
+}
+
+func cacheKind(typeName string) string {
+	if typeName == "teacher" {
+		return cache.KindTeachers
+	}
+	return cache.KindGroups
 }
 
 func (b *Bot) formatDays(chat *Chat, typeName, value string, days []map[string]any, opts formatter.FormatOptions) string {

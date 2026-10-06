@@ -198,6 +198,119 @@ func TestNextLessonFutureDayReturnsOpener(t *testing.T) {
 	}
 }
 
+func TestCurrentAndUpcomingSplitTheDay(t *testing.T) {
+	calls := callsFixture()
+	cases := []struct {
+		name         string
+		now          time.Time
+		wantCurrent  string
+		wantUpcoming string
+	}{
+		{"before the first pair", at(8, 0), "", "Math"},
+		{"during the second pair", at(11, 0), "Physics", "History"},
+		{"during the last pair", at(13, 0), "History", ""},
+		{"after the last pair", at(15, 0), "", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			current, hasCurrent := Current(dayFixture(), tc.now, calls)
+			if tc.wantCurrent == "" {
+				if hasCurrent {
+					t.Fatalf("current = %+v, want none", current)
+				}
+			} else if !hasCurrent || current.Lesson.Subject != tc.wantCurrent {
+				t.Fatalf("current = %+v %v, want %s", current, hasCurrent, tc.wantCurrent)
+			}
+
+			upcoming, hasUpcoming := Upcoming(dayFixture(), tc.now, calls)
+			if tc.wantUpcoming == "" {
+				if hasUpcoming {
+					t.Fatalf("upcoming = %+v, want none", upcoming)
+				}
+			} else if !hasUpcoming || upcoming.Lesson.Subject != tc.wantUpcoming {
+				t.Fatalf("upcoming = %+v %v, want %s", upcoming, hasUpcoming, tc.wantUpcoming)
+			}
+		})
+	}
+}
+
+func TestCurrentIsBoundToItsSpan(t *testing.T) {
+	calls := callsFixture()
+	current, ok := Current(dayFixture(), at(9, 0), calls)
+	if !ok || current.Lesson.Subject != "Math" || current.End != at(10, 40) {
+		t.Fatalf("at the start of a pair current = %+v %v, want Math until 10:40", current, ok)
+	}
+	if _, ok := Current(dayFixture(), at(10, 40), calls); ok {
+		t.Fatal("a lesson must stop being current at its own end")
+	}
+	upcoming, ok := Upcoming(dayFixture(), at(9, 0), calls)
+	if !ok || upcoming.Lesson.Num == current.Lesson.Num {
+		t.Fatalf("upcoming = %+v %v, must be the pair starting after the running one", upcoming, ok)
+	}
+}
+
+func TestCurrentAndUpcomingSkipEmptyDays(t *testing.T) {
+	calls := callsFixture()
+	days := []timetable.Day{
+		{Date: "07.09.2026"},
+		{Date: "07.09.2026", Lessons: []timetable.Lesson{}},
+		{Date: "tomorrow", Lessons: []timetable.Lesson{lesson(1, "Math")}},
+	}
+	for _, day := range days {
+		if _, ok := Current(day, at(11, 0), calls); ok {
+			t.Fatalf("current matched for %+v", day)
+		}
+		if _, ok := Upcoming(day, at(11, 0), calls); ok {
+			t.Fatalf("upcoming matched for %+v", day)
+		}
+	}
+	for _, calls := range []Schedule{{}, {Weekdays: [][2][2]string{}}} {
+		if _, ok := Current(dayFixture(), at(11, 0), calls); ok {
+			t.Fatal("an empty bell schedule must not produce a current lesson")
+		}
+		if _, ok := Upcoming(dayFixture(), at(11, 0), calls); ok {
+			t.Fatal("an empty bell schedule must not produce an upcoming lesson")
+		}
+	}
+}
+
+func TestUpcomingSkipsBlankSubjects(t *testing.T) {
+	day := timetable.Day{Date: "07.09.2026", Lessons: []timetable.Lesson{{Num: 1, Subject: "  "}, lesson(2, "Physics")}}
+	upcoming, ok := Upcoming(day, at(8, 0), callsFixture())
+	if !ok || upcoming.Lesson.Subject != "Physics" {
+		t.Fatalf("upcoming = %+v %v, want Physics", upcoming, ok)
+	}
+}
+
+func TestUpcomingUsesTheSaturdayTable(t *testing.T) {
+	day := timetable.Day{Date: "05.09.2026", Lessons: []timetable.Lesson{lesson(1, "Math")}}
+	now := time.Date(2026, 9, 5, 8, 0, 0, 0, time.UTC)
+	upcoming, ok := Upcoming(day, now, callsFixture())
+	if !ok {
+		t.Fatal("want the Saturday opener, got none")
+	}
+	wantEnd := time.Date(2026, 9, 5, 10, 5, 0, 0, time.UTC)
+	if upcoming.End != wantEnd {
+		t.Fatalf("end = %v, want %v", upcoming.End, wantEnd)
+	}
+}
+
+func TestSlotResolvesAPairNumber(t *testing.T) {
+	start, end, ok := Slot(at(0, 0), time.UTC, callsFixture(), 3)
+	if !ok || start != at(12, 40) || end != at(14, 20) {
+		t.Fatalf("slot = %v-%v %v, want 12:40-14:20 true", start, end, ok)
+	}
+	for _, num := range []int{0, -1, 4} {
+		if _, _, ok := Slot(at(0, 0), time.UTC, callsFixture(), num); ok {
+			t.Fatalf("pair %d resolved, want none", num)
+		}
+	}
+	if _, _, ok := Slot(at(0, 0), time.UTC, Schedule{}, 1); ok {
+		t.Fatal("an empty bell schedule must not resolve a pair")
+	}
+}
+
 func TestLessonSpanResolvesSlot(t *testing.T) {
 	start, end, ok := LessonSpan(dayFixture(), 1, time.UTC, callsFixture())
 	if !ok || start != at(10, 50) || end != at(12, 30) {

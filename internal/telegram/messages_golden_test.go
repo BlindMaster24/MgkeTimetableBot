@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/testgolden"
 )
 
@@ -281,6 +282,38 @@ func messageScenarios() []messageScenario {
 		}
 		b.showCallsFullFull(&Update{Bot: b, ChatID: userID, UserID: userID}, chat)
 	}
+	next := func(t *testing.T, b *Bot, userID int64) {
+		t.Helper()
+		cmd := &nextLessonCmd{bot: b}
+		if err := cmd.Handler(context.Background(), &Update{Bot: b, ChatID: userID, UserID: userID, Text: "/next"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	todayTimetable := func(b *Bot) {
+		date := messageGoldenNow.Format("02.01.2006")
+		b.cache.SetCalls(context.Background(), cache.Schedule{}, cache.Schedule{Weekdays: [][2][2]string{
+			{{"04:30", "04:30"}, {"06:00", "06:00"}},
+			{{"06:10", "06:10"}, {"07:00", "07:00"}},
+		}}, "manual")
+		b.cache.SetGroups(context.Background(), map[string]any{
+			"901": e2eJsonRoundTrip(map[string]any{"group": "901", "days": []any{
+				map[string]any{"day": date, "lessons": []any{
+					map[string]any{"lesson": "Математика", "type": "Лек", "cabinet": "101"},
+					map[string]any{"lesson": "Физика", "type": "ЛР", "cabinet": "202"},
+				}},
+			}}),
+			"902": e2eJsonRoundTrip(map[string]any{"group": "902", "days": []any{
+				map[string]any{"day": date, "lessons": []any{
+					map[string]any{"lesson": "Информатика", "type": "Пр", "cabinet": "303"},
+				}},
+			}}),
+			"903": e2eJsonRoundTrip(map[string]any{"group": "903", "days": []any{
+				map[string]any{"day": date, "lessons": []any{}},
+			}}),
+		}, "golden-today")
+	}
+
 	manualCalls := func(b *Bot) {
 		b.cache.SetCallsManualNotify(
 			[][2][2]string{{{"10:00", "10:30"}, {"10:40", "11:10"}}},
@@ -321,6 +354,12 @@ func messageScenarios() []messageScenario {
 	showParserTime := func(chat *Chat) {
 		chat.ShowParserTime = true
 	}
+	todayGroup := func(chat *Chat) {
+		chat.Group = "901"
+	}
+	emptyTodayGroup := func(chat *Chat) {
+		chat.Group = "903"
+	}
 
 	return []messageScenario{
 		{name: "day/student/default", handle: day},
@@ -337,5 +376,8 @@ func messageScenarios() []messageScenario {
 		{name: "calls/short", chat: withoutGroup, handle: calls},
 		{name: "calls/student/full", chat: weekStudent, handle: callsFull},
 		{name: "calls/manual-source", setup: manualCalls, chat: withoutGroup, handle: calls},
+		{name: "next/now-and-next", setup: todayTimetable, chat: todayGroup, handle: next},
+		{name: "next/nothing-left", setup: todayTimetable, chat: emptyTodayGroup, handle: next},
+		{name: "next/no-timetable", handle: next},
 	}
 }

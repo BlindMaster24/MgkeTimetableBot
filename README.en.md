@@ -252,6 +252,7 @@ Every field is also available as an environment variable: `MGKE_PARSER_GUARD_MIN
 | `/group` | Group timetable |
 | `/teacher` | Teacher timetable |
 | `/image` | Timetable as an image |
+| `/next` | The lesson running now and the next one |
 | `/cabinet` | Search by classroom |
 | `/settings` | Settings entry point for the submenus below |
 | `/formatter` | Output format menu |
