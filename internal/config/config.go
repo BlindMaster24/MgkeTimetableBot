@@ -44,6 +44,12 @@ type GuardConfig struct {
 	MaxDropPercent int  `yaml:"max_drop_percent"`
 }
 
+type MetricsConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Path    string `yaml:"path"`
+	Token   string `yaml:"token"`
+}
+
 type ArchiveConfig struct {
 	BackupDir           string `yaml:"backup_dir"`
 	BackupKeep          int    `yaml:"backup_keep"`
@@ -117,6 +123,7 @@ type Config struct {
 
 	Health  *HealthConfig `yaml:"health"`
 	Archive ArchiveConfig `yaml:"archive"`
+	Metrics MetricsConfig `yaml:"metrics"`
 
 	Accept struct {
 		Room    bool `yaml:"room"`
@@ -164,6 +171,8 @@ const (
 	DefaultCacheDir            = "./cache/rasp"
 	DefaultBackupKeep          = 7
 	DefaultMaintenanceSchedule = "0 30 4 * * *"
+	DefaultMetricsPath         = "/metrics"
+	MinimumMetricsToken        = 8
 )
 
 func (c *Config) ResolvedChatDBPath() string {
@@ -198,6 +207,10 @@ func (c *Config) RetentionEnabled() bool {
 
 func (c *Config) MaintenanceEnabled() bool {
 	return c.BackupEnabled() || c.RetentionEnabled()
+}
+
+func (c *Config) ResolvedMetricsPath() string {
+	return pathOr(strings.TrimSpace(c.Metrics.Path), DefaultMetricsPath)
 }
 
 func (c *Config) TelegramAPIServer() (string, error) {

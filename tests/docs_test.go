@@ -58,6 +58,7 @@ func TestDocsListEveryAPIEndpoint(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	server := api.NewServer(raspCache, 0, health.NewDefaultTracker(), build.New("test", "", ""), nil, nil)
+	server.SetMetricsConfig(api.MetricsConfig{})
 	server.HandleGoogleOAuth("/google/oauth", nil)
 
 	engine, ok := server.Handler().(*gin.Engine)
@@ -66,8 +67,8 @@ func TestDocsListEveryAPIEndpoint(t *testing.T) {
 	}
 
 	routes := engine.Routes()
-	if len(routes) < 7 {
-		t.Fatalf("expected the API surface, got %d routes", len(routes))
+	if len(routes) < 8 {
+		t.Fatalf("expected the API surface plus the metrics route, got %d routes", len(routes))
 	}
 
 	for _, doc := range docs {
@@ -226,6 +227,35 @@ func TestDocsDocumentArchiveMaintenance(t *testing.T) {
 		for _, key := range keys {
 			if !strings.Contains(content, key) {
 				t.Errorf("%s does not document the %s config key", doc, key)
+			}
+		}
+	}
+}
+
+func TestDocsDocumentPrometheusMetrics(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "configs", "config.example.yaml"))
+	if err != nil {
+		t.Fatalf("read config example: %v", err)
+	}
+
+	keys := []string{"metrics.enabled", "metrics.path", "metrics.token"}
+	for _, key := range keys {
+		field := strings.TrimPrefix(key, "metrics.")
+		if !strings.Contains(string(data), field+":") {
+			t.Errorf("config.example.yaml does not carry the metrics.%s key", field)
+		}
+	}
+
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, key := range keys {
+			if !strings.Contains(content, key) {
+				t.Errorf("%s does not document the %s config key", doc, key)
+			}
+		}
+		for _, token := range []string{api.DefaultMetricsPath, "Prometheus", "MGKE_METRICS_TOKEN"} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the metrics token %q", doc, token)
 			}
 		}
 	}

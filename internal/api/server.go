@@ -34,6 +34,10 @@ type Server struct {
 	public   map[string]bool
 	publicMu sync.RWMutex
 	webhook  func(ctx context.Context) any
+
+	metricsPath    string
+	metricsToken   string
+	metricsSources MetricsSources
 }
 
 func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info, keys *apikey.Store, loc *i18n.Localizer) *Server {

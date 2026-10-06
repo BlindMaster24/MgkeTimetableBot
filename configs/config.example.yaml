@@ -113,6 +113,11 @@ archive:
   retention_days: 0
   maintenance_schedule: "0 30 4 * * *"
 
+metrics:
+  enabled: false
+  path: "/metrics"
+  token: ""
+
 encrypt_key: ""
 
 health:

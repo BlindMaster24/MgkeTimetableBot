@@ -122,6 +122,12 @@ func (n *EventNotifier) reminderChats(kind, value string) []*EventChat {
 	return n.mergeChats(base, subs)
 }
 
+func (n *EventNotifier) TrackedReminders() int {
+	n.remMu.Lock()
+	defer n.remMu.Unlock()
+	return len(n.remSent) + len(n.remDue)
+}
+
 func (n *EventNotifier) pruneReminders(now time.Time) {
 	cutoff := now.Add(-time.Hour).Unix()
 	n.remMu.Lock()

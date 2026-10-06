@@ -223,6 +223,8 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	})
 
 	var eventNotifier *notification.EventNotifier
+	schedulerEntries := func() int { return 0 }
+	var trackedReminders func() int
 	if cfg.Telegram.Noticer {
 		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
 		eventNotifier.SetLocalizer(loc)
@@ -232,7 +234,21 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		scheduler.SetIncidents(incidents)
 		scheduler.Start()
 		defer scheduler.Stop()
+		schedulerEntries = scheduler.Entries
+		trackedReminders = eventNotifier.TrackedReminders
 		log.Info().Msg("notification scheduler started")
+	}
+
+	if cfg.Metrics.Enabled {
+		apiServer.SetMetricsConfig(api.MetricsConfig{Path: cfg.ResolvedMetricsPath(), Token: cfg.Metrics.Token})
+		apiServer.SetMetricsSources(api.MetricsSources{
+			Archive:   archiveRepo.Stats,
+			Bounds:    archiveRepo.DayIndexBounds,
+			Webhook:   newWebhookMetricsSource(bot.WebhookStatus).Get,
+			Scheduler: schedulerEntries,
+			Reminders: trackedReminders,
+		})
+		log.Info().Str("path", cfg.ResolvedMetricsPath()).Msg("prometheus metrics enabled")
 	}
 
 	drainEvents := func(tag string) {

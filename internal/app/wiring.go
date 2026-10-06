@@ -1,11 +1,14 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/backup"
@@ -16,6 +19,45 @@ import (
 	parserpkg "github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
+
+const webhookMetricsInterval = 30 * time.Second
+
+func webhookMetrics(status telegrambot.WebhookStatus) api.WebhookMetrics {
+	return api.WebhookMetrics{
+		Enabled:    status.Enabled,
+		Mode:       status.Mode,
+		Registered: status.InfoError == "" && status.URL != "",
+		Secret:     status.SecretToken,
+		Reachable:  status.InfoError == "",
+		Pending:    status.PendingUpdates,
+	}
+}
+
+type webhookMetricsSource struct {
+	mu       sync.Mutex
+	interval time.Duration
+	fetch    func(ctx context.Context) telegrambot.WebhookStatus
+	now      func() time.Time
+	at       time.Time
+	cached   api.WebhookMetrics
+}
+
+func newWebhookMetricsSource(fetch func(ctx context.Context) telegrambot.WebhookStatus) *webhookMetricsSource {
+	return &webhookMetricsSource{interval: webhookMetricsInterval, fetch: fetch, now: time.Now}
+}
+
+func (s *webhookMetricsSource) Get(ctx context.Context) api.WebhookMetrics {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.at.IsZero() && s.now().Sub(s.at) < s.interval {
+		return s.cached
+	}
+
+	s.cached = webhookMetrics(s.fetch(ctx))
+	s.at = s.now()
+	return s.cached
+}
 
 type archiveMaintenance struct {
 	cfg  *config.Config

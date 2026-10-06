@@ -71,6 +71,13 @@ func (s *Scheduler) RemindNow(now time.Time) {
 	s.notifier.RemindUpcoming(now, lead, window, r)
 }
 
+func (s *Scheduler) Entries() int {
+	if s.cron == nil {
+		return 0
+	}
+	return len(s.cron.Entries())
+}
+
 func (s *Scheduler) SetIncidents(incidents *health.IncidentLog) {
 	s.incidents = incidents
 	if s.health != nil {

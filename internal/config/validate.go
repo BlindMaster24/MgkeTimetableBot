@@ -57,6 +57,18 @@ func (c *Config) Validate() error {
 			errs = append(errs, fmt.Errorf("archive.maintenance_schedule must be a cron expression with seconds, got %q: %w", c.Archive.MaintenanceSchedule, err))
 		}
 	}
+	if c.Metrics.Enabled {
+		path := c.ResolvedMetricsPath()
+		if !strings.HasPrefix(path, "/") || len(path) < 2 {
+			errs = append(errs, fmt.Errorf("metrics.path must be an absolute path like /metrics, got %q", c.Metrics.Path))
+		}
+		if strings.HasPrefix(path, "/api") {
+			errs = append(errs, fmt.Errorf("metrics.path must stay outside /api, otherwise the REST API key gate applies to it, got %q", path))
+		}
+		if token := strings.TrimSpace(c.Metrics.Token); token != "" && len(token) < MinimumMetricsToken {
+			errs = append(errs, fmt.Errorf("metrics.token must be at least %d characters long when it is set, got %d", MinimumMetricsToken, len(token)))
+		}
+	}
 	return errors.Join(errs...)
 }
 

@@ -128,6 +128,7 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `parser` | Poll intervals, sources, bell schedule, proxy |
 | `timetable` | Fallback bell schedule: `weekdays`, `saturday` (used when the site is unreachable); `reminder_lead_minutes` (>0 enables per-lesson reminders), `reminder_jitter_seconds` (send-time spread) |
 | `health` | Alert thresholds: parser, calendar sync, API errors |
+| `metrics` | Prometheus metrics: `metrics.enabled` turns a dedicated route on (off by default), `metrics.path` is its path (default `/metrics`, outside `/api`), and `metrics.token` is an optional token of at least 8 characters that must arrive in `Authorization: Bearer` |
 | `archive` | Archive maintenance: `archive.backup_dir` is the directory of hot SQLite copies (empty disables them), `archive.backup_keep` is how many copies to keep (7 by default, 0 keeps every copy), `archive.retention_days` drops archive rows older than N days (0 never drops any), and `archive.maintenance_schedule` is the cron expression with seconds (default `0 30 4 * * *`) |
 | `encrypt_key` | Encryption key: it signs the REST API keys and encrypts the stored Google OAuth tokens, so it must be at least 32 characters long |
 
@@ -313,6 +314,8 @@ The server listens on `0.0.0.0:http.port`:
 
 `google.url` (default `/google/oauth`) is the Google OAuth callback the user returns to after authorization.
 
+Separate from the REST API there is the metrics route `metrics.path` (default `/metrics`): it serves Prometheus-format aggregates, is not protected by an API key, and is enabled by the `metrics` section — see “Prometheus (`/metrics`)” below.
+
 Every route except `GET /api/health` is protected by a key and expects it in the `Authorization: Bearer <key>` header: a request without a key or with an unknown one gets `401` (`{"error":"Неверный ключ авторизации"}`), and one over the rate limit gets `429` (`{"error":"Превышен лимит запросов"}`). The bot itself hands out the keys:
 
 - `/api` in a private chat shows that chat's key — its number, the key, the requests-per-second limit and the last usage time;
@@ -363,6 +366,25 @@ health:
 ```
 
 Every field is also available as an environment variable (`MGKE_HEALTH_PARSER_STALE_MINUTES` and so on).
+
+### Prometheus (`/metrics`)
+
+The `metrics` section adds a Prometheus-format route outside `/api`, so the REST API keys never apply to it:
+
+```yaml
+metrics:
+  enabled: true                # MGKE_METRICS_ENABLED, false by default
+  path: "/metrics"             # MGKE_METRICS_PATH, /metrics by default
+  token: ""                    # MGKE_METRICS_TOKEN, empty leaves the route open
+```
+
+```bash
+curl -s localhost:8081/metrics
+```
+
+The route serves **aggregates only** and nothing sensitive: the build version and commit, the size and freshness of the cache, the parser, calendar and HTTP API counters (request and 5xx numbers per route), the archive size and its day bounds, the number of scheduler entries and tracked reminders, the webhook state (flags and the count of pending updates) and `mgke_uptime_seconds`. There are no secrets in it: no tokens, no API keys, no chat IDs, no message texts and no webhook address — just numbers and a fixed set of labels (`method`, `path`, `version`, `commit`, `mode`), with the `path` values taken from the routes the server actually registered. Metrics whose source is missing are not invented: when a source (the archive, say) is unavailable, its lines are simply absent. The webhook state comes from `getWebhookInfo`, but that request is repeated at most once every 30 seconds — other scrapes get the last known snapshot, so polling the metrics never turns into a stream of Bot API calls.
+
+When `metrics.token` is set, the route expects `Authorization: Bearer <token>` and answers `401` with a `WWW-Authenticate` header without it; an empty token leaves the route open, so it should be closed at the reverse proxy instead. The path must be absolute and outside `/api` (otherwise the REST API key gate would cover it), and the token must be at least 8 characters long; both rules are checked at startup, so a config typo never turns into a silently open route.
 
 ## Notifications
 
