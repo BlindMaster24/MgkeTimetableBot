@@ -370,6 +370,8 @@ The scheduler (`internal/notification`) starts with the bot and sends:
 
 Events are produced by the parser, queued in the cache and drained after every parse cycle. Every notification type can be turned off from the notification menu (`/notice`), and each chat keeps its own settings.
 
+Lesson reminders (enabled by `timetable.reminder_lead_minutes` > 0) are tuned per chat: the “⏰ Напоминания” menu inside the settings (`/settings`) offers 5, 10, 15, 30 or 60 minutes, and “как в конфиге” falls back to the configured value. Every chat hears about a given lesson once.
+
 ## Google Calendar and ICS
 
 - `docs/google-calendar.md` — Google Cloud setup, OAuth, account linking, permissions.

@@ -77,6 +77,9 @@
     { "section": "buttons", "kind": "extra_in_go", "value": "Источник: конфиг", "reason": "Go-only calls source switcher (site/manual/config/auto) in the calls settings menu" },
     { "section": "buttons", "kind": "extra_in_go", "value": "Источник: сайт", "reason": "Go-only calls source switcher (site/manual/config/auto) in the calls settings menu" },
     { "section": "buttons", "kind": "extra_in_go", "value": "🔄 Переустановить webhook", "reason": "the Go webhook status screen can re-register the webhook with Telegram in one tap; TS had no webhook mode" },
+    { "section": "buttons", "kind": "extra_in_go", "value": "⏰ Напоминания", "reason": "Go port lets every chat tune the lesson reminders; the old bot only had the global reminder_lead_minutes config value and no settings submenu for it" },
+    { "section": "buttons", "kind": "extra_in_go", "value": "⏰ Напоминание: как в конфиге", "reason": "Go-only preset that drops a chat's reminder override so the configured default applies again" },
+    { "section": "buttons", "kind": "extra_in_go", "value": "⏰ Напоминание: за мин", "reason": "Go-only per-chat reminder lead presets (5/10/15/30/60 minutes collapse into this one label because the checker strips digits); the old bot could only remind on the global lead" },
 
     { "section": "api", "kind": "differs", "value": "missing_name_404", "reason": "the old getGroup/getTeacher API methods answered 200 with {days: null} for an unknown name, the Go API answers 404 with an error body — the documented REST contract of the Go API, which apiprobe and API clients expect" },
     { "section": "api", "kind": "differs", "value": "array_envelope", "reason": "the old getGroups/getTeachers returned a bare JSON array, the Go API wraps it as {\"groups\": [...]} / {\"teachers\": [...]} — documented Go contract; the sort order inside matches the old sort()" },

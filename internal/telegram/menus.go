@@ -76,6 +76,21 @@ func (b *Bot) menuSpecs() []menuSpec {
 			},
 		},
 		{
+			id:       "reminders",
+			scene:    sceneSettings,
+			prompt:   b.loc("settings_reminders_menu"),
+			openText: []string{b.loc("button_settings_reminders")},
+			keyboard: func(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsReminders(chat) },
+			items: []func(b *Bot) Command{
+				func(b *Bot) Command { return &reminderLeadTextCmd{bot: b, minutes: 0} },
+				func(b *Bot) Command { return &reminderLeadTextCmd{bot: b, minutes: 5} },
+				func(b *Bot) Command { return &reminderLeadTextCmd{bot: b, minutes: 10} },
+				func(b *Bot) Command { return &reminderLeadTextCmd{bot: b, minutes: 15} },
+				func(b *Bot) Command { return &reminderLeadTextCmd{bot: b, minutes: 30} },
+				func(b *Bot) Command { return &reminderLeadTextCmd{bot: b, minutes: 60} },
+			},
+		},
+		{
 			id:       "view",
 			name:     "view",
 			desc:     "Настройки отображения расписания",

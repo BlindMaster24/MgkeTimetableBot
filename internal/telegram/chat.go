@@ -43,6 +43,7 @@ type Chat struct {
 	NoticeNextWeek           bool
 	NoticeCalls              bool
 	NoticeParserErrors       bool
+	ReminderLeadMinutes      int
 	ShowParserTime           bool
 	ShowHints                bool
 	DiffEnabled              bool
@@ -113,6 +114,7 @@ func (r *Repository) migrate() error {
 		notice_next_week INTEGER NOT NULL DEFAULT 1,
 		notice_calls INTEGER NOT NULL DEFAULT 1,
 		notice_parser_errors INTEGER NOT NULL DEFAULT 1,
+		reminder_lead_minutes INTEGER NOT NULL DEFAULT 0,
 		notice_week INTEGER NOT NULL DEFAULT 1,
 		show_parser_time INTEGER NOT NULL DEFAULT 0,
 		show_hints INTEGER NOT NULL DEFAULT 1,
@@ -148,6 +150,7 @@ func (r *Repository) migrate() error {
 		{"calls_edit_input", "ALTER TABLE bot_chats ADD COLUMN calls_edit_input TEXT"},
 		{"calls_edit_reason", "ALTER TABLE bot_chats ADD COLUMN calls_edit_reason TEXT"},
 		{"calls_campus", "ALTER TABLE bot_chats ADD COLUMN calls_campus TEXT"},
+		{"reminder_lead_minutes", "ALTER TABLE bot_chats ADD COLUMN reminder_lead_minutes INTEGER NOT NULL DEFAULT 0"},
 	} {
 		var count int
 		r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count)
@@ -243,6 +246,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		        show_calls, show_fast_group, show_fast_teacher, hide_past_days,
 		        delete_last_msg, last_msg_id, allow_send_mess, notice_changes,
 		        notice_next_week, notice_calls, notice_parser_errors,
+		        reminder_lead_minutes,
 		        show_parser_time, show_hints, diff_enabled, diff_auto_in_week,
 		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref,
 		        history_group, history_teacher,
@@ -266,7 +270,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
 		&showAbout, &showDaily, &showWeekly, &showCalls, &showFastGroup, &showFastTeacher,
 		&hidePastDays, &deleteLastMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
-		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &showParserTime, &showHints,
+		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &chat.ReminderLeadMinutes, &showParserTime, &showHints,
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
 		&chat.DiffMaxLines, &nsRef, &nsHistoryGroup, &nsHistoryTeacher,
 		&chat.LastMsgTime, &subscribeDistribution, &needUpdateButtons, &deactivateSecondaryCheck,
@@ -398,6 +402,7 @@ func (r *Repository) Save(chat *Chat) error {
 			show_calls=?, show_fast_group=?, show_fast_teacher=?, hide_past_days=?,
 			delete_last_msg=?, last_msg_id=?, allow_send_mess=?, notice_changes=?,
 			notice_next_week=?, notice_calls=?, notice_parser_errors=?,
+			reminder_lead_minutes=?,
 			show_parser_time=?, show_hints=?, diff_enabled=?, diff_auto_in_week=?,
 			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?,
 			history_group=?, history_teacher=?, last_msg_time=?, subscribe_distribution=?,
@@ -409,6 +414,7 @@ func (r *Repository) Save(chat *Chat) error {
 		toInt(chat.ShowFastTeacher), toInt(chat.HidePastDays), toInt(chat.DeleteLastMsg),
 		chat.LastMsgID, toInt(chat.AllowSendMess), toInt(chat.NoticeChanges),
 		toInt(chat.NoticeNextWeek), toInt(chat.NoticeCalls), toInt(chat.NoticeParserErrors),
+		chat.ReminderLeadMinutes,
 		toInt(chat.ShowParserTime), toInt(chat.ShowHints), toInt(chat.DiffEnabled),
 		toInt(chat.DiffAutoInWeek), toInt(chat.DiffAutoInUpdates), toInt(chat.DiffShowBeforeAfter),
 		chat.DiffMaxLines, chat.Ref,

@@ -141,6 +141,7 @@ func main() {
 		notice_next_week INTEGER NOT NULL DEFAULT 1,
 		notice_calls INTEGER NOT NULL DEFAULT 1,
 		notice_parser_errors INTEGER NOT NULL DEFAULT 1,
+		reminder_lead_minutes INTEGER NOT NULL DEFAULT 0,
 		notice_week INTEGER NOT NULL DEFAULT 1,
 		show_parser_time INTEGER NOT NULL DEFAULT 0,
 		show_hints INTEGER NOT NULL DEFAULT 1,

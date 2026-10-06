@@ -49,11 +49,12 @@ type EventChat struct {
 	Group   string
 	Teacher string
 
-	NoticeChanges    bool
-	NoticeNextWeek   bool
-	NoticeCalls      bool
-	NoticeParserErrs bool
-	AllowSendMess    bool
+	NoticeChanges       bool
+	NoticeNextWeek      bool
+	NoticeCalls         bool
+	NoticeParserErrs    bool
+	AllowSendMess       bool
+	ReminderLeadMinutes int
 
 	Formatter      int
 	HidePastDays   bool

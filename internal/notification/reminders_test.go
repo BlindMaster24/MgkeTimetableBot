@@ -286,6 +286,86 @@ func TestSchedulerRegistersReminderTick(t *testing.T) {
 	}
 }
 
+func TestRemindUsesTheChatLeadOverride(t *testing.T) {
+	n, sender, finder, c := newTestNotifier(t)
+	finder.byGroups = []*EventChat{
+		{ID: 1, PeerID: 1001, Group: "63", Mode: "student", ReminderLeadMinutes: 90},
+		{ID: 2, PeerID: 1002, Group: "63", Mode: "student"},
+	}
+
+	now := reminderMoment()
+	seedReminderDay(t, c, now,
+		[][2][2]string{reminderSlot(now.Add(90*time.Minute), now.Add(135*time.Minute))},
+		[]any{map[string]any{"lesson": "Математика", "cabinet": "101"}},
+	)
+
+	n.RemindUpcoming(now, 15*time.Minute, 0, nil)
+	if len(sender.sent) != 1 {
+		t.Fatalf("the chat override must fire on its own lead, got %d sends", len(sender.sent))
+	}
+	if sender.sent[0].chatID != 1001 {
+		t.Fatalf("the override chat must hear first, got %d", sender.sent[0].chatID)
+	}
+
+	n.RemindUpcoming(now.Add(76*time.Minute), 15*time.Minute, 0, nil)
+	if len(sender.sent) != 2 {
+		t.Fatalf("the default chat must fire on the shared lead, got %d sends", len(sender.sent))
+	}
+	if sender.sent[1].chatID != 1002 {
+		t.Fatalf("the default chat must hear later, got %d", sender.sent[1].chatID)
+	}
+
+	n.RemindUpcoming(now.Add(80*time.Minute), 15*time.Minute, 0, nil)
+	if len(sender.sent) != 2 {
+		t.Fatalf("every chat must hear about a pair once, got %d sends", len(sender.sent))
+	}
+}
+
+func TestRemindChatLeadCanBeShorterThanTheDefault(t *testing.T) {
+	n, sender, finder, c := newTestNotifier(t)
+	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student", ReminderLeadMinutes: 5}}
+
+	now := reminderMoment()
+	seedReminderDay(t, c, now,
+		[][2][2]string{reminderSlot(now.Add(30*time.Minute), now.Add(75*time.Minute))},
+		[]any{map[string]any{"lesson": "Математика"}},
+	)
+
+	n.RemindUpcoming(now, time.Hour, 0, nil)
+	if len(sender.sent) != 0 {
+		t.Fatalf("a short chat lead must wait instead of firing early, got %d sends", len(sender.sent))
+	}
+
+	n.RemindUpcoming(now.Add(25*time.Minute), time.Hour, 0, nil)
+	if len(sender.sent) != 1 {
+		t.Fatalf("the short chat lead must fire at its own time, got %d sends", len(sender.sent))
+	}
+}
+
+func TestRemindSendsToEveryChatOnce(t *testing.T) {
+	n, sender, finder, c := newTestNotifier(t)
+	finder.byGroups = []*EventChat{
+		{ID: 1, PeerID: 1001, Group: "63", Mode: "student"},
+		{ID: 2, PeerID: 1002, Group: "63", Mode: "student"},
+	}
+
+	now := reminderMoment()
+	seedReminderDay(t, c, now,
+		[][2][2]string{reminderSlot(now.Add(30*time.Minute), now.Add(75*time.Minute))},
+		[]any{map[string]any{"lesson": "Математика", "cabinet": "101"}},
+	)
+
+	n.RemindUpcoming(now, time.Hour, 0, nil)
+	if len(sender.sent) != 2 {
+		t.Fatalf("both chats must hear about the pair, got %d sends", len(sender.sent))
+	}
+
+	n.RemindUpcoming(now.Add(time.Minute), time.Hour, 0, nil)
+	if len(sender.sent) != 2 {
+		t.Fatalf("a repeated tick must not send again, got %d sends", len(sender.sent))
+	}
+}
+
 func TestRemindTeacherLessonFires(t *testing.T) {
 	n, sender, finder, c := newTestNotifier(t)
 	finder.byTeachers = []*EventChat{{ID: 2, PeerID: 1002, Teacher: "Иванов И.И.", Mode: "teacher"}}

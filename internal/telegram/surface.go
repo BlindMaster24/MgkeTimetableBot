@@ -141,6 +141,7 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		reply("replySettingsMain", b.replySettingsMain),
 		reply("replySettingsButtons", func() *telego.ReplyKeyboardMarkup { return b.replySettingsButtons(chat) }),
 		reply("replySettingsNotice", func() *telego.ReplyKeyboardMarkup { return b.replySettingsNotice(chat) }),
+		reply("replySettingsReminders", func() *telego.ReplyKeyboardMarkup { return b.replySettingsReminders(chat) }),
 		reply("replySettingsView", func() *telego.ReplyKeyboardMarkup { return b.replySettingsView(chat) }),
 		reply("replySettingsDiff", func() *telego.ReplyKeyboardMarkup { return b.replySettingsDiff(chat) }),
 		reply("replySettingsDiffAdvanced", func() *telego.ReplyKeyboardMarkup { return b.replySettingsDiffAdvanced(chat) }),

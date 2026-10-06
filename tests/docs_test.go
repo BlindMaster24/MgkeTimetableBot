@@ -178,6 +178,9 @@ func TestDocsDocumentReminders(t *testing.T) {
 				t.Errorf("%s does not document the %s config key", doc, token)
 			}
 		}
+		if !strings.Contains(content, "⏰ Напоминания") {
+			t.Errorf("%s does not document the per-chat reminder menu", doc)
+		}
 	}
 }
 

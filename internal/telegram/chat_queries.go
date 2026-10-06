@@ -12,7 +12,8 @@ func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
 
 	rows, err := r.db.Query(
 		`SELECT id, service, peer_id, COALESCE(mode, ''), COALESCE("group", ''), COALESCE(teacher, ''),
-		 COALESCE(notice_changes, 1), COALESCE(notice_next_week, 1), COALESCE(notice_calls, 1)
+		 COALESCE(notice_changes, 1), COALESCE(notice_next_week, 1), COALESCE(notice_calls, 1),
+		 COALESCE(reminder_lead_minutes, 0)
 		 FROM bot_chats WHERE service = ? AND accepted = 1 AND mode IS NOT NULL AND allow_send_mess = 1`,
 		service,
 	)
@@ -26,7 +27,7 @@ func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
 		chat := &Chat{}
 		var mode string
 		var noticeChanges, noticeNextWeek, noticeCalls int
-		err := rows.Scan(&chat.ID, &chat.Service, &chat.PeerID, &mode, &chat.Group, &chat.Teacher, &noticeChanges, &noticeNextWeek, &noticeCalls)
+		err := rows.Scan(&chat.ID, &chat.Service, &chat.PeerID, &mode, &chat.Group, &chat.Teacher, &noticeChanges, &noticeNextWeek, &noticeCalls, &chat.ReminderLeadMinutes)
 		if err != nil {
 			continue
 		}
@@ -273,6 +274,7 @@ var eventChatColumns = []string{
 	"COALESCE(%sallow_send_mess, 1)", "COALESCE(%snotice_changes, 1)", "COALESCE(%snotice_next_week, 1)",
 	"COALESCE(%snotice_calls, 1)", "COALESCE(%snotice_parser_errors, 1)", "COALESCE(%sformatter, 0)",
 	"COALESCE(%shide_past_days, 0)", "COALESCE(%sshow_hints, 1)", "COALESCE(%sshow_parser_time, 0)",
+	"COALESCE(%sreminder_lead_minutes, 0)",
 }
 
 func selectEventChats(prefix string) string {
@@ -294,20 +296,21 @@ func scanEventChats(rows *sql.Rows) ([]*Chat, error) {
 	var result []*Chat
 	for rows.Next() {
 		var (
-			chat       Chat
-			mode       string
-			allowSend  int
-			noticeCh   int
-			noticeWeek int
-			noticeCall int
-			noticeErr  int
-			hidePast   int
-			hints      int
-			parserTime int
+			chat         Chat
+			mode         string
+			allowSend    int
+			noticeCh     int
+			noticeWeek   int
+			noticeCall   int
+			noticeErr    int
+			hidePast     int
+			hints        int
+			parserTime   int
+			reminderLead int
 		)
 		err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher,
 			&allowSend, &noticeCh, &noticeWeek, &noticeCall, &noticeErr, &chat.Formatter,
-			&hidePast, &hints, &parserTime)
+			&hidePast, &hints, &parserTime, &reminderLead)
 		if err != nil {
 			continue
 		}
@@ -320,6 +323,7 @@ func scanEventChats(rows *sql.Rows) ([]*Chat, error) {
 		chat.HidePastDays = hidePast != 0
 		chat.ShowHints = hints != 0
 		chat.ShowParserTime = parserTime != 0
+		chat.ReminderLeadMinutes = reminderLead
 		result = append(result, &chat)
 	}
 	return result, nil

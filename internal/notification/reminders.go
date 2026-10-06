@@ -13,6 +13,7 @@ import (
 type reminderKey struct {
 	kind  string
 	value string
+	chat  int64
 	start int64
 }
 
@@ -41,21 +42,6 @@ func (n *EventNotifier) remindValue(kind, value string, day timetable.Day, now t
 	if !ok {
 		return
 	}
-	key := reminderKey{kind: kind, value: value, start: next.Start.Unix()}
-	n.remMu.Lock()
-	if n.remDue == nil {
-		n.remDue = make(map[reminderKey]time.Time)
-	}
-	fireAt, known := n.remDue[key]
-	if !known {
-		fireAt = reminder.ReminderTime(next.Start, lead, window, r)
-		n.remDue[key] = fireAt
-	}
-	done := n.remSent[key]
-	n.remMu.Unlock()
-	if done || now.Before(fireAt) {
-		return
-	}
 	chats := n.reminderChats(kind, value)
 	if len(chats) == 0 {
 		return
@@ -66,20 +52,53 @@ func (n *EventNotifier) remindValue(kind, value string, day timetable.Day, now t
 		"Room":    next.Lesson.Room,
 	})
 	for _, chat := range chats {
-		if chat.PeerID != 0 {
-			chat.ID = chat.PeerID
+		if !n.reminderDue(chat, kind, value, next.Start, lead, window, now, r) {
+			continue
 		}
-		if err := n.sender.SendText(chat.ID, text); err != nil {
-			n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("lesson reminder send failed")
+		target := chat.ID
+		if chat.PeerID != 0 {
+			target = chat.PeerID
+		}
+		if err := n.sender.SendText(target, text); err != nil {
+			n.log.Error().Err(err).Int64("chatID", target).Msg("lesson reminder send failed")
 		}
 	}
+}
+
+func (n *EventNotifier) reminderDue(chat *EventChat, kind, value string, start time.Time, lead, window time.Duration, now time.Time, r *rand.Rand) bool {
+	chatLead := n.chatLead(chat, lead)
+	key := reminderKey{kind: kind, value: value, chat: chat.ID, start: start.Unix()}
+
 	n.remMu.Lock()
+	defer n.remMu.Unlock()
+
+	if n.remSent[key] {
+		return false
+	}
+	if n.remDue == nil {
+		n.remDue = make(map[reminderKey]time.Time)
+	}
+	fireAt, known := n.remDue[key]
+	if !known {
+		fireAt = reminder.ReminderTime(start, chatLead, window, r)
+		n.remDue[key] = fireAt
+	}
+	if now.Before(fireAt) {
+		return false
+	}
 	if n.remSent == nil {
 		n.remSent = make(map[reminderKey]bool)
 	}
 	n.remSent[key] = true
 	delete(n.remDue, key)
-	n.remMu.Unlock()
+	return true
+}
+
+func (n *EventNotifier) chatLead(chat *EventChat, fallback time.Duration) time.Duration {
+	if chat != nil && chat.ReminderLeadMinutes > 0 {
+		return time.Duration(chat.ReminderLeadMinutes) * time.Minute
+	}
+	return fallback
 }
 
 func (n *EventNotifier) reminderChats(kind, value string) []*EventChat {

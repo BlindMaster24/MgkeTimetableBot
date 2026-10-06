@@ -15,20 +15,21 @@ func (f *EventChatFinder) toEventChats(chats []*Chat) []*notification.EventChat 
 	result := make([]*notification.EventChat, 0, len(chats))
 	for _, c := range chats {
 		result = append(result, &notification.EventChat{
-			ID:               c.ID,
-			PeerID:           c.PeerID,
-			Mode:             string(c.Mode),
-			Group:            c.Group,
-			Teacher:          c.Teacher,
-			NoticeChanges:    c.NoticeChanges,
-			NoticeNextWeek:   c.NoticeNextWeek,
-			NoticeCalls:      c.NoticeCalls,
-			NoticeParserErrs: c.NoticeParserErrors,
-			AllowSendMess:    c.AllowSendMess,
-			Formatter:        c.Formatter,
-			HidePastDays:     c.HidePastDays,
-			ShowHints:        c.ShowHints,
-			ShowParserTime:   c.ShowParserTime,
+			ID:                  c.ID,
+			PeerID:              c.PeerID,
+			Mode:                string(c.Mode),
+			Group:               c.Group,
+			Teacher:             c.Teacher,
+			ReminderLeadMinutes: c.ReminderLeadMinutes,
+			NoticeChanges:       c.NoticeChanges,
+			NoticeNextWeek:      c.NoticeNextWeek,
+			NoticeCalls:         c.NoticeCalls,
+			NoticeParserErrs:    c.NoticeParserErrors,
+			AllowSendMess:       c.AllowSendMess,
+			Formatter:           c.Formatter,
+			HidePastDays:        c.HidePastDays,
+			ShowHints:           c.ShowHints,
+			ShowParserTime:      c.ShowParserTime,
 		})
 	}
 	return result

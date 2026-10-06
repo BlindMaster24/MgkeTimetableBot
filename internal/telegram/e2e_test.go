@@ -1568,6 +1568,149 @@ func TestE2E_ButtonToggleTextCommand(t *testing.T) {
 	}
 }
 
+func TestE2E_ReminderLeadTextCommand(t *testing.T) {
+	b, repo := setupE2EBot(t)
+	userID := int64(2004)
+
+	chat, _ := repo.FindOrCreate("telegram", userID)
+	chat.Scene = sceneSettings
+	repo.Save(chat)
+
+	for _, preset := range reminderLeadPresets {
+		cmd := &reminderLeadTextCmd{bot: b, minutes: preset}
+		if !cmd.MatchText(b.reminderLeadLabel(preset)) {
+			t.Fatalf("the %d minute command must answer its own button", preset)
+		}
+		if cmd.MatchText("⏰ Напоминание: за 7 мин") {
+			t.Fatal("no command may answer a label outside the presets")
+		}
+	}
+
+	u := makeUpdate(userID, b.reminderLeadLabel(15))
+	u.Bot = b
+	if err := (&reminderLeadTextCmd{bot: b, minutes: 15}).Handler(context.Background(), u); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	saved, _ := repo.FindOrCreate("telegram", userID)
+	if saved.ReminderLeadMinutes != 15 {
+		t.Fatalf("lead = %d, want 15", saved.ReminderLeadMinutes)
+	}
+	if saved.Scene != sceneSettings {
+		t.Fatalf("scene = %q, want settings", saved.Scene)
+	}
+	if reply := b.reminderLeadReply(saved); !strings.Contains(reply, "15") {
+		t.Errorf("the reply must name the chosen lead, got %q", reply)
+	}
+
+	u = makeUpdate(userID, b.reminderLeadLabel(0))
+	u.Bot = b
+	if err := (&reminderLeadTextCmd{bot: b, minutes: 0}).Handler(context.Background(), u); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	saved, _ = repo.FindOrCreate("telegram", userID)
+	if saved.ReminderLeadMinutes != 0 {
+		t.Fatalf("the default button must clear the override, got %d", saved.ReminderLeadMinutes)
+	}
+
+	b.cfg.Timetable.ReminderLeadMinutes = 25
+	if reply := b.reminderLeadReply(saved); !strings.Contains(reply, "25") {
+		t.Errorf("without an override the reply must show the configured lead, got %q", reply)
+	}
+
+	b.cfg.Timetable.ReminderLeadMinutes = 0
+	if reply := b.reminderLeadReply(saved); !strings.Contains(reply, "выключены") {
+		t.Errorf("a disabled feature must say so, got %q", reply)
+	}
+}
+
+func TestE2E_ReminderLeadMigratesAnOlderDatabase(t *testing.T) {
+	path := t.TempDir() + "/older.db"
+
+	older, err := New(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := older.db.Exec(`ALTER TABLE bot_chats DROP COLUMN reminder_lead_minutes`); err != nil {
+		t.Fatalf("dropping the new column must model the previous release: %v", err)
+	}
+	if _, err := older.db.Exec(`INSERT INTO bot_chats (service, peer_id, mode, "group") VALUES ('telegram', 777, 'student', '100')`); err != nil {
+		t.Fatal(err)
+	}
+	older.Close()
+
+	repo, err := New(path)
+	if err != nil {
+		t.Fatalf("opening the older database must migrate it: %v", err)
+	}
+	defer repo.Close()
+
+	chat, err := repo.FindOrCreate("telegram", 777)
+	if err != nil {
+		t.Fatalf("the migrated chat must load: %v", err)
+	}
+	if chat.ReminderLeadMinutes != 0 {
+		t.Fatalf("a migrated chat must start on the config default, got %d", chat.ReminderLeadMinutes)
+	}
+	if chat.Group != "100" {
+		t.Fatalf("the migration must keep the stored group, got %q", chat.Group)
+	}
+
+	chat.ReminderLeadMinutes = 30
+	if err := repo.Save(chat); err != nil {
+		t.Fatalf("saving a migrated chat must work: %v", err)
+	}
+
+	reread, _ := repo.FindOrCreate("telegram", 777)
+	if reread.ReminderLeadMinutes != 30 {
+		t.Fatalf("lead = %d, want 30", reread.ReminderLeadMinutes)
+	}
+}
+
+func TestE2E_ReminderKeyboardOffersEveryPreset(t *testing.T) {
+	b, _ := setupE2EBot(t)
+
+	labels := map[string]bool{}
+	for _, row := range b.replySettingsReminders(&Chat{}).Keyboard {
+		for _, button := range row {
+			labels[button.Text] = true
+		}
+	}
+
+	for _, preset := range reminderLeadPresets {
+		label := b.reminderLeadLabel(preset)
+		if !labels[label] {
+			t.Fatalf("the keyboard must offer the %d minute preset", preset)
+		}
+		cmd := &reminderLeadTextCmd{bot: b, minutes: preset}
+		if !cmd.MatchText(label) {
+			t.Fatalf("no command answers the %q button", label)
+		}
+	}
+}
+
+func TestE2E_ReminderMenuOpenerMatchesItsButton(t *testing.T) {
+	b, _ := setupE2EBot(t)
+
+	spec, ok := b.menuByID("reminders")
+	if !ok {
+		t.Fatal("reminders menu not found")
+	}
+	opener := &menuCommand{bot: b, spec: spec}
+
+	matched := false
+	for _, row := range b.replySettingsMain().Keyboard {
+		for _, button := range row {
+			if opener.MatchText(button.Text) {
+				matched = true
+			}
+		}
+	}
+	if !matched {
+		t.Fatal("the settings keyboard offers no button the reminders menu answers to")
+	}
+}
+
 func TestE2E_SceneGuardBlocksOutOfSceneText(t *testing.T) {
 	b, repo := setupE2EBot(t)
 	userID := int64(2003)

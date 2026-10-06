@@ -25,6 +25,7 @@ func (b *Bot) replySettingsMain() *telego.ReplyKeyboardMarkup {
 			{{Text: "🗓️ Управление расписаниями"}},
 			{{Text: "⌨️ Кнопки"}, {Text: "📃 Форматировщик"}},
 			{{Text: "🔊 Оповещения"}, {Text: "🔔 Подписки"}, {Text: "🖼️ Отображение"}, {Text: "📊 Сравнение"}},
+			{{Text: b.loc("button_settings_reminders")}},
 			{{Text: "Показать текущие"}, {Text: "Главное меню"}},
 		},
 		IsPersistent:   true,
@@ -60,6 +61,19 @@ func (b *Bot) replySettingsNotice(chat *Chat) *telego.ReplyKeyboardMarkup {
 			{{Text: noYesSmileVolume(chat.NoticeChanges, "Оповещение о новых днях")}},
 			{{Text: noYesSmileVolume(chat.NoticeNextWeek, "Оповещение о новой неделе")}},
 			{{Text: noYesSmileVolume(chat.NoticeCalls, "Оповещение о звонках")}},
+			settingsBotNavRow(),
+		},
+		IsPersistent:   true,
+		ResizeKeyboard: true,
+	}
+}
+
+func (b *Bot) replySettingsReminders(chat *Chat) *telego.ReplyKeyboardMarkup {
+	return &telego.ReplyKeyboardMarkup{
+		Keyboard: [][]telego.KeyboardButton{
+			{{Text: b.loc("reminder_lead_default")}},
+			{{Text: b.loc("reminder_lead_5")}, {Text: b.loc("reminder_lead_10")}, {Text: b.loc("reminder_lead_15")}},
+			{{Text: b.loc("reminder_lead_30")}, {Text: b.loc("reminder_lead_60")}},
 			settingsBotNavRow(),
 		},
 		IsPersistent:   true,
