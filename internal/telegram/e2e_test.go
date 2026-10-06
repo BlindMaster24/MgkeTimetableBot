@@ -336,7 +336,7 @@ func TestE2E_AllCommandsRegistered(t *testing.T) {
 		"/eula", "/api", "/diff", "/notice", "/view", "/dev", "/math", "/flushcache", "/acceptbot", "/debug", "/send", "/trigger",
 		"/history", "/stats", "/google_calendar", "/alias",
 		"/regexp", "/vanish", "/parserLogs", "/requireNewButtons", "/createApiKey",
-		"/cabinet", "/groups", "/teachers", "/comparegroups", "/next",
+		"/cabinet", "/groups", "/teachers", "/comparegroups", "/next", "/free",
 		"/ping", "/ics", "/subscriptions", "/subscriptions_test",
 		"/archive", "/endings", "/chat", "/id", "/error", "/test",
 		"/indexToStrDate", "/strToIndex",

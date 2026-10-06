@@ -305,13 +305,28 @@ func messageScenarios() []messageScenario {
 			}}),
 			"902": e2eJsonRoundTrip(map[string]any{"group": "902", "days": []any{
 				map[string]any{"day": date, "lessons": []any{
-					map[string]any{"lesson": "Информатика", "type": "Пр", "cabinet": "303"},
+					map[string]any{"lesson": "Информатика", "type": "Пр", "cabinet": "202"},
 				}},
 			}}),
 			"903": e2eJsonRoundTrip(map[string]any{"group": "903", "days": []any{
 				map[string]any{"day": date, "lessons": []any{}},
 			}}),
 		}, "golden-today")
+	}
+
+	free := func(t *testing.T, b *Bot, userID int64) {
+		t.Helper()
+		cmd := &freeRoomsCmd{bot: b}
+		if err := cmd.Handler(context.Background(), &Update{Bot: b, ChatID: userID, UserID: userID, Text: "/free"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	freeSecondPair := func(t *testing.T, b *Bot, userID int64) {
+		t.Helper()
+		cmd := &freeRoomsCmd{bot: b}
+		if err := cmd.Handler(context.Background(), &Update{Bot: b, ChatID: userID, UserID: userID, Text: "/free 2"}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	manualCalls := func(b *Bot) {
@@ -379,5 +394,8 @@ func messageScenarios() []messageScenario {
 		{name: "next/now-and-next", setup: todayTimetable, chat: todayGroup, handle: next},
 		{name: "next/nothing-left", setup: todayTimetable, chat: emptyTodayGroup, handle: next},
 		{name: "next/no-timetable", handle: next},
+		{name: "free/now-busy", setup: todayTimetable, handle: free},
+		{name: "free/second-pair", setup: todayTimetable, handle: freeSecondPair},
+		{name: "free/no-data", handle: free},
 	}
 }

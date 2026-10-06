@@ -254,6 +254,7 @@ Every field is also available as an environment variable: `MGKE_PARSER_GUARD_MIN
 | `/image` | Timetable as an image |
 | `/next` | The lesson running now and the next one |
 | `/cabinet` | Search by classroom |
+| `/free` | Classrooms free at a lesson |
 | `/settings` | Settings entry point for the submenus below |
 | `/formatter` | Output format menu |
 | `/view` | View menu: hide past days, show the last parse time, hints |
@@ -274,6 +275,8 @@ Every field is also available as an environment variable: `MGKE_PARSER_GUARD_MIN
 | `/cancel` | Cancel the current dialog |
 | `/api` | API information and keys |
 | `/ping`, `/stats` | Liveness and statistics |
+
+`/next` answers with two lines: the lesson running right now and the one that starts next — both take their times from the bell schedule and their data from the cached day of the current group or teacher. `/free` lists the classrooms nobody is using at that moment: `/free` for the running or nearest lesson, `/free 3` for a concrete one; a room counts as busy when any group or teacher places a lesson there, and the room list is exactly what the site publishes (a room nobody uses that day is unknown to the bot).
 
 The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notice_toggle_text_*`, `/diff_toggle_text_*`, `/formatter_select_text*`, `/settings_nav_*`, `/calls_settings_text_*`, `/setup_mode_text_*`, `/alias_action_text_*`, `/subs_action_text_*`, `/show_current_settings_text`) are registered from the declarative menu table and are triggered by keyboard buttons rather than typed by users.
 
