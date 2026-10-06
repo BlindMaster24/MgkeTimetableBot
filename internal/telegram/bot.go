@@ -223,6 +223,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&compareGroupsCmd{bot: b})
 	b.RegisterCommand(&nextLessonCmd{bot: b})
 	b.RegisterCommand(&freeRoomsCmd{bot: b})
+	b.RegisterCommand(&backupCmd{bot: b})
 	b.RegisterCommand(&pingCmd{bot: b})
 	b.RegisterCommand(&icsCmd{bot: b})
 	b.RegisterCommand(&subscriptionsTestCmd{bot: b})

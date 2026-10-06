@@ -107,6 +107,12 @@ timetable:
   reminder_lead_minutes: 0
   reminder_jitter_seconds: 0
 
+archive:
+  backup_dir: ""
+  backup_keep: 7
+  retention_days: 0
+  maintenance_schedule: "0 30 4 * * *"
+
 encrypt_key: ""
 
 health:

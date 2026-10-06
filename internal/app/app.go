@@ -12,6 +12,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/backup"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
@@ -147,6 +148,27 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		return loc.T("ru", "incident_note_restart", map[string]interface{}{"Current": current.Build})
 	}) {
 		log.Info().Str("key", record.Key).Str("note", record.Note).Msg("open api incident annotated at startup")
+	}
+
+	maintenance := newArchiveMaintenance(cfg, archiveRepo, log)
+
+	bot.SetBackupFunc(func(_ context.Context) (telegrambot.BackupReport, error) {
+		return maintenance.Run()
+	})
+
+	if cfg.MaintenanceEnabled() {
+		scheduler := backup.NewScheduler(cfg.ResolvedMaintenanceSchedule(), log, func() {
+			if _, err := maintenance.Run(); err != nil {
+				log.Error().Err(err).Msg("archive maintenance failed")
+			}
+		})
+		scheduler.Start()
+		defer scheduler.Stop()
+		log.Info().
+			Str("expr", cfg.ResolvedMaintenanceSchedule()).
+			Str("backup_dir", cfg.Archive.BackupDir).
+			Int("retention_days", cfg.Archive.RetentionDays).
+			Msg("archive maintenance armed")
 	}
 
 	googleService := google.NewCalendarService(cfg)

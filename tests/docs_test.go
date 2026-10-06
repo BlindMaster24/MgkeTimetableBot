@@ -184,6 +184,30 @@ func TestDocsDocumentReminders(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentArchiveMaintenance(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "configs", "config.example.yaml"))
+	if err != nil {
+		t.Fatalf("read config example: %v", err)
+	}
+
+	keys := []string{"archive.backup_dir", "archive.backup_keep", "archive.retention_days", "archive.maintenance_schedule"}
+	for _, key := range keys {
+		field := strings.TrimPrefix(key, "archive.")
+		if !strings.Contains(string(data), field+":") {
+			t.Errorf("config.example.yaml does not carry the archive.%s key", field)
+		}
+	}
+
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, key := range keys {
+			if !strings.Contains(content, key) {
+				t.Errorf("%s does not document the %s config key", doc, key)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentTheRaceDetector(t *testing.T) {
 	for _, doc := range docs {
 		content := readDoc(t, doc)

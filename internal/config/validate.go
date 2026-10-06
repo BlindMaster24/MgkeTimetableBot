@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 func (c *Config) Validate() error {
@@ -44,8 +46,21 @@ func (c *Config) Validate() error {
 	if c.Parser.Guard.MaxDropPercent < 0 || c.Parser.Guard.MaxDropPercent > 100 {
 		errs = append(errs, fmt.Errorf("parser.guard.max_drop_percent must be between 0 and 100, got %d", c.Parser.Guard.MaxDropPercent))
 	}
+	if c.Archive.BackupKeep < 0 {
+		errs = append(errs, fmt.Errorf("archive.backup_keep must not be negative, got %d", c.Archive.BackupKeep))
+	}
+	if c.Archive.RetentionDays < 0 {
+		errs = append(errs, fmt.Errorf("archive.retention_days must not be negative, got %d", c.Archive.RetentionDays))
+	}
+	if c.MaintenanceEnabled() {
+		if _, err := maintenanceScheduleParser.Parse(c.ResolvedMaintenanceSchedule()); err != nil {
+			errs = append(errs, fmt.Errorf("archive.maintenance_schedule must be a cron expression with seconds, got %q: %w", c.Archive.MaintenanceSchedule, err))
+		}
+	}
 	return errors.Join(errs...)
 }
+
+var maintenanceScheduleParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
 func checkSlot(section string, index int, slot [2][2]string) error {
 	for half := 0; half < 2; half++ {

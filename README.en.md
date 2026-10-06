@@ -128,6 +128,7 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `parser` | Poll intervals, sources, bell schedule, proxy |
 | `timetable` | Fallback bell schedule: `weekdays`, `saturday` (used when the site is unreachable); `reminder_lead_minutes` (>0 enables per-lesson reminders), `reminder_jitter_seconds` (send-time spread) |
 | `health` | Alert thresholds: parser, calendar sync, API errors |
+| `archive` | Archive maintenance: `archive.backup_dir` is the directory of hot SQLite copies (empty disables them), `archive.backup_keep` is how many copies to keep (7 by default, 0 keeps every copy), `archive.retention_days` drops archive rows older than N days (0 never drops any), and `archive.maintenance_schedule` is the cron expression with seconds (default `0 30 4 * * *`) |
 | `encrypt_key` | Encryption key: it signs the REST API keys and encrypts the stored Google OAuth tokens, so it must be at least 32 characters long |
 
 The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQLite (see `db_path`); the archive schema is embedded into the binary (`internal/archive/migrations/`).
@@ -284,7 +285,7 @@ The internal menu commands (`/btn_toggle_text_*`, `/view_toggle_text_*`, `/notic
 
 Available to the IDs listed in `telegram.admin_ids` only — the Telegram command menu shows them to those IDs with an `[адм]` prefix:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/webhook`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/webhook`, `/backup`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits.
 
@@ -375,6 +376,8 @@ The scheduler (`internal/notification`) starts with the bot and sends:
 Events are produced by the parser, queued in the cache and drained after every parse cycle. Every notification type can be turned off from the notification menu (`/notice`), and each chat keeps its own settings.
 
 Lesson reminders (enabled by `timetable.reminder_lead_minutes` > 0) are tuned per chat: the “⏰ Напоминания” menu inside the settings (`/settings`) offers 5, 10, 15, 30 or 60 minutes, and “как в конфиге” falls back to the configured value. Every chat hears about a given lesson once.
+
+`/backup` runs the archive maintenance on demand: it takes a hot copy of the live `db_path` database (SQLite `VACUUM INTO`, so the copy is taken without stopping the bot and without external tools), keeps only the `archive.backup_keep` newest copies in `archive.backup_dir`, and drops archive rows older than `archive.retention_days`. The bot does the same on the `archive.maintenance_schedule` cron — the copies live on the mounted volume next to `/data`, so the volume backup picks them up, and the prune keeps the archive from growing forever. It only ever deletes what it owns: inside the backup directory only files named `<database name>-YYYYMMDD-HHMMSS.db`, which is what the bot wrote itself, so neighbouring files, directories and symbolic links survive, and inside the database only rows of the `timetable_archive` table below the cutoff.
 
 ## Google Calendar and ICS
 

@@ -28,6 +28,7 @@ type botDeps struct {
 	noticeDay    func(index int)
 	calendarSync func(ctx context.Context) (int, error)
 	apiProbe     func(ctx context.Context) []apiprobe.Result
+	backupFunc   func(ctx context.Context) (BackupReport, error)
 	now          func() time.Time
 	startTime    time.Time
 	buildInfo    build.Info

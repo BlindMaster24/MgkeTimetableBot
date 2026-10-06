@@ -329,6 +329,27 @@ func messageScenarios() []messageScenario {
 		}
 	}
 
+	backupReport := func(b *Bot) {
+		b.SetBackupFunc(func(context.Context) (BackupReport, error) {
+			return BackupReport{
+				Backup:        true,
+				Retention:     true,
+				Path:          "/data/backups/sqlite3.db",
+				Removed:       2,
+				Kept:          7,
+				PrunedRows:    41,
+				RetentionDays: 30,
+			}, nil
+		})
+	}
+	backup := func(t *testing.T, b *Bot, userID int64) {
+		t.Helper()
+		cmd := &backupCmd{bot: b}
+		if err := cmd.Handler(context.Background(), &Update{Bot: b, ChatID: userID, UserID: backupAdminID, Text: "/backup"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	manualCalls := func(b *Bot) {
 		b.cache.SetCallsManualNotify(
 			[][2][2]string{{{"10:00", "10:30"}, {"10:40", "11:10"}}},
@@ -397,5 +418,7 @@ func messageScenarios() []messageScenario {
 		{name: "free/now-busy", setup: todayTimetable, handle: free},
 		{name: "free/second-pair", setup: todayTimetable, handle: freeSecondPair},
 		{name: "free/no-data", handle: free},
+		{name: "backup/report", setup: backupReport, handle: backup},
+		{name: "backup/disabled", handle: backup},
 	}
 }

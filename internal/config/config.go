@@ -44,6 +44,13 @@ type GuardConfig struct {
 	MaxDropPercent int  `yaml:"max_drop_percent"`
 }
 
+type ArchiveConfig struct {
+	BackupDir           string `yaml:"backup_dir"`
+	BackupKeep          int    `yaml:"backup_keep"`
+	RetentionDays       int    `yaml:"retention_days"`
+	MaintenanceSchedule string `yaml:"maintenance_schedule"`
+}
+
 type Config struct {
 	DBPath     string `yaml:"db_path" env:"DB_PATH"`
 	ChatDBPath string `yaml:"chat_db_path"`
@@ -108,7 +115,8 @@ type Config struct {
 		} `yaml:"ics"`
 	} `yaml:"calendar"`
 
-	Health *HealthConfig `yaml:"health"`
+	Health  *HealthConfig `yaml:"health"`
+	Archive ArchiveConfig `yaml:"archive"`
 
 	Accept struct {
 		Room    bool `yaml:"room"`
@@ -152,8 +160,10 @@ type LessonFilter struct {
 }
 
 const (
-	DefaultChatDBPath = "./bot_chats.db"
-	DefaultCacheDir   = "./cache/rasp"
+	DefaultChatDBPath          = "./bot_chats.db"
+	DefaultCacheDir            = "./cache/rasp"
+	DefaultBackupKeep          = 7
+	DefaultMaintenanceSchedule = "0 30 4 * * *"
 )
 
 func (c *Config) ResolvedChatDBPath() string {
@@ -162,6 +172,32 @@ func (c *Config) ResolvedChatDBPath() string {
 
 func (c *Config) ResolvedCacheDir() string {
 	return pathOr(c.CacheDir, DefaultCacheDir)
+}
+
+func (c *Config) ResolvedBackupKeep() int {
+	if c.Archive.BackupKeep < 0 {
+		return 0
+	}
+	if c.Archive.BackupKeep == 0 {
+		return DefaultBackupKeep
+	}
+	return c.Archive.BackupKeep
+}
+
+func (c *Config) ResolvedMaintenanceSchedule() string {
+	return pathOr(strings.TrimSpace(c.Archive.MaintenanceSchedule), DefaultMaintenanceSchedule)
+}
+
+func (c *Config) BackupEnabled() bool {
+	return strings.TrimSpace(c.Archive.BackupDir) != ""
+}
+
+func (c *Config) RetentionEnabled() bool {
+	return c.Archive.RetentionDays > 0
+}
+
+func (c *Config) MaintenanceEnabled() bool {
+	return c.BackupEnabled() || c.RetentionEnabled()
 }
 
 func (c *Config) TelegramAPIServer() (string, error) {

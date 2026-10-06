@@ -127,6 +127,7 @@ go version   # ожидается go1.27.1 или новее
 | `parser` | Интервал опроса, источники, расписание звонков, прокси |
 | `timetable` | Резервное расписание звонков: `weekdays`, `saturday` (используется, когда сайт недоступен); `reminder_lead_minutes` (>0 включает напоминания о парах), `reminder_jitter_seconds` (разброс времени отправки) |
 | `health` | Пороги алертов по здоровью: парсер, синхронизация календарей, ошибки API |
+| `archive` | Обслуживание архива: `archive.backup_dir` — каталог горячих копий SQLite (пусто — копии выключены), `archive.backup_keep` — сколько копий хранить (по умолчанию 7, 0 — без ограничения), `archive.retention_days` — удалять записи архива старше N дней (0 — не удалять), `archive.maintenance_schedule` — cron-выражение с секундами (по умолчанию `0 30 4 * * *`) |
 | `encrypt_key` | Ключ шифрования: им подписываются ключи REST API и шифруются токены Google OAuth, поэтому короче 32 символов его задавать нельзя |
 
 Кэш расписания лежит в `cache/rasp/` в виде JSON, архив — в SQLite (см. `db_path`); схема архива встроена в бинарник (`internal/archive/migrations/`).
@@ -284,7 +285,7 @@ parser:
 
 Доступны только ID из `telegram.admin_ids` — в меню команд Telegram они показываются только им и с пометкой `[адм]`:
 
-`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/webhook`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
+`/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/webhook`, `/backup`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
 `/send` рассылает сообщение всем чатам с ограничением 25 сообщений в минуту, чтобы не упереться в лимиты Telegram.
 
@@ -377,6 +378,8 @@ health:
 События формируются парсером, складываются в кэш и разбираются после каждого цикла парсинга. Каждый тип уведомлений можно выключить в меню «Оповещения» (`/notice`), у каждого чата свои настройки.
 
 Напоминания о начале пары (включаются `timetable.reminder_lead_minutes` > 0) настраиваются уже для каждого чата отдельно: меню «⏰ Напоминания» в настройках (`/settings`) предлагает за 5, 10, 15, 30 или 60 минут, а пункт «как в конфиге» возвращает значение из конфига. Про одну пару каждый чат получает одно напоминание.
+
+`/backup` запускает обслуживание архива вручную: делает горячую копию живой базы `db_path` (SQLite `VACUUM INTO`, поэтому копия снимается без остановки бота и без внешних утилит), оставляет в `archive.backup_dir` только `archive.backup_keep` свежих копий и удаляет из архива записи старше `archive.retention_days`. То же самое по расписанию `archive.maintenance_schedule` делает сам бот — копии живут в смонтированном томе рядом с `/data`, поэтому их забирает бэкап тома, а чистка не даёт архиву расти бесконечно. Удаляется только своё: в каталоге копий под нож идут лишь файлы с именем `<имя базы>-ГГГГММДД-ЧЧММСС.db`, то есть созданные самим ботом — соседние файлы, каталоги и символические ссылки остаются нетронутыми, а из базы удаляются только строки таблицы `timetable_archive` старше порога.
 
 ## Google Calendar и ICS
 
