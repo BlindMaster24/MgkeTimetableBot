@@ -49,11 +49,29 @@ func clockAnchorRange(lines []string) (int, int) {
 			}
 			continue
 		}
-		if line == "}" {
+		if strings.TrimRight(line, "\r") == "}" {
 			return start, number
 		}
 	}
 	return -1, -1
+}
+
+func TestClockAnchorRangeSurvivesWindowsLineEndings(t *testing.T) {
+	crlf := strings.Split("func reminderMoment() {\r\n\treturn time.Now()\r\n}\r\nfunc other() {\r\n}", "\n")
+
+	start, end := clockAnchorRange(crlf)
+	if start != 0 || end != 2 {
+		t.Fatalf("range = (%d, %d), want the anchored function (0, 2) on a CRLF checkout", start, end)
+	}
+
+	lf := strings.Split("func reminderMoment() {\n\treturn time.Now()\n}\n", "\n")
+	if start, end := clockAnchorRange(lf); start != 0 || end != 2 {
+		t.Fatalf("range = (%d, %d), want the anchored function (0, 2) on a LF checkout", start, end)
+	}
+
+	if start, end := clockAnchorRange(strings.Split("func other() {\n}\n", "\n")); start != -1 || end != -1 {
+		t.Fatalf("range = (%d, %d), want no anchor when reminderMoment is missing", start, end)
+	}
 }
 
 func TestSourcesNeverRewriteTheProcessTimezone(t *testing.T) {
