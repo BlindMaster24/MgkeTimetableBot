@@ -18,6 +18,8 @@ const (
 	HealthPath     = "/api/health"
 )
 
+var clock = time.Now
+
 type Target struct {
 	Method string
 	Path   string
@@ -94,9 +96,9 @@ func probe(ctx context.Context, client *http.Client, base string, target Target,
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	started := time.Now()
+	started := clock()
 	response, err := client.Do(request)
-	result.Duration = time.Since(started)
+	result.Duration = clock().Sub(started)
 	if err != nil {
 		result.Err = err.Error()
 		return result
@@ -105,7 +107,7 @@ func probe(ctx context.Context, client *http.Client, base string, target Target,
 
 	_, _ = io.Copy(io.Discard, response.Body)
 	result.Status = response.StatusCode
-	result.Duration = time.Since(started)
+	result.Duration = clock().Sub(started)
 	return result
 }
 

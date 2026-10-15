@@ -57,6 +57,14 @@ func TestTargetsWithoutCacheData(t *testing.T) {
 }
 
 func TestRunMeasuresEveryTarget(t *testing.T) {
+	original := clock
+	ticks := 0
+	clock = func() time.Time {
+		ticks++
+		return time.Unix(0, 0).Add(time.Duration(ticks) * time.Millisecond)
+	}
+	t.Cleanup(func() { clock = original })
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/groups":
