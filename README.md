@@ -3,7 +3,7 @@
 [English version](README.en.md)
 
 [![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
-[![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8)](https://go.dev/dl/)
+[![Go 1.27.2](https://img.shields.io/badge/go-1.27.2-00ADD8)](https://go.dev/dl/)
 
 ## Описание
 
@@ -57,14 +57,14 @@ HTTP API (gin)          ─┴─> расписание
 
 ## Требования
 
-- **Минимальная версия Go — 1.27.1** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
+- **Минимальная версия Go — 1.27.2** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
 - CGO не нужен: SQLite и рендеринг картинок работают на чистом Go.
 - Для работы нужен только записываемый каталог для `cache/` и файлов базы.
 
 Проверить версию:
 
 ```bash
-go version   # ожидается go1.27.1 или новее
+go version   # ожидается go1.27.2 или новее
 ```
 
 ## Установка и запуск
@@ -333,7 +333,7 @@ parser:
 
 ```bash
 curl -s localhost:8081/api/health | jq .build
-# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.1", "os": "linux", "arch": "amd64" }
+# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.2", "os": "linux", "arch": "amd64" }
 ```
 
 Метрики и состояние алертов сохраняются в базу чатов (таблица `bot_state`) после каждого цикла парсинга и при остановке, а при старте читаются обратно. Поэтому перезапуск бота не скрывает проблему: если расписание не обновлялось час, алерт `parser_stale` придёт сразу после старта, а уже отправленные алерты не продублируются, пока не истёк `cooldown_minutes`.
@@ -473,7 +473,7 @@ services:
 
 Что важно знать про образ:
 
-- многостудийная сборка: бинарник собирается на `golang:1.27.1`, а в рантайм-образ попадают только бинарник, шаблон конфига и корневые сертификаты `ca-certificates` — без этого набора HTTPS к Telegram, сайту колледжа и Google не работает;
+- многостудийная сборка: бинарник собирается на `golang:1.27.2`, а в рантайм-образ попадают только бинарник, шаблон конфига и корневые сертификаты `ca-certificates` — без этого набора HTTPS к Telegram, сайту колледжа и Google не работает;
 - build-стадия идёт на архитектуре раннера и кросс-компилирует бинарник под `TARGETARCH`, поэтому образ для `linux/arm64` собирается без QEMU — обычно за минуты, а не за десятки минут;
 - процесс запускается от непривилегированного пользователя, CGO не нужен (SQLite и рендер картинок — чистый Go);
 - встроенный `HEALTHCHECK` каждые 30 секунд обращается к `GET /api/health` и переводит контейнер в `unhealthy` при алертах;

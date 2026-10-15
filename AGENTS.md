@@ -71,7 +71,7 @@
 - New locale string: add key to `internal/i18n/locales/ru.json`, use `b.loc("key")` in code.
 
 ## Build, Test, and Development Commands
-- Runtime: Go 1.27.1+ — the minimum is pinned in `go.mod` (`go 1.27.1`); CI reads it through `go-version-file: go.mod`.
+- Runtime: Go 1.27.2+ — the minimum is pinned in `go.mod` (`go 1.27.2`); CI reads it through `go-version-file: go.mod`.
 - Package manager: Go modules (go.mod).
 - `go mod tidy` — sync dependencies (it drops a redundant `toolchain` line; keep go.mod tidy).
 - `go build -o bot ./cmd/bot/` — build binary.
@@ -93,7 +93,7 @@
 - Coverage is measured on all three operating systems but only the Linux run uploads the artifact and the summary, otherwise the artifact names would clash. The race job probes with `racecheck -check` first and, when Windows reports the detector as unavailable, warns instead of failing — `-race` builds through cgo and the Windows runner has no guaranteed C toolchain.
 - `.github/workflows/security.yml` runs `govulncheck` on push to `main`, on a weekly schedule and on demand; it is deliberately outside CI so an advisory never blocks a pull request.
 - Actions are pinned by commit SHA with the release tag in a comment; Dependabot bumps the SHA and the comment together, so keep the `# vN` comment when editing a `uses:` line.
-- Every job sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.1` from `go.mod` is the version the checks pass with and a newer toolchain is never substituted silently. The `newest-toolchain` job opts in explicitly with `go-version: stable`, so a Go release that breaks the suite shows up without moving the pinned minimum.
+- Every job sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.2` from `go.mod` is the version the checks pass with and a newer toolchain is never substituted silently. The `newest-toolchain` job opts in explicitly with `go-version: stable`, so a Go release that breaks the suite shows up without moving the pinned minimum.
 - `.github/workflows/release.yml` first runs `verify` (build, vet, tests on Linux, Windows and macOS) on the same revision and only then publishes: a push to `main` pushes the multi-arch image to `ghcr.io/blindmaster24/mgketimetablebot` as `:edge`/`:main`; a `v*` tag additionally builds linux/amd64, linux/arm64, windows/amd64 and darwin/arm64 archives, attaches them to a GitHub Release and gives the image `:<major>.<minor>.<patch>`, `:<major>.<minor>` and `:latest`. Do not pin a concrete release number in the docs: link the releases page and the GHCR package instead.
 - The release build injects the tag, commit and build date through `-X main.version`, `-X main.commit` and `-X main.date`; `cmd/bot/main.go` logs them at startup, `internal/build` carries them into `GET /api/health`, `GET /api/info` and the admin `/debug` command. Bump the version by tagging, never by editing code.
 - `internal/image` finds a font by probing the known Debian/Alpine, macOS and Windows paths and then scanning the system font directories, keeping only fonts that actually load; the runtime image installs `font-dejavu` so the PNG rendering works in the container too.

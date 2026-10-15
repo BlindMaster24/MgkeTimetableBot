@@ -3,7 +3,7 @@
 [Русская версия](README.md)
 
 [![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
-[![Go 1.27.1](https://img.shields.io/badge/go-1.27.1-00ADD8)](https://go.dev/dl/)
+[![Go 1.27.2](https://img.shields.io/badge/go-1.27.2-00ADD8)](https://go.dev/dl/)
 
 ## Overview
 
@@ -57,14 +57,14 @@ college site ──> parser ──> cache (JSON + event queue)
 
 ## Requirements
 
-- **Minimum Go version: 1.27.1** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
+- **Minimum Go version: 1.27.2** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
 - No CGO: SQLite and image rendering are pure Go.
 - A writable directory for `cache/` and the database files.
 
 Check your version:
 
 ```bash
-go version   # expect go1.27.1 or newer
+go version   # expect go1.27.2 or newer
 ```
 
 ## Install and run
@@ -333,7 +333,7 @@ Counters are kept in memory (`internal/health`) and served by `GET /api/health`.
 
 ```bash
 curl -s localhost:8081/api/health | jq .build
-# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.1", "os": "linux", "arch": "amd64" }
+# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.2", "os": "linux", "arch": "amd64" }
 ```
 
 Metrics and the alert state are persisted to the chat database (the `bot_state` table) after every parse cycle and on shutdown, and read back on startup. A restart therefore never hides a problem: if the timetable has not refreshed for an hour, the `parser_stale` alert fires right after the start, and alerts that were already sent are not repeated until `cooldown_minutes` expires.
@@ -471,7 +471,7 @@ services:
 
 What to know about the image:
 
-- multi-stage build: the binary is compiled on `golang:1.27.1` and the runtime image only carries the binary, the config template and the `ca-certificates` trust store — without those roots HTTPS to Telegram, the college site and Google would not work;
+- multi-stage build: the binary is compiled on `golang:1.27.2` and the runtime image only carries the binary, the config template and the `ca-certificates` trust store — without those roots HTTPS to Telegram, the college site and Google would not work;
 - the build stage runs on the runner's architecture and cross-compiles for `TARGETARCH`, so the `linux/arm64` image needs no QEMU and finishes in minutes instead of tens of minutes;
 - the process runs as an unprivileged user, CGO is not needed (SQLite and image rendering are pure Go);
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
