@@ -839,7 +839,7 @@ func (b *Bot) SendGoogleLinked(peerID int64, email string) error {
 		ParseMode:   "HTML",
 		ReplyMarkup: googleControlCalendarKeyboard(),
 	})
-	return err
+	return b.countSendError(transportSendMessage, err)
 }
 
 type googleCalCb struct{ bot *Bot }

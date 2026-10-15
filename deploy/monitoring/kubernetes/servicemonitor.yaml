@@ -1,0 +1,45 @@
+# Prometheus Operator v1 resources that scrape the bot's metrics route.
+#
+# The bot serves the metrics on the same HTTP port as the REST API (metrics.path,
+# metrics.enabled), so one Service port is enough. Keep the port name, the
+# selector labels and the secret name in sync with your Deployment, or adapt
+# them here:
+#   - the pod template needs app.kubernetes.io/name: mgke-timetablebot
+#   - the container port must be named http and carry the api.port value
+#   - kubectl -n <namespace> create secret generic mgke-metrics-token \
+#       --from-literal=token="$MGKE_METRICS_TOKEN"
+#     (skip the authorization block when metrics.token is empty)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mgke-timetablebot
+  labels:
+    app.kubernetes.io/name: mgke-timetablebot
+spec:
+  selector:
+    app.kubernetes.io/name: mgke-timetablebot
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mgke-timetablebot
+  labels:
+    app.kubernetes.io/name: mgke-timetablebot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mgke-timetablebot
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      authorization:
+        type: Bearer
+        credentials:
+          name: mgke-metrics-token
+          key: token

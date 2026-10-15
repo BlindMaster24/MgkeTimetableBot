@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
-	"github.com/mymmrac/telego"
 )
 
 type adminChecker interface {
@@ -200,11 +199,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Нет активных чатов для рассылки")
 	}
 
-	progressMsg, err := c.bot.client.SendMessage(context.Background(), &telego.SendMessageParams{
-		ChatID:    telego.ChatID{ID: u.ChatID},
-		Text:      "Начинаю отправку сообщений.",
-		ParseMode: "HTML",
-	})
+	progressID, err := c.bot.sendMessageForID(u.ChatID, "Начинаю отправку сообщений.")
 	if err != nil {
 		return err
 	}
@@ -239,11 +234,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 			if failed > 0 {
 				editText += fmt.Sprintf("\n❌ Ошибок: %d", failed)
 			}
-			c.bot.client.EditMessageText(context.Background(), &telego.EditMessageTextParams{
-				ChatID:    telego.ChatID{ID: u.ChatID},
-				MessageID: progressMsg.MessageID,
-				Text:      editText,
-			})
+			c.bot.EditMessageText(u.ChatID, progressID, editText, nil)
 			lastEdit = time.Now()
 		}
 	}
@@ -253,11 +244,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 		result += fmt.Sprintf("\n❌ Ошибок: %d", failed)
 	}
 
-	c.bot.client.EditMessageText(context.Background(), &telego.EditMessageTextParams{
-		ChatID:    telego.ChatID{ID: u.ChatID},
-		MessageID: progressMsg.MessageID,
-		Text:      result,
-	})
+	c.bot.EditMessageText(u.ChatID, progressID, result, nil)
 
 	return nil
 }

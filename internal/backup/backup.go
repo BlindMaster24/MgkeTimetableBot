@@ -22,7 +22,10 @@ var (
 
 var stampRe = regexp.MustCompile(`^\d{8}-\d{6}$`)
 
-const stampLayout = "20060102-150405"
+const (
+	stampLayout           = "20060102-150405"
+	snapshotBusyTimeoutMS = 5000
+)
 
 type Options struct {
 	DBPath string
@@ -79,6 +82,13 @@ func Snapshot(dbPath, dest string) error {
 		return err
 	}
 	defer db.Close()
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA busy_timeout=%d", snapshotBusyTimeoutMS)); err != nil {
+		return fmt.Errorf("snapshot %s: %w", dbPath, err)
+	}
 
 	if _, err := db.Exec(`VACUUM INTO ?`, dest); err != nil {
 		return fmt.Errorf("snapshot %s: %w", dbPath, err)

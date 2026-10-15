@@ -1,0 +1,44 @@
+# Alertmanager for the MGKE timetable bot alerts.
+#
+# Both receivers are intentionally empty: alerts are then visible in the
+# Alertmanager UI and in Grafana, and nothing is delivered anywhere until the
+# operator plugs a real integration in. That keeps the stack usable without an
+# SMTP account, a webhook or a bot token, and it never sends anything by
+# accident.
+#
+# Enable the profile when starting the stack:
+#   docker compose -f docker-compose.monitoring.yml --profile alerts up -d
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by:
+    - alertname
+    - severity
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: critical
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 1h
+
+receivers:
+  - name: default
+  - name: critical
+
+# A Telegram receiver for the admin chat, to be uncommented together with the
+# MGKE_TELEGRAM_CHAT_ID and MGKE_TELEGRAM_TOKEN environment variables of the
+# alertmanager service in docker-compose.monitoring.yml:
+#
+# receivers:
+#   - name: default
+#     telegram_configs:
+#       - bot_token_file: /etc/alertmanager/telegram-token
+#         chat_id: 123456789
+#         parse_mode: HTML
+#         send_resolved: true

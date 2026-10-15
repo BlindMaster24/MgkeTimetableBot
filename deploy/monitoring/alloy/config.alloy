@@ -1,0 +1,42 @@
+// Grafana Alloy for the Grafana Cloud case: it scrapes the bot's metrics route
+// and pushes the samples to a Grafana Cloud metrics instance.
+//
+// The file is committed, the credentials are not: everything comes from the
+// environment. Set these before starting Alloy:
+//
+//   MGKE_METRICS_TARGET                  the bot's host and port, e.g. bot:8080
+//   MGKE_METRICS_PATH                    metrics.path, /metrics by default
+//   MGKE_METRICS_TOKEN                   metrics.token, empty when the route is open
+//   GRAFANA_CLOUD_PROMETHEUS_URL         https://prometheus-prod-XX-....grafana.net/api/prom/push
+//   GRAFANA_CLOUD_PROMETHEUS_USERNAME    the numeric instance id
+//   GRAFANA_CLOUD_API_KEY                a token with the metrics:write scope
+//
+// Check it offline with:
+//   docker run --rm -v ./deploy/monitoring/alloy:/etc/alloy grafana/alloy:v1.20.1 validate /etc/alloy/config.alloy
+// and load the alerts of deploy/monitoring/prometheus/rules/mgke.yml into Grafana
+// Cloud with mimirtool rules load (see deploy/monitoring/README.md).
+
+prometheus.scrape "mgke" {
+  targets = [{
+    "__address__" = sys.env("MGKE_METRICS_TARGET"),
+    "job"         = "mgke",
+  }]
+
+  metrics_path    = coalesce(sys.env("MGKE_METRICS_PATH"), "/metrics")
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+  bearer_token    = sys.env("MGKE_METRICS_TOKEN")
+
+  forward_to = [prometheus.remote_write.cloud.receiver]
+}
+
+prometheus.remote_write "cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROMETHEUS_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROMETHEUS_USERNAME")
+      password = sys.env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}

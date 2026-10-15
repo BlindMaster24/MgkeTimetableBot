@@ -17,6 +17,8 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 const testMetricsToken = "metrics-token-123"
@@ -29,15 +31,32 @@ type metricLine struct {
 
 var metricLabelRe = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*)="([^"]*)"`)
 
-var metricLabelNames = map[string]bool{
-	"method":  true,
-	"path":    true,
-	"version": true,
-	"commit":  true,
-	"mode":    true,
+var declaredMetricLabels = declaredLabelSet()
+
+func declaredLabelSet() map[string]bool {
+	set := make(map[string]bool, len(MetricLabelNames()))
+	for _, name := range MetricLabelNames() {
+		set[name] = true
+	}
+	return set
+}
+
+func telegramCountersFixture() *health.TelegramCounters {
+	counters := health.NewTelegramCounters()
+	counters.CountCommand("/day")
+	counters.CountCommand("/day")
+	counters.CountCallback("day")
+	counters.CountNotification("reminder")
+	counters.CountSendError("send_message")
+	return counters
 }
 
 func setupMetricsServer(t *testing.T, tracker *health.Tracker, token string) *Server {
+	t.Helper()
+	return setupMetricsServerWithCounters(t, tracker, token, telegramCountersFixture())
+}
+
+func setupMetricsServerWithCounters(t *testing.T, tracker *health.Tracker, token string, counters *health.TelegramCounters) *Server {
 	t.Helper()
 
 	srv := setupTestServerWith(t, tracker)
@@ -61,6 +80,7 @@ func setupMetricsServer(t *testing.T, tracker *health.Tracker, token string) *Se
 		},
 		Scheduler: func() int { return 12 },
 		Reminders: func() int { return 3 },
+		Telegram:  counters.TelegramStats,
 	})
 	return srv
 }
@@ -143,8 +163,8 @@ func metricLabels(t *testing.T, text string) map[string]string {
 		t.Fatalf("label set %q has no labels", text)
 	}
 	for _, match := range matches {
-		if !metricLabelNames[match[1]] {
-			t.Errorf("metric exposes the unexpected label %q", match[1])
+		if !declaredMetricLabels[match[1]] {
+			t.Errorf("metric exposes the undeclared label %q", match[1])
 		}
 		labels[match[1]] = match[2]
 	}
@@ -171,50 +191,7 @@ func TestMetricsEndpointServesOnlyAggregates(t *testing.T) {
 	scrapeMetrics(t, srv)
 	body, samples := scrapeMetrics(t, srv)
 
-	for _, name := range []string{
-		"mgke_build_info",
-		"mgke_cache_groups",
-		"mgke_cache_teachers",
-		"mgke_cache_hits_total",
-		"mgke_cache_misses_total",
-		"mgke_cache_last_success",
-		"mgke_cache_groups_last_update_seconds",
-		"mgke_cache_teachers_last_update_seconds",
-		"mgke_uptime_seconds",
-		"mgke_parser_runs_total",
-		"mgke_parser_errors_total",
-		"mgke_parser_consecutive_failures",
-		"mgke_parser_lag_seconds",
-		"mgke_parser_last_duration_seconds",
-		"mgke_parser_layout_failures",
-		"mgke_parser_guard_failures",
-		"mgke_calendar_runs_total",
-		"mgke_calendar_errors_total",
-		"mgke_calendar_consecutive_failures",
-		"mgke_calendar_days_synced_total",
-		"mgke_calendar_lag_seconds",
-		"mgke_alerts_active",
-		"mgke_api_requests_total",
-		"mgke_api_errors_total",
-		"mgke_api_slowest_seconds",
-		"mgke_archive_rows",
-		"mgke_archive_rows_with_group",
-		"mgke_archive_rows_with_teacher",
-		"mgke_archive_first_day_index",
-		"mgke_archive_last_day_index",
-		"mgke_scheduler_entries",
-		"mgke_reminders_tracked",
-		"mgke_webhook_enabled",
-		"mgke_webhook_mode",
-		"mgke_webhook_registered",
-		"mgke_webhook_secret_configured",
-		"mgke_webhook_reachable",
-		"mgke_webhook_pending_updates",
-	} {
-		if !strings.Contains(body, "# TYPE "+name+" ") {
-			t.Errorf("the scrape is missing %s", name)
-		}
-	}
+	assertDeclaredFamiliesRendered(t, body)
 
 	if samples["mgke_cache_groups"] != 2 || samples["mgke_cache_teachers"] != 1 {
 		t.Errorf("cache sizes = %v / %v, want 2 / 1", samples["mgke_cache_groups"], samples["mgke_cache_teachers"])
@@ -428,6 +405,189 @@ func TestMetricsScrapeCarriesNoSecrets(t *testing.T) {
 	for _, forbidden := range []string{testSecret, testMetricsToken, "Bearer", "https://", "http://", "@", "chat_id", "token="} {
 		if strings.Contains(body, forbidden) {
 			t.Errorf("the scrape leaks %q", forbidden)
+		}
+	}
+}
+
+func labelledMetric(t *testing.T, body, name, label, value string) float64 {
+	t.Helper()
+
+	for _, line := range metricLines(t, body) {
+		if line.name == name && line.labels[label] == value {
+			return line.value
+		}
+	}
+	t.Fatalf("%s{%s=%q} is missing from the scrape:\n%s", name, label, value, body)
+	return 0
+}
+
+func TestMetricsScrapeCountsTelegramTraffic(t *testing.T) {
+	counters := health.NewTelegramCounters()
+	counters.CountCommand("/day")
+	counters.CountCommand("/day")
+	counters.CountCommand("/start 63 \"evil\"")
+	counters.CountCallback("day")
+	counters.CountNotification("reminder")
+	counters.CountNotification("reminder")
+	counters.CountSendError("send_photo")
+
+	srv := setupMetricsServerWithCounters(t, health.NewDefaultTracker(), "", counters)
+	body, _ := scrapeMetrics(t, srv)
+
+	for _, want := range []struct {
+		name  string
+		label string
+		value string
+		count float64
+	}{
+		{"mgke_telegram_commands_total", "command", "day", 2},
+		{"mgke_telegram_commands_total", "command", "start63evil", 1},
+		{"mgke_telegram_callbacks_total", "callback", "day", 1},
+		{"mgke_notifications_total", "notification", "reminder", 2},
+		{"mgke_telegram_send_errors_total", "transport", "send_photo", 1},
+	} {
+		if got := labelledMetric(t, body, want.name, want.label, want.value); got != want.count {
+			t.Errorf("%s{%s=%q} = %v, want %v", want.name, want.label, want.value, got, want.count)
+		}
+	}
+
+	for _, forbidden := range []string{"/start", "start 63", `\"`} {
+		if strings.Contains(body, forbidden) {
+			t.Errorf("the scrape leaks the raw key %q", forbidden)
+		}
+	}
+	for _, name := range []string{"mgke_telegram_commands_total", "mgke_telegram_callbacks_total", "mgke_notifications_total", "mgke_telegram_send_errors_total"} {
+		if !strings.Contains(body, "# TYPE "+name+" counter") {
+			t.Errorf("%s must be exposed as a counter", name)
+		}
+	}
+}
+
+func TestMetricsScrapeStaysSilentWithoutTelegramTraffic(t *testing.T) {
+	srv := setupMetricsServerWithCounters(t, health.NewDefaultTracker(), "", health.NewTelegramCounters())
+	body, _ := scrapeMetrics(t, srv)
+
+	for _, name := range []string{"mgke_telegram_commands_total", "mgke_telegram_callbacks_total", "mgke_notifications_total", "mgke_telegram_send_errors_total"} {
+		if strings.Contains(body, name) {
+			t.Errorf("%s must stay absent while nothing happened", name)
+		}
+	}
+
+	srv.SetMetricsSources(MetricsSources{})
+	body, _ = scrapeMetrics(t, srv)
+	for _, name := range []string{"mgke_telegram_commands_total", "mgke_notifications_total"} {
+		if strings.Contains(body, name) {
+			t.Errorf("%s must stay absent without a source", name)
+		}
+	}
+}
+
+func parsedFamilyKinds(t *testing.T, body string) map[string]string {
+	t.Helper()
+
+	parser := expfmt.NewTextParser(model.LegacyValidation)
+	families, err := parser.TextToMetricFamilies(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("the scrape does not parse as the prometheus text format: %v", err)
+	}
+
+	kinds := make(map[string]string, len(families))
+	for name, family := range families {
+		kinds[name] = family.GetType().String()
+	}
+	return kinds
+}
+
+func assertDeclaredFamiliesRendered(t *testing.T, body string) {
+	t.Helper()
+
+	kinds := parsedFamilyKinds(t, body)
+	declared := make(map[string]bool, len(MetricFamilies()))
+	for _, name := range MetricFamilies() {
+		declared[name] = true
+		if !strings.Contains(body, "# TYPE "+name+" ") {
+			t.Errorf("the scrape is missing the TYPE line of %s", name)
+		}
+		if !strings.Contains(body, "# HELP "+name+" ") {
+			t.Errorf("the scrape is missing the HELP line of %s", name)
+		}
+		if _, ok := kinds[name]; !ok {
+			t.Errorf("the exposition of %s does not parse back", name)
+		}
+	}
+
+	for name := range kinds {
+		if !declared[name] {
+			t.Errorf("the scrape carries the undeclared family %s", name)
+		}
+	}
+}
+
+func fullyWiredMetricsServer(t *testing.T) string {
+	t.Helper()
+
+	tracker := health.NewDefaultTracker()
+	tracker.ParserSuccess(2 * time.Second)
+	tracker.ParserFailure(errors.New("site down"))
+	tracker.CalendarSuccess(4)
+	tracker.RecordAPI(health.APIRequest{Method: http.MethodGet, Path: "/api/info", Status: http.StatusOK, Duration: 2 * time.Millisecond})
+
+	srv := setupMetricsServer(t, tracker, "")
+	scrapeMetrics(t, srv)
+	body, _ := scrapeMetrics(t, srv)
+	return body
+}
+
+func TestMetricFamiliesMatchTheDeclaredList(t *testing.T) {
+	body := fullyWiredMetricsServer(t)
+	assertDeclaredFamiliesRendered(t, body)
+
+	if len(MetricFamilies()) == 0 || len(MetricLabelNames()) == 0 {
+		t.Fatal("the declared metric surface must not be empty")
+	}
+}
+
+func TestMetricFamiliesAreDeclaredOnce(t *testing.T) {
+	seen := map[string]bool{}
+	for _, name := range MetricFamilies() {
+		if seen[name] {
+			t.Errorf("%s is declared twice", name)
+		}
+		seen[name] = true
+		if !strings.HasPrefix(name, "mgke_") {
+			t.Errorf("%s does not carry the mgke_ prefix", name)
+		}
+	}
+
+	labels := map[string]bool{}
+	for _, name := range MetricLabelNames() {
+		if labels[name] {
+			t.Errorf("the label %s is declared twice", name)
+		}
+		labels[name] = true
+	}
+}
+
+func TestMetricLabelsMatchTheDeclaredList(t *testing.T) {
+	body := fullyWiredMetricsServer(t)
+
+	used := map[string]bool{}
+	for _, raw := range strings.Split(body, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		for _, match := range metricLabelRe.FindAllStringSubmatch(line, -1) {
+			used[match[1]] = true
+			if !declaredMetricLabels[match[1]] {
+				t.Errorf("metric exposes the undeclared label %q", match[1])
+			}
+		}
+	}
+
+	for _, name := range MetricLabelNames() {
+		if !used[name] {
+			t.Errorf("the declared label %s never reaches the scrape", name)
 		}
 	}
 }

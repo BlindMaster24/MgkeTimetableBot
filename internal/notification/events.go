@@ -79,6 +79,7 @@ type EventNotifier struct {
 	chats     EventChatFinder
 	now       func() time.Time
 	localizer *i18n.Localizer
+	counters  notificationSink
 	remMu     sync.Mutex
 	remDue    map[reminderKey]time.Time
 	remSent   map[reminderKey]bool
@@ -206,7 +207,7 @@ func (n *EventNotifier) sendDay(kind, value string, isUpdate bool, phrase string
 		}
 		header := n.dayHeader(isUpdate, phrase, kind, value, own)
 		msg := header + "\n" + n.formatDay(kind, value, day, chat)
-		if err := n.sender.SendText(chat.ID, msg); err != nil {
+		if err := n.sendText(chat.ID, msg, kindDayNotice); err != nil {
 			n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("day notification send failed")
 		}
 	}
@@ -307,7 +308,7 @@ func (n *EventNotifier) sendDayUpdate(ev *cache.DayEvent, phrase string, chats [
 			msg += summary + "\n"
 		}
 		msg += "\n" + n.formatDay(ev.Kind, ev.Value, ev.Day, chat)
-		if err := n.sender.SendText(chat.ID, msg); err != nil {
+		if err := n.sendText(chat.ID, msg, kindDayChange); err != nil {
 			n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("day notification send failed")
 		}
 	}
@@ -429,7 +430,7 @@ func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 			}
 			header := n.dayHeader(false, phrase, kind, value, own)
 			msg := header + "\n" + n.formatDay(kind, value, day, chat)
-			if err := n.sender.SendText(chat.ID, msg); err != nil {
+			if err := n.sendText(chat.ID, msg, kindDayNotice); err != nil {
 				n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("cron day notification failed")
 			}
 		}
@@ -564,9 +565,9 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 			chat.ID = chat.PeerID
 		}
 		if btn != nil {
-			n.sender.SendTextWithButtons(chat.ID, message, []KeyboardButton{*btn})
+			n.sendTextWithButtons(chat.ID, message, []KeyboardButton{*btn}, kindNewWeek)
 		} else {
-			n.sender.SendText(chat.ID, message)
+			n.sendText(chat.ID, message, kindNewWeek)
 		}
 	}
 
@@ -592,7 +593,7 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 			if chat.PeerID != 0 {
 				chat.ID = chat.PeerID
 			}
-			n.sender.SendTextWithButtons(chat.ID, scoped, []KeyboardButton{btn})
+			n.sendTextWithButtons(chat.ID, scoped, []KeyboardButton{btn}, kindNewWeek)
 		}
 	}
 }
@@ -643,7 +644,7 @@ func (n *EventNotifier) WithdrawWeek(kind string, week int, entries []string) {
 		if chat.PeerID != 0 {
 			chat.ID = chat.PeerID
 		}
-		n.sender.SendText(chat.ID, baseMessage)
+		n.sendText(chat.ID, baseMessage, kindWeekWithdrawn)
 	}
 
 	for _, value := range entries {
@@ -665,7 +666,7 @@ func (n *EventNotifier) WithdrawWeek(kind string, week int, entries []string) {
 			if chat.PeerID != 0 {
 				chat.ID = chat.PeerID
 			}
-			n.sender.SendText(chat.ID, scoped)
+			n.sendText(chat.ID, scoped, kindWeekWithdrawn)
 		}
 	}
 }
@@ -704,7 +705,7 @@ func (n *EventNotifier) CallsChanged(ev *cache.CallsEvent) {
 		if chat.PeerID != 0 {
 			chat.ID = chat.PeerID
 		}
-		if err := n.sender.SendTextWithButtons(chat.ID, message, []KeyboardButton{{Text: "📊 Показать", Data: getCallsCallback}}); err != nil {
+		if err := n.sendTextWithButtons(chat.ID, message, []KeyboardButton{{Text: "📊 Показать", Data: getCallsCallback}}, kindCalls); err != nil {
 			n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("calls notification failed")
 		}
 	}
@@ -747,7 +748,7 @@ func (n *EventNotifier) ParserError(err error) {
 		if chat.PeerID != 0 {
 			chat.ID = chat.PeerID
 		}
-		n.sender.SendText(chat.ID, message)
+		n.sendText(chat.ID, message, kindParserError)
 	}
 }
 

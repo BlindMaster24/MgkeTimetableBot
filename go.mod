@@ -4,23 +4,29 @@ go 1.27.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
-	// gin stays the HTTP router for the REST API; stdlib net/http alone would
-	// reimplement its routing, middleware and panic recovery for no gain.
-	github.com/gin-gonic/gin v1.12.0
 	// fogleman/gg stays the timetable PNG renderer: pure Go, no CGO, and the
 	// container font lookup in internal/image is built around it.
 	github.com/fogleman/gg v1.3.0
+	// gin stays the HTTP router for the REST API; stdlib net/http alone would
+	// reimplement its routing, middleware and panic recovery for no gain.
+	github.com/gin-gonic/gin v1.12.0
 	// lib/pq verdict: kept only for cmd/migrate-pg, the one-off PostgreSQL to
 	// SQLite chat migration. The bot itself uses modernc.org/sqlite (pure Go,
 	// no CGO) for the archive and chat databases; do not add new lib/pq uses.
 	github.com/lib/pq v1.12.3
 	github.com/mymmrac/telego v1.11.2
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
+	// prometheus/common verdict: tooling and tests only. The preflight probes
+	// the metrics route and parses the exposition with expfmt, and the api tests
+	// parse what the writer renders, while the bot binary keeps rendering the
+	// text format itself: no client_golang and no new runtime dependency in
+	// cmd/bot.
+	github.com/prometheus/common v0.72.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.35.1
-	golang.org/x/net v0.58.0
-	golang.org/x/oauth2 v0.36.0
-	golang.org/x/text v0.41.0
+	golang.org/x/net v0.61.0
+	golang.org/x/oauth2 v0.37.0
+	golang.org/x/text v0.43.0
 	google.golang.org/api v0.294.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -63,8 +69,10 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -80,9 +88,9 @@ require (
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect

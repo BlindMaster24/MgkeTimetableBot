@@ -1,0 +1,99 @@
+# Monitoring stack for the MGKE timetable bot: Prometheus, Grafana and, under
+# the alerts profile, Alertmanager.
+#
+# It scrapes a bot that runs on the host, on any port, with or without a
+# metrics token:
+#
+#   MGKE_METRICS_ENABLED=true MGKE_METRICS_PATH=/metrics
+#   MGKE_METRICS_TARGET=host.docker.internal:8080   # the bot's api.port
+#   MGKE_METRICS_TOKEN=...                          # metrics.token, empty is fine
+#   GRAFANA_ADMIN_PASSWORD=...
+#
+#   docker compose -f docker-compose.monitoring.yml up -d
+#   docker compose -f docker-compose.monitoring.yml --profile alerts up -d
+#
+# Nothing here needs editing: the one-shot scrape-config service writes the
+# bearer token and the scrape target into two volumes before Prometheus starts.
+name: mgke-monitoring
+
+services:
+  scrape-config:
+    image: busybox:1.37.0
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        printf '%s' "$${MGKE_METRICS_TOKEN}" > /secrets/metrics-token
+        printf '%s' "[{\"targets\":[\"$${MGKE_METRICS_TARGET}\"]}]" > /targets/mgke.json
+        printf 'prometheus will scrape %s\n' "$${MGKE_METRICS_TARGET}"
+    environment:
+      MGKE_METRICS_TOKEN: ${MGKE_METRICS_TOKEN:-}
+      MGKE_METRICS_TARGET: ${MGKE_METRICS_TARGET:-host.docker.internal:8080}
+    restart: "no"
+    volumes:
+      - prometheus-secrets:/secrets
+      - prometheus-targets:/targets
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    depends_on:
+      scrape-config:
+        condition: service_completed_successfully
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-secrets:/etc/prometheus/secrets:ro
+      - prometheus-targets:/etc/prometheus/targets:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:13.2.4
+    environment:
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-mgke}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - 127.0.0.1:3000:3000
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    profiles:
+      - alerts
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - 127.0.0.1:9093:9093
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+
+volumes:
+  alertmanager-data:
+    name: mgke-alertmanager-data
+  grafana-data:
+    name: mgke-grafana-data
+  prometheus-data:
+    name: mgke-prometheus-data
+  prometheus-secrets:
+    name: mgke-prometheus-secrets
+  prometheus-targets:
+    name: mgke-prometheus-targets

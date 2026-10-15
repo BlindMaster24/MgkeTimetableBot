@@ -1,0 +1,161 @@
+# Alerting rules for the MGKE timetable bot.
+#
+# Load it with promtool check rules deploy/monitoring/prometheus/rules/mgke.yml
+# and behave as documented in deploy/monitoring/README.md, where every alert
+# below has a "### <AlertName>" section the runbook_url points at.
+#
+# Annotations stay template-free on purpose: promtool expands templates in
+# exp_annotations, so a static string is the one form that can be pinned
+# verbatim in mgke.test.yml without depending on the rendered label values.
+groups:
+  - name: mgke-availability
+    rules:
+      - alert: MgkeMetricsGone
+        expr: absent(mgke_uptime_seconds)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The bot stopped exposing metrics"
+          description: "Prometheus scraped no mgke_uptime_seconds series, so the bot is down, the metrics route is closed or the scrape target is wrong. Check the container and the metrics.enabled switch; the deploy/monitoring README documents the target and the token."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkemetricsgone"
+
+      - alert: MgkeHealthAlertsActive
+        expr: mgke_alerts_active > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The bot reports active health alerts"
+          description: "The health layer inside the bot (parser, Google Calendar or HTTP API) has been unhappy for 15 minutes. The /incidents command lists the alert keys, the affected endpoints and the last 20 incidents, and the parserLogs command renders the live parser report."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkehealthalertsactive"
+
+  - name: mgke-parser
+    rules:
+      - alert: MgkeParserNeverFilled
+        expr: mgke_uptime_seconds > 1800 and mgke_cache_groups_last_update_seconds == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The timetable cache was never filled"
+          description: "The bot has been up for more than 30 minutes and the cache freshness gauge is still zero, so no parse has ever succeeded. Parser lag reads zero in exactly this case and would look healthy, which is why this rule is built on the durable cache freshness gauge."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeparserneverfilled"
+
+      - alert: MgkeParserStale
+        expr: mgke_cache_groups_last_update_seconds > 0 and (time() - mgke_cache_groups_last_update_seconds > 900 or mgke_parser_lag_seconds > 900)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The timetable has not been refreshed for 15 minutes"
+          description: "The served cache is older than 15 minutes or the bot has not recorded a successful parse for 15 minutes, and the cache was filled at least once. The two gauges are read together because a parser that never ran reports no lag at all, and that case belongs to MgkeParserNeverFilled."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeparserstale"
+
+      - alert: MgkeParserFrozen
+        expr: mgke_cache_groups_last_update_seconds > 0 and time() - mgke_cache_groups_last_update_seconds > 21600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The timetable data is more than six hours old"
+          description: "The group cache has not been refreshed for six hours, so every chat is served yesterday's timetable. Check the parser log, the college site and the data-loss guards before the next parse runs."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeparserfrozen"
+
+      - alert: MgkeParserFailing
+        expr: mgke_parser_consecutive_failures >= 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The parser fails repeatedly"
+          description: "Two or more parse runs failed in a row. The bot keeps the previous cache entry, so the timetable stays available but stale. The parser log names the source that failed and the probes that stopped matching."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeparserfailing"
+
+      - alert: MgkeParserLayout
+        expr: mgke_parser_layout_failures > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A required page selector stopped matching"
+          description: "The last parse reported missing selectors, which means the college site changed its markup. Every required probe names the CSS selector it expects, and the parserLogs command renders the live report."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeparserlayout"
+
+      - alert: MgkeParserGuard
+        expr: mgke_parser_guard_failures > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The data-loss guard kept the previous cache"
+          description: "A guard trip means a parse returned far less data than before, so the cache kept the previous entry instead of overwriting it. The timetable is stale rather than empty; check the site before the next parse runs."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeparserguard"
+
+  - name: mgke-calendar
+    rules:
+      - alert: MgkeCalendarFailing
+        expr: mgke_calendar_runs_total > 0 and mgke_calendar_consecutive_failures >= 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Google Calendar sync fails repeatedly"
+          description: "Two or more calendar sync runs failed in a row. The failed days are retried because the manual sync marker only advances after a successful pass, so check the service account, the per-chat account and the calendar quota."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkecalendarfailing"
+
+      - alert: MgkeCalendarStale
+        expr: mgke_calendar_runs_total > 0 and mgke_calendar_lag_seconds > 21600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No successful calendar sync for six hours"
+          description: "The calendar sync has run at least once but has not succeeded for six hours. The reconcile pass catches the missed days up as soon as a sync works again, and the calendarSync button on the health alert runs it by hand."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkecalendarstale"
+
+  - name: mgke-api
+    rules:
+      - alert: MgkeAPIErrorBurst
+        expr: increase(mgke_api_errors_total[10m]) >= 3
+        for: 5m
+        keep_firing_for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The API answered several 5xx responses"
+          description: "Three or more 5xx responses arrived inside ten minutes. The api_errors alert inside the bot names the failing endpoints, and the per-route panels on the dashboard show which route started failing."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeapierrorburst"
+
+      - alert: MgkeAPIErrorRate
+        expr: increase(mgke_api_errors_total[20m]) / clamp_min(increase(mgke_api_requests_total[20m]), 1) > 0.02 and increase(mgke_api_requests_total[20m]) >= 20
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than two percent of the API requests fail"
+          description: "At least 20 requests arrived inside twenty minutes and more than two percent of them answered 5xx. Compare the per-route error panel with the slowest route panel to find the handler that degraded."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeapierrorrate"
+
+      - alert: MgkeAPISlowRoute
+        expr: mgke_api_endpoint_latency_seconds_avg > 2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An API route is slower than two seconds"
+          description: "A route answered slower than two seconds on average for 15 minutes. The alert labels name the method and the path, and the api_slow_ms threshold drives the marking inside the bot."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkeapislowroute"
+
+  - name: mgke-telegram
+    rules:
+      - alert: MgkeSendFailures
+        expr: increase(mgke_telegram_send_errors_total[20m]) > 0
+        for: 10m
+        keep_firing_for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Telegram sends are failing"
+          description: "A Bot API transport returned errors in the last 20 minutes, so notifications or replies never reached their chats. The alert labels name the transport, and blocked users and a revoked token both show up here."
+          runbook_url: "https://github.com/BlindMaster24/MgkeTimetableBot/blob/main/deploy/monitoring/README.md#mgkesendfailures"

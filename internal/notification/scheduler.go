@@ -27,6 +27,7 @@ type Scheduler struct {
 	health        *HealthNotifier
 	store         health.StateStore
 	incidents     *health.IncidentLog
+	counters      notificationSink
 }
 
 func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, sender EventSender, chats EventChatFinder, tracker *health.Tracker, store health.StateStore) *Scheduler {
@@ -78,6 +79,17 @@ func (s *Scheduler) Entries() int {
 	return len(s.cron.Entries())
 }
 
+func (s *Scheduler) SetCounterSink(sink notificationSink) {
+	s.counters = sink
+}
+
+func (s *Scheduler) TrackedReminders() int {
+	if s.notifier == nil {
+		return 0
+	}
+	return s.notifier.TrackedReminders()
+}
+
 func (s *Scheduler) SetIncidents(incidents *health.IncidentLog) {
 	s.incidents = incidents
 	if s.health != nil {
@@ -87,6 +99,7 @@ func (s *Scheduler) SetIncidents(incidents *health.IncidentLog) {
 
 func (s *Scheduler) Start() {
 	s.notifier = NewEventNotifier(s.cache, s.cfg, s.log, s.sender, s.chats)
+	s.notifier.SetCounterSink(s.counters)
 
 	s.registerSlots(s.cfg.Timetable.Weekdays, "1-5")
 	s.registerSlots(s.cfg.Timetable.Saturday, "6")
@@ -126,6 +139,7 @@ func (s *Scheduler) registerHealthCheck() {
 	}
 
 	s.health = NewHealthNotifier(s.healthTracker, s.log, s.sender, s.chats, cooldown, s.store)
+	s.health.SetCounterSink(s.counters)
 	s.health.SetIncidents(s.incidents)
 	expr := fmt.Sprintf("0 */%d * * * *", minutes)
 	if _, err := s.cron.AddFunc(expr, s.health.Check); err != nil {

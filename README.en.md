@@ -382,9 +382,47 @@ metrics:
 curl -s localhost:8081/metrics
 ```
 
-The route serves **aggregates only** and nothing sensitive: the build version and commit, the size and freshness of the cache, the parser, calendar and HTTP API counters (request and 5xx numbers per route), the archive size and its day bounds, the number of scheduler entries and tracked reminders, the webhook state (flags and the count of pending updates) and `mgke_uptime_seconds`. There are no secrets in it: no tokens, no API keys, no chat IDs, no message texts and no webhook address — just numbers and a fixed set of labels (`method`, `path`, `version`, `commit`, `mode`), with the `path` values taken from the routes the server actually registered. Metrics whose source is missing are not invented: when a source (the archive, say) is unavailable, its lines are simply absent. The webhook state comes from `getWebhookInfo`, but that request is repeated at most once every 30 seconds — other scrapes get the last known snapshot, so polling the metrics never turns into a stream of Bot API calls.
+The route serves **aggregates only** and nothing sensitive: the build version and commit, the size and freshness of the cache, the parser, calendar and HTTP API counters (request and 5xx numbers per route), the archive size and its day bounds, the number of scheduler entries and tracked reminders, the webhook state (flags and the count of pending updates), the Telegram traffic (commands by name, callbacks by prefix, notifications sent by kind and send failures by transport) and `mgke_uptime_seconds`. There are no secrets in it: no tokens, no API keys, no chat IDs, no message texts and no webhook address — just numbers and a fixed set of labels (`callback`, `command`, `commit`, `method`, `mode`, `notification`, `path`, `transport`, `version`), with the `path` values taken from the routes the server actually registered.
+
+Telegram counter keys are normalised: only `a-z`, `0-9`, `_` and `-` survive (up to 64 characters), an empty key is ignored, and every dictionary keeps at most 128 keys — the excess is folded into `other`. A stream of malformed updates or arbitrary texts therefore never grows the cardinality: a label only ever carries a command name, a callback prefix, a notification kind or a Bot API transport. Metrics whose source is missing are not invented: when a source (the archive, say) is unavailable, its lines are simply absent. The webhook state comes from `getWebhookInfo`, but that request is repeated at most once every 30 seconds — other scrapes get the last known snapshot, so polling the metrics never turns into a stream of Bot API calls.
 
 When `metrics.token` is set, the route expects `Authorization: Bearer <token>` and answers `401` with a `WWW-Authenticate` header without it; an empty token leaves the route open, so it should be closed at the reverse proxy instead. The path must be absolute and outside `/api` (otherwise the REST API key gate would cover it), and the token must be at least 8 characters long; both rules are checked at startup, so a config typo never turns into a silently open route.
+
+The family list is declared once, in `api.MetricFamilies()`, and the allowed label names in `api.MetricLabelNames()`. The preflight `metrics` check and the tests lean on them: a fully wired server must render exactly the declared set, so a renamed metric or a forgotten `HELP` line is caught before a deploy rather than after it.
+
+### Monitoring (`deploy/monitoring`)
+
+A complete monitoring set lives in `deploy/monitoring` and can be used as it is, without editing anything: the compose stack writes the scrape target and the bearer token into volumes itself, the dashboard is a single import, and the rules load into a plain Prometheus, the Prometheus Operator or Grafana Cloud alike. The set is documented in full in `deploy/monitoring/README.md`.
+
+```bash
+export MGKE_METRICS_TARGET=host.docker.internal:8081   # the bot's api.port
+export MGKE_METRICS_TOKEN='<metrics.token, leave it unset when the route is open>'
+export GRAFANA_ADMIN_PASSWORD='<a password you choose>'
+
+docker compose -f docker-compose.monitoring.yml up -d                   # Prometheus :9090, Grafana :3000
+docker compose -f docker-compose.monitoring.yml --profile alerts up -d  # plus Alertmanager :9093
+curl -s -X POST http://127.0.0.1:9090/-/reload                          # reload the rules after an edit
+
+promtool check rules deploy/monitoring/prometheus/rules/mgke.yml
+promtool test rules deploy/monitoring/prometheus/rules/mgke.test.yml
+```
+
+After `up -d` everything is visible at once: <http://localhost:9090/targets> shows the `mgke` target, <http://localhost:9090/alerts> the rules, and <http://localhost:3000> Grafana with the dashboard already provisioned in the `MGKE` folder. Import it by hand through `Dashboards` → `New` → `Import` with `deploy/monitoring/grafana/dashboards/mgke-timetablebot.json`: Grafana asks for the datasource, because the dashboard is exported in the import model (`__inputs` with `DS_PROMETHEUS`).
+
+What is inside: `deploy/monitoring/grafana/dashboards/mgke-timetablebot.json` is the dashboard in the Grafana import model (`__inputs` with `DS_PROMETHEUS`, `schemaVersion: 39`; the stack provisions it already, and a manual import asks for the datasource) with panels for the parser and the cache freshness, the calendar sync, the API errors and per-route response times, the notifications and the Telegram traffic, the archive size, the tracked reminders and the scheduler; `deploy/monitoring/prometheus/rules/mgke.yml` carries 14 alerts in five groups (availability, parser, calendar, api, telegram); `deploy/monitoring/kubernetes/servicemonitor.yaml` and `deploy/monitoring/kubernetes/prometheusrule.yaml` are the same scrape and the same alerts through the Prometheus Operator; `deploy/monitoring/alloy/config.alloy` is the scrape and the remote_write for Grafana Cloud. Alertmanager sits behind the `alerts` profile: the alerts are visible in its UI and reach nothing until a receiver is configured.
+
+The staleness rule is deliberately not built on the lag gauge: a bot that never parsed the site reports `mgke_parser_lag_seconds` of zero and looks healthy. No rule therefore reads the lag alone: the staleness rule adds it to the durable cache freshness gauge (`mgke_cache_groups_last_update_seconds`), and the never-filled case is its own rule on `mgke_uptime_seconds` plus a zero freshness. `promtool test rules` pins all three situations — a cache that was never filled, one that was filled but went stale, and a fresh cache whose parse record went stale. The metric names are not invented either: the preflight `metrics` check verifies that every `mgke_*` name under `deploy/monitoring` is actually served (except the source-dependent families), and `tests/monitoring_test.go` compares the Kubernetes copies with the plain files, so editing one file cannot leave the others behind.
+
+The set itself is checked offline by one command — `scripts/monitoringcheck`. It parses the rules and the Alertmanager config, compares the Kubernetes copies with the plain files, validates the dashboard against the Grafana import model and requires every `mgke_*` name referenced by the rules, the dashboard and the scrape configs to be declared in `api.MetricFamilies()` **and** actually served by the route (which it starts on a loopback port and scrapes): a declared family the renderer stopped emitting is as much of a failure as an unknown name. When promtool is installed it runs `promtool check rules` and `promtool test rules`; when it is not, the script prints an explicit skip with the counts, `result: NOT VERIFIED`, and exits with code 1 — a missing tool never looks like a green result:
+
+```bash
+go run ./scripts/monitoringcheck                                       # promtool is looked up on PATH
+go run ./scripts/monitoringcheck -promtool /path/to/promtool -strict   # -strict fails warnings and skips too
+go run ./scripts/monitoringcheck -skip-promtool                        # deliberately offline: the rules stay unchecked
+go run ./scripts/monitoringcheck -json | jq                            # a report for automation
+```
+
+The `monitoring` CI job runs the same command together with `promtool test rules` and promtool 3.15.0 downloaded against an explicitly pinned SHA-256, so a stale metric name, a broken expression or a Kubernetes copy that drifted behind fails a pull request instead of surfacing during an incident.
 
 ## Notifications
 
@@ -616,6 +654,7 @@ What it checks:
 | `locale` | `locales/ru.json` is valid, has no empty values and carries **every** key referenced by `loc(...)`/`locData(...)` in the code |
 | `storage` | the database, chat and cache directories are writable (missing ones are created) |
 | `timetable` | configured bell schedule slots: the start precedes the end and lessons do not overlap |
+| `metrics` | the `metrics.path` route: with metrics enabled the check starts the API on a loopback port and scrapes it — without the token it must answer `401` with `WWW-Authenticate` (an empty `metrics.token` is a warning), with the token `200` and a Prometheus-format parse: the required families, their `HELP`/`TYPE`, no repeated series and every `mgke_*` the rules and the dashboard under `deploy/monitoring` rely on (except the source-dependent ones). The check is local, so it runs under `-skip-site` too |
 | `site:groups`, `site:teachers` | the page downloaded, the parser found groups and teachers, every day column carries a real `dd.MM.yyyy` date, lessons exist and the days run in order |
 | `site:calls` | the bell schedule parsed, campus variants are listed and the slots are ordered (both single blocks like `08:00–09:20` and paired ones like `09:00–09:45 / 09:55–10:40` are valid) |
 | `image` | a PNG really renders: the first group or teacher with data is drawn and the signature, the dimensions and the available font are verified |
@@ -653,6 +692,7 @@ CI runs the same checks — see “CI and releases” below.
 | `newest-toolchain` | the same suite on all three operating systems with the newest stable Go (`go-version: stable`), so the minimum version from `go.mod` and the fresh toolchain are checked independently |
 | `race` | `go run ./scripts/racecheck` on all three operating systems — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
+| `monitoring` | `go run ./scripts/monitoringcheck -strict` plus `promtool test rules`, with promtool 3.15.0 downloaded against a pinned SHA-256: the rules, the dashboard, the Alertmanager config, the Kubernetes copies and the metric names are checked the same way as locally |
 | `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata, the container timezone (`date +%z` → `+0300`) and a graceful `SIGTERM` shutdown (`docker stop` waits for `shutdown complete`) |
 | `workflow-lint` | `actionlint` over the workflow files themselves |
 
@@ -692,7 +732,7 @@ internal/
   notification/          — scheduler, events and health alerts
   parity/                — TypeScript ↔ Go surface comparator
   parser/                — timetable parser (groups, teachers, bell schedule, diagnostics)
-  preflight/             — pre-deploy check: config, credentials, webhook, Bot API, locale, live site, image
+  preflight/             — pre-deploy check: config, credentials, webhook, Bot API, locale, storage, metrics, live site, image
   tgstub/                — stub Telegram Bot API for the container smoke test: records the bot calls and answers like Telegram
   testgolden/            — golden text normalization (tests only)
   telegram/              — telego: commands, callbacks, menus, keyboards, scenes
@@ -726,6 +766,7 @@ docker-compose.webhook-nginx.yml — webhook behind nginx, the certificate comes
 deploy/caddy/Caddyfile      — Caddy configuration
 deploy/nginx/default.conf.template — nginx configuration template (envsubst)
 docs/google-calendar.md     — Google Calendar guide
+scripts/monitoringcheck/    — check of the deploy/monitoring set (rules, dashboard, metric names, promtool)
 scripts/paritycheck/        — TypeScript parity checker
 scripts/preflight/          — the pre-deploy check
 scripts/racecheck/          — the local run under the race detector

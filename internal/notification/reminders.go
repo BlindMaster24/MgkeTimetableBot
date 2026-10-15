@@ -59,7 +59,7 @@ func (n *EventNotifier) remindValue(kind, value string, day timetable.Day, now t
 		if chat.PeerID != 0 {
 			target = chat.PeerID
 		}
-		if err := n.sender.SendText(target, text); err != nil {
+		if err := n.sendText(target, text, kindReminder); err != nil {
 			n.log.Error().Err(err).Int64("chatID", target).Msg("lesson reminder send failed")
 		}
 	}

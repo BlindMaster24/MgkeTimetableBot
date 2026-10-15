@@ -48,6 +48,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	loc := i18n.New("ru")
 
 	metrics := health.NewTracker(healthThresholds(cfg))
+	telegramCounters := health.NewTelegramCounters()
 
 	ctx, cancel := signal.NotifyContext(ctx, stopSignals()...)
 	defer cancel()
@@ -128,6 +129,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	}
 	bot.SetBuildInfo(buildInfo)
 	bot.SetHealthSource(metrics)
+	bot.SetCounterSink(telegramCounters)
 	bot.SetKeyStore(keyStore)
 	bot.SetAPIProbeFunc(func(ctx context.Context) []apiprobe.Result {
 		return apiprobe.Run(ctx, apiProbeClient, apiProbeBaseURL(cfg), apiprobe.Targets(raspCache), probeToken)
@@ -232,10 +234,11 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		bot.SetNoticeDayFunc(notifier.CronDayAll)
 		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics, chatRepo)
 		scheduler.SetIncidents(incidents)
+		scheduler.SetCounterSink(telegramCounters)
 		scheduler.Start()
 		defer scheduler.Stop()
 		schedulerEntries = scheduler.Entries
-		trackedReminders = eventNotifier.TrackedReminders
+		trackedReminders = scheduler.TrackedReminders
 		log.Info().Msg("notification scheduler started")
 	}
 
@@ -247,6 +250,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 			Webhook:   newWebhookMetricsSource(bot.WebhookStatus).Get,
 			Scheduler: schedulerEntries,
 			Reminders: trackedReminders,
+			Telegram:  telegramCounters.TelegramStats,
 		})
 		log.Info().Str("path", cfg.ResolvedMetricsPath()).Msg("prometheus metrics enabled")
 	}

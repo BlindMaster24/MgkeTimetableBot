@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -81,6 +82,98 @@ func TestSnapshotOfALiveDatabaseIsReadable(t *testing.T) {
 
 	if err := repo.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSnapshotWaitsForAnExclusiveWriter(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "sqlite3.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+
+	for _, stmt := range []string{
+		"CREATE TABLE archive_rows (day INTEGER NOT NULL, data TEXT NOT NULL)",
+		"INSERT INTO archive_rows (day, data) VALUES (1, 'kept')",
+		"PRAGMA journal_mode=DELETE",
+		"BEGIN EXCLUSIVE",
+		"UPDATE archive_rows SET data = data",
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+
+	dest := filepath.Join(dir, "snapshot.db")
+	snapshot := make(chan error, 1)
+	go func() { snapshot <- Snapshot(dbPath, dest) }()
+
+	select {
+	case err := <-snapshot:
+		t.Fatalf("the snapshot failed while a writer held the lock instead of waiting for it: %v", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	if _, err := db.Exec("COMMIT"); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case err := <-snapshot:
+		if err != nil {
+			t.Fatalf("the snapshot must succeed once the writer released the lock: %v", err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("the snapshot never finished after the writer released the lock")
+	}
+
+	check, err := sql.Open("sqlite", dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer check.Close()
+
+	var rows int
+	if err := check.QueryRow("SELECT COUNT(*) FROM archive_rows").Scan(&rows); err != nil {
+		t.Fatalf("the snapshot is not a readable database: %v", err)
+	}
+	if rows != 1 {
+		t.Fatalf("snapshot holds %d rows, want the committed one", rows)
+	}
+}
+
+func TestSnapshotSucceedsWhileAWriterIsMidTransaction(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "sqlite3.db")
+
+	repo, err := archive.New(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repo.Close()
+	appendDay(t, repo, "12.02.2026", "100")
+
+	tx, err := repo.DB().Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE timetable_archive SET data = data WHERE "group" = ?`, "100"); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(dir, "snapshot.db")
+	if err := Snapshot(dbPath, dest); err != nil {
+		t.Fatalf("the snapshot must read a live WAL database while a writer is mid-transaction: %v", err)
+	}
+
+	days := storedDays(t, dest)
+	if len(days) != 1 || days[0] != "12.02.2026" {
+		t.Fatalf("snapshot holds %v, want the day that was committed before it started", days)
 	}
 }
 

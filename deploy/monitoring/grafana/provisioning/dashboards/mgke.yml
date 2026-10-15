@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# File provisioning for the dashboard committed next to this file. Grafana
+# resolves the dashboard's DS_PROMETHEUS placeholder through the datasource
+# variable it carries, whose default is the uid of the provisioned Prometheus
+# datasource above, so the provisioned copy renders without the import dialog.
+providers:
+  - name: mgke
+    orgId: 1
+    folder: MGKE
+    folderUid: mgke
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

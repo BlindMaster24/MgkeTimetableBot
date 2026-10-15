@@ -359,6 +359,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 
 	bestPrefix, bestHandler := b.findCallback(cb.Data)
 	if bestHandler != nil {
+		b.countCallback(bestPrefix)
 		if err := bestHandler.Handler(ctx, u); err != nil {
 			b.log.Error().Err(err).Str("prefix", bestPrefix).Msg("callback error")
 		}
@@ -399,7 +400,7 @@ func (b *Bot) SendText(chatID int64, text string) error {
 		Text:      text,
 		ParseMode: "HTML",
 	})
-	return err
+	return b.countSendError(transportSendMessage, err)
 }
 
 func (b *Bot) SendTextWithKeyboard(chatID int64, text string, kb *telego.InlineKeyboardMarkup) error {
@@ -409,7 +410,7 @@ func (b *Bot) SendTextWithKeyboard(chatID int64, text string, kb *telego.InlineK
 		ParseMode:   "HTML",
 		ReplyMarkup: kb,
 	})
-	return err
+	return b.countSendError(transportSendMessage, err)
 }
 
 type namedBytes struct {
@@ -442,7 +443,7 @@ func (b *Bot) SendDocument(chatID int64, filename string, data []byte, caption s
 		params.ParseMode = "HTML"
 	}
 	_, err := b.client.SendDocument(context.Background(), params)
-	return err
+	return b.countSendError(transportSendDocument, err)
 }
 
 func (b *Bot) SendPhoto(chatID int64, filePath string, caption string) error {
@@ -471,7 +472,7 @@ func (b *Bot) sendPhoto(chatID int64, filePath string, caption string, replyTo i
 		params.ReplyParameters = &telego.ReplyParameters{MessageID: replyTo}
 	}
 	_, err = b.client.SendPhoto(context.Background(), params)
-	return err
+	return b.countSendError(transportSendPhoto, err)
 }
 
 func (b *Bot) AnswerCallback(callbackID string, text string) error {
@@ -496,7 +497,7 @@ func (b *Bot) SendTextWithReplyKeyboard(chatID int64, text string, kb *telego.Re
 		ParseMode:   "HTML",
 		ReplyMarkup: kb,
 	})
-	return err
+	return b.countSendError(transportSendMessage, err)
 }
 
 func buttonsKeyboard(buttons []notification.KeyboardButton) *telego.InlineKeyboardMarkup {
@@ -527,7 +528,7 @@ func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *tele
 		params.ReplyMarkup = kb
 	}
 	_, err := b.client.EditMessageText(context.Background(), params)
-	return err
+	return b.countSendError(transportEditMessage, err)
 }
 
 func (b *Bot) sendOrEdit(u *Update, text string, inlineKb *telego.InlineKeyboardMarkup) error {

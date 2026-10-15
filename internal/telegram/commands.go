@@ -580,6 +580,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if !b.allowsCommand(cmd, u.UserID) {
 			return false
 		}
+		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
 			b.log.Error().Err(err).Str("cmd", u.Text).Msg("command error")
 		}
@@ -596,6 +597,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 			cmd = b.commandByName(cmdName)
 		}
 		if cmd != nil && b.allowsCommand(cmd, u.UserID) {
+			b.countCommand(cmd)
 			if err := cmd.Handler(ctx, u); err != nil {
 				b.log.Error().Err(err).Str("cmd", cmdName).Msg("command error")
 			}
@@ -610,6 +612,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if !b.allowsCommand(cmd, u.UserID) {
 			continue
 		}
+		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
 			b.log.Error().Err(err).Msg("text match error")
 		}
@@ -623,6 +626,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if !b.allowsCommand(cmd, u.UserID) {
 			continue
 		}
+		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
 			b.log.Error().Err(err).Msg("text match error")
 		}

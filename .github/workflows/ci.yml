@@ -65,6 +65,7 @@ jobs:
           go build -o "$out/" ./cmd/migrate-pg/
           go build -o "$out/" ./scripts/paritycheck/
           go build -o "$out/" ./scripts/preflight/
+          go build -o "$out/" ./scripts/monitoringcheck/
           go build -o "$out/" ./scripts/tgstub/
           ls -l "$out"
 
@@ -186,6 +187,7 @@ jobs:
           go test -run FuzzSearch -fuzz FuzzSearchStaysOrderedAndBounded -fuzztime 20s ./internal/search/
           go test -run FuzzCurrent -fuzz FuzzCurrentAndUpcomingStayInsideTheDay -fuzztime 20s ./internal/reminder/
           go test -run FuzzKey -fuzz FuzzKeyIsStableAndUniverseKeepsOneLabel -fuzztime 20s ./internal/rooms/
+          go test -run FuzzCounterKey -fuzz FuzzCounterKeyStaysBounded -fuzztime 20s ./internal/health/
 
       - name: Fuzz the parsers and the webhook
         run: |
@@ -219,6 +221,41 @@ jobs:
 
       - name: Check the docs against the bot surface
         run: go test -count=1 ./tests/
+
+  monitoring:
+    name: monitoring assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROMTOOL_VERSION: 3.15.0
+      PROMTOOL_SHA256: 2a542df32eac02ee17b9d844fb2aa1de00dafa5476579ba8a3ba862e9d572ea0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install the pinned promtool
+        run: |
+          archive="prometheus-${PROMTOOL_VERSION}.linux-amd64.tar.gz"
+          curl -sSL -o "/tmp/${archive}" "https://github.com/prometheus/prometheus/releases/download/v${PROMTOOL_VERSION}/${archive}"
+          echo "${PROMTOOL_SHA256}  /tmp/${archive}" | sha256sum --check
+
+          mkdir -p /tmp/promtool
+          tar -xzf "/tmp/${archive}" -C /tmp/promtool "prometheus-${PROMTOOL_VERSION}.linux-amd64/promtool"
+          echo "PROMTOOL=/tmp/promtool/prometheus-${PROMTOOL_VERSION}.linux-amd64/promtool" >> "$GITHUB_ENV"
+
+      - name: Show the promtool version
+        run: $PROMTOOL --version
+
+      - name: Check the monitoring assets
+        run: go run ./scripts/monitoringcheck -promtool "$PROMTOOL" -strict
+
+      - name: Run the promtool unit tests
+        run: $PROMTOOL test rules deploy/monitoring/prometheus/rules/mgke.test.yml
 
   container:
     name: container smoke test

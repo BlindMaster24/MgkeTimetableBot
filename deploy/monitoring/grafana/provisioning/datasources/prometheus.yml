@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# The datasource uid is fixed on purpose: the dashboard is exported in the
+# Grafana import model (__inputs with DS_PROMETHEUS) and defaults its
+# DS_PROMETHEUS variable to this uid, so the copy this stack provisions renders
+# without any editing while a manual UI import still asks for the datasource.
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      prometheusType: Prometheus
+      timeInterval: 30s

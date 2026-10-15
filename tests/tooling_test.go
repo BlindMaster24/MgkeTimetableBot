@@ -3,6 +3,7 @@ package tests
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -49,6 +50,39 @@ func TestCITestsEveryPlatform(t *testing.T) {
 	}
 	if !strings.Contains(workflow, "shell: bash") {
 		t.Error("the workflow must pin bash so one command string works on every platform")
+	}
+}
+
+func TestCIRunsTheMonitoringCheck(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	if !strings.Contains(workflow, "monitoring:") {
+		t.Error("ci.yml must keep a job that checks the monitoring assets")
+	}
+	if !strings.Contains(workflow, "go run ./scripts/monitoringcheck") {
+		t.Error("the monitoring job must run the checked-in script so the local and CI commands cannot drift")
+	}
+	if !strings.Contains(workflow, "test rules deploy/monitoring/prometheus/rules/mgke.test.yml") {
+		t.Error("the monitoring job must run the promtool unit tests, not only the offline checker")
+	}
+
+	version := regexp.MustCompile(`PROMTOOL_VERSION:\s*([0-9]+\.[0-9]+\.[0-9]+)`).FindStringSubmatch(workflow)
+	if version == nil {
+		t.Fatal("the monitoring job must pin the promtool version explicitly")
+	}
+	if regexp.MustCompile(`PROMTOOL_SHA256:\s*[0-9a-f]{64}`).FindString(workflow) == "" {
+		t.Fatal("the pinned promtool download must be verified against a sha256 checksum")
+	}
+	for _, want := range []string{"sha256sum --check", "v${PROMTOOL_VERSION}"} {
+		if !strings.Contains(workflow, want) {
+			t.Errorf("the monitoring job must download and verify the pinned archive through %q", want)
+		}
+	}
+
+	for _, doc := range append(append([]string{}, docs...), filepath.Join("deploy", "monitoring", "README.md")) {
+		if !strings.Contains(readRepoFile(t, doc), version[1]) {
+			t.Errorf("%s does not document the promtool version %s the CI job installs", doc, version[1])
+		}
 	}
 }
 

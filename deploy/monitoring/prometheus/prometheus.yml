@@ -1,0 +1,36 @@
+# Prometheus for the MGKE timetable bot.
+#
+# The bot serves the metrics under metrics.path (metrics.enabled) on its HTTP
+# port. This file never carries a secret and never needs editing: the compose
+# stack writes the scrape target and the bearer token into the two mounted
+# directories before Prometheus starts, so the operator only sets
+# MGKE_METRICS_TARGET and MGKE_METRICS_TOKEN for the stack.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 1m
+  external_labels:
+    monitor: mgke
+
+# The promtool unit tests live next to the rules as mgke.test.yml, so the rule
+# files are listed one by one instead of globbing the directory: Prometheus must
+# never try to load a unit-test file as a rule file.
+rule_files:
+  - /etc/prometheus/rules/mgke.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: mgke
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/metrics-token
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/mgke.json
+        refresh_interval: 1m

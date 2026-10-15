@@ -54,10 +54,14 @@ type Check struct {
 }
 
 type Report struct {
-	ConfigPath string    `json:"configPath"`
-	Started    time.Time `json:"started"`
-	ElapsedMS  int64     `json:"elapsedMs"`
-	Checks     []Check   `json:"checks"`
+	Title        string    `json:"-"`
+	SubjectLabel string    `json:"-"`
+	Subject      string    `json:"subject,omitempty"`
+	ConfigPath   string    `json:"configPath,omitempty"`
+	Started      time.Time `json:"started"`
+	ElapsedMS    int64     `json:"elapsedMs"`
+	Incomplete   bool      `json:"incomplete,omitempty"`
+	Checks       []Check   `json:"checks"`
 }
 
 type Endpoints struct {
@@ -103,6 +107,7 @@ func Run(opts Options) Report {
 	report.add(checkLocale(findRepoRoot()))
 	report.add(checkStorage(cfg))
 	report.add(checkTimetable(cfg))
+	report.add(checkMetrics(cfg))
 
 	endpoints := endpointsFor(cfg, opts.Endpoints)
 	switch {
@@ -163,7 +168,7 @@ func (r Report) Summary() string {
 func (r Report) Text() string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("preflight %s config=%s\n\n", r.Started.Format("02.01.2006 15:04:05"), r.ConfigPath))
+	b.WriteString(fmt.Sprintf("%s %s %s=%s\n\n", r.title(), r.Started.Format("02.01.2006 15:04:05"), r.subjectLabel(), r.subject()))
 
 	width := 0
 	for _, check := range r.Checks {
@@ -181,8 +186,32 @@ func (r Report) Text() string {
 
 	b.WriteString("\n")
 	b.WriteString(r.Summary())
+	if r.Incomplete {
+		b.WriteString("\nresult: NOT VERIFIED, a skipped check above did not run")
+	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+func (r Report) title() string {
+	if strings.TrimSpace(r.Title) == "" {
+		return "preflight"
+	}
+	return r.Title
+}
+
+func (r Report) subjectLabel() string {
+	if strings.TrimSpace(r.SubjectLabel) == "" {
+		return "config"
+	}
+	return r.SubjectLabel
+}
+
+func (r Report) subject() string {
+	if strings.TrimSpace(r.Subject) == "" {
+		return r.ConfigPath
+	}
+	return r.Subject
 }
 
 func (r Report) JSON() ([]byte, error) {

@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"crypto/subtle"
+	"maps"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +20,74 @@ const (
 	DefaultMetricsPath = "/metrics"
 	metricsContentType = "text/plain; version=0.0.4; charset=utf-8"
 )
+
+var metricFamilies = []string{
+	"mgke_alerts_active",
+	"mgke_api_endpoint_errors_total",
+	"mgke_api_endpoint_latency_seconds_avg",
+	"mgke_api_endpoint_requests_total",
+	"mgke_api_errors_total",
+	"mgke_api_requests_total",
+	"mgke_api_slowest_seconds",
+	"mgke_notifications_total",
+	"mgke_archive_first_day_index",
+	"mgke_archive_last_day_index",
+	"mgke_archive_rows",
+	"mgke_archive_rows_with_group",
+	"mgke_archive_rows_with_teacher",
+	"mgke_build_info",
+	"mgke_cache_groups",
+	"mgke_cache_groups_last_update_seconds",
+	"mgke_cache_hits_total",
+	"mgke_cache_last_success",
+	"mgke_cache_misses_total",
+	"mgke_cache_teachers",
+	"mgke_cache_teachers_last_update_seconds",
+	"mgke_calendar_consecutive_failures",
+	"mgke_calendar_days_synced_total",
+	"mgke_calendar_errors_total",
+	"mgke_calendar_lag_seconds",
+	"mgke_calendar_runs_total",
+	"mgke_parser_consecutive_failures",
+	"mgke_parser_errors_total",
+	"mgke_parser_guard_failures",
+	"mgke_parser_lag_seconds",
+	"mgke_parser_last_duration_seconds",
+	"mgke_parser_layout_failures",
+	"mgke_parser_runs_total",
+	"mgke_reminders_tracked",
+	"mgke_scheduler_entries",
+	"mgke_telegram_callbacks_total",
+	"mgke_telegram_commands_total",
+	"mgke_telegram_send_errors_total",
+	"mgke_uptime_seconds",
+	"mgke_webhook_enabled",
+	"mgke_webhook_mode",
+	"mgke_webhook_pending_updates",
+	"mgke_webhook_reachable",
+	"mgke_webhook_registered",
+	"mgke_webhook_secret_configured",
+}
+
+var metricLabelNames = []string{
+	"callback",
+	"command",
+	"commit",
+	"method",
+	"mode",
+	"notification",
+	"path",
+	"transport",
+	"version",
+}
+
+func MetricFamilies() []string {
+	return slices.Clone(metricFamilies)
+}
+
+func MetricLabelNames() []string {
+	return slices.Clone(metricLabelNames)
+}
 
 var metricsMethods = map[string]bool{
 	http.MethodGet:     true,
@@ -49,6 +119,7 @@ type MetricsSources struct {
 	Webhook   func(ctx context.Context) WebhookMetrics
 	Scheduler func() int
 	Reminders func() int
+	Telegram  func() health.TelegramStats
 }
 
 func (s *Server) SetMetricsConfig(cfg MetricsConfig) {
@@ -190,6 +261,14 @@ func (s *Server) renderSourceMetrics(w *prometheusWriter, ctx context.Context) {
 		w.emit("mgke_reminders_tracked", "gauge", "Lesson reminders currently remembered per chat.", strconv.Itoa(s.metricsSources.Reminders()))
 	}
 
+	if s.metricsSources.Telegram != nil {
+		stats := s.metricsSources.Telegram()
+		w.emitCounters("mgke_telegram_commands_total", "Telegram commands handled per command name.", "command", stats.Commands)
+		w.emitCounters("mgke_telegram_callbacks_total", "Telegram callback buttons handled per prefix.", "callback", stats.Callbacks)
+		w.emitCounters("mgke_notifications_total", "Notifications sent per notification kind.", "notification", stats.Notifications)
+		w.emitCounters("mgke_telegram_send_errors_total", "Failed Telegram calls per transport.", "transport", stats.Transports)
+	}
+
 	if s.metricsSources.Webhook != nil {
 		webhook := s.metricsSources.Webhook(ctx)
 		w.emit("mgke_webhook_enabled", "gauge", "Whether the bot serves updates over a webhook.", boolValue(webhook.Enabled))
@@ -262,6 +341,12 @@ func (w *prometheusWriter) emit(name, kind, help, value string, labels ...string
 		w.builder.WriteString("{" + strings.Join(labels, ",") + "}")
 	}
 	w.builder.WriteString(" " + value + "\n")
+}
+
+func (w *prometheusWriter) emitCounters(name, help, label string, values map[string]int64) {
+	for _, key := range slices.Sorted(maps.Keys(values)) {
+		w.emit(name, "counter", help, strconv.FormatInt(values[key], 10), promLabel(label, key))
+	}
 }
 
 func (w *prometheusWriter) String() string {

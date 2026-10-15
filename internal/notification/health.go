@@ -32,6 +32,7 @@ type HealthNotifier struct {
 	cooldown time.Duration
 	store    health.StateStore
 	incident *health.IncidentLog
+	counters notificationSink
 
 	mu       sync.Mutex
 	active   map[string]time.Time
@@ -175,6 +176,7 @@ func (n *HealthNotifier) broadcast(chats []*EventChat, message string, buttons [
 		} else {
 			err = n.sender.SendText(id, message)
 		}
+		countNotification(n.counters, kindHealth, err)
 		if err != nil {
 			n.log.Error().Err(err).Int64("chat", id).Msg("failed to send health alert")
 		}

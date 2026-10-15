@@ -22,6 +22,7 @@ type botDeps struct {
 	archive      archiveStore
 	google       googleService
 	health       healthSource
+	counters     counterSink
 	keys         *apikey.Store
 	incidents    *health.IncidentLog
 	parseFunc    func() error

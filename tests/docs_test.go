@@ -261,6 +261,35 @@ func TestDocsDocumentPrometheusMetrics(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentTheMonitoringStack(t *testing.T) {
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{
+			"deploy/monitoring",
+			"deploy/monitoring/README.md",
+			"docker-compose.monitoring.yml",
+			"--profile alerts",
+			"deploy/monitoring/prometheus/rules/mgke.yml",
+			"promtool check rules",
+			"promtool test rules",
+			"deploy/monitoring/grafana/dashboards/mgke-timetablebot.json",
+			"deploy/monitoring/kubernetes/servicemonitor.yaml",
+			"deploy/monitoring/kubernetes/prometheusrule.yaml",
+			"deploy/monitoring/alloy/config.alloy",
+			"MGKE_METRICS_TARGET",
+			"scripts/monitoringcheck",
+			"go run ./scripts/monitoringcheck",
+			"-skip-promtool",
+			"NOT VERIFIED",
+			"| `monitoring` |",
+		} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document the monitoring token %q", doc, token)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentTheRaceDetector(t *testing.T) {
 	for _, doc := range docs {
 		content := readDoc(t, doc)
