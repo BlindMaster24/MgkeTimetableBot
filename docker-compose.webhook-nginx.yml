@@ -1,6 +1,9 @@
 services:
   bot:
-    build: .
+    build:
+      context: .
+      args:
+        GO_VERSION: "${GO_VERSION:?GO_VERSION is unset: export it from go.mod first, see the README}"
     image: mgke-timetable-bot:latest
     container_name: mgke-timetable-bot
     restart: unless-stopped

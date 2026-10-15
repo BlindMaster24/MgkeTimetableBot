@@ -454,8 +454,11 @@ go run ./scripts/monitoringcheck -json | jq                            # отч�
 ## Развёртывание в Docker
 
 ```bash
+export GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 docker compose up -d --build
 ```
+
+Версия Go живёт ровно в одном месте — в директиве `go` файла `go.mod`. Сборка образа получает её аргументом `GO_VERSION` (CI передаёт то же значение из `actions/setup-go`), поэтому правка `go.mod` меняет и тулчейн образа; без `GO_VERSION` compose останавливается с понятной ошибкой, а не собирает образ на случайной версии.
 
 `docker-compose.yml` собирает образ из `Dockerfile`, подкладывает конфиг `configs/config.yaml` и хранит состояние (`bot_chats.db`, `sqlite3.db`, `cache/`, логи) в именованном томе. Секреты передаются переменными окружения:
 
@@ -473,7 +476,7 @@ services:
 
 Что важно знать про образ:
 
-- многостудийная сборка: бинарник собирается на `golang:1.27.2`, а в рантайм-образ попадают только бинарник, шаблон конфига и корневые сертификаты `ca-certificates` — без этого набора HTTPS к Telegram, сайту колледжа и Google не работает;
+- многостудийная сборка: бинарник собирается на образе `golang:${GO_VERSION}-alpine`, где `GO_VERSION` — версия из `go.mod`, а в рантайм-образ попадают только бинарник, шаблон конфига и корневые сертификаты `ca-certificates` — без этого набора HTTPS к Telegram, сайту колледжа и Google не работает;
 - build-стадия идёт на архитектуре раннера и кросс-компилирует бинарник под `TARGETARCH`, поэтому образ для `linux/arm64` собирается без QEMU — обычно за минуты, а не за десятки минут;
 - процесс запускается от непривилегированного пользователя, CGO не нужен (SQLite и рендер картинок — чистый Go);
 - встроенный `HEALTHCHECK` каждые 30 секунд обращается к `GET /api/health` и переводит контейнер в `unhealthy` при алертах;
@@ -513,6 +516,7 @@ export BOT_DOMAIN=bot.example.com
 export ACME_EMAIL=admin@example.com
 export MGKE_TELEGRAM_TOKEN=123:ABC
 export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+export GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 
 docker compose -f docker-compose.webhook.yml up -d --build
 ```
@@ -524,6 +528,7 @@ export BOT_DOMAIN=bot.example.com
 export ACME_EMAIL=admin@example.com
 export MGKE_TELEGRAM_TOKEN=123:ABC
 export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+export GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 
 # первый выпуск: файл проверки отдаёт временный nginx из того же тома
 docker run --rm -d --name mgke-acme -p 80:80 \

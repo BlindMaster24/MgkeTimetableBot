@@ -452,8 +452,11 @@ Lesson reminders (enabled by `timetable.reminder_lead_minutes` > 0) are tuned pe
 ## Docker deployment
 
 ```bash
+export GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 docker compose up -d --build
 ```
+
+The Go version lives in exactly one place — the `go` directive of `go.mod`. The image build receives it through the `GO_VERSION` build argument (CI passes the same value from `actions/setup-go`), so editing `go.mod` moves the image toolchain with it; without `GO_VERSION` compose stops with a clear error instead of building the image on whatever version it happens to find.
 
 `docker-compose.yml` builds the image from the `Dockerfile`, ships the config `configs/config.yaml` and keeps state (`bot_chats.db`, `sqlite3.db`, `cache/`, logs) in a named volume. Secrets are passed as environment variables:
 
@@ -471,7 +474,7 @@ services:
 
 What to know about the image:
 
-- multi-stage build: the binary is compiled on `golang:1.27.2` and the runtime image only carries the binary, the config template and the `ca-certificates` trust store — without those roots HTTPS to Telegram, the college site and Google would not work;
+- multi-stage build: the binary is compiled on a `golang:${GO_VERSION}-alpine` image, where `GO_VERSION` is the version from `go.mod`, and the runtime image only carries the binary, the config template and the `ca-certificates` trust store — without those roots HTTPS to Telegram, the college site and Google would not work;
 - the build stage runs on the runner's architecture and cross-compiles for `TARGETARCH`, so the `linux/arm64` image needs no QEMU and finishes in minutes instead of tens of minutes;
 - the process runs as an unprivileged user, CGO is not needed (SQLite and image rendering are pure Go);
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
@@ -511,6 +514,7 @@ export BOT_DOMAIN=bot.example.com
 export ACME_EMAIL=admin@example.com
 export MGKE_TELEGRAM_TOKEN=123:ABC
 export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+export GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 
 docker compose -f docker-compose.webhook.yml up -d --build
 ```
@@ -522,6 +526,7 @@ export BOT_DOMAIN=bot.example.com
 export ACME_EMAIL=admin@example.com
 export MGKE_TELEGRAM_TOKEN=123:ABC
 export MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN="$(openssl rand -hex 24)"
+export GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 
 # first issuance: a throwaway nginx serves the challenge file from the same volume
 docker run --rm -d --name mgke-acme -p 80:80 \
