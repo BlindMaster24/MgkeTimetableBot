@@ -34,6 +34,15 @@ type State struct {
 	CalendarLastSuccessAt string `json:"calendarLastSuccessAt,omitempty"`
 	CalendarLastErrorAt   string `json:"calendarLastErrorAt,omitempty"`
 	CalendarLastError     string `json:"calendarLastError,omitempty"`
+
+	ArchiveBusyRetries  int64 `json:"archiveBusyRetries"`
+	ArchiveBusyFailures int64 `json:"archiveBusyFailures"`
+
+	MaintenanceRuns          int64  `json:"maintenanceRuns"`
+	MaintenanceFailures      int    `json:"maintenanceFailures"`
+	MaintenanceLastSuccessAt string `json:"maintenanceLastSuccessAt,omitempty"`
+	MaintenanceLastErrorAt   string `json:"maintenanceLastErrorAt,omitempty"`
+	MaintenanceLastError     string `json:"maintenanceLastError,omitempty"`
 }
 
 func LoadState(store StateStore, key string, value any) error {
@@ -109,6 +118,15 @@ func (t *Tracker) stateLocked() State {
 		CalendarLastSuccessAt: formatTime(t.calendarLastSuccess),
 		CalendarLastErrorAt:   formatTime(t.calendarLastError),
 		CalendarLastError:     t.calendarLastErrorText,
+
+		ArchiveBusyRetries:  t.archiveBusyRetries,
+		ArchiveBusyFailures: t.archiveBusyFailures,
+
+		MaintenanceRuns:          t.maintenanceRuns,
+		MaintenanceFailures:      t.maintenanceFailures,
+		MaintenanceLastSuccessAt: formatTime(t.maintenanceLastSuccess),
+		MaintenanceLastErrorAt:   formatTime(t.maintenanceLastError),
+		MaintenanceLastError:     t.maintenanceLastErrorText,
 	}
 
 	for source, layout := range t.parserLayout {
@@ -150,6 +168,15 @@ func (t *Tracker) applyStateLocked(state State) {
 	t.calendarLastSuccess = parseTime(state.CalendarLastSuccessAt)
 	t.calendarLastError = parseTime(state.CalendarLastErrorAt)
 	t.calendarLastErrorText = state.CalendarLastError
+
+	t.archiveBusyRetries = state.ArchiveBusyRetries
+	t.archiveBusyFailures = state.ArchiveBusyFailures
+
+	t.maintenanceRuns = state.MaintenanceRuns
+	t.maintenanceFailures = state.MaintenanceFailures
+	t.maintenanceLastSuccess = parseTime(state.MaintenanceLastSuccessAt)
+	t.maintenanceLastError = parseTime(state.MaintenanceLastErrorAt)
+	t.maintenanceLastErrorText = state.MaintenanceLastError
 
 	for source, failures := range state.ParserLayoutFailures {
 		if t.parserLayout == nil {

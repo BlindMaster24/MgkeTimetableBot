@@ -66,7 +66,12 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		Int("teachers", len(raspCache.GetTeachers())).
 		Msg("cache loaded from disk")
 
-	archiveRepo, err := archive.New(cfg.DBPath)
+	archiveRepo, err := archive.NewWithOptions(cfg.DBPath, archive.Options{
+		BusyTimeout: cfg.ResolvedSQLiteBusyTimeout(),
+		Retries:     cfg.ResolvedSQLiteBusyRetries(),
+		OnRetry:     func(int, error) { metrics.ArchiveBusyRetry() },
+		OnFailure:   func(error) { metrics.ArchiveBusyFailure() },
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("failed to open archive DB")
 		return 1
@@ -84,7 +89,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 
 	syncArchive("startup")
 
-	chatRepo, err := telegrambot.NewChatRepo(cfg.ResolvedChatDBPath())
+	chatRepo, err := telegrambot.NewChatRepo(cfg.ResolvedChatDBPath(), cfg.ResolvedSQLiteBusyTimeout())
 	if err != nil {
 		log.Error().Err(err).Msg("failed to open chat DB")
 		return 1
@@ -152,7 +157,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		log.Info().Str("key", record.Key).Str("note", record.Note).Msg("open api incident annotated at startup")
 	}
 
-	maintenance := newArchiveMaintenance(cfg, archiveRepo, log)
+	maintenance := newArchiveMaintenance(cfg, archiveRepo, log, metrics)
 
 	bot.SetBackupFunc(func(_ context.Context) (telegrambot.BackupReport, error) {
 		return maintenance.Run()

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/testgolden"
 )
 
@@ -135,6 +137,20 @@ func goldenChats() []*EventChat {
 
 func notificationScenarios() []messageScenario {
 	return []messageScenario{
+		{
+			name: "health/backup_failed",
+			run: func(t *testing.T, _ *EventNotifier, sender *mockEventSender, finder *mockEventChatFinder) {
+				finder.admins = []*EventChat{{ID: 7, PeerID: 9001}}
+
+				tracker := health.NewTracker(health.Thresholds{BackupFailures: 1})
+				tracker.MaintenanceFailure(errors.New("snapshot ./sqlite3.db: database is locked (5) (SQLITE_BUSY)"))
+				notifier := NewHealthNotifier(tracker, logger.New("error", nil), sender, finder, time.Minute, nil)
+				notifier.Check()
+
+				tracker.MaintenanceSuccess()
+				notifier.Check()
+			},
+		},
 		{
 			name: "day/add/today",
 			run: func(t *testing.T, n *EventNotifier, _ *mockEventSender, finder *mockEventChatFinder) {

@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,10 +24,16 @@ type CallsConfig struct {
 	Campus     string `yaml:"campus"`
 }
 
+type SQLiteConfig struct {
+	BusyTimeoutMS int `yaml:"busy_timeout_ms"`
+	BusyRetries   int `yaml:"busy_retries"`
+}
+
 type HealthConfig struct {
 	Disabled             bool `yaml:"disabled"`
 	CheckMinutes         int  `yaml:"check_minutes"`
 	CooldownMinutes      int  `yaml:"cooldown_minutes"`
+	BackupFailures       int  `yaml:"backup_failures"`
 	ParserStaleMinutes   int  `yaml:"parser_stale_minutes"`
 	ParserFailures       int  `yaml:"parser_failures"`
 	ParserLayoutFailures int  `yaml:"parser_layout_failures"`
@@ -124,6 +131,7 @@ type Config struct {
 	Health  *HealthConfig `yaml:"health"`
 	Archive ArchiveConfig `yaml:"archive"`
 	Metrics MetricsConfig `yaml:"metrics"`
+	SQLite  SQLiteConfig  `yaml:"sqlite"`
 
 	Accept struct {
 		Room    bool `yaml:"room"`
@@ -173,7 +181,26 @@ const (
 	DefaultMaintenanceSchedule = "0 30 4 * * *"
 	DefaultMetricsPath         = "/metrics"
 	MinimumMetricsToken        = 8
+	DefaultSQLiteBusyTimeoutMS = 5000
+	DefaultSQLiteBusyRetries   = 1
 )
+
+func (c *Config) ResolvedSQLiteBusyTimeout() time.Duration {
+	if c.SQLite.BusyTimeoutMS <= 0 {
+		return time.Duration(DefaultSQLiteBusyTimeoutMS) * time.Millisecond
+	}
+	return time.Duration(c.SQLite.BusyTimeoutMS) * time.Millisecond
+}
+
+func (c *Config) ResolvedSQLiteBusyRetries() int {
+	switch {
+	case c.SQLite.BusyRetries < 0:
+		return 0
+	case c.SQLite.BusyRetries == 0:
+		return DefaultSQLiteBusyRetries
+	}
+	return c.SQLite.BusyRetries
+}
 
 func (c *Config) ResolvedChatDBPath() string {
 	return pathOr(c.ChatDBPath, DefaultChatDBPath)

@@ -289,9 +289,12 @@ to get the alerts in an admin chat.
 
 Every `mgke_*` name in this directory is checked twice: the preflight `metrics`
 check reads `deploy/monitoring/**/*.{yml,yaml,json,alloy}` and refuses a name
-that the scraped endpoint does not serve (except the source-dependent families
-listed in `internal/preflight/metrics.go`, which are legitimately absent when
-the archive or the webhook is not wired), and `tests/monitoring_test.go` refuses
+that the scraped endpoint does not serve. The probe wires the sources the
+configuration can supply (the archive once `db_path` exists, the webhook block,
+and the scheduler and reminder gauges while `telegram.noticer` is on) and
+excuses a family only while its source is genuinely absent, so a configured
+source that stops rendering fails the check instead of passing silently. Then
+`tests/monitoring_test.go` refuses
 a name that `api.MetricFamilies()` does not declare. A rename in
 `internal/api/metrics.go` that leaves a dashboard panel behind therefore fails
 `go test ./tests/...` and `go run ./scripts/preflight -skip-site` instead of

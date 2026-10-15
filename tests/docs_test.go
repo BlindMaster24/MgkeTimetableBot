@@ -232,6 +232,36 @@ func TestDocsDocumentArchiveMaintenance(t *testing.T) {
 	}
 }
 
+func TestDocsDocumentSQLiteTuningAndBackupAlerts(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "configs", "config.example.yaml"))
+	if err != nil {
+		t.Fatalf("read config example: %v", err)
+	}
+	for _, field := range []string{"busy_timeout_ms:", "busy_retries:", "backup_failures:"} {
+		if !strings.Contains(string(data), field) {
+			t.Errorf("config.example.yaml does not carry the %s key", field)
+		}
+	}
+
+	for _, doc := range docs {
+		content := readDoc(t, doc)
+		for _, token := range []string{
+			"sqlite.busy_timeout_ms",
+			"sqlite.busy_retries",
+			"health.backup_failures",
+			"backup_failed",
+			"mgke_archive_busy_retries_total",
+			"mgke_archive_busy_failures_total",
+			"mgke_maintenance_failures",
+			"mgke_maintenance_last_success_seconds",
+		} {
+			if !strings.Contains(content, token) {
+				t.Errorf("%s does not document %q", doc, token)
+			}
+		}
+	}
+}
+
 func TestDocsDocumentPrometheusMetrics(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "configs", "config.example.yaml"))
 	if err != nil {

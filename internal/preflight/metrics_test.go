@@ -131,9 +131,15 @@ func TestMetricsCheckReportsAPanickingRoute(t *testing.T) {
 func brokenMetricsExposition(t *testing.T, rewrite func(string) string) Check {
 	t.Helper()
 
-	return runMetricsCheck(metricsConfig(true, ""), metricsProbeOptions{
+	return brokenMetricsExpositionWith(t, metricsConfig(true, ""), rewrite)
+}
+
+func brokenMetricsExpositionWith(t *testing.T, cfg *config.Config, rewrite func(string) string) Check {
+	t.Helper()
+
+	return runMetricsCheck(cfg, metricsProbeOptions{
 		handler: func(cacheDir, path, token string) (http.Handler, error) {
-			inner, err := metricsAPIHandler(cacheDir, path, token)
+			inner, err := metricsAPIHandler(cfg, cacheDir, path, token)
 			if err != nil {
 				return nil, err
 			}
@@ -262,6 +268,39 @@ func TestMetricsCheckReadsTheMonitoringDeploy(t *testing.T) {
 	requireMetricsLevel(t, broken, LevelFail)
 	if !containsHint(broken.Hints, "mgke_missing_family_total") {
 		t.Errorf("the failure must name the unknown family: %v", broken.Hints)
+	}
+}
+
+func TestMetricsCheckFailsWhenAConfiguredSourceStopsRendering(t *testing.T) {
+	dir := t.TempDir()
+	cfg := metricsConfig(true, probeMetricsToken)
+	cfg.DBPath = filepath.Join(dir, "sqlite3.db")
+	if err := os.WriteFile(cfg.DBPath, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Telegram.Noticer = true
+
+	for _, dropped := range []string{
+		"mgke_reminders_tracked",
+		"mgke_scheduler_entries",
+		"mgke_archive_rows",
+		"mgke_archive_first_day_index",
+		"mgke_webhook_pending_updates",
+	} {
+		check := brokenMetricsExpositionWith(t, cfg, dropLines(dropped))
+		requireMetricsLevel(t, check, LevelFail)
+		if !containsHint(check.Hints, dropped) {
+			t.Errorf("dropping %s must be reported by name: %v", dropped, check.Hints)
+		}
+	}
+}
+
+func TestMetricsCheckExcusesAFamilyOnlyWhileItsSourceIsAbsent(t *testing.T) {
+	cfg := metricsConfig(true, probeMetricsToken)
+
+	for _, dropped := range []string{"mgke_reminders_tracked", "mgke_scheduler_entries", "mgke_archive_rows"} {
+		check := brokenMetricsExpositionWith(t, cfg, dropLines(dropped))
+		requireMetricsLevel(t, check, LevelOK)
 	}
 }
 

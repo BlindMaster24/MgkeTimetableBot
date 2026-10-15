@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/sqlitedb"
 )
 
 func fixedClock() time.Time {
@@ -85,15 +86,13 @@ func TestSnapshotOfALiveDatabaseIsReadable(t *testing.T) {
 	}
 }
 
-func TestSnapshotWaitsForAnExclusiveWriter(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "sqlite3.db")
+func holdExclusiveWriter(t *testing.T, path string) *sql.DB {
+	t.Helper()
 
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 	db.SetMaxOpenConns(1)
 
 	for _, stmt := range []string{
@@ -104,9 +103,19 @@ func TestSnapshotWaitsForAnExclusiveWriter(t *testing.T) {
 		"UPDATE archive_rows SET data = data",
 	} {
 		if _, err := db.Exec(stmt); err != nil {
+			db.Close()
 			t.Fatalf("%s: %v", stmt, err)
 		}
 	}
+	return db
+}
+
+func TestSnapshotWaitsForAnExclusiveWriter(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "sqlite3.db")
+
+	db := holdExclusiveWriter(t, dbPath)
+	defer db.Close()
 
 	dest := filepath.Join(dir, "snapshot.db")
 	snapshot := make(chan error, 1)
@@ -143,6 +152,41 @@ func TestSnapshotWaitsForAnExclusiveWriter(t *testing.T) {
 	}
 	if rows != 1 {
 		t.Fatalf("snapshot holds %d rows, want the committed one", rows)
+	}
+}
+
+func TestSnapshotGivesUpWithinItsConfiguredBusyTimeout(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "sqlite3.db")
+
+	blocker := holdExclusiveWriter(t, dbPath)
+	defer blocker.Close()
+
+	dest := filepath.Join(dir, "snapshot.db")
+	started := time.Now()
+	err := SnapshotWithOptions(dbPath, dest, Options{BusyTimeout: 200 * time.Millisecond})
+	elapsed := time.Since(started)
+
+	if err == nil {
+		t.Fatal("the snapshot must not report success while the writer holds the lock")
+	}
+	if !sqlitedb.IsBusy(err) {
+		t.Fatalf("err = %v, want a busy error", err)
+	}
+	if elapsed < 150*time.Millisecond {
+		t.Fatalf("the snapshot gave up after %s, want it to wait for the configured 200ms lock", elapsed)
+	}
+	if elapsed > 10*time.Second {
+		t.Fatalf("the snapshot waited %s, want it bounded by the configured timeout", elapsed)
+	}
+}
+
+func TestSnapshotBusyTimeoutFallsBackToTheDefault(t *testing.T) {
+	if got := snapshotBusyTimeout(Options{}); got != sqlitedb.DefaultBusyTimeout {
+		t.Errorf("timeout = %s, want the default %s", got, sqlitedb.DefaultBusyTimeout)
+	}
+	if got := snapshotBusyTimeout(Options{BusyTimeout: 250 * time.Millisecond}); got != 250*time.Millisecond {
+		t.Errorf("timeout = %s, want the configured 250ms", got)
 	}
 }
 

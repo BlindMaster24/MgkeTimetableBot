@@ -1,7 +1,6 @@
 package backup
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/sqlitedb"
 )
 
 var (
@@ -22,16 +21,14 @@ var (
 
 var stampRe = regexp.MustCompile(`^\d{8}-\d{6}$`)
 
-const (
-	stampLayout           = "20060102-150405"
-	snapshotBusyTimeoutMS = 5000
-)
+const stampLayout = "20060102-150405"
 
 type Options struct {
-	DBPath string
-	Dir    string
-	Keep   int
-	Now    time.Time
+	DBPath      string
+	Dir         string
+	Keep        int
+	Now         time.Time
+	BusyTimeout time.Duration
 }
 
 type Result struct {
@@ -55,7 +52,7 @@ func Run(opts Options) (Result, error) {
 	}
 
 	dest := filepath.Join(dir, Name(opts.DBPath, opts.Now))
-	if err := Snapshot(opts.DBPath, dest); err != nil {
+	if err := SnapshotWithOptions(opts.DBPath, dest, opts); err != nil {
 		return Result{}, err
 	}
 
@@ -77,23 +74,27 @@ func Name(dbPath string, now time.Time) string {
 }
 
 func Snapshot(dbPath, dest string) error {
-	db, err := sql.Open("sqlite", dbPath)
+	return SnapshotWithOptions(dbPath, dest, Options{})
+}
+
+func SnapshotWithOptions(dbPath, dest string, opts Options) error {
+	db, err := sqlitedb.Open(dbPath, sqlitedb.Options{BusyTimeout: snapshotBusyTimeout(opts)})
 	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA busy_timeout=%d", snapshotBusyTimeoutMS)); err != nil {
 		return fmt.Errorf("snapshot %s: %w", dbPath, err)
 	}
+	defer db.Close()
 
 	if _, err := db.Exec(`VACUUM INTO ?`, dest); err != nil {
 		return fmt.Errorf("snapshot %s: %w", dbPath, err)
 	}
 	return nil
+}
+
+func snapshotBusyTimeout(opts Options) time.Duration {
+	if opts.BusyTimeout <= 0 {
+		return sqlitedb.DefaultBusyTimeout
+	}
+	return opts.BusyTimeout
 }
 
 func Prune(dir, prefix string, keep int) ([]string, []string, error) {

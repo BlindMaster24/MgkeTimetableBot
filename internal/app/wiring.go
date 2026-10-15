@@ -60,14 +60,15 @@ func (s *webhookMetricsSource) Get(ctx context.Context) api.WebhookMetrics {
 }
 
 type archiveMaintenance struct {
-	cfg  *config.Config
-	repo *archive.Repository
-	log  *logger.Logger
-	now  func() time.Time
+	cfg     *config.Config
+	repo    *archive.Repository
+	log     *logger.Logger
+	tracker *health.Tracker
+	now     func() time.Time
 }
 
-func newArchiveMaintenance(cfg *config.Config, repo *archive.Repository, log *logger.Logger) *archiveMaintenance {
-	return &archiveMaintenance{cfg: cfg, repo: repo, log: log, now: time.Now}
+func newArchiveMaintenance(cfg *config.Config, repo *archive.Repository, log *logger.Logger, tracker *health.Tracker) *archiveMaintenance {
+	return &archiveMaintenance{cfg: cfg, repo: repo, log: log, tracker: tracker, now: time.Now}
 }
 
 func (m *archiveMaintenance) Run() (telegrambot.BackupReport, error) {
@@ -109,7 +110,20 @@ func (m *archiveMaintenance) Run() (telegrambot.BackupReport, error) {
 		}
 	}
 
-	return report, errors.Join(failures...)
+	err := errors.Join(failures...)
+	m.record(err)
+	return report, err
+}
+
+func (m *archiveMaintenance) record(err error) {
+	if m.tracker == nil {
+		return
+	}
+	if err != nil {
+		m.tracker.MaintenanceFailure(err)
+		return
+	}
+	m.tracker.MaintenanceSuccess()
 }
 
 var apiProbeClient = &http.Client{Timeout: apiprobe.DefaultTimeout}
@@ -122,6 +136,7 @@ func healthThresholds(cfg *config.Config) health.Thresholds {
 
 	thresholds.ParserStale = time.Duration(cfg.Health.ParserStaleMinutes) * time.Minute
 	thresholds.ParserFailures = cfg.Health.ParserFailures
+	thresholds.BackupFailures = cfg.Health.BackupFailures
 	thresholds.ParserLayout = cfg.Health.ParserLayoutFailures
 	thresholds.ParserGuard = cfg.Health.ParserGuardFailures
 	thresholds.CalendarStale = time.Duration(cfg.Health.CalendarStaleMinutes) * time.Minute

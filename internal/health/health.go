@@ -22,6 +22,7 @@ const (
 	AlertCalendarStale    = "calendar_stale"
 	AlertCalendarFailures = "calendar_failures"
 	AlertAPIErrors        = "api_errors"
+	AlertBackupFailed     = "backup_failed"
 )
 
 type Thresholds struct {
@@ -34,6 +35,7 @@ type Thresholds struct {
 	APIErrors        int
 	APIWindow        time.Duration
 	APISlow          time.Duration
+	BackupFailures   int
 }
 
 const (
@@ -56,6 +58,7 @@ func DefaultThresholds() Thresholds {
 		APIErrors:        20,
 		APIWindow:        5 * time.Minute,
 		APISlow:          500 * time.Millisecond,
+		BackupFailures:   1,
 	}
 }
 
@@ -88,6 +91,9 @@ func (t Thresholds) WithDefaults() Thresholds {
 	}
 	if t.APISlow <= 0 {
 		t.APISlow = fallback.APISlow
+	}
+	if t.BackupFailures <= 0 {
+		t.BackupFailures = fallback.BackupFailures
 	}
 	return t
 }
@@ -211,13 +217,30 @@ func (s apiEndpointState) avgDuration() time.Duration {
 	return s.durationTotal / time.Duration(s.durationCount)
 }
 
+type ArchiveStats struct {
+	BusyRetries  int64 `json:"busyRetries"`
+	BusyFailures int64 `json:"busyFailures"`
+}
+
+type MaintenanceStats struct {
+	Runs            int64  `json:"runs"`
+	Failures        int    `json:"failures"`
+	LastSuccessAt   string `json:"lastSuccessAt,omitempty"`
+	LastSuccessUnix int64  `json:"lastSuccessUnix"`
+	LastErrorAt     string `json:"lastErrorAt,omitempty"`
+	LastError       string `json:"lastError,omitempty"`
+	LagSeconds      int64  `json:"lagSeconds"`
+}
+
 type Snapshot struct {
-	UptimeSeconds int64         `json:"uptimeSeconds"`
-	Build         *build.Info   `json:"build,omitempty"`
-	Parser        ParserStats   `json:"parser"`
-	Calendar      CalendarStats `json:"calendar"`
-	API           APIStats      `json:"api"`
-	Alerts        []Alert       `json:"alerts"`
+	UptimeSeconds int64            `json:"uptimeSeconds"`
+	Build         *build.Info      `json:"build,omitempty"`
+	Parser        ParserStats      `json:"parser"`
+	Calendar      CalendarStats    `json:"calendar"`
+	API           APIStats         `json:"api"`
+	Archive       ArchiveStats     `json:"archive"`
+	Maintenance   MaintenanceStats `json:"maintenance"`
+	Alerts        []Alert          `json:"alerts"`
 }
 
 type Tracker struct {
@@ -242,6 +265,15 @@ type Tracker struct {
 	calendarLastSuccess   time.Time
 	calendarLastError     time.Time
 	calendarLastErrorText string
+
+	archiveBusyRetries  int64
+	archiveBusyFailures int64
+
+	maintenanceRuns          int64
+	maintenanceFailures      int
+	maintenanceLastSuccess   time.Time
+	maintenanceLastError     time.Time
+	maintenanceLastErrorText string
 
 	apiRequests     int64
 	apiErrors       int64
@@ -446,6 +478,19 @@ func (t *Tracker) Snapshot() Snapshot {
 			Endpoints:      t.apiEndpointStatsLocked(),
 			LastErrors:     append([]APIErrorSample(nil), t.apiLastErrors...),
 		},
+		Archive: ArchiveStats{
+			BusyRetries:  t.archiveBusyRetries,
+			BusyFailures: t.archiveBusyFailures,
+		},
+		Maintenance: MaintenanceStats{
+			Runs:            t.maintenanceRuns,
+			Failures:        t.maintenanceFailures,
+			LastSuccessAt:   formatTime(t.maintenanceLastSuccess),
+			LastSuccessUnix: t.maintenanceLastSuccess.Unix(),
+			LastErrorAt:     formatTime(t.maintenanceLastError),
+			LastError:       t.maintenanceLastErrorText,
+			LagSeconds:      lagSeconds(now, t.maintenanceLastSuccess),
+		},
 		Alerts: t.alertsLocked(now),
 	}
 }
@@ -462,6 +507,54 @@ func (t *Tracker) Alerts() []Alert {
 	defer t.mu.Unlock()
 
 	return t.alertsLocked(time.Now())
+}
+
+func (t *Tracker) ArchiveBusyRetry() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.archiveBusyRetries++
+}
+
+func (t *Tracker) ArchiveBusyFailure() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.archiveBusyFailures++
+}
+
+func (t *Tracker) MaintenanceSuccess() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.maintenanceRuns++
+	t.maintenanceFailures = 0
+	t.maintenanceLastSuccess = time.Now()
+}
+
+func (t *Tracker) MaintenanceFailure(err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.maintenanceRuns++
+	t.maintenanceFailures++
+	t.maintenanceLastError = time.Now()
+	if err != nil {
+		t.maintenanceLastErrorText = err.Error()
+	}
+}
+
+func maintenanceDetail(consecutive, threshold int, text string) string {
+	detail := fmt.Sprintf("consecutiveFailures=%d threshold=%d", consecutive, threshold)
+
+	text = strings.TrimSpace(strings.ReplaceAll(text, "\n", " "))
+	if text == "" {
+		return detail
+	}
+	if len(text) > 160 {
+		text = text[:160]
+	}
+	return detail + " error=" + text
 }
 
 func (t *Tracker) layoutIssuesLocked() []LayoutIssue {
@@ -557,6 +650,14 @@ func (t *Tracker) alertsLocked(now time.Time) []Alert {
 			Key:    AlertCalendarFailures,
 			Level:  LevelCritical,
 			Detail: fmt.Sprintf("consecutiveFailures=%d threshold=%d", t.calendarFailures, t.thresholds.CalendarFailures),
+		})
+	}
+
+	if t.maintenanceFailures > 0 && t.maintenanceFailures >= t.thresholds.BackupFailures {
+		alerts = append(alerts, Alert{
+			Key:    AlertBackupFailed,
+			Level:  LevelCritical,
+			Detail: maintenanceDetail(t.maintenanceFailures, t.thresholds.BackupFailures, t.maintenanceLastErrorText),
 		})
 	}
 

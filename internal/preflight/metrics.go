@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
@@ -44,20 +45,17 @@ var (
 		".alloy": true,
 	}
 
-	metricsSourceDependent = map[string]bool{
-		"mgke_archive_first_day_index":   true,
-		"mgke_archive_last_day_index":    true,
-		"mgke_archive_rows":              true,
-		"mgke_archive_rows_with_group":   true,
-		"mgke_archive_rows_with_teacher": true,
-		"mgke_reminders_tracked":         true,
-		"mgke_scheduler_entries":         true,
-		"mgke_webhook_enabled":           true,
-		"mgke_webhook_mode":              true,
-		"mgke_webhook_pending_updates":   true,
-		"mgke_webhook_reachable":         true,
-		"mgke_webhook_registered":        true,
-		"mgke_webhook_secret_configured": true,
+	archiveMetricFamilies = []string{
+		"mgke_archive_first_day_index",
+		"mgke_archive_last_day_index",
+		"mgke_archive_rows",
+		"mgke_archive_rows_with_group",
+		"mgke_archive_rows_with_teacher",
+	}
+
+	noticerMetricFamilies = []string{
+		"mgke_reminders_tracked",
+		"mgke_scheduler_entries",
 	}
 )
 
@@ -69,13 +67,15 @@ type metricsProbeOptions struct {
 
 func checkMetrics(cfg *config.Config) Check {
 	return runMetricsCheck(cfg, metricsProbeOptions{
-		handler: metricsAPIHandler,
+		handler: func(cacheDir, path, token string) (http.Handler, error) {
+			return metricsAPIHandler(cfg, cacheDir, path, token)
+		},
 		root:    findRepoRoot,
 		timeout: metricsProbeTimeout,
 	})
 }
 
-func metricsAPIHandler(cacheDir, path, token string) (http.Handler, error) {
+func metricsAPIHandler(cfg *config.Config, cacheDir, path, token string) (http.Handler, error) {
 	raspCache, err := cache.New(cacheDir)
 	if err != nil {
 		return nil, err
@@ -87,10 +87,58 @@ func metricsAPIHandler(cacheDir, path, token string) (http.Handler, error) {
 	counters.CountNotification("reminder")
 	counters.CountSendError("send_message")
 
+	sources := api.MetricsSources{
+		Telegram: counters.TelegramStats,
+		Webhook: func(context.Context) api.WebhookMetrics {
+			return api.WebhookMetrics{
+				Enabled: cfg != nil && cfg.Telegram.Webhook.Enabled,
+				Mode:    webhookModeForConfig(cfg),
+			}
+		},
+	}
+	if archiveAvailable(cfg) {
+		sources.Archive = func() (archive.Stats, error) { return archive.Stats{}, nil }
+		sources.Bounds = func() (archive.Bounds, error) { return archive.Bounds{}, nil }
+	}
+	if cfg != nil && cfg.Telegram.Noticer {
+		sources.Scheduler = func() int { return 0 }
+		sources.Reminders = func() int { return 0 }
+	}
+
 	server := api.NewServer(raspCache, 0, health.NewDefaultTracker(), build.Info{}, nil, nil)
 	server.SetMetricsConfig(api.MetricsConfig{Path: path, Token: token})
-	server.SetMetricsSources(api.MetricsSources{Telegram: counters.TelegramStats})
+	server.SetMetricsSources(sources)
 	return server.Handler(), nil
+}
+
+func webhookModeForConfig(cfg *config.Config) string {
+	if cfg != nil && cfg.Telegram.Webhook.Enabled {
+		return "webhook"
+	}
+	return "long_polling"
+}
+
+func archiveAvailable(cfg *config.Config) bool {
+	if cfg == nil || strings.TrimSpace(cfg.DBPath) == "" {
+		return false
+	}
+	info, err := os.Stat(cfg.DBPath)
+	return err == nil && !info.IsDir()
+}
+
+func excusedMetricFamilies(cfg *config.Config, archiveReady bool) map[string]bool {
+	excused := make(map[string]bool)
+	if !archiveReady {
+		for _, name := range archiveMetricFamilies {
+			excused[name] = true
+		}
+	}
+	if cfg == nil || !cfg.Telegram.Noticer {
+		for _, name := range noticerMetricFamilies {
+			excused[name] = true
+		}
+	}
+	return excused
 }
 
 func runMetricsCheck(cfg *config.Config, opts metricsProbeOptions) Check {
@@ -148,7 +196,9 @@ func runMetricsCheck(cfg *config.Config, opts metricsProbeOptions) Check {
 	helps, duplicates := scanMetricLines(body)
 	referenced := referencedMetricFamilies(opts.root())
 
-	for _, name := range requiredMetricFamilies() {
+	excused := excusedMetricFamilies(cfg, archiveAvailable(cfg))
+
+	for _, name := range requiredMetricFamilies(excused) {
 		kind, ok := kinds[name]
 		if !ok {
 			failures = append(failures, name+" is missing from the scrape")
@@ -166,7 +216,7 @@ func runMetricsCheck(cfg *config.Config, opts metricsProbeOptions) Check {
 		if _, ok := kinds[name]; ok {
 			continue
 		}
-		if metricsSourceDependent[name] {
+		if excused[name] {
 			continue
 		}
 		failures = append(failures, name+" is used by the monitoring deploy but missing from the scrape")
@@ -224,7 +274,9 @@ func metricsHints(cfg *config.Config) []string {
 
 func (o metricsProbeOptions) withDefaults() metricsProbeOptions {
 	if o.handler == nil {
-		o.handler = metricsAPIHandler
+		o.handler = func(cacheDir, path, token string) (http.Handler, error) {
+			return metricsAPIHandler(nil, cacheDir, path, token)
+		}
 	}
 	if o.root == nil {
 		o.root = findRepoRoot
@@ -399,10 +451,10 @@ func seriesKey(line string) string {
 	return name + "{" + strings.Join(parts, ",") + "}"
 }
 
-func requiredMetricFamilies() []string {
+func requiredMetricFamilies(excused map[string]bool) []string {
 	var required []string
 	for _, name := range api.MetricFamilies() {
-		if !metricsSourceDependent[name] {
+		if !excused[name] {
 			required = append(required, name)
 		}
 	}

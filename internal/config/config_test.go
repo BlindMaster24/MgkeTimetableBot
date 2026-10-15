@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -243,5 +244,27 @@ func TestLoadConfigInvalidYAML(t *testing.T) {
 	_, err := Load(cfgPath)
 	if err == nil {
 		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestResolvedSQLiteTuning(t *testing.T) {
+	if got := (&Config{}).ResolvedSQLiteBusyTimeout(); got != time.Duration(DefaultSQLiteBusyTimeoutMS)*time.Millisecond {
+		t.Errorf("timeout = %s, want the default", got)
+	}
+	if got := (&Config{SQLite: SQLiteConfig{BusyTimeoutMS: 250}}).ResolvedSQLiteBusyTimeout(); got != 250*time.Millisecond {
+		t.Errorf("timeout = %s, want the configured 250ms", got)
+	}
+	if got := (&Config{SQLite: SQLiteConfig{BusyTimeoutMS: -1}}).ResolvedSQLiteBusyTimeout(); got != time.Duration(DefaultSQLiteBusyTimeoutMS)*time.Millisecond {
+		t.Errorf("timeout = %s, want the default for a negative value", got)
+	}
+
+	if got := (&Config{}).ResolvedSQLiteBusyRetries(); got != DefaultSQLiteBusyRetries {
+		t.Errorf("retries = %d, want the default", got)
+	}
+	if got := (&Config{SQLite: SQLiteConfig{BusyRetries: 3}}).ResolvedSQLiteBusyRetries(); got != 3 {
+		t.Errorf("retries = %d, want the configured 3", got)
+	}
+	if got := (&Config{SQLite: SQLiteConfig{BusyRetries: -1}}).ResolvedSQLiteBusyRetries(); got != 0 {
+		t.Errorf("retries = %d, want the retry disabled", got)
 	}
 }

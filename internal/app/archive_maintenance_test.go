@@ -3,11 +3,13 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 )
 
@@ -81,9 +83,61 @@ func storedDays(t *testing.T, path string) []string {
 	return out
 }
 
+func TestArchiveMaintenanceReportsAFailureAndItsRecovery(t *testing.T) {
+	cfg, repo := maintenanceConfig(t)
+	tracker := health.NewTracker(health.Thresholds{BackupFailures: 1})
+	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil), tracker)
+	maintenanceAt(m, time.Date(2026, 10, 6, 4, 30, 15, 0, time.UTC))
+
+	if _, err := m.Run(); err != nil {
+		t.Fatalf("the first run must succeed: %v", err)
+	}
+	if alerts := tracker.Alerts(); len(alerts) != 0 {
+		t.Fatalf("a successful run must not alert: %+v", alerts)
+	}
+	success := tracker.Snapshot().Maintenance
+	if success.Runs != 1 || success.Failures != 0 || success.LastSuccessUnix == 0 {
+		t.Fatalf("maintenance snapshot = %+v", success)
+	}
+
+	backupDir := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(backupDir, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Archive.BackupDir = backupDir
+
+	if _, err := m.Run(); err == nil {
+		t.Fatal("a backup into a file must fail")
+	}
+	alerts := tracker.Alerts()
+	if len(alerts) != 1 {
+		t.Fatalf("alerts = %+v, want the backup failure", alerts)
+	}
+	if alerts[0].Key != health.AlertBackupFailed || alerts[0].Level != health.LevelCritical {
+		t.Errorf("alert = %+v, want %s at %s", alerts[0], health.AlertBackupFailed, health.LevelCritical)
+	}
+	if !strings.Contains(alerts[0].Detail, "consecutiveFailures=1 threshold=1") {
+		t.Errorf("detail = %q, want the consecutive count and the threshold", alerts[0].Detail)
+	}
+	if !strings.Contains(alerts[0].Detail, "error=") {
+		t.Errorf("detail = %q, want the failure text", alerts[0].Detail)
+	}
+
+	cfg.Archive.BackupDir = filepath.Join(t.TempDir(), "backups")
+	if _, err := m.Run(); err != nil {
+		t.Fatalf("a healthy run after a failure must succeed: %v", err)
+	}
+	if alerts := tracker.Alerts(); len(alerts) != 0 {
+		t.Fatalf("a recovery must clear the alert: %+v", alerts)
+	}
+	if recovered := tracker.Snapshot().Maintenance; recovered.Failures != 0 {
+		t.Fatalf("consecutive failures = %d, want 0 after a recovery", recovered.Failures)
+	}
+}
+
 func TestArchiveMaintenanceBacksUpBeforeItPrunes(t *testing.T) {
 	cfg, repo := maintenanceConfig(t)
-	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil))
+	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil), health.NewDefaultTracker())
 	maintenanceAt(m, time.Date(2026, 10, 6, 4, 30, 15, 0, time.UTC))
 
 	report, err := m.Run()
@@ -126,7 +180,7 @@ func TestArchiveMaintenanceBacksUpBeforeItPrunes(t *testing.T) {
 
 func TestArchiveMaintenanceRetiresOnlyItsOwnOldestCopies(t *testing.T) {
 	cfg, repo := maintenanceConfig(t)
-	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil))
+	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil), health.NewDefaultTracker())
 
 	maintenanceAt(m, time.Date(2026, 10, 6, 4, 30, 15, 0, time.UTC))
 	if _, err := m.Run(); err != nil {
@@ -161,7 +215,7 @@ func TestArchiveMaintenanceRetiresOnlyItsOwnOldestCopies(t *testing.T) {
 
 func TestArchiveMaintenanceDoesNothingWhenItIsSwitchedOff(t *testing.T) {
 	cfg := &config.Config{DBPath: filepath.Join(t.TempDir(), "sqlite3.db")}
-	m := newArchiveMaintenance(cfg, nil, logger.New("error", nil))
+	m := newArchiveMaintenance(cfg, nil, logger.New("error", nil), health.NewDefaultTracker())
 
 	report, err := m.Run()
 	if err != nil {

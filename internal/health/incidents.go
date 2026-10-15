@@ -12,6 +12,7 @@ const (
 	ScopeParser   = "parser"
 	ScopeCalendar = "calendar"
 	ScopeAPI      = "api"
+	ScopeBackup   = "backup"
 
 	ResolutionAuto   = "auto"
 	ResolutionManual = "manual"
@@ -96,6 +97,8 @@ func AlertScope(key string) string {
 		return ScopeCalendar
 	case AlertAPIErrors:
 		return ScopeAPI
+	case AlertBackupFailed:
+		return ScopeBackup
 	}
 	return ""
 }

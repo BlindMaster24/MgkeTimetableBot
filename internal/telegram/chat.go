@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"sync"
+	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/sqlitedb"
 )
 
 type ChatMode string
@@ -70,11 +71,14 @@ type Repository struct {
 }
 
 func New(dbPath string) (*Repository, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	return NewWithBusyTimeout(dbPath, sqlitedb.DefaultBusyTimeout)
+}
+
+func NewWithBusyTimeout(dbPath string, busyTimeout time.Duration) (*Repository, error) {
+	db, err := sqlitedb.Open(dbPath, sqlitedb.Options{BusyTimeout: busyTimeout})
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
 
 	r := &Repository{db: db, defaultAccepted: true}
 	if err := r.migrate(); err != nil {
@@ -425,8 +429,8 @@ func (r *Repository) Save(chat *Chat) error {
 	return err
 }
 
-func NewChatRepo(dbPath string) (*Repository, error) {
-	return New(dbPath)
+func NewChatRepo(dbPath string, busyTimeout time.Duration) (*Repository, error) {
+	return NewWithBusyTimeout(dbPath, busyTimeout)
 }
 
 func (r *Repository) LoadState(key string) (string, bool, error) {

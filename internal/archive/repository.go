@@ -3,10 +3,11 @@ package archive
 import (
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/sqlitedb"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
-	_ "modernc.org/sqlite"
 )
 
 type ArchiveRow struct {
@@ -21,23 +22,44 @@ type Bounds struct {
 	Max int64
 }
 
+type Options struct {
+	BusyTimeout time.Duration
+	Retries     int
+	OnRetry     func(attempt int, err error)
+	OnFailure   func(err error)
+}
+
+func DefaultOptions() Options {
+	return Options{BusyTimeout: sqlitedb.DefaultBusyTimeout, Retries: sqlitedb.DefaultRetries}
+}
+
 type Repository struct {
-	db *sql.DB
+	db    *sql.DB
+	write sqlitedb.Options
 }
 
 func New(dbPath string) (*Repository, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	return NewWithOptions(dbPath, DefaultOptions())
+}
+
+func NewWithOptions(dbPath string, opts Options) (*Repository, error) {
+	db, err := sqlitedb.Open(dbPath, sqlitedb.Options{
+		BusyTimeout: opts.BusyTimeout,
+		JournalMode: sqlitedb.JournalWAL,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(1)
-
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		return nil, err
+	repo := &Repository{
+		db: db,
+		write: sqlitedb.Options{
+			BusyTimeout: opts.BusyTimeout,
+			Retries:     opts.Retries,
+			OnRetry:     opts.OnRetry,
+			OnFailure:   opts.OnFailure,
+		},
 	}
-
-	repo := &Repository{db: db}
 	if err := repo.EnsureSchema(); err != nil {
 		db.Close()
 		return nil, err
@@ -212,6 +234,12 @@ type AppendDay struct {
 }
 
 func (r *Repository) AppendDays(entries []AppendDay) error {
+	return r.write.Retry(func() error {
+		return r.appendDays(entries)
+	})
+}
+
+func (r *Repository) appendDays(entries []AppendDay) error {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return err

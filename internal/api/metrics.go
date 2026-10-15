@@ -30,6 +30,8 @@ var metricFamilies = []string{
 	"mgke_api_requests_total",
 	"mgke_api_slowest_seconds",
 	"mgke_notifications_total",
+	"mgke_archive_busy_failures_total",
+	"mgke_archive_busy_retries_total",
 	"mgke_archive_first_day_index",
 	"mgke_archive_last_day_index",
 	"mgke_archive_rows",
@@ -48,6 +50,8 @@ var metricFamilies = []string{
 	"mgke_calendar_errors_total",
 	"mgke_calendar_lag_seconds",
 	"mgke_calendar_runs_total",
+	"mgke_maintenance_failures",
+	"mgke_maintenance_last_success_seconds",
 	"mgke_parser_consecutive_failures",
 	"mgke_parser_errors_total",
 	"mgke_parser_guard_failures",
@@ -198,6 +202,14 @@ func (s *Server) renderMetrics(ctx context.Context) string {
 		w.emit("mgke_calendar_consecutive_failures", "gauge", "Calendar sync failures in a row.", strconv.Itoa(calendar.ConsecutiveFailures))
 		w.emit("mgke_calendar_days_synced_total", "counter", "Calendar days written.", strconv.FormatInt(calendar.DaysSynced, 10))
 		w.emit("mgke_calendar_lag_seconds", "gauge", "Seconds since the last successful calendar sync.", strconv.FormatInt(calendar.LagSeconds, 10))
+
+		archiveStats := snapshot.Archive
+		w.emit("mgke_archive_busy_retries_total", "counter", "Archive writes retried after a busy lock.", strconv.FormatInt(archiveStats.BusyRetries, 10))
+		w.emit("mgke_archive_busy_failures_total", "counter", "Archive writes that stayed busy after the retries.", strconv.FormatInt(archiveStats.BusyFailures, 10))
+
+		maintenance := snapshot.Maintenance
+		w.emit("mgke_maintenance_failures", "gauge", "Backup and retention runs that failed in a row.", strconv.Itoa(maintenance.Failures))
+		w.emit("mgke_maintenance_last_success_seconds", "gauge", "Unix time of the last successful backup and retention run, 0 while it never succeeded.", strconv.FormatInt(maintenance.LastSuccessUnix, 10))
 
 		w.emit("mgke_alerts_active", "gauge", "Health alerts that are firing right now.", strconv.Itoa(len(snapshot.Alerts)))
 

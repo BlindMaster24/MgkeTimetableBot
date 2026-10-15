@@ -231,6 +231,8 @@ func HealthAlertTitle(key string) string {
 		return "Google Calendar давно не синхронизировался"
 	case health.AlertAPIErrors:
 		return "Ошибки HTTP API"
+	case health.AlertBackupFailed:
+		return "Не удалось забрать резервную копию архива"
 	}
 	return key
 }

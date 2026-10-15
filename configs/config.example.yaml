@@ -118,6 +118,10 @@ metrics:
   path: "/metrics"
   token: ""
 
+sqlite:
+  busy_timeout_ms: 5000
+  busy_retries: 1
+
 encrypt_key: ""
 
 health:
@@ -133,3 +137,4 @@ health:
   api_errors: 20
   api_window_minutes: 5
   api_slow_ms: 500
+  backup_failures: 1

@@ -1,3 +1,10 @@
+=== health/backup_failed ===
+[peer 9001]
+⚠️ Не удалось забрать резервную копию архива
+consecutiveFailures=1 threshold=1 error=snapshot ./sqlite3.db: database is locked (5) (SQLITE_BUSY)
+[peer 9001]
+✅ Не удалось забрать резервную копию архива — восстановлено
+
 === day/add/today ===
 [peer 1001]
 📢 Расписание на сегодня
