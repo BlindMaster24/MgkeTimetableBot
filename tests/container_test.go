@@ -120,7 +120,7 @@ func TestContainerSmokeTestRunsTheWebhookTransport(t *testing.T) {
 }
 
 func TestContainerSmokeTestPollsOnlyTheStubBotAPI(t *testing.T) {
-	workflow := readFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+	workflow := strings.ReplaceAll(readFile(t, filepath.Join(".github", "workflows", "ci.yml")), "\r\n", "\n")
 
 	start := strings.Index(workflow, "\n  container:\n")
 	if start < 0 {

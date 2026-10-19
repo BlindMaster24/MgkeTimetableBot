@@ -484,7 +484,7 @@ func TestWebhookDeliversUpdatesToTheBot(t *testing.T) {
 	}
 
 	var registered string
-	for _, call := range caller.calls {
+	for _, call := range caller.snapshot() {
 		if call.Method == "setWebhook" {
 			registered = call.Raw
 		}

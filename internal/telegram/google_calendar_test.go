@@ -108,6 +108,15 @@ func (c *recordingCaller) last() string {
 	return c.tests[len(c.tests)-1]
 }
 
+func (c *recordingCaller) snapshot() []recordedCall {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	calls := make([]recordedCall, len(c.calls))
+	copy(calls, c.calls)
+	return calls
+}
+
 func (c *recordingCaller) delivered() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
