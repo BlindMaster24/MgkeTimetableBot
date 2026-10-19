@@ -118,6 +118,27 @@ func TestContainerSmokeTestChecksTheGracefulShutdown(t *testing.T) {
 	}
 }
 
+func TestContainerSmokeTestWaitsForTheUpdateLoopBeforeStopping(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+	polling := regexp.MustCompile(`Msg\("(bot started, listening for updates via long polling)"\)`).
+		FindStringSubmatch(readRepoFile(t, filepath.Join("internal", "telegram", "webhook.go")))
+	if polling == nil {
+		t.Fatal("could not find the long polling startup line the bot logs")
+	}
+
+	wait := strings.Index(workflow, polling[1])
+	if wait < 0 {
+		t.Fatalf("the container smoke test must wait for %q before it stops the bot, otherwise the stop races the startup", polling[1])
+	}
+	stop := strings.Index(workflow, "docker stop --time 20 mgke-smoke")
+	if stop < 0 {
+		t.Fatal("the container smoke test no longer stops the smoke container")
+	}
+	if wait > stop {
+		t.Error("the smoke test must wait for the polling loop to start before docker stop")
+	}
+}
+
 func TestContainerSmokeTestChecksTheImageFont(t *testing.T) {
 	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
 

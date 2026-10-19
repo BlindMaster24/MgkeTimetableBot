@@ -361,5 +361,6 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		log.Error().Err(err).Msg("failed to save cache")
 	}
 	log.Info().Msg("shutdown complete")
+	_ = log.Close()
 	return 0
 }

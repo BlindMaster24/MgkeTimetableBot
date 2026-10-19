@@ -293,13 +293,31 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Start the stub Bot API
+        run: |
+          go build -o /tmp/tgstub ./scripts/tgstub
+          nohup /tmp/tgstub -listen 127.0.0.1:18090 > /tmp/tgstub.log 2>&1 &
+          echo "$!" > /tmp/tgstub.pid
+
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:18090/_stub/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the stub Bot API never answered" >&2
+          cat /tmp/tgstub.log >&2 || true
+          exit 1
+
       - name: Start the bot
         run: |
           docker run -d --name mgke-smoke \
+            --network host \
             -e MGKE_TELEGRAM_TOKEN="123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" \
+            -e MGKE_TELEGRAM_API_BASE_URL="http://127.0.0.1:18090" \
             -e MGKE_PARSER_ENABLED=false \
-            -e MGKE_HTTP_PORT=8080 \
-            -p 18081:8080 \
+            -e MGKE_HTTP_PORT=18081 \
             mgke-timetable-bot:ci
 
       - name: Wait for the API to report healthy
@@ -352,6 +370,22 @@ jobs:
 
           jq -e '.error == "Неверный ключ авторизации"' /tmp/info.json > /dev/null
 
+      - name: Wait for the update loop to poll
+        run: |
+          for _ in $(seq 1 60); do
+            if docker logs mgke-smoke 2>&1 | grep -q "bot started, listening for updates via long polling" \
+              && curl -sf http://127.0.0.1:18090/_stub/calls > /tmp/poll-calls.json \
+              && jq -e '[.calls[] | select(.method == "getUpdates")] | length > 0' /tmp/poll-calls.json > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the bot never polled the stub Bot API, so the shutdown assertion would race the startup" >&2
+          docker logs mgke-smoke 2>&1 | tail -20 >&2
+          curl -s http://127.0.0.1:18090/_stub/calls >&2 || true
+          exit 1
+
       - name: Show the container logs
         if: failure()
         run: docker logs mgke-smoke
@@ -373,23 +407,6 @@ jobs:
       - name: Remove the container
         if: always()
         run: docker rm -f mgke-smoke || true
-
-      - name: Start the stub Bot API
-        run: |
-          go build -o /tmp/tgstub ./scripts/tgstub
-          nohup /tmp/tgstub -listen 127.0.0.1:18090 > /tmp/tgstub.log 2>&1 &
-          echo "$!" > /tmp/tgstub.pid
-
-          for _ in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:18090/_stub/health > /dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-
-          echo "the stub Bot API never answered" >&2
-          cat /tmp/tgstub.log >&2 || true
-          exit 1
 
       - name: Start the bot in webhook mode
         run: |
@@ -529,9 +546,11 @@ jobs:
 
       - name: Remove the webhook container
         if: always()
-        run: |
-          docker rm -f mgke-webhook || true
-          kill "$(cat /tmp/tgstub.pid)" 2>/dev/null || true
+        run: docker rm -f mgke-webhook || true
+
+      - name: Stop the stub Bot API
+        if: always()
+        run: kill "$(cat /tmp/tgstub.pid)" 2>/dev/null || true
 
   workflow-lint:
     name: workflow lint

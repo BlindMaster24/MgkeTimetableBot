@@ -1,6 +1,9 @@
 package logger
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +54,30 @@ func TestLoggerWithFile(t *testing.T) {
 	log := New("info", cfg)
 	if log == nil {
 		t.Fatal("expected non-nil logger")
+	}
+}
+
+func TestLoggerCloseReleasesTheLogFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.log")
+	log := New("info", &FileConfig{Enabled: true, Path: path, MaxSizeMB: 1, MaxFiles: 1})
+
+	log.Info().Msg("hello")
+	if err := log.Close(); err != nil {
+		t.Fatalf("close the file logger: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read the log file: %v", err)
+	}
+	if !strings.Contains(string(data), "hello") {
+		t.Error("the file logger did not write the entry")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Errorf("the closed logger still holds the file: %v", err)
+	}
+	if err := New("info", nil).Close(); err != nil {
+		t.Errorf("closing a console logger returned %v", err)
 	}
 }
 

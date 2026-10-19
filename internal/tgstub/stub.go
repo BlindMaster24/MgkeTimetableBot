@@ -83,7 +83,31 @@ func (s *Stub) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	webhook := s.webhook
 	s.mu.Unlock()
 
+	if method == "getUpdates" {
+		waitForUpdates(request, body)
+	}
+
 	writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "result": resultFor(method, body, webhook)})
+}
+
+func waitForUpdates(request *http.Request, body map[string]any) {
+	seconds, ok := body["timeout"].(float64)
+	if !ok || seconds <= 0 {
+		return
+	}
+
+	timeout := time.Duration(seconds * float64(time.Second))
+	if timeout > 10*time.Second {
+		timeout = 10 * time.Second
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+	case <-request.Context().Done():
+	}
 }
 
 func botMethod(path string) (string, string, bool) {

@@ -119,6 +119,49 @@ func TestContainerSmokeTestRunsTheWebhookTransport(t *testing.T) {
 	}
 }
 
+func TestContainerSmokeTestPollsOnlyTheStubBotAPI(t *testing.T) {
+	workflow := readFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	start := strings.Index(workflow, "\n  container:\n")
+	if start < 0 {
+		t.Fatal("ci.yml no longer has the container job")
+	}
+	container := workflow[start:]
+	if end := strings.Index(container, "\n  workflow-lint:"); end >= 0 {
+		container = container[:end]
+	}
+
+	if strings.Contains(container, "api.telegram.org") {
+		t.Error("the container job must not depend on the real Bot API")
+	}
+
+	stub := strings.Index(container, "nohup /tmp/tgstub")
+	poll := strings.Index(container, "docker run -d --name mgke-smoke")
+	if stub < 0 || poll < 0 {
+		t.Fatal("the container job must start the stub Bot API and the long polling container")
+	}
+	if stub > poll {
+		t.Error("the stub Bot API must be ready before the long polling container starts")
+	}
+
+	block := container[poll:]
+	if end := strings.Index(block, "\n\n      - name:"); end >= 0 {
+		block = block[:end]
+	}
+	for _, want := range []string{"--network host", `MGKE_TELEGRAM_API_BASE_URL="http://127.0.0.1:18090"`} {
+		if !strings.Contains(block, want) {
+			t.Errorf("the long polling container must set %s so it never reaches the real Bot API", want)
+		}
+	}
+
+	if strings.Count(container, `MGKE_TELEGRAM_API_BASE_URL="http://127.0.0.1:18090"`) < 2 {
+		t.Error("both container runs must point at the stub Bot API")
+	}
+	if !strings.Contains(container, `select(.method == "getUpdates")`) {
+		t.Error("the container job must prove the long polling loop polled the stub, not only that it logged a start")
+	}
+}
+
 func TestReleaseWorkflowsInjectTheBuildMetadata(t *testing.T) {
 	release := readFile(t, filepath.Join(".github", "workflows", "release.yml"))
 

@@ -269,15 +269,22 @@ func (b *Bot) consumeUpdates(ctx context.Context, updates <-chan telego.Update) 
 	for {
 		select {
 		case <-ctx.Done():
-			b.log.Info().Msg("stop signal received, leaving the update loop")
+			b.logUpdateLoopStop()
 			return nil
 		case update, ok := <-updates:
 			if !ok {
+				if ctx.Err() != nil {
+					b.logUpdateLoopStop()
+				}
 				return nil
 			}
 			b.handleUpdate(ctx, update)
 		}
 	}
+}
+
+func (b *Bot) logUpdateLoopStop() {
+	b.log.Info().Msg("stop signal received, leaving the update loop")
 }
 
 func (b *Bot) handleUpdate(ctx context.Context, update telego.Update) {

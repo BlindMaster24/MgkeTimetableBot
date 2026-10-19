@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mymmrac/telego"
 )
@@ -171,6 +173,57 @@ func TestStubEchoesTheEditedMessageIDAndAnswersCallbacks(t *testing.T) {
 	}
 	if sent.MessageID != 1 {
 		t.Errorf("a fresh message id = %d, want the default 1", sent.MessageID)
+	}
+}
+
+func TestStubServesTheLongPollingLoop(t *testing.T) {
+	_, server := startStub(t)
+
+	client, err := telego.NewBot(stubToken, telego.WithAPIServer(server.URL), telego.WithDiscardLogger())
+	if err != nil {
+		t.Fatalf("create bot: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	updates, err := client.UpdatesViaLongPolling(ctx, &telego.GetUpdatesParams{Timeout: 1})
+	if err != nil {
+		t.Fatalf("start long polling: %v", err)
+	}
+
+	deadline := time.After(5 * time.Second)
+	for len(callsOf(t, server, "getUpdates")) == 0 {
+		select {
+		case <-deadline:
+			cancel()
+			t.Fatal("the stub never received a getUpdates call")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	cancel()
+	for range updates {
+	}
+
+	if len(callsOf(t, server, "getUpdates")) == 0 {
+		t.Error("the long polling loop must poll the stub, not only start")
+	}
+}
+
+func TestStubHoldsGetUpdatesForTheRequestedTimeout(t *testing.T) {
+	_, server := startStub(t)
+
+	started := time.Now()
+	response, err := http.Post(server.URL+"/bot"+stubToken+"/getUpdates", "application/json", strings.NewReader(`{"timeout":1}`))
+	if err != nil {
+		t.Fatalf("getUpdates: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("getUpdates answered %d, want 200", response.StatusCode)
+	}
+	if elapsed := time.Since(started); elapsed < 500*time.Millisecond {
+		t.Errorf("getUpdates answered after %s, want it to wait for the requested timeout", elapsed)
 	}
 }
 

@@ -10,7 +10,8 @@ import (
 )
 
 type Logger struct {
-	z zerolog.Logger
+	z    zerolog.Logger
+	file *lumberjack.Logger
 }
 
 func New(level string, fileCfg *FileConfig) *Logger {
@@ -21,14 +22,16 @@ func New(level string, fileCfg *FileConfig) *Logger {
 		TimeFormat: time.RFC3339,
 	})
 
+	var file *lumberjack.Logger
 	if fileCfg != nil && fileCfg.Enabled {
-		writers = append(writers, &lumberjack.Logger{
+		file = &lumberjack.Logger{
 			Filename:   fileCfg.Path,
 			MaxSize:    fileCfg.MaxSizeMB,
 			MaxBackups: fileCfg.MaxFiles,
 			MaxAge:     30,
 			Compress:   true,
-		})
+		}
+		writers = append(writers, file)
 	}
 
 	multi := io.MultiWriter(writers...)
@@ -39,7 +42,14 @@ func New(level string, fileCfg *FileConfig) *Logger {
 	}
 
 	z := zerolog.New(multi).Level(lvl).With().Timestamp().Logger()
-	return &Logger{z: z}
+	return &Logger{z: z, file: file}
+}
+
+func (l *Logger) Close() error {
+	if l.file == nil {
+		return nil
+	}
+	return l.file.Close()
 }
 
 type FileConfig struct {
