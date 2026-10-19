@@ -162,6 +162,11 @@ func buildDayColumns(headerRow *goquery.Selection, allowUndated bool) []DayColum
 		span := cellSpan(cell)
 		text := normalizeLabel(cell.Text())
 
+		if hasImpossibleDayString(text) {
+			col += span
+			return
+		}
+
 		dated := extractDayString(text) != ""
 		named := weekdayRe.MatchString(text)
 

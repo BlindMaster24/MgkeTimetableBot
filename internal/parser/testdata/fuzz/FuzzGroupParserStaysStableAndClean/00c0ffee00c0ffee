@@ -1,0 +1,2 @@
+go test fuzz v1
+string(`<h1>Группа - 63ТП</h1><table><tr><th rowspan="2">№</th><th colspan="2">Понедельник, &#48;0.00.0000</th></tr><tr><th>1</th><td>Математика</td></tr></table>`)

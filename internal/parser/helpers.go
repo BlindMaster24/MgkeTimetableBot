@@ -145,11 +145,16 @@ func mergeTeacherDays(existing, incoming *model.Teacher) *model.Teacher {
 }
 
 func extractDayString(text string) string {
-	match := dayPattern.FindString(text)
-	if match == "" {
-		return ""
+	for _, match := range dayPattern.FindAllString(text, -1) {
+		if _, err := time.Parse("02.01.2006", match); err == nil {
+			return strings.TrimSpace(match)
+		}
 	}
-	return strings.TrimSpace(match)
+	return ""
+}
+
+func hasImpossibleDayString(text string) bool {
+	return dayPattern.MatchString(text) && extractDayString(text) == ""
 }
 
 func hashDocument(doc *goquery.Document) string {

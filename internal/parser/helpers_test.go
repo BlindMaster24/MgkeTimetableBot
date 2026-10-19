@@ -16,12 +16,28 @@ func TestExtractDayString(t *testing.T) {
 		{"Вторник 15.06.2025", "15.06.2025"},
 		{"no date", ""},
 		{"", ""},
+		{"Понедельник, 00.00.0000", ""},
+		{"Понедельник, 32.13.2026", ""},
+		{"00.00.0000 31.08.2026", "31.08.2026"},
 	}
 	for _, c := range cases {
 		got := extractDayString(c.input)
 		if got != c.want {
 			t.Errorf("extractDayString(%q) = %q, want %q", c.input, got, c.want)
 		}
+	}
+}
+
+func TestDayColumnsIgnoreImpossibleDates(t *testing.T) {
+	html := `<table><tr><th colspan="2">Понедельник, 00.00.0000</th><th colspan="2">Вторник, 01.09.2026</th></tr></table>`
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	columns := buildDayColumns(doc.Find("tr").First(), true)
+	if len(columns) != 1 || columns[0].Day != "01.09.2026" {
+		t.Fatalf("columns = %+v, want only the real date", columns)
 	}
 }
 
