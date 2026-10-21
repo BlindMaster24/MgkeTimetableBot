@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,8 +23,10 @@ var typeInParensRe = regexp.MustCompile(`^\(([^)]+)\)$`)
 var dashOnlyRe = regexp.MustCompile(`^[-—\s]+$`)
 
 type GroupParser struct {
-	doc    *goquery.Document
-	report Report
+	doc         *goquery.Document
+	report      Report
+	skippedDays int
+	undatedDays int
 }
 
 func NewGroupParser(doc *goquery.Document) *GroupParser {
@@ -56,6 +59,8 @@ func (p *GroupParser) Parse() (model.Groups, Report) {
 func (p *GroupParser) ParseContext(ctx context.Context) (model.Groups, Report, error) {
 	groups := make(model.Groups)
 	builder := newReport(SourceGroups, "")
+	p.skippedDays = 0
+	p.undatedDays = 0
 
 	tables := scopedTables(p.doc, builder)
 	builder.probe("table", "timetable tables", tables.Length(), true)
@@ -105,6 +110,10 @@ func (p *GroupParser) ParseContext(ctx context.Context) (model.Groups, Report, e
 	builder.probe("td lesson cells", "groups with at least one lesson", withLessons, false)
 	builder.probe("th[colspan] with dd.MM.yyyy", "day columns carrying a parseable date", groupDatedDays(groups), true)
 	builder.probe("table with a day header", "timetable blocks across every published week", blocks, true)
+	builder.probeSkipped("th: day header without dd.MM.yyyy", "every day column carries a date", p.undatedDays,
+		fmt.Sprintf("%d day columns carried no date and were skipped", p.undatedDays))
+	builder.probeSkipped("th: day header with an impossible date", "every day column carries a valid date", p.skippedDays,
+		fmt.Sprintf("%d day columns carried an unreadable date and were skipped", p.skippedDays))
 
 	if skipped > 0 {
 		builder.warn("%d tables had no readable day columns", skipped)
@@ -164,7 +173,9 @@ func (p *GroupParser) parseTable(table *goquery.Selection, groupNum string) *mod
 		return nil
 	}
 
-	columns := buildDayColumns(headerRow, true)
+	columns, unreadable, undated := buildDayColumns(headerRow)
+	p.skippedDays += unreadable
+	p.undatedDays += undated
 	if len(columns) == 0 {
 		return nil
 	}

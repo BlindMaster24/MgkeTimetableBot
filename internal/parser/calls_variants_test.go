@@ -71,6 +71,29 @@ func TestCallsParserSingleCampusStaysUnnamed(t *testing.T) {
 	}
 }
 
+func TestCallsParserIgnoresWeekHeadingsAsCampusNames(t *testing.T) {
+	html := `<html><body><div class="entry"><div class="content">
+<h2>Расписание звонков</h2>
+<h5>с 01.09.2026 по 07.09.2026</h5>
+<table><tr><td>1 пара</td><td>8.00 &ndash; 8.45<br />8.55 &ndash; 9.40</td></tr></table>
+<h5>2 неделя</h5>
+<table><tr><td>1 пара</td><td>9.00 &ndash; 9.45<br />9.55 &ndash; 10.40</td></tr></table>
+</div></div></body></html>`
+
+	doc := docFromHTML(t, html)
+	variants, report := ParseCallsVariants(doc)
+
+	if len(variants) != 1 {
+		t.Fatalf("week headings must not split the schedule, got %d: %s", len(variants), report.Summary())
+	}
+	if variants[0].Name != "" {
+		t.Errorf("a week heading became a campus name: %q", variants[0].Name)
+	}
+	if len(report.Variants) != 0 {
+		t.Errorf("the report must not list week headings as variants: %+v", report.Variants)
+	}
+}
+
 func TestCallsParserSaturdayBelongsToItsCampus(t *testing.T) {
 	html := `<html><body><div class="entry"><div class="content">
 <h5>Учебный корпус по улице Казинца</h5>

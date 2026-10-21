@@ -227,6 +227,35 @@ func TestRun_FailsWhenDayColumnsHaveNoDate(t *testing.T) {
 	}
 }
 
+func TestRun_WarnsWhenADayColumnLostItsDate(t *testing.T) {
+	partial := strings.Replace(groupHTML(todayPlus(0)), `<th rowspan="2">№</th>`, `<th rowspan="2">№</th><th>Вторник</th>`, 1)
+	site := startSite(t, partial, teacherHTML(todayPlus(1)))
+
+	report := Run(Options{ConfigPath: siteConfig(t, site), HTTPClient: site.server.Client()})
+
+	groups := findCheck(t, report, "site:groups")
+	if groups.Level != LevelWarn {
+		t.Fatalf("a dateless column must warn, got %s %v", groups.Level, groups.Hints)
+	}
+	if !containsHint(groups.Hints, "th: day header without dd.MM.yyyy") {
+		t.Errorf("the warning must name the dateless column: %v", groups.Hints)
+	}
+}
+
+func TestRun_WarnsWhenTheBellScheduleCarriesNoDate(t *testing.T) {
+	site := startSite(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)))
+
+	report := Run(Options{ConfigPath: siteConfig(t, site), HTTPClient: site.server.Client()})
+
+	calls := findCheck(t, report, "site:calls")
+	if calls.Level != LevelWarn {
+		t.Fatalf("a bell schedule without a date must warn, got %s %v", calls.Level, calls.Hints)
+	}
+	if !containsHint(calls.Hints, "[date-updated] with dd.MM.yyyy") {
+		t.Errorf("the warning must name the date marker: %v", calls.Hints)
+	}
+}
+
 func TestRun_FailsWhenTheSiteIsUnreachable(t *testing.T) {
 	site := startSite(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)))
 	path := siteConfig(t, site)

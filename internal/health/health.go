@@ -109,6 +109,7 @@ type LayoutIssue struct {
 	Selector string `json:"selector"`
 	Expected string `json:"expected,omitempty"`
 	Found    int    `json:"found"`
+	Missing  int    `json:"missing,omitempty"`
 }
 
 type GuardIssue struct {
@@ -701,10 +702,16 @@ func layoutDetail(issues []LayoutIssue) string {
 	}
 
 	parts := make([]string, 0, len(issues))
+	prefix := "skipped "
 	for _, issue := range issues {
+		if issue.Missing > 0 {
+			parts = append(parts, fmt.Sprintf("%s: %s (skipped %d)", issue.Source, issue.Selector, issue.Missing))
+			continue
+		}
+		prefix = "missing "
 		parts = append(parts, fmt.Sprintf("%s: %s", issue.Source, issue.Selector))
 	}
-	return "missing " + strings.Join(parts, ", ")
+	return prefix + strings.Join(parts, ", ")
 }
 
 func (t *Tracker) apiEndpointStatsLocked() []APIEndpointStat {

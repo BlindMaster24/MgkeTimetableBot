@@ -18,10 +18,15 @@ type Probe struct {
 	Selector string `json:"selector"`
 	Expected string `json:"expected,omitempty"`
 	Found    int    `json:"found"`
+	Missing  int    `json:"missing,omitempty"`
 	Required bool   `json:"required"`
+	Inverted bool   `json:"inverted,omitempty"`
 }
 
 func (p Probe) OK() bool {
+	if p.Inverted {
+		return p.Missing == 0
+	}
 	return !p.Required || p.Found > 0
 }
 
@@ -82,11 +87,20 @@ func (r Report) Summary() string {
 	parts := []string{fmt.Sprintf("%s: items=%d", r.Source, r.Items)}
 
 	if failing := r.Failing(); len(failing) > 0 {
-		names := make([]string, 0, len(failing))
+		var missing, skipped []string
 		for _, probe := range failing {
-			names = append(names, probe.Selector)
+			if probe.Inverted {
+				skipped = append(skipped, fmt.Sprintf("%s (%d skipped)", probe.Selector, probe.Missing))
+				continue
+			}
+			missing = append(missing, probe.Selector)
 		}
-		parts = append(parts, "no data for: "+strings.Join(names, ", "))
+		if len(missing) > 0 {
+			parts = append(parts, "no data for: "+strings.Join(missing, ", "))
+		}
+		if len(skipped) > 0 {
+			parts = append(parts, "skipped: "+strings.Join(skipped, ", "))
+		}
 	}
 	if len(r.Variants) > 0 {
 		parts = append(parts, "variants: "+strings.Join(r.Variants, ", "))
@@ -141,6 +155,20 @@ func (b *reportBuilder) probe(selector, expected string, found int, required boo
 		Found:    found,
 		Required: required,
 	})
+}
+
+func (b *reportBuilder) probeSkipped(selector, expected string, missing int, warning string) {
+	b.report.Probes = append(b.report.Probes, Probe{
+		Source:   b.report.Source,
+		Selector: selector,
+		Expected: expected,
+		Missing:  missing,
+		Required: true,
+		Inverted: true,
+	})
+	if missing > 0 && warning != "" {
+		b.report.Warn("%s", warning)
+	}
 }
 
 func (b *reportBuilder) fallback(name string) {

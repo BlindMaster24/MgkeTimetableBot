@@ -17,6 +17,15 @@ func (d Day) Time() (time.Time, error) {
 	return ParseDate(d.Date)
 }
 
+func (d Day) Dated() (Day, bool) {
+	label := normalizeDateLabel(d.Date)
+	if _, err := ParseDate(label); err != nil {
+		return Day{}, false
+	}
+	d.Date = label
+	return d, true
+}
+
 func (d Day) Validate() error {
 	if _, err := ParseDate(d.Date); err != nil {
 		return err

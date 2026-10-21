@@ -225,7 +225,7 @@ func (c *RaspCache) SetGroups(ctx context.Context, groups map[string]any, hash s
 	defer c.mu.Unlock()
 
 	now := time.Now().UnixMilli()
-	merged, maxWeek, changed := c.setTimetable(KindGroups, c.groupsAny, groups, c.Groups.LastWeekIndex)
+	merged, maxWeek, changed := c.setTimetable(KindGroups, c.groupsAny, onlyDatedEntries(groups), c.Groups.LastWeekIndex)
 	c.groupsAny = merged
 	c.Groups.Timetable = GroupTimetableFromAny(merged)
 	c.Groups.Update = now
@@ -244,7 +244,7 @@ func (c *RaspCache) SetTeachers(ctx context.Context, teachers map[string]any, ha
 	defer c.mu.Unlock()
 
 	now := time.Now().UnixMilli()
-	merged, maxWeek, changed := c.setTimetable(KindTeachers, c.teachersAny, teachers, c.Teachers.LastWeekIndex)
+	merged, maxWeek, changed := c.setTimetable(KindTeachers, c.teachersAny, onlyDatedEntries(teachers), c.Teachers.LastWeekIndex)
 	c.teachersAny = merged
 	c.Teachers.Timetable = TeacherTimetableFromAny(merged)
 	c.Teachers.Update = now

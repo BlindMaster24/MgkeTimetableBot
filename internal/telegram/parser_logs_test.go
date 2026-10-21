@@ -36,6 +36,32 @@ func TestParserDiagnosticsRenderFailingSelectors(t *testing.T) {
 	}
 }
 
+func TestParserDiagnosticsRenderSkippedItems(t *testing.T) {
+	b := setupTestBot(t)
+
+	report := parser.Report{Source: parser.SourceGroups, Items: 3}
+	report.Probes = append(report.Probes, parser.Probe{
+		Source:   parser.SourceGroups,
+		Selector: "th: day header without dd.MM.yyyy",
+		Expected: "every day column carries a date",
+		Missing:  1,
+		Required: true,
+		Inverted: true,
+	})
+
+	b.RecordParserReport(report)
+
+	lines := strings.Join(b.parserDiagnostics(), "\n")
+	for _, want := range []string{
+		"th: day header without dd.MM.yyyy",
+		"пропущено: 1",
+	} {
+		if !strings.Contains(lines, want) {
+			t.Errorf("diagnostics omit %q:\n%s", want, lines)
+		}
+	}
+}
+
 func TestParserDiagnosticsReportCleanState(t *testing.T) {
 	b := setupTestBot(t)
 

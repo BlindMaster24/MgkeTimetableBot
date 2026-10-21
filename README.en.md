@@ -214,11 +214,13 @@ The bell schedule page can hold several tables, one per campus. The parser keeps
 
 The parser does not depend on a rigid page structure: the group or teacher name comes from the nearest heading (any `h1`…`h6` or `caption`), and the day columns are derived from the table header, `colspan` included, instead of hard-coded cell numbers. If the layout collapses to a single column per day, the parser tries to read the room from the cell text.
 
+A degraded page is never silent. A column whose header carries no parseable date (a bare "Вторник", say) is skipped and counted in the diagnostics: the number of such columns shows up in `/parserlogs` and `/parserhealth`, raises `mgke_parser_layout_failures` on `/metrics`, comes back in `GET /api/health` and reaches the admins as the `parser_layout` alert with its `🔄 Переразобрать сейчас` button; the day itself never enters the cache. The bell schedule gets the same treatment: a table without a readable date or a row without a readable pair label reaches the same report and alert, and only the slots that parsed are stored. Report warnings stay in `/parserlogs` for diagnosis — only a failed page probe becomes an alert. An older cache file that still holds a dateless day is cleaned on load, so every cached day carries a `дд.мм.гггг` date.
+
 The site publishes several weeks at once, one block each. The parser reads **every** block on the page instead of the first one only and folds the days of a group (or teacher) into a single entry keyed by date: a repeated date is overwritten by the later block, and the days are kept in ascending order. Right after a new week is published the bot therefore knows both the current and the next one and notifies about the new week. Weekday names are spelled out in full ("Понедельник, 21.09.2026") the way the site writes them.
 
 Every run collects diagnostics — which selector matched what. When the site changes and a required selector stops matching, an empty or sharply shrunken result **never overwrites the cache**: the bot keeps serving the timetable, and the admins hear about it right away — as a Telegram alert, plus in `/parserLogs` and `GET /api/health`:
 
-- `parser_layout` — a required selector stopped matching (`health.parser_layout_failures` runs in a row, 2 by default);
+- `parser_layout` — the page degraded: a required selector stopped matching, a day column lost its date (or carries an impossible one), or the bell schedule page has no readable date or pair label. The alert arrives after `health.parser_layout_failures` consecutive runs (2 by default) and names the selector together with the number of skipped items;
 - `parser_guard` — the data-loss guard engaged: the page came back empty, the group or teacher count dropped past the limit, or the parser had to take a fallback path (1 run by default, `health.parser_guard_failures: 1`).
 
 Every parser alert arrives in Telegram with a `🔄 Переразобрать сейчас` button that runs a parse out of schedule, without waiting for the next cycle. The full snapshot is available to admins at any moment through `/parserhealth`.
@@ -357,7 +359,7 @@ health:
   cooldown_minutes: 30         # pause between reminders
   parser_stale_minutes: 15     # the timetable has not been refreshed for so long
   parser_failures: 3           # consecutive failed parses
-  parser_layout_failures: 2    # consecutive parses where a selector stopped matching
+  parser_layout_failures: 2    # consecutive degraded parses: a selector, a dateless column, calls without a date or a pair label
   parser_guard_failures: 1     # data-loss guard trips (1 sends the alert immediately)
   calendar_stale_minutes: 360
   calendar_failures: 3
@@ -637,6 +639,20 @@ go test -fuzz FuzzKeyIsStableAndUniverseKeepsOneLabel -fuzztime 30s ./internal/r
 
 The `fuzz` CI job spends 20 seconds on every target, and a crashing input Go finds is written to `testdata/fuzz/<target>/` and stays there as a permanent seed corpus, so a plain `go test` keeps covering it — that is how reading `24.09.2026` as a bell time, a pair ending before it starts, and a half-stripped `каб` prefix in a room key are now locked down.
 
+### Offline development without Telegram
+
+The `devbot` profile starts the stub Bot API on loopback and runs the real bot against it, so no request can leave for `api.telegram.org`. It serves the same handler as the `scripts/tgstub` binary, in process, so no separate server has to be started. The token and `telegram.api_base_url` are overridden before the config is read, so a real token in `configs/config.yaml` is never used at all; the stub only accepts a loopback address and refuses to start otherwise.
+
+```bash
+go run ./scripts/devbot                          # bot plus stub, state under ./.dev/
+go run ./scripts/devbot -command start           # deliver /start right after startup
+go run ./scripts/devbot -send "63ТП"             # arbitrary text for an input scene
+curl -X POST 127.0.0.1:18090/_stub/updates -d '{"text":"/week"}'   # deliver an update while it runs
+curl -s 127.0.0.1:18090/_stub/calls                                  # what the bot sent
+```
+
+`configs/config.dev.yaml` keeps the parser, the notification scheduler, health alerts and the webhook off and stores state under `./.dev/` (gitignored). Without the profile the config refuses to start: `telegram.token` is empty and validation rejects it, so it cannot be pointed at real Telegram by accident. In Git Bash `/start` is rewritten into a path (`C:/Program Files/Git/start`), so use `-command start` there (or `MSYS_NO_PATHCONV=1`).
+
 ### Pre-flight check
 
 `scripts/preflight` is a single command that verifies everything that must hold before a deploy and prints a report with exit codes: `0` — fine, `1` — something failed. It parses the **live site** with the very parsers the bot uses and checks the rest of the environment.
@@ -663,7 +679,7 @@ What it checks:
 | `timetable` | configured bell schedule slots: the start precedes the end and lessons do not overlap |
 | `metrics` | the `metrics.path` route: with metrics enabled the check starts the API on a loopback port and scrapes it — without the token it must answer `401` with `WWW-Authenticate` (an empty `metrics.token` is a warning), with the token `200` and a Prometheus-format parse: the required families, their `HELP`/`TYPE`, no repeated series and every `mgke_*` the rules and the dashboard under `deploy/monitoring` rely on (except the families whose source is genuinely absent in this configuration: the archive metrics are not required while the `db_path` database does not exist yet, and `mgke_scheduler_entries` and `mgke_reminders_tracked` are not required while `telegram.noticer` is off — once the source is configured, its metric must be in the scrape or the check fails). The check is local, so it runs under `-skip-site` too |
 | `site:groups`, `site:teachers` | the page downloaded, the parser found groups and teachers, every day column carries a real `dd.MM.yyyy` date, lessons exist and the days run in order |
-| `site:calls` | the bell schedule parsed, campus variants are listed and the slots are ordered (both single blocks like `08:00–09:20` and paired ones like `09:00–09:45 / 09:55–10:40` are valid) |
+| `site:calls` | the bell schedule parsed, campus variants are listed and the slots are ordered (both single blocks like `08:00–09:20` and paired ones like `09:00–09:45 / 09:55–10:40` are valid); a missing page date or pair label warns, which fails `-strict` |
 | `image` | a PNG really renders: the first group or teacher with data is drawn and the signature, the dimensions and the available font are verified |
 
 The offline checks (`-skip-site`) render the image from the local cache, so the command is useful on a machine without internet and inside the container too.
@@ -701,6 +717,7 @@ CI runs the same checks — see “CI and releases” below.
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
 | `monitoring` | `go run ./scripts/monitoringcheck -strict` plus `promtool test rules`, with promtool 3.15.0 downloaded against a pinned SHA-256: the rules, the dashboard, the Alertmanager config, the Kubernetes copies and the metric names are checked the same way as locally |
 | `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata, the container timezone (`date +%z` → `+0300`) and a graceful `SIGTERM` shutdown (`docker stop` waits for `shutdown complete`) |
+| `devbot` | the offline profile without Docker: builds `scripts/devbot`, runs it with `-command ping` against the loopback stub, waits for `pong` in `/_stub/calls`, checks the log never mentions `api.telegram.org` and requires a graceful `SIGTERM` shutdown |
 | `workflow-lint` | `actionlint` over the workflow files themselves |
 
 `.github/workflows/security.yml` is a separate security lane: `govulncheck` scans the module and its dependencies on every push to `main`, on a schedule (Monday, 06:00 UTC) and on demand. It does not block pull requests and is not part of CI: its job is to report a known vulnerability, not to stop development.
@@ -768,12 +785,14 @@ internal/
     google_calendar.go, google_store.go — the Google Calendar menu and its database state
   utils/                 — academic weeks, subjects
 configs/config.example.yaml — configuration template
+configs/config.dev.yaml     — offline development profile: stub Bot API, state under ./.dev/
 docker-compose.yml          — long polling (the default)
 docker-compose.webhook.yml  — webhook behind Caddy: TLS and the Let's Encrypt certificate automatic
 docker-compose.webhook-nginx.yml — webhook behind nginx, the certificate comes from certbot
 deploy/caddy/Caddyfile      — Caddy configuration
 deploy/nginx/default.conf.template — nginx configuration template (envsubst)
 docs/google-calendar.md     — Google Calendar guide
+scripts/devbot/             — offline profile: the stub Bot API on loopback plus the bot against it
 scripts/monitoringcheck/    — check of the deploy/monitoring set (rules, dashboard, metric names, promtool)
 scripts/paritycheck/        — TypeScript parity checker
 scripts/preflight/          — the pre-deploy check

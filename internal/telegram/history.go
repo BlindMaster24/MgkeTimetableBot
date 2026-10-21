@@ -133,22 +133,35 @@ func (b *Bot) parseWeekIndex(text string) *utils.WeekIndex {
 	}
 
 	dateMatch := regexp3.FindStringSubmatch(value)
-	if dateMatch != nil {
-		day, _ := strconv.Atoi(dateMatch[1])
-		month, _ := strconv.Atoi(dateMatch[2])
-		year := b.nowTime().Year()
-		if dateMatch[3] != "" {
-			year, _ = strconv.Atoi(dateMatch[3])
-			if year < 100 {
-				year += 2000
-			}
+	if dateMatch == nil {
+		return nil
+	}
+
+	day, err := strconv.Atoi(dateMatch[1])
+	if err != nil {
+		return nil
+	}
+	month, err := strconv.Atoi(dateMatch[2])
+	if err != nil {
+		return nil
+	}
+	year := b.nowTime().Year()
+	if dateMatch[3] != "" {
+		year, err = strconv.Atoi(dateMatch[3])
+		if err != nil {
+			return nil
 		}
-		if day > 0 && month > 0 && year > 0 {
-			date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
-			wi := utils.WeekIndexFromDate(date)
-			return &wi
+		if year < 100 {
+			year += 2000
 		}
 	}
 
-	return nil
+	parsed, err := time.Parse("02.01.2006", fmt.Sprintf("%02d.%02d.%04d", day, month, year))
+	if err != nil {
+		return nil
+	}
+
+	date := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.Local)
+	wi := utils.WeekIndexFromDate(date)
+	return &wi
 }

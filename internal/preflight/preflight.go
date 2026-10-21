@@ -695,6 +695,9 @@ func checkGroups(client *http.Client, url string) (model.Groups, Check) {
 	if len(report.Fallbacks) > 0 && level == LevelOK {
 		level = LevelWarn
 	}
+	if len(report.Failing()) > 0 && level == LevelOK {
+		level = LevelWarn
+	}
 
 	return groups, Check{
 		Name:   "site:groups",
@@ -745,6 +748,9 @@ func checkTeachers(client *http.Client, url string) Check {
 		level = LevelFail
 		hints = append(hints, "error: no teacher had a single lesson")
 	}
+	if len(report.Failing()) > 0 && level == LevelOK {
+		level = LevelWarn
+	}
 
 	return Check{
 		Name:   "site:teachers",
@@ -782,6 +788,9 @@ func checkCalls(client *http.Client, url string) Check {
 		for _, problem := range problems {
 			hints = append(hints, "error: "+problem)
 		}
+	}
+	if level == LevelOK && len(report.Failing()) > 0 {
+		level = LevelWarn
 	}
 	if len(saturday) == 0 {
 		if level == LevelOK {
@@ -1037,6 +1046,10 @@ func dateRangeHint(entries []dayEntry) string {
 func probeHints(report parser.Report) []string {
 	var hints []string
 	for _, probe := range report.Failing() {
+		if probe.Inverted {
+			hints = append(hints, fmt.Sprintf("error: %q found %d unexpected item(s) (expected %s)", probe.Selector, probe.Missing, probe.Expected))
+			continue
+		}
 		hints = append(hints, fmt.Sprintf("error: no data for %q (expected %s)", probe.Selector, probe.Expected))
 	}
 	for _, fallback := range report.Fallbacks {

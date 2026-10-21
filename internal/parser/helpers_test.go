@@ -35,9 +35,34 @@ func TestDayColumnsIgnoreImpossibleDates(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 
-	columns := buildDayColumns(doc.Find("tr").First(), true)
+	columns, unreadable, undated := buildDayColumns(doc.Find("tr").First())
 	if len(columns) != 1 || columns[0].Day != "01.09.2026" {
 		t.Fatalf("columns = %+v, want only the real date", columns)
+	}
+	if unreadable != 1 {
+		t.Errorf("unreadable = %d, want the impossible date reported", unreadable)
+	}
+	if undated != 0 {
+		t.Errorf("undated = %d, want none", undated)
+	}
+}
+
+func TestDayColumnsRequireACalendarDate(t *testing.T) {
+	html := `<table><tr><th colspan="2">Понедельник</th><th colspan="2">Вторник, 01.09.2026</th></tr></table>`
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	columns, unreadable, undated := buildDayColumns(doc.Find("tr").First())
+	if len(columns) != 1 || columns[0].Day != "01.09.2026" {
+		t.Fatalf("columns = %+v, want only the dated day", columns)
+	}
+	if unreadable != 0 {
+		t.Errorf("unreadable = %d, want none", unreadable)
+	}
+	if undated != 1 {
+		t.Errorf("undated = %d, want the bare weekday reported", undated)
 	}
 }
 

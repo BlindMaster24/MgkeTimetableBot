@@ -130,6 +130,7 @@ health:
   cooldown_minutes: 30
   parser_stale_minutes: 15
   parser_failures: 3
+  # consecutive degraded parses: a selector, a dateless day column, calls without a date or a pair label
   parser_layout_failures: 2
   parser_guard_failures: 1
   calendar_stale_minutes: 360

@@ -83,6 +83,23 @@ func TestParserHealthTextRendersTheSnapshot(t *testing.T) {
 	}
 }
 
+func TestParserHealthTextRendersSkippedColumns(t *testing.T) {
+	b := setupTestBot(t)
+	b.SetHealthSource(&fakeHealthSource{snapshot: health.Snapshot{
+		Parser: health.ParserStats{
+			Runs:           3,
+			LastSuccessAt:  "2026-09-13T12:00:00Z",
+			Layout:         []health.LayoutIssue{{Source: "groups", Selector: "th: day header without dd.MM.yyyy", Missing: 1}},
+			LayoutFailures: 1,
+		},
+	}})
+
+	text := b.parserHealthText()
+	if !strings.Contains(text, "groups: th: day header without dd.MM.yyyy (пропущено: 1)") {
+		t.Errorf("parser health text must show the skipped column:\n%s", text)
+	}
+}
+
 func TestParserHealthTextReportsAHealthyParser(t *testing.T) {
 	b := setupTestBot(t)
 	b.SetHealthSource(&fakeHealthSource{snapshot: health.Snapshot{

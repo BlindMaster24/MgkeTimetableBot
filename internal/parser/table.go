@@ -154,8 +154,10 @@ func cellSpan(cell *goquery.Selection) int {
 	return span
 }
 
-func buildDayColumns(headerRow *goquery.Selection, allowUndated bool) []DayColumn {
+func buildDayColumns(headerRow *goquery.Selection) ([]DayColumn, int, int) {
 	var days []DayColumn
+	unreadable := 0
+	undated := 0
 	col := 0
 
 	headerRow.Find("th, td").Each(func(_ int, cell *goquery.Selection) {
@@ -163,32 +165,33 @@ func buildDayColumns(headerRow *goquery.Selection, allowUndated bool) []DayColum
 		text := normalizeLabel(cell.Text())
 
 		if hasImpossibleDayString(text) {
+			unreadable++
 			col += span
 			return
 		}
 
-		dated := extractDayString(text) != ""
-		named := weekdayRe.MatchString(text)
-
-		if dated || (named && span > 1) || (allowUndated && named) {
-			dayValue := extractDayString(text)
-			if dayValue == "" {
-				dayValue = text
+		dayValue := extractDayString(text)
+		if dayValue == "" {
+			if weekdayRe.MatchString(text) {
+				undated++
 			}
-			day := DayColumn{Day: dayValue, LessonCol: col}
-			if span > 1 {
-				day.HasCabinet = true
-				day.CabinetCol = col + 1
-			} else {
-				day.CabinetCol = col
-			}
-			days = append(days, day)
+			col += span
+			return
 		}
+
+		day := DayColumn{Day: dayValue, LessonCol: col}
+		if span > 1 {
+			day.HasCabinet = true
+			day.CabinetCol = col + 1
+		} else {
+			day.CabinetCol = col
+		}
+		days = append(days, day)
 
 		col += span
 	})
 
-	return days
+	return days, unreadable, undated
 }
 
 func findHeaderRow(rows *goquery.Selection) *goquery.Selection {

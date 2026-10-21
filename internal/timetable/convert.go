@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
@@ -18,8 +19,10 @@ var groupEntryKeys = []string{"group", "days", "lastNoticedDay"}
 var teacherEntryKeys = []string{"teacher", "days", "lastNoticedDay"}
 
 func normalizeDateLabel(value string) string {
-	if match := dateLabelRe.FindString(value); match != "" {
-		return match
+	for _, match := range dateLabelRe.FindAllString(value, -1) {
+		if _, err := time.Parse(DateFormat, match); err == nil {
+			return match
+		}
 	}
 	return strings.TrimSpace(value)
 }

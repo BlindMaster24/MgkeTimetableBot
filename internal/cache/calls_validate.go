@@ -26,11 +26,12 @@ func checkCallSlot(section string, index int, slot [2][2]string) error {
 		if err != nil {
 			return fmt.Errorf("calls %s[%d] holds invalid time %q, want HH:MM", section, index, slot[half][0])
 		}
-		end, err := time.Parse("15:04", strings.TrimSpace(slot[half][1]))
+		endLabel := strings.TrimSpace(slot[half][1])
+		end, err := time.Parse("15:04", endLabel)
 		if err != nil {
 			return fmt.Errorf("calls %s[%d] holds invalid time %q, want HH:MM", section, index, slot[half][1])
 		}
-		if !start.Before(end) {
+		if !start.Before(end) && endLabel != "00:00" {
 			return fmt.Errorf("calls %s[%d] starts at %q but ends at %q", section, index, slot[half][0], slot[half][1])
 		}
 	}

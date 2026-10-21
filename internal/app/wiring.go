@@ -168,6 +168,7 @@ func parserLayoutIssues(report parserpkg.Report) []health.LayoutIssue {
 			Selector: probe.Selector,
 			Expected: probe.Expected,
 			Found:    probe.Found,
+			Missing:  probe.Missing,
 		})
 	}
 	return issues

@@ -417,3 +417,187 @@ func builderCache(t *testing.T) *cache.RaspCache {
 	}
 	return c
 }
+
+type mutablePage struct {
+	mu   sync.Mutex
+	html string
+}
+
+func (p *mutablePage) set(html string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.html = html
+}
+
+func (p *mutablePage) serve(w http.ResponseWriter) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(p.html))
+}
+
+const undatedGroupsPage = `<html><body><div class="entry"><div class="content">
+<h2>Группа - 63ТП</h2>
+<table>
+<tr><th>№</th><th>Понедельник, 07.09.2026</th><th>Вторник</th></tr>
+<tr><th>1</th><td>Математика<br>(Лек)<br>Иванов И.И.<br>3-205</td><td>Физика<br>(Лек)<br>Петров П.П.<br>2-101</td></tr>
+</table>
+</div></div></body></html>`
+
+const datedGroupsPage = `<html><body><div class="entry"><div class="content">
+<h2>Группа - 63ТП</h2>
+<table>
+<tr><th>№</th><th>Понедельник, 07.09.2026</th><th>Вторник, 08.09.2026</th></tr>
+<tr><th>1</th><td>Математика<br>(Лек)<br>Иванов И.И.<br>3-205</td><td>Физика<br>(Лек)<br>Петров П.П.<br>2-101</td></tr>
+</table>
+</div></div></body></html>`
+
+const undatedCallsPage = `<html><body><div class="entry"><div class="content">
+<h2>Расписание звонков</h2>
+<table>
+<tr><td>1 пара</td><td>8.00 &ndash; 8.45<br />8.55 &ndash; 9.40</td></tr>
+<tr><td>2 пара</td><td>9.50 &ndash; 10.35<br />10.45 &ndash; 11.30</td></tr>
+</table>
+</div></div></body></html>`
+
+const datedCallsPage = `<html><body><div class="entry"><div class="content" date-updated="07.09.2026 08:00">
+<h2>Расписание звонков</h2>
+<table>
+<tr><td>1 пара</td><td>8.00 &ndash; 8.45<br />8.55 &ndash; 9.40</td></tr>
+<tr><td>2 пара</td><td>9.50 &ndash; 10.35<br />10.45 &ndash; 11.30</td></tr>
+</table>
+</div></div></body></html>`
+
+func parserAlertHarness(t *testing.T, cfg *config.Config) (*parserpkg.Fetcher, *cache.RaspCache, *notification.HealthNotifier, *recordingSender, *health.IncidentLog) {
+	t.Helper()
+
+	raspper := builderCache(t)
+	tracker := health.NewTracker(healthThresholds(cfg))
+	fetcher := parserpkg.NewFetcher(logger.New("error", nil), raspper, parserpkg.Options{
+		Guard: parserGuard(cfg),
+		OnReport: func(report parserpkg.Report) {
+			tracker.ParserReport(report.Source, parserLayoutIssues(report), guardIssues(report))
+		},
+	})
+
+	sender := &recordingSender{}
+	incidents := health.NewIncidentLog(nil, 0)
+	notifier := notification.NewHealthNotifier(tracker, logger.New("error", nil), sender, adminFinder{}, time.Minute, nil)
+	notifier.SetIncidents(incidents)
+
+	return fetcher, raspper, notifier, sender, incidents
+}
+
+func TestUndatedDayColumnReachesTheAdminsEndToEnd(t *testing.T) {
+	page := &mutablePage{html: undatedGroupsPage}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "teacher") {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write([]byte(entriesPage("Преподаватель", 1)))
+			return
+		}
+		page.serve(w)
+	}))
+	defer srv.Close()
+
+	cfg := &config.Config{Health: &config.HealthConfig{ParserLayoutFailures: 1}}
+	fetcher, raspper, notifier, sender, incidents := parserAlertHarness(t, cfg)
+
+	if err := fetcher.Timetable(t.Context(), srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
+		t.Fatalf("timetable: %v", err)
+	}
+
+	entry, ok := raspper.GetGroups()["63ТП"].(map[string]any)
+	if !ok {
+		t.Fatalf("the cache must keep the group: %+v", raspper.GetGroups())
+	}
+	if days, _ := entry["days"].([]any); len(days) != 1 {
+		t.Fatalf("the undated column must be dropped from the cache: %+v", entry["days"])
+	}
+
+	notifier.Check()
+
+	delivered := sender.delivered()
+	if len(delivered) != 1 {
+		t.Fatalf("expected one admin alert for the skipped column, got %+v", delivered)
+	}
+	for _, want := range []string{
+		notification.HealthAlertTitle(health.AlertParserLayout),
+		"th: day header without dd.MM.yyyy",
+		"skipped 1",
+	} {
+		if !strings.Contains(delivered[0].text, want) {
+			t.Errorf("alert %q misses %q", delivered[0].text, want)
+		}
+	}
+	if len(delivered[0].buttons) != 1 || delivered[0].buttons[0].Data != notification.ParserReparseCallback {
+		t.Fatalf("the alert must offer the reparse button, got %+v", delivered[0].buttons)
+	}
+
+	open := incidents.Open()
+	if len(open) != 1 || open[0].Key != health.AlertParserLayout {
+		t.Fatalf("the skipped column must enter the incident history, got %+v", open)
+	}
+	if !strings.Contains(open[0].Detail, "skipped 1") {
+		t.Errorf("the incident must keep the skipped count: %q", open[0].Detail)
+	}
+
+	page.set(datedGroupsPage)
+	if err := fetcher.Timetable(t.Context(), srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
+		t.Fatalf("timetable: %v", err)
+	}
+	notifier.Check()
+
+	messages := sender.messages()
+	if len(messages) != 2 || !strings.Contains(messages[1], "восстановлено") {
+		t.Fatalf("a dated page must recover the alert, got %+v", messages)
+	}
+}
+
+func TestUnparseableCallsHeaderReachesTheAdminsEndToEnd(t *testing.T) {
+	page := &mutablePage{html: undatedCallsPage}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page.serve(w)
+	}))
+	defer srv.Close()
+
+	cfg := &config.Config{Health: &config.HealthConfig{ParserLayoutFailures: 1}}
+	fetcher, _, notifier, sender, incidents := parserAlertHarness(t, cfg)
+
+	if err := fetcher.Calls(t.Context(), srv.URL); err != nil {
+		t.Fatalf("calls: %v", err)
+	}
+
+	notifier.Check()
+
+	delivered := sender.delivered()
+	if len(delivered) != 1 {
+		t.Fatalf("expected one admin alert for the undated bell schedule, got %+v", delivered)
+	}
+	for _, want := range []string{
+		notification.HealthAlertTitle(health.AlertParserLayout),
+		"[date-updated] with dd.MM.yyyy",
+	} {
+		if !strings.Contains(delivered[0].text, want) {
+			t.Errorf("alert %q misses %q", delivered[0].text, want)
+		}
+	}
+
+	open := incidents.Open()
+	if len(open) != 1 || open[0].Key != health.AlertParserLayout {
+		t.Fatalf("the undated bell schedule must enter the incident history, got %+v", open)
+	}
+
+	page.set(datedCallsPage)
+	if err := fetcher.Calls(t.Context(), srv.URL); err != nil {
+		t.Fatalf("calls: %v", err)
+	}
+	notifier.Check()
+
+	messages := sender.messages()
+	if len(messages) != 2 || !strings.Contains(messages[1], "восстановлено") {
+		t.Fatalf("a dated bell schedule must recover the alert, got %+v", messages)
+	}
+}

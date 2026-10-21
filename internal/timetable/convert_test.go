@@ -70,6 +70,19 @@ func TestGroupRoundTripNormalizesLegacyLabels(t *testing.T) {
 	}
 }
 
+func TestGroupRoundTripKeepsAnImpossibleDateOutOfDayDate(t *testing.T) {
+	schedule, err := GroupScheduleFromJSON([]byte(`{"group":"100","days":[{"day":"Понедельник, 00.00.0000","lessons":[]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schedule.Days[0].Date != "Понедельник, 00.00.0000" {
+		t.Errorf("date = %q, want the raw label instead of a fake date", schedule.Days[0].Date)
+	}
+	if err := schedule.Validate(); err == nil {
+		t.Error("Validate() must reject the day without a real date")
+	}
+}
+
 func TestGroupNumberingFollowsSlotPositions(t *testing.T) {
 	schedule, err := GroupScheduleFromJSON([]byte(`{"group":"100","days":[{"day":"07.09.2026","lessons":[
 		{"lesson":"А"},

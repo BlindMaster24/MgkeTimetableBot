@@ -18,6 +18,18 @@ func TestCallsScheduleValidateAcceptsWorkingHours(t *testing.T) {
 	}
 }
 
+func TestCallsScheduleValidateAcceptsASlotEndingAtMidnight(t *testing.T) {
+	schedule := CallsSchedule{Weekdays: [][2][2]string{{{"23:50", "00:00"}, {"23:50", "00:00"}}}}
+	if err := schedule.Validate(); err != nil {
+		t.Fatalf("Validate() = %v, want the parser's midnight pair to be accepted", err)
+	}
+
+	empty := CallsSchedule{Weekdays: [][2][2]string{{{"09:00", "09:00"}, {"09:00", "09:00"}}}}
+	if err := empty.Validate(); err == nil {
+		t.Error("Validate() must still reject a slot that starts and ends at the same time")
+	}
+}
+
 func TestCallsScheduleValidateRejectsBrokenSlots(t *testing.T) {
 	cases := []struct {
 		name     string

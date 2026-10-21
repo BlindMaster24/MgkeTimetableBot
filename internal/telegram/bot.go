@@ -599,6 +599,13 @@ func (b *Bot) parserDiagnostics() []string {
 		if len(failing) > 0 {
 			selectors := make([]string, 0, len(failing))
 			for _, probe := range failing {
+				if probe.Inverted {
+					selectors = append(selectors, b.locData("parser_logs_skipped_suffix", map[string]interface{}{
+						"Selector": probe.Selector,
+						"Count":    probe.Missing,
+					}))
+					continue
+				}
 				selectors = append(selectors, fmt.Sprintf("%s (found %d)", probe.Selector, probe.Found))
 			}
 			summary += "\n   " + b.loc("parser_logs_no_data") + strings.Join(selectors, ", ")

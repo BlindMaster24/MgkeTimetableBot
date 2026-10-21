@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
@@ -54,7 +55,9 @@ func ParseCallsUpdatedAt(doc *goquery.Document) CallsUpdatedAt {
 }
 
 var saturdayRe = regexp.MustCompile(`(?i)(суббот|выход|сб\.)`)
+var weekHeadingRe = regexp.MustCompile(`(?i)(недел|\d{1,2}\.\d{1,2}\.\d{2,4})`)
 var callsLineRe = regexp.MustCompile(`(?m)^\s*\d{1,2}\s*(?:пара|звонок)?[.:]?\s*\d{1,2}[.:]\d{2}.*$`)
+var pairLabelRe = regexp.MustCompile(`^\s*\d{1,2}(?:\s*[-–—]\s*\d{1,2})?\s*(?:пара|звонок)?\s*$`)
 
 type callsGroup struct {
 	name     string
@@ -97,10 +100,18 @@ func ParseCallsVariantsCtx(ctx context.Context, doc *goquery.Document) ([]cache.
 	}
 	builder.probe("table", "bell schedule tables", tables.Length(), true)
 
+	dated := 0
+	if callsPageDate(doc, scope) {
+		dated = 1
+	}
+	builder.probe("[date-updated] with dd.MM.yyyy", "bell schedule page date", dated, true)
+
 	var groups []*callsGroup
 	byName := make(map[string]*callsGroup)
 	var current *callsGroup
 	tablesWithSlots := 0
+	unlabelled := 0
+	unreadable := 0
 
 	headings := headingIndex(doc)
 	eachTableCtx(ctx, tables, func(table *goquery.Selection) bool {
@@ -111,7 +122,9 @@ func ParseCallsVariantsCtx(ctx context.Context, doc *goquery.Document) ([]cache.
 			current = groupFor(byName, &groups, campusLabel(heading))
 		}
 
-		slots := extractCallSlots(table)
+		slots, rowsUnlabelled, rowsUnreadable := extractCallSlots(table)
+		unlabelled += rowsUnlabelled
+		unreadable += rowsUnreadable
 		if len(slots) == 0 {
 			return true
 		}
@@ -131,6 +144,10 @@ func ParseCallsVariantsCtx(ctx context.Context, doc *goquery.Document) ([]cache.
 	})
 
 	builder.probe("tr with two time ranges", "bell schedule rows", tablesWithSlots, true)
+	builder.probeSkipped("td: pair label", "every bell schedule row names its pair", unlabelled,
+		fmt.Sprintf("%d bell schedule rows carried no readable pair label", unlabelled))
+	builder.probeSkipped("tr: two time ranges", "every bell schedule row carries a valid slot", unreadable,
+		fmt.Sprintf("%d bell schedule rows carried times but no valid slot", unreadable))
 
 	variants := buildVariants(groups)
 	if len(variants) == 0 && ctx.Err() == nil {
@@ -212,7 +229,7 @@ func campusLabel(heading string) string {
 	}
 
 	lowered := strings.ToLower(heading)
-	if saturdayRe.MatchString(lowered) {
+	if saturdayRe.MatchString(lowered) || weekHeadingRe.MatchString(lowered) {
 		return ""
 	}
 
@@ -233,8 +250,10 @@ func campusLabel(heading string) string {
 	return heading
 }
 
-func extractCallSlots(table *goquery.Selection) [][2][2]string {
+func extractCallSlots(table *goquery.Selection) ([][2][2]string, int, int) {
 	var slots [][2][2]string
+	unlabelled := 0
+	unreadable := 0
 
 	table.Find("tr").Each(func(_ int, row *goquery.Selection) {
 		cells := row.Find("td, th")
@@ -251,20 +270,40 @@ func extractCallSlots(table *goquery.Selection) [][2][2]string {
 			lines = []string{text}
 		}
 
-		if slot := parseCallSlot(lines[len(lines)-1]); slot != nil {
-			slots = append(slots, *slot)
+		slot := parseCallSlot(lines[len(lines)-1])
+		if slot == nil && cells.Length() >= 2 {
+			slot = parseCallSlot(rowTimeText(cells))
+		}
+		if slot == nil {
+			if len(callsTimeRe.FindAllStringSubmatch(rowTimeText(cells), -1)) >= 2 {
+				unreadable++
+			}
 			return
 		}
 
-		if cells.Length() >= 2 {
-			joined := rowTimeText(cells)
-			if slot := parseCallSlot(joined); slot != nil {
-				slots = append(slots, *slot)
-			}
+		if cells.Length() >= 2 && !pairLabelRe.MatchString(normalizeCallsText(cells.First().Text())) {
+			unlabelled++
 		}
+		slots = append(slots, *slot)
 	})
 
-	return slots
+	return slots, unlabelled, unreadable
+}
+
+func callsPageDate(doc *goquery.Document, scope *goquery.Selection) bool {
+	if ParseCallsUpdatedAt(doc).At != 0 {
+		return true
+	}
+
+	dated := false
+	scope.Find("h1, h2, h3, h4, h5, h6, caption").EachWithBreak(func(_ int, heading *goquery.Selection) bool {
+		if extractDayString(heading.Text()) == "" {
+			return true
+		}
+		dated = true
+		return false
+	})
+	return dated
 }
 
 func rowTimeText(cells *goquery.Selection) string {

@@ -133,6 +133,14 @@ func (b *Bot) parserHealthText() string {
 	if len(parser.Layout) > 0 {
 		lines = append(lines, "", fmt.Sprintf("-- Вёрстка сайта (подряд %d) --", parser.LayoutFailures))
 		for _, issue := range parser.Layout {
+			if issue.Missing > 0 {
+				lines = append(lines, b.locData("parser_health_layout_skipped", map[string]interface{}{
+					"Source":   issue.Source,
+					"Selector": issue.Selector,
+					"Count":    issue.Missing,
+				}))
+				continue
+			}
 			lines = append(lines, fmt.Sprintf("%s: %s (найдено %d)", issue.Source, issue.Selector, issue.Found))
 		}
 	}

@@ -77,22 +77,13 @@ func assertNoMarkup(t *testing.T, what, value string) {
 	}
 }
 
-func assertDayLabel(t *testing.T, html, day string) {
+func assertDayLabel(t *testing.T, day string) {
 	t.Helper()
 
-	if day == "" {
-		return
-	}
 	if _, err := time.Parse("02.01.2006", day); err == nil {
 		return
 	}
-	if weekdayRe.MatchString(day) {
-		return
-	}
-	if strings.Contains(html, day) {
-		return
-	}
-	t.Fatalf("day label %q was invented by the parser", day)
+	t.Fatalf("day label %q is not a calendar date", day)
 }
 
 func checkGroupExplain(t *testing.T, lesson *model.GroupLessonExplain) {
@@ -132,10 +123,10 @@ func checkGroupLesson(t *testing.T, lesson model.GroupLesson) {
 	}
 }
 
-func checkTeacherDay(t *testing.T, html string, day model.TeacherDay) {
+func checkTeacherDay(t *testing.T, day model.TeacherDay) {
 	t.Helper()
 
-	assertDayLabel(t, html, day.Day)
+	assertDayLabel(t, day.Day)
 	for _, lesson := range day.Lessons {
 		if lesson == nil {
 			continue
@@ -184,7 +175,7 @@ func FuzzGroupParserStaysStableAndClean(f *testing.F) {
 				t.Fatalf("group %q lost its label", name)
 			}
 			for _, day := range group.Days {
-				assertDayLabel(t, html, day.Day)
+				assertDayLabel(t, day.Day)
 				for _, lesson := range day.Lessons {
 					checkGroupLesson(t, lesson)
 				}
@@ -219,7 +210,7 @@ func FuzzTeacherParserStaysStableAndClean(f *testing.F) {
 				t.Fatalf("teacher %q lost its label", name)
 			}
 			for _, day := range teacher.Days {
-				checkTeacherDay(t, html, day)
+				checkTeacherDay(t, day)
 			}
 		}
 

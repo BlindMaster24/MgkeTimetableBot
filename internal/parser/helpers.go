@@ -16,6 +16,7 @@ import (
 )
 
 var dayPattern = regexp.MustCompile(`(\d{2}\.\d{2}\.\d{4})`)
+var dateLikePattern = regexp.MustCompile(`\d{1,2}\.\d{1,2}\.\d{2,4}`)
 
 var contentScopes = []string{
 	"#main-p .content",
@@ -154,7 +155,7 @@ func extractDayString(text string) string {
 }
 
 func hasImpossibleDayString(text string) bool {
-	return dayPattern.MatchString(text) && extractDayString(text) == ""
+	return dateLikePattern.MatchString(text) && extractDayString(text) == ""
 }
 
 func hashDocument(doc *goquery.Document) string {

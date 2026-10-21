@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,8 +18,10 @@ var typeOnlyRe = regexp.MustCompile(`^\s*\([^()]*\)\s*$`)
 var subgroupRe = regexp.MustCompile(`^(\d+)\.\s*(.+)`)
 
 type TeacherParser struct {
-	doc    *goquery.Document
-	report Report
+	doc         *goquery.Document
+	report      Report
+	skippedDays int
+	undatedDays int
 }
 
 func NewTeacherParser(doc *goquery.Document) *TeacherParser {
@@ -51,6 +54,8 @@ func (p *TeacherParser) Parse() (model.Teachers, Report) {
 func (p *TeacherParser) ParseContext(ctx context.Context) (model.Teachers, Report, error) {
 	teachers := make(model.Teachers)
 	builder := newReport(SourceTeachers, "")
+	p.skippedDays = 0
+	p.undatedDays = 0
 
 	tables := scopedTables(p.doc, builder)
 	builder.probe("table", "timetable tables", tables.Length(), true)
@@ -96,6 +101,10 @@ func (p *TeacherParser) ParseContext(ctx context.Context) (model.Teachers, Repor
 	builder.probe("td lesson cells", "teachers with at least one lesson", withLessons, false)
 	builder.probe("th[colspan] with dd.MM.yyyy", "day columns carrying a parseable date", teacherDatedDays(teachers), true)
 	builder.probe("table with a day header", "timetable blocks across every published week", blocks, true)
+	builder.probeSkipped("th: day header without dd.MM.yyyy", "every day column carries a date", p.undatedDays,
+		fmt.Sprintf("%d day columns carried no date and were skipped", p.undatedDays))
+	builder.probeSkipped("th: day header with an impossible date", "every day column carries a valid date", p.skippedDays,
+		fmt.Sprintf("%d day columns carried an unreadable date and were skipped", p.skippedDays))
 
 	if skipped > 0 {
 		builder.warn("%d tables had no readable day columns", skipped)
@@ -147,7 +156,9 @@ func (p *TeacherParser) parseTable(table *goquery.Selection, teacherName string)
 		return nil
 	}
 
-	columns := buildDayColumns(headerRow, true)
+	columns, unreadable, undated := buildDayColumns(headerRow)
+	p.skippedDays += unreadable
+	p.undatedDays += undated
 	if len(columns) == 0 {
 		return nil
 	}

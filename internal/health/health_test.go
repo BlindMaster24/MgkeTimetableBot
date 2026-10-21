@@ -213,6 +213,37 @@ func TestParserLayoutAlertNeedsRepeatedRuns(t *testing.T) {
 	}
 }
 
+func TestParserLayoutCarriesTheSkippedCount(t *testing.T) {
+	thresholds := DefaultThresholds()
+	thresholds.ParserLayout = 1
+	tracker := NewTracker(thresholds)
+
+	tracker.ParserReport("groups", []LayoutIssue{{
+		Source:   "groups",
+		Selector: "th: day header without dd.MM.yyyy",
+		Expected: "every day column carries a date",
+		Missing:  1,
+	}}, nil)
+
+	alert := findAlert(tracker.Alerts(), AlertParserLayout)
+	if alert == nil {
+		t.Fatal("a skipped column must raise the layout alert")
+	}
+	for _, want := range []string{"skipped 1", "th: day header without dd.MM.yyyy"} {
+		if !strings.Contains(alert.Detail, want) {
+			t.Errorf("alert detail %q misses %q", alert.Detail, want)
+		}
+	}
+	if strings.HasPrefix(alert.Detail, "missing") {
+		t.Errorf("a skipped column is not a missing selector: %q", alert.Detail)
+	}
+
+	snapshot := tracker.Snapshot()
+	if len(snapshot.Parser.Layout) != 1 || snapshot.Parser.Layout[0].Missing != 1 {
+		t.Errorf("layout stats = %+v", snapshot.Parser.Layout)
+	}
+}
+
 func TestParserGuardAlertsOnTheFirstTrip(t *testing.T) {
 	tracker := NewTracker(DefaultThresholds())
 

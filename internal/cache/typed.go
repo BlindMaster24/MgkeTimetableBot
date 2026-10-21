@@ -2,6 +2,7 @@ package cache
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/timetable"
 )
@@ -9,6 +10,77 @@ import (
 type GroupTimetable map[string]timetable.GroupSchedule
 
 type TeacherTimetable map[string]timetable.TeacherSchedule
+
+func datedDays(days []timetable.Day) []timetable.Day {
+	if len(days) == 0 {
+		return days
+	}
+
+	kept := make([]timetable.Day, 0, len(days))
+	for _, day := range days {
+		dated, ok := day.Dated()
+		if !ok {
+			continue
+		}
+		kept = append(kept, dated)
+	}
+	return kept
+}
+
+func onlyDatedEntries(entries map[string]any) map[string]any {
+	sanitized := make(map[string]any, len(entries))
+
+	for name, value := range entries {
+		entry, ok := value.(map[string]any)
+		if !ok {
+			sanitized[name] = value
+			continue
+		}
+		rawDays, ok := entry["days"].([]any)
+		if !ok {
+			sanitized[name] = value
+			continue
+		}
+
+		days := make([]any, 0, len(rawDays))
+		modified := false
+		for _, raw := range rawDays {
+			day, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			label, _ := day["day"].(string)
+			dated, ok := timetable.Day{Date: label}.Dated()
+			if !ok {
+				continue
+			}
+			if dated.Date == strings.TrimSpace(label) {
+				days = append(days, raw)
+				continue
+			}
+			copiedDay := make(map[string]any, len(day))
+			for key, item := range day {
+				copiedDay[key] = item
+			}
+			copiedDay["day"] = dated.Date
+			days = append(days, copiedDay)
+			modified = true
+		}
+		if len(days) == len(rawDays) && !modified {
+			sanitized[name] = value
+			continue
+		}
+
+		copied := make(map[string]any, len(entry))
+		for key, item := range entry {
+			copied[key] = item
+		}
+		copied["days"] = days
+		sanitized[name] = copied
+	}
+
+	return sanitized
+}
 
 func plausibleGroups(schedules map[string]timetable.GroupSchedule) bool {
 	for _, schedule := range schedules {
@@ -30,15 +102,18 @@ func plausibleTeachers(schedules map[string]timetable.TeacherSchedule) bool {
 
 func (t *GroupTimetable) UnmarshalJSON(data []byte) error {
 	var typed map[string]timetable.GroupSchedule
-	if err := json.Unmarshal(data, &typed); err == nil && plausibleGroups(typed) {
+	if err := json.Unmarshal(data, &typed); err == nil {
 		for name, schedule := range typed {
+			schedule.Days = datedDays(schedule.Days)
 			if schedule.Group == "" {
 				schedule.Group = name
-				typed[name] = schedule
 			}
+			typed[name] = schedule
 		}
-		*t = typed
-		return nil
+		if plausibleGroups(typed) {
+			*t = typed
+			return nil
+		}
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -50,6 +125,7 @@ func (t *GroupTimetable) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
+		schedule.Days = datedDays(schedule.Days)
 		if schedule.Group == "" {
 			schedule.Group = name
 		}
@@ -61,15 +137,18 @@ func (t *GroupTimetable) UnmarshalJSON(data []byte) error {
 
 func (t *TeacherTimetable) UnmarshalJSON(data []byte) error {
 	var typed map[string]timetable.TeacherSchedule
-	if err := json.Unmarshal(data, &typed); err == nil && plausibleTeachers(typed) {
+	if err := json.Unmarshal(data, &typed); err == nil {
 		for name, schedule := range typed {
+			schedule.Days = datedDays(schedule.Days)
 			if schedule.Teacher == "" {
 				schedule.Teacher = name
-				typed[name] = schedule
 			}
+			typed[name] = schedule
 		}
-		*t = typed
-		return nil
+		if plausibleTeachers(typed) {
+			*t = typed
+			return nil
+		}
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -81,6 +160,7 @@ func (t *TeacherTimetable) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return err
 		}
+		schedule.Days = datedDays(schedule.Days)
 		if schedule.Teacher == "" {
 			schedule.Teacher = name
 		}
@@ -117,6 +197,7 @@ func GroupTimetableFromAny(data map[string]any) GroupTimetable {
 		if err != nil {
 			continue
 		}
+		schedule.Days = datedDays(schedule.Days)
 		if schedule.Group == "" {
 			schedule.Group = name
 		}
@@ -136,6 +217,7 @@ func TeacherTimetableFromAny(data map[string]any) TeacherTimetable {
 		if err != nil {
 			continue
 		}
+		schedule.Days = datedDays(schedule.Days)
 		if schedule.Teacher == "" {
 			schedule.Teacher = name
 		}
