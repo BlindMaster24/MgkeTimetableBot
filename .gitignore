@@ -1,6 +1,8 @@
 # Binaries
 /bot
 /bot.exe
+/devbot
+/devbot.pid
 *.exe
 *.exe~
 *.dll
@@ -22,6 +24,7 @@ old/
 
 # Local runtime volumes
 /data/
+/.dev/
 
 # Config with secrets
 configs/config.yaml

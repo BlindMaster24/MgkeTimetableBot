@@ -1,0 +1,70 @@
+db_path: "./.dev/archive.db"
+chat_db_path: "./.dev/bot_chats.db"
+cache_dir: "./.dev/cache"
+
+logging:
+  level: "debug"
+  format: "pretty"
+  file:
+    enabled: false
+
+http:
+  port: 8081
+
+telegram:
+  token: ""
+  api_base_url: ""
+  admin_ids: [4242]
+  noticer: false
+  webhook:
+    enabled: false
+
+api:
+  url: "/api"
+
+google:
+  oauth:
+    client_id: ""
+    client_secret: ""
+  service_account:
+    client_email: ""
+    private_key: ""
+
+calendar:
+  ics:
+    enabled: false
+
+accept:
+  room: false
+  private: true
+
+parser:
+  enabled: false
+  activity: [9, 17]
+
+timetable:
+  weekdays:
+    - [["09:00", "09:45"], ["09:55", "10:40"]]
+    - [["10:50", "11:35"], ["11:55", "12:40"]]
+    - [["13:00", "13:45"], ["13:55", "14:40"]]
+    - [["14:50", "15:35"], ["15:45", "16:30"]]
+    - [["16:40", "17:25"], ["17:35", "18:20"]]
+    - [["18:30", "19:15"], ["19:25", "20:10"]]
+  saturday:
+    - [["09:00", "09:45"], ["09:55", "10:40"]]
+    - [["10:50", "11:35"], ["11:55", "12:40"]]
+    - [["12:50", "13:35"], ["13:45", "14:30"]]
+    - [["14:40", "15:25"], ["15:35", "16:20"]]
+    - [["16:30", "17:15"], ["17:25", "18:10"]]
+    - [["18:20", "19:05"], ["19:15", "20:00"]]
+
+archive:
+  backup_dir: ""
+  backup_keep: 7
+  retention_days: 0
+
+metrics:
+  enabled: false
+
+health:
+  disabled: true

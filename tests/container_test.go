@@ -122,14 +122,7 @@ func TestContainerSmokeTestRunsTheWebhookTransport(t *testing.T) {
 func TestContainerSmokeTestPollsOnlyTheStubBotAPI(t *testing.T) {
 	workflow := strings.ReplaceAll(readFile(t, filepath.Join(".github", "workflows", "ci.yml")), "\r\n", "\n")
 
-	start := strings.Index(workflow, "\n  container:\n")
-	if start < 0 {
-		t.Fatal("ci.yml no longer has the container job")
-	}
-	container := workflow[start:]
-	if end := strings.Index(container, "\n  workflow-lint:"); end >= 0 {
-		container = container[:end]
-	}
+	container := workflowJob(t, workflow, "container")
 
 	if strings.Contains(container, "api.telegram.org") {
 		t.Error("the container job must not depend on the real Bot API")

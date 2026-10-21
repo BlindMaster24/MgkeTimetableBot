@@ -256,6 +256,96 @@ func TestStubForgetsTheWebhookWhenItIsDeleted(t *testing.T) {
 	}
 }
 
+func TestStubEndpointQueuesAnUpdateForTheBot(t *testing.T) {
+	stub, server := startStub(t)
+
+	client, err := telego.NewBot(stubToken, telego.WithAPIServer(server.URL), telego.WithDiscardLogger())
+	if err != nil {
+		t.Fatalf("create bot: %v", err)
+	}
+
+	response, err := http.Post(server.URL+updatesPath, "application/json", strings.NewReader(`{"text":"/week","chat_id":77}`))
+	if err != nil {
+		t.Fatalf("queue an update: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("queue an update answered %d", response.StatusCode)
+	}
+	if stub.queuedUpdates() != 1 {
+		t.Fatalf("queued updates = %d, want 1", stub.queuedUpdates())
+	}
+
+	updates, err := client.GetUpdates(context.Background(), &telego.GetUpdatesParams{Timeout: 1})
+	if err != nil {
+		t.Fatalf("getUpdates: %v", err)
+	}
+	if len(updates) != 1 || updates[0].Message == nil {
+		t.Fatalf("updates = %+v, want the queued message", updates)
+	}
+	if updates[0].Message.Text != "/week" || updates[0].Message.Chat.ID != 77 {
+		t.Errorf("update text = %q chat = %d", updates[0].Message.Text, updates[0].Message.Chat.ID)
+	}
+
+	empty, err := client.GetUpdates(context.Background(), &telego.GetUpdatesParams{Timeout: 1})
+	if err != nil {
+		t.Fatalf("second getUpdates: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("a delivered update must not be served twice: %+v", empty)
+	}
+
+	missing, err := http.Post(server.URL+updatesPath, "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("post an empty update: %v", err)
+	}
+	missing.Body.Close()
+	if missing.StatusCode != http.StatusBadRequest {
+		t.Errorf("an empty update answered %d, want 400", missing.StatusCode)
+	}
+}
+
+func TestStubWakesAPendingPollWhenAnUpdateIsQueued(t *testing.T) {
+	stub, server := startStub(t)
+
+	client, err := telego.NewBot(stubToken, telego.WithAPIServer(server.URL), telego.WithDiscardLogger())
+	if err != nil {
+		t.Fatalf("create bot: %v", err)
+	}
+
+	result := make(chan []telego.Update, 1)
+	failures := make(chan error, 1)
+	go func() {
+		updates, err := client.GetUpdates(context.Background(), &telego.GetUpdatesParams{Timeout: 5})
+		if err != nil {
+			failures <- err
+			return
+		}
+		result <- updates
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for len(callsOf(t, server, "getUpdates")) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the stub never received getUpdates")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	stub.QueueUpdate("/start", stubChatID, stubChatID)
+
+	select {
+	case err := <-failures:
+		t.Fatalf("getUpdates: %v", err)
+	case updates := <-result:
+		if len(updates) != 1 || updates[0].Message == nil || updates[0].Message.Text != "/start" {
+			t.Fatalf("updates = %+v, want the queued /start", updates)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("a queued update did not wake the pending getUpdates")
+	}
+}
+
 func TestStubAnswersHealthAndRejectsUnknownPaths(t *testing.T) {
 	_, server := startStub(t)
 

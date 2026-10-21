@@ -20,6 +20,27 @@ func readRepoFile(t *testing.T, name string) string {
 	return string(data)
 }
 
+var workflowJobHeader = regexp.MustCompile(`(?m)^  ([a-z][a-z0-9-]*):\r?$`)
+
+func workflowJob(t *testing.T, workflow, name string) string {
+	t.Helper()
+
+	headers := workflowJobHeader.FindAllStringSubmatchIndex(workflow, -1)
+	for i, header := range headers {
+		if workflow[header[2]:header[3]] != name {
+			continue
+		}
+		end := len(workflow)
+		if i+1 < len(headers) {
+			end = headers[i+1][0]
+		}
+		return workflow[header[0]:end]
+	}
+
+	t.Fatalf("ci.yml has no %s job", name)
+	return ""
+}
+
 func TestCIRunsTheRaceCheckScript(t *testing.T) {
 	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
 
@@ -136,6 +157,32 @@ func TestContainerSmokeTestWaitsForTheUpdateLoopBeforeStopping(t *testing.T) {
 	}
 	if wait > stop {
 		t.Error("the smoke test must wait for the polling loop to start before docker stop")
+	}
+}
+
+func TestCIRunsTheOfflineDevProfile(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	job := workflowJob(t, workflow, "devbot")
+
+	for _, want := range []string{
+		"name: offline dev profile",
+		"go build -o ./devbot ./scripts/devbot/",
+		"./devbot -command ping",
+		"http://127.0.0.1:18090/_stub/calls",
+		`"pong"`,
+		"kill -TERM",
+		"shutdown complete",
+	} {
+		if !strings.Contains(job, want) {
+			t.Errorf("the offline dev profile job must keep %q", want)
+		}
+	}
+
+	pong := strings.Index(job, `"pong"`)
+	stop := strings.Index(job, "kill -TERM")
+	if pong < 0 || stop < 0 || pong > stop {
+		t.Error("the job must prove pong before it stops the bot")
 	}
 }
 

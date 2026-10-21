@@ -552,6 +552,71 @@ jobs:
         if: always()
         run: kill "$(cat /tmp/tgstub.pid)" 2>/dev/null || true
 
+  devbot:
+    name: offline dev profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build the offline profile
+        run: go build -o ./devbot ./scripts/devbot/
+
+      - name: Answer ping through the stub
+        run: |
+          nohup ./devbot -command ping > devbot.log 2>&1 &
+          echo $! > devbot.pid
+
+          for _ in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:18090/_stub/calls > /tmp/devbot-calls.json \
+              && jq -e '[.calls[] | select(.method == "sendMessage" and (.body.text == "pong"))] | length > 0' /tmp/devbot-calls.json > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the offline profile never answered /ping with pong" >&2
+          cat devbot.log >&2
+          curl -s http://127.0.0.1:18090/_stub/calls >&2 || true
+          exit 1
+
+      - name: Check the traffic stayed on loopback
+        run: |
+          grep -q "127.0.0.1:18090" devbot.log
+          if grep -q "api.telegram.org" devbot.log; then
+            echo "the offline profile reached the real Bot API" >&2
+            exit 1
+          fi
+
+      - name: Stop the profile gracefully
+        if: always()
+        run: |
+          if [ ! -f devbot.pid ]; then
+            exit 0
+          fi
+          kill -TERM "$(cat devbot.pid)" 2>/dev/null || true
+
+          for _ in $(seq 1 30); do
+            if grep -q "shutdown complete" devbot.log 2>/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "the offline profile did not shut down gracefully" >&2
+          cat devbot.log >&2 || true
+          exit 1
+
+      - name: Show the dev profile log
+        if: failure()
+        run: cat devbot.log || true
+
   workflow-lint:
     name: workflow lint
     runs-on: ubuntu-latest
