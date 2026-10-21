@@ -20,6 +20,7 @@ func main() {
 	imageDir := flag.String("image-dir", "", "keep the checked PNG in this directory instead of a temporary one")
 	asJSON := flag.Bool("json", false, "print the report as JSON")
 	strict := flag.Bool("strict", false, "treat warnings as failures")
+	callsStaleDays := flag.Int("calls-stale-days", 0, "warn when the bell schedule page date is older than this many days (default 180)")
 	timeout := flag.Duration("timeout", 45*time.Second, "per request timeout for the live site checks")
 	flag.Parse()
 
@@ -30,10 +31,11 @@ func main() {
 			Teachers: *teachersURL,
 			Calls:    *callsURL,
 		},
-		HTTPClient: &http.Client{Timeout: *timeout},
-		ImageDir:   *imageDir,
-		SkipSite:   *skipSite,
-		SkipImage:  *skipImage,
+		HTTPClient:     &http.Client{Timeout: *timeout},
+		ImageDir:       *imageDir,
+		SkipSite:       *skipSite,
+		SkipImage:      *skipImage,
+		CallsStaleDays: *callsStaleDays,
 	})
 
 	if *asJSON {

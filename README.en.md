@@ -661,6 +661,7 @@ curl -s 127.0.0.1:18090/_stub/calls                                  # what the 
 go run ./scripts/preflight -config configs/config.yaml
 go run ./scripts/preflight -skip-site                 # local checks only
 go run ./scripts/preflight -strict                    # treat warnings as failures
+go run ./scripts/preflight -calls-stale-days 90       # a tighter bell-schedule freshness limit
 go run ./scripts/preflight -json | jq                 # a report for automation
 go run ./scripts/preflight -image-dir ./tmp/preflight # keep the generated image
 go run ./scripts/preflight -groups-url http://localhost:8080/groups   # override the URLs
@@ -679,7 +680,7 @@ What it checks:
 | `timetable` | configured bell schedule slots: the start precedes the end and lessons do not overlap |
 | `metrics` | the `metrics.path` route: with metrics enabled the check starts the API on a loopback port and scrapes it — without the token it must answer `401` with `WWW-Authenticate` (an empty `metrics.token` is a warning), with the token `200` and a Prometheus-format parse: the required families, their `HELP`/`TYPE`, no repeated series and every `mgke_*` the rules and the dashboard under `deploy/monitoring` rely on (except the families whose source is genuinely absent in this configuration: the archive metrics are not required while the `db_path` database does not exist yet, and `mgke_scheduler_entries` and `mgke_reminders_tracked` are not required while `telegram.noticer` is off — once the source is configured, its metric must be in the scrape or the check fails). The check is local, so it runs under `-skip-site` too |
 | `site:groups`, `site:teachers` | the page downloaded, the parser found groups and teachers, every day column carries a real `dd.MM.yyyy` date, lessons exist and the days run in order |
-| `site:calls` | the bell schedule parsed, campus variants are listed and the slots are ordered (both single blocks like `08:00–09:20` and paired ones like `09:00–09:45 / 09:55–10:40` are valid); a missing page date or pair label warns, which fails `-strict` |
+| `site:calls` | the bell schedule parsed, campus variants are listed and the slots are ordered (both single blocks like `08:00–09:20` and paired ones like `09:00–09:45 / 09:55–10:40` are valid); a missing page date or pair label warns, which fails `-strict`; a `date-updated` older than `-calls-stale-days` (180 by default) or dated in the future warns too, so times the college forgot to refresh are caught before users see them |
 | `image` | a PNG really renders: the first group or teacher with data is drawn and the signature, the dimensions and the available font are verified |
 
 The offline checks (`-skip-site`) render the image from the local cache, so the command is useful on a machine without internet and inside the container too.

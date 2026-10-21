@@ -90,6 +90,12 @@ type siteFixtures struct {
 func startSite(t *testing.T, groups, teachers string) *siteFixtures {
 	t.Helper()
 
+	return startSiteWithCalls(t, groups, teachers, callsHTML)
+}
+
+func startSiteWithCalls(t *testing.T, groups, teachers, calls string) *siteFixtures {
+	t.Helper()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/groups", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, groups)
@@ -98,7 +104,7 @@ func startSite(t *testing.T, groups, teachers string) *siteFixtures {
 		io.WriteString(w, teachers)
 	})
 	mux.HandleFunc("/calls", func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, callsHTML)
+		io.WriteString(w, calls)
 	})
 
 	server := httptest.NewServer(mux)
@@ -239,6 +245,93 @@ func TestRun_WarnsWhenADayColumnLostItsDate(t *testing.T) {
 	}
 	if !containsHint(groups.Hints, "th: day header without dd.MM.yyyy") {
 		t.Errorf("the warning must name the dateless column: %v", groups.Hints)
+	}
+}
+
+func callsHTMLDated(date string) string {
+	return strings.Replace(callsHTML, "<html><body>", `<html date-updated="`+date+`"><body>`, 1)
+}
+
+func TestRun_WarnsWhenTheBellScheduleDateIsStale(t *testing.T) {
+	now := time.Now()
+	stale := now.AddDate(0, 0, -400).Format("02.01.2006")
+	site := startSiteWithCalls(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)), callsHTMLDated(stale))
+
+	report := Run(Options{
+		ConfigPath: siteConfig(t, site),
+		HTTPClient: site.server.Client(),
+		Now:        func() time.Time { return now },
+	})
+
+	calls := findCheck(t, report, "site:calls")
+	if calls.Level != LevelWarn {
+		t.Fatalf("a stale bell schedule date must warn, got %s %v", calls.Level, calls.Hints)
+	}
+	if !containsHint(calls.Hints, stale) {
+		t.Errorf("the warning must name the declared date %s: %v", stale, calls.Hints)
+	}
+	if !containsHint(calls.Hints, "days old") {
+		t.Errorf("the warning must say how old the page is: %v", calls.Hints)
+	}
+	if !strings.Contains(calls.Detail, "dated "+stale) {
+		t.Errorf("the detail must carry the declared date, got %q", calls.Detail)
+	}
+}
+
+func TestRun_AcceptsARecentBellScheduleDate(t *testing.T) {
+	now := time.Now()
+	recent := now.AddDate(0, 0, -7).Format("02.01.2006")
+	site := startSiteWithCalls(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)), callsHTMLDated(recent))
+
+	report := Run(Options{
+		ConfigPath: siteConfig(t, site),
+		HTTPClient: site.server.Client(),
+		Now:        func() time.Time { return now },
+	})
+
+	calls := findCheck(t, report, "site:calls")
+	if calls.Level != LevelOK {
+		t.Fatalf("a week-old bell schedule must pass, got %s %v", calls.Level, calls.Hints)
+	}
+	if !strings.Contains(calls.Detail, "dated "+recent) {
+		t.Errorf("the detail must carry the declared date, got %q", calls.Detail)
+	}
+}
+
+func TestRun_HonoursTheBellScheduleStaleLimit(t *testing.T) {
+	now := time.Now()
+	old := now.AddDate(0, 0, -400).Format("02.01.2006")
+	site := startSiteWithCalls(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)), callsHTMLDated(old))
+
+	report := Run(Options{
+		ConfigPath:     siteConfig(t, site),
+		HTTPClient:     site.server.Client(),
+		Now:            func() time.Time { return now },
+		CallsStaleDays: 1000,
+	})
+
+	if calls := findCheck(t, report, "site:calls"); calls.Level != LevelOK {
+		t.Fatalf("a wider stale limit must accept a 400-day-old page, got %s %v", calls.Level, calls.Hints)
+	}
+}
+
+func TestRun_WarnsWhenTheBellScheduleDateIsInTheFuture(t *testing.T) {
+	now := time.Now()
+	ahead := now.AddDate(0, 0, 7).Format("02.01.2006")
+	site := startSiteWithCalls(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)), callsHTMLDated(ahead))
+
+	report := Run(Options{
+		ConfigPath: siteConfig(t, site),
+		HTTPClient: site.server.Client(),
+		Now:        func() time.Time { return now },
+	})
+
+	calls := findCheck(t, report, "site:calls")
+	if calls.Level != LevelWarn {
+		t.Fatalf("a future bell schedule date must warn, got %s %v", calls.Level, calls.Hints)
+	}
+	if !containsHint(calls.Hints, "future") {
+		t.Errorf("the warning must say the date lies in the future: %v", calls.Hints)
 	}
 }
 

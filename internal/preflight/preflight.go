@@ -38,6 +38,8 @@ const (
 	noticeSource     = "internal/notification"
 	defaultTimeout   = 45 * time.Second
 	storageProbeName = ".preflight-probe"
+
+	defaultCallsStaleDays = 180
 )
 
 var (
@@ -71,13 +73,14 @@ type Endpoints struct {
 }
 
 type Options struct {
-	ConfigPath string
-	Endpoints  Endpoints
-	HTTPClient *http.Client
-	ImageDir   string
-	SkipSite   bool
-	SkipImage  bool
-	Now        func() time.Time
+	ConfigPath     string
+	Endpoints      Endpoints
+	HTTPClient     *http.Client
+	ImageDir       string
+	SkipSite       bool
+	SkipImage      bool
+	Now            func() time.Time
+	CallsStaleDays int
 }
 
 func Run(opts Options) Report {
@@ -87,6 +90,11 @@ func Run(opts Options) Report {
 	}
 
 	report := &Report{ConfigPath: opts.ConfigPath, Started: started}
+
+	staleDays := opts.CallsStaleDays
+	if staleDays <= 0 {
+		staleDays = defaultCallsStaleDays
+	}
 
 	cfg, err := config.LoadWithEnv(opts.ConfigPath, os.LookupEnv)
 	if err != nil {
@@ -118,7 +126,7 @@ func Run(opts Options) Report {
 		groups, groupCheck := checkGroups(client, endpoints.Groups)
 		report.add(groupCheck)
 		report.add(checkTeachers(client, endpoints.Teachers))
-		report.add(checkCalls(client, endpoints.Calls))
+		report.add(checkCalls(client, endpoints.Calls, started, staleDays))
 		if groups != nil {
 			report.add(checkImage(groups, opts))
 		} else {
@@ -760,7 +768,7 @@ func checkTeachers(client *http.Client, url string) Check {
 	}
 }
 
-func checkCalls(client *http.Client, url string) Check {
+func checkCalls(client *http.Client, url string, now time.Time, staleDays int) Check {
 	if strings.TrimSpace(url) == "" {
 		return Check{Name: "site:calls", Level: LevelSkip, Detail: "parser.endpoints.bell_schedule is empty"}
 	}
@@ -800,6 +808,23 @@ func checkCalls(client *http.Client, url string) Check {
 	}
 
 	detail := fmt.Sprintf("%d variant(s), %d weekday slots, %d saturday slots", len(variants), len(weekdays), len(saturday))
+	if updated := parser.ParseCallsUpdatedAt(doc); updated.At != 0 {
+		declared := time.UnixMilli(updated.At).UTC()
+		label := declared.Format("02.01.2006")
+		detail += ", dated " + label
+		switch age := now.Sub(declared); {
+		case age < -24*time.Hour:
+			if level == LevelOK {
+				level = LevelWarn
+			}
+			hints = append(hints, "warning: the bell schedule page is dated in the future: "+label)
+		case age > time.Duration(staleDays)*24*time.Hour:
+			if level == LevelOK {
+				level = LevelWarn
+			}
+			hints = append(hints, fmt.Sprintf("warning: the bell schedule page is dated %s, %d days old (limit %d days)", label, int(age.Hours()/24), staleDays))
+		}
+	}
 	if len(variants) > 1 {
 		names := make([]string, 0, len(variants))
 		for _, variant := range variants {

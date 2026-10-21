@@ -21,7 +21,7 @@
   - `notification/` — cron scheduler (robfig/cron), event-to-message mapping and health alert dispatch.
   - `formatter/` — output formats: default, compact, visual, litolax.
   - `parity/` — TS ↔ Go surface comparator used by `scripts/paritycheck` and the offline parity test.
-  - `preflight/` — pre-deploy checks: config keys, credentials, the webhook configuration, locale keys, storage, the metrics route (`metrics.go` serves it on an ephemeral loopback port and parses the exposition with `expfmt`), the live site (dates, calls), a rendered PNG; `scripts/preflight` prints the report.
+  - `preflight/` — pre-deploy checks: config keys, credentials, the webhook configuration, locale keys, storage, the metrics route (`metrics.go` serves it on an ephemeral loopback port and parses the exposition with `expfmt`), the live site (dates, calls — `checkCalls` also warns when the page's `date-updated` is older than `-calls-stale-days`, 180 by default, or lies in the future), a rendered PNG; `scripts/preflight` prints the report.
   - `testgolden/` — golden-text normalization (dates, week numbers, callback data) shared by the message golden tests; tests only.
   - `tgstub/` — stub Telegram Bot API: records every bot call and answers `setWebhook`/`deleteWebhook`/`getWebhookInfo`/`getUpdates` (holding the request for its timeout, waking as soon as an update is queued)/`sendMessage`/`editMessageText` like Telegram does, an edit echoing the message id it was given; `LoopbackBaseURL` refuses a non-loopback listen address; the `container` CI job runs both transports against it and `scripts/devbot` runs local development against it.
   - `backup/` — online SQLite snapshot (`VACUUM INTO`), strictly scoped backup-directory retention and the cron entry that runs both.
