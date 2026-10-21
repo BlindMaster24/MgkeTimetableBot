@@ -107,6 +107,7 @@
 - `go test -count=1 -p 1 ./internal/... ./tests/...` before commit.
 - `go build -o bot ./cmd/bot/` to verify binary compiles.
 - `go run ./scripts/paritycheck` to verify the Telegram surface still matches the old TypeScript bot.
+- `go test -count=1 ./internal/image/` after touching the PNG renderer or the embedded logo: the golden images fail on any layout drift, and `go test ./internal/image -update` is the only way to accept a new render.
 - `go run ./scripts/monitoringcheck -promtool /path/to/promtool -strict` after touching the monitoring assets: one pass parses the rules, the Alertmanager config and the dashboard, compares the Kubernetes copies, checks the metric names against `api.MetricFamilies()` and both directions of the render, and runs `promtool check rules` and `promtool test rules` (`promtool check rules deploy/monitoring/prometheus/rules/mgke.yml` and `promtool test rules deploy/monitoring/prometheus/rules/mgke.test.yml` alone are enough for a quick loop). Without promtool the script prints an explicit skip with `result: NOT VERIFIED` and exits 1, so a machine that cannot run the tool says so instead of reporting a pass — the `monitoring` CI job installs promtool 3.15.0 against its pinned SHA-256 and runs the same command, and `tests/monitoring_test.go` keeps gating the files offline (metric names, dashboard shape, Kubernetes parity, compose wiring, promtool expectations).
 - `go run ./scripts/preflight -config configs/config.yaml` before a deploy: it parses the live site and checks dates, calls, credentials, the locale keys, storage, PNG rendering and the metrics route in one run — the `metrics` check serves the route on a loopback port, refuses a scrape that does not answer `401` without the token and fails when a family, its `HELP`/`TYPE` or a `mgke_*` name used under `deploy/monitoring` is missing (exit code 1 on a failure, `-strict` also fails on warnings).
 - `go test -count=1 ./internal/app/ -run EndToEnd` after touching a parser diagnostic: it drives the real fetcher, health tracker, notifier, alert buttons and incident log, so a probe that only logs is caught here.
@@ -128,6 +129,7 @@
 - `internal/telegram/parity_test.go` re-checks the same surface offline, so plain `go test` catches drift.
 - Keyboard layouts are golden files: `go test ./internal/telegram -run Golden -update` rewrites `internal/telegram/testdata/keyboard_layouts.golden`.
 - Message texts are golden files too: `internal/telegram/testdata/messages.golden` (day, week, calls) and `internal/notification/testdata/messages.golden` (notifications). `go test ./internal/telegram -update` and `go test ./internal/notification -update` rewrite them; `testgolden.Normalize` replaces dates, week numbers and callback data with tokens, and a guard test fails if a raw date reaches the output.
+- The timetable PNG is a golden image: `internal/image/testdata/group.golden.png` and `teacher.golden.png` are compared pixel by pixel (tolerance 8 per channel) against a render with the embedded Go font and a fixed clock, so the platform font and `time.Now()` never leak in. `go test ./internal/image -update` rewrites them, and a failing run keeps the received image next to the golden as `<name>.got.png`.
 
 ## Menus
 - Menus are declared in `internal/telegram/menus.go`: one entry per menu holds its scene, prompt, opening button texts, keyboard builder and text items.
@@ -263,7 +265,7 @@ These are settled; do not reopen them without the user asking.
 - Parser check: `go test ./internal/parser/... ./tests/...`
 - Bot check: `go test ./internal/telegram/...`
 - Full suite: `go test -count=1 -p 1 ./internal/... ./tests/...`
-- Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`; message texts: `go test ./internal/telegram ./internal/notification`
+- Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`; message texts: `go test ./internal/telegram ./internal/notification`; timetable PNG: `go test ./internal/image` (`-update` rewrites the goldens)
 - Race detector: `go run ./scripts/racecheck` (needs `CGO_ENABLED=1` and a C compiler — gcc on Linux, clang on macOS, mingw-w64 on Windows; `-check` only reports)
 - Fuzz targets: `go test -run Fuzz -fuzz <Target> -fuzztime 30s ./internal/<pkg>/` for `schedulediff`, `search`, `reminder`, `rooms`, `parser` and the webhook target in `telegram`
 - Static analysis: `go vet ./...`

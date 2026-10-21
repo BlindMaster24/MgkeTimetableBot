@@ -21,11 +21,28 @@ var logoPNG []byte
 type Renderer struct {
 	outputDir string
 	cacheDir  string
+	fontPath  string
+	now       func() time.Time
 }
 
 func NewRenderer(outputDir string) *Renderer {
 	os.MkdirAll(outputDir, 0755)
 	return &Renderer{outputDir: outputDir, cacheDir: outputDir}
+}
+
+func (r *Renderer) SetFontPath(path string) {
+	r.fontPath = path
+}
+
+func (r *Renderer) SetNow(now func() time.Time) {
+	r.now = now
+}
+
+func (r *Renderer) clock() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
 }
 
 type Column struct {
@@ -164,7 +181,10 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	dc.SetColor(color.White)
 	dc.Clear()
 
-	fontPath := findFont()
+	fontPath := r.fontPath
+	if fontPath == "" {
+		fontPath = findFont()
+	}
 	if fontPath == "" {
 		return "", fmt.Errorf("no suitable font found on this system")
 	}
@@ -287,7 +307,7 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	dc.DrawStringAnchored("Viber: https://mgke.keller.by/viber", padding, baseY-18, 0, 0.5)
 	dc.DrawStringAnchored("TG: https://t.me/mgke_slave_bot", padding, baseY-9, 0, 0.5)
 	dc.DrawStringAnchored("VK: https://vk.com/mgke_slave", padding, baseY, 0, 0.5)
-	dc.DrawStringAnchored(fmt.Sprintf("Сгенерированно в: %s", time.Now().Format("02.01.2006 15:04:05,000")), float64(totalW-padding), baseY-9, 1, 0.5)
+	dc.DrawStringAnchored(fmt.Sprintf("Сгенерированно в: %s", r.clock().Format("02.01.2006 15:04:05,000")), float64(totalW-padding), baseY-9, 1, 0.5)
 	dc.DrawStringAnchored("Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы", float64(totalW-padding), baseY, 1, 0.5)
 
 	fname := fmt.Sprintf("timetable_%d.png", time.Now().UnixNano())
