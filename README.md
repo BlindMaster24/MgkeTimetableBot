@@ -3,13 +3,15 @@
 [English version](README.en.md)
 
 [![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
-[![Go 1.27.2](https://img.shields.io/badge/go-1.27.2-00ADD8)](https://go.dev/dl/)
+[![Go 1.27.3](https://img.shields.io/badge/go-1.27.3-00ADD8)](https://go.dev/dl/)
 
 ## Описание
 
 МГКЦТ Бот расписаний — Telegram-бот для удобного просмотра расписания Минского государственного колледжа цифровых технологий.
 
 Это полный порт старого TypeScript-бота на Go: тот же набор команд, меню, кнопок и текстов, без VK / Viber / Алисы — только Telegram и HTTP API. Паритет поверхности (команды, callback-префиксы, подписи кнопок) проверяется автоматически — см. [Паритет с TypeScript-ботом](#паритет-с-typescript-ботом).
+
+Документация: [инструкция по Google Calendar](docs/google-calendar.md), [набор мониторинга](deploy/monitoring/README.md), [шаблон конфигурации](configs/config.example.yaml), [правила разработки](AGENTS.md), [релизы](https://github.com/BlindMaster24/MgkeTimetableBot/releases) и [образ в GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
 Возможности:
 
@@ -34,7 +36,6 @@
 - [yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) — конфигурация
 - ICS генерируется вручную в `internal/calendar`, внешней библиотеки нет
 
-Решение по зависимостям зафиксировано: `gin` остаётся HTTP-роутером REST API (маршруты, middleware, восстановление после паник — переписывать это на `net/http` смысла нет), `fogleman/gg` остаётся рендерером PNG (чистый Go без CGO, поиск шрифтов в `internal/image` построен вокруг него). `lib/pq` используется только разовым `cmd/migrate-pg` (переезд чатов с PostgreSQL на SQLite); сам бот работает на `modernc.org/sqlite`, новых использований `lib/pq` не добавлять
 
 ## Как это работает
 
@@ -57,14 +58,14 @@ HTTP API (gin)          ─┴─> расписание
 
 ## Требования
 
-- **Минимальная версия Go — 1.27.2** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
+- **Минимальная версия Go — 1.27.3** (см. [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
 - CGO не нужен: SQLite и рендеринг картинок работают на чистом Go.
 - Для работы нужен только записываемый каталог для `cache/` и файлов базы.
 
 Проверить версию:
 
 ```bash
-go version   # ожидается go1.27.2 или новее
+go version   # ожидается go1.27.3 или новее
 ```
 
 ## Установка и запуск
@@ -335,7 +336,7 @@ parser:
 
 ```bash
 curl -s localhost:8081/api/health | jq .build
-# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.2", "os": "linux", "arch": "amd64" }
+# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.3", "os": "linux", "arch": "amd64" }
 ```
 
 Метрики и состояние алертов сохраняются в базу чатов (таблица `bot_state`) после каждого цикла парсинга и при остановке, а при старте читаются обратно. Поэтому перезапуск бота не скрывает проблему: если расписание не обновлялось час, алерт `parser_stale` придёт сразу после старта, а уже отправленные алерты не продублируются, пока не истёк `cooldown_minutes`.
@@ -398,7 +399,7 @@ curl -s localhost:8081/metrics
 
 ### Мониторинг (`deploy/monitoring`)
 
-Набор мониторинга лежит в `deploy/monitoring` — его можно взять целиком, ничего не редактируя: стек compose сам записывает адрес и токен ручки в тома, дашборд импортируется как есть, а правила грузятся и обычным Prometheus, и Prometheus Operator, и Grafana Cloud. Полное описание набора — `deploy/monitoring/README.md`.
+Набор мониторинга лежит в `deploy/monitoring` — его можно взять целиком, ничего не редактируя: стек compose сам записывает адрес и токен ручки в тома, дашборд импортируется как есть, а правила грузятся и обычным Prometheus, и Prometheus Operator, и Grafana Cloud. Полное описание набора — [deploy/monitoring/README.md](deploy/monitoring/README.md).
 
 ```bash
 export MGKE_METRICS_TARGET=host.docker.internal:8081   # api.port бота
@@ -447,7 +448,7 @@ go run ./scripts/monitoringcheck -json | jq                            # отч�
 
 ## Google Calendar и ICS
 
-- `docs/google-calendar.md` — настройка Google Cloud, OAuth, привязка аккаунта, права.
+- [docs/google-calendar.md](docs/google-calendar.md) — настройка Google Cloud, OAuth, привязка аккаунта, права.
 - Google-меню: `/google_calendar` или кнопка «📅 Google Calendar» в главном меню — список календарей, добавление, выдача и снятие прав.
 - Синхронизация событийная: парсер после каждого цикла отдаёт только те дни, которые реально изменились, и бот обновляет ровно их — без перечитывания архива целиком. День перед записью очищается от старых событий, время пар берётся из расписания звонков.
 - Отдельно работает выравнивание (reconcile): если календарь отстал (например, бот был выключен или началась новая неделя), бот добирает только недостающие дни — по одному разу, без повторной перезаписи уже синхронизированного.
@@ -653,7 +654,7 @@ curl -X POST 127.0.0.1:18090/_stub/updates -d '{"text":"/week"}'   # доста�
 curl -s 127.0.0.1:18090/_stub/calls                                  # что бот отправил
 ```
 
-`configs/config.dev.yaml` держит парсер, планировщик уведомлений, health-алерты и webhook выключенными, а состояние — в `./.dev/` (каталог в `.gitignore`). Без профиля этот конфиг не стартует: `telegram.token` пуст, и валидация его отклоняет, поэтому случайно направить его в настоящий Telegram нельзя. В Git Bash аргумент `/start` превращается в путь (`C:/Program Files/Git/start`), поэтому там используйте `-command start` (или `MSYS_NO_PATHCONV=1`).
+`configs/config.dev.yaml` держит парсер, планировщик уведомлений, health-алерты и webhook выключенными, а состояние — в `./.dev/` (каталог в `.gitignore`). Без профиля этот конфиг не стартует: `telegram.token` пуст, и валидация его отклоняет, поэтому случайно направить его в настоящий Telegram нельзя. Команду на старте удобнее отдавать через `-command` — флаг доставляет её уже после подключения бота.
 
 ### Проверка перед запуском
 

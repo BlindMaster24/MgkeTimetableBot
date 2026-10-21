@@ -16,7 +16,7 @@
   - `apiprobe/` — live probe of the bot's own API endpoints (targets built from the cache, statuses, response times, health summary) used by the `api_errors` alert button.
   - `health/` — metrics tracker (parser, calendar sync, API) with threshold-based alert evaluation; `state.go` persists it through the `StateStore` interface, and `telegram.go` holds the bounded Telegram counters (commands, callbacks, notifications, send transports) that both the bot and the notification scheduler feed.
   - `google/` — Google Calendar OAuth2 user client, Service Account sync, lesson event builders.
-  - `image/` — fogleman/gg timetable PNG renderer.
+  - `image/` — fogleman/gg timetable PNG renderer that keeps the old TypeScript layout: a 30px centered heading, two day tables per row, an 18px day header over a 14px column header, multiline cells that grow their row, and the 8px footer with the Viber/TG/VK links, the generation stamp and the credit line; the college logo is embedded from `mgke.png`.
   - `calendar/` — ICS calendar export (hand-rolled, no external lib).
   - `notification/` — cron scheduler (robfig/cron), event-to-message mapping and health alert dispatch.
   - `formatter/` — output formats: default, compact, visual, litolax.
@@ -71,7 +71,7 @@
 - New locale string: add key to `internal/i18n/locales/ru.json`, use `b.loc("key")` in code.
 
 ## Build, Test, and Development Commands
-- Runtime: Go 1.27.2+ — the minimum is pinned in `go.mod` (`go 1.27.2`); CI reads it through `go-version-file: go.mod`, the container build receives the same version through the `GO_VERSION` build argument, and `tests/goversion_test.go` keeps `go.mod` the only file in the tree that carries a version literal.
+- Runtime: Go 1.27.3+ — the minimum is pinned in `go.mod` (`go 1.27.3`); CI reads it through `go-version-file: go.mod`, the container build receives the same version through the `GO_VERSION` build argument, and `tests/goversion_test.go` keeps `go.mod` the only file in the tree that carries a version literal.
 - Package manager: Go modules (go.mod).
 - `go mod tidy` — sync dependencies (it drops a redundant `toolchain` line; keep go.mod tidy).
 - `go build -o bot ./cmd/bot/` — build binary.
@@ -94,7 +94,7 @@
 - Coverage is measured on all three operating systems but only the Linux run uploads the artifact and the summary, otherwise the artifact names would clash. The race job probes with `racecheck -check` first and, when Windows reports the detector as unavailable, warns instead of failing — `-race` builds through cgo and the Windows runner has no guaranteed C toolchain.
 - `.github/workflows/security.yml` runs `govulncheck` on push to `main`, on a weekly schedule and on demand; it is deliberately outside CI so an advisory never blocks a pull request.
 - Actions are pinned by commit SHA with the release tag in a comment; Dependabot bumps the SHA and the comment together, so keep the `# vN` comment when editing a `uses:` line.
-- Every job sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.2` from `go.mod` is the version the checks pass with and a newer toolchain is never substituted silently. The `newest-toolchain` job opts in explicitly with `go-version: stable`, so a Go release that breaks the suite shows up without moving the pinned minimum.
+- Every job sets `GOTOOLCHAIN: local`, so the pinned `go 1.27.3` from `go.mod` is the version the checks pass with and a newer toolchain is never substituted silently. The `newest-toolchain` job opts in explicitly with `go-version: stable`, so a Go release that breaks the suite shows up without moving the pinned minimum.
 - `.github/workflows/release.yml` first runs `verify` (build, vet, tests on Linux, Windows and macOS) on the same revision and only then publishes: a push to `main` pushes the multi-arch image to `ghcr.io/blindmaster24/mgketimetablebot` as `:edge`/`:main`; a `v*` tag additionally builds linux/amd64, linux/arm64, windows/amd64 and darwin/arm64 archives, attaches them to a GitHub Release and gives the image `:<major>.<minor>.<patch>`, `:<major>.<minor>` and `:latest`. Do not pin a concrete release number in the docs: link the releases page and the GHCR package instead.
 - The release build injects the tag, commit and build date through `-X main.version`, `-X main.commit` and `-X main.date`; `cmd/bot/main.go` logs them at startup, `internal/build` carries them into `GET /api/health`, `GET /api/info` and the admin `/debug` command. Bump the version by tagging, never by editing code.
 - `internal/image` finds a font by probing the known Debian/Alpine, macOS and Windows paths and then scanning the system font directories, keeping only fonts that actually load; the runtime image installs `font-dejavu` so the PNG rendering works in the container too.
@@ -227,6 +227,13 @@ Long polling is the default; `telegram.webhook` makes Telegram push updates to a
 - The long polling run of the `container` job waits for the `bot started, listening for updates via long polling` line before `docker stop` — the same literal `runPolling` logs — and `tests/tooling_test.go` keeps the workflow gate and that literal together, so the stop can never race the startup; `consumeUpdates` logs `stop signal received` whenever the root context is cancelled, including when the closed update channel wins the select.
 - The `container` CI job runs the transport twice: long polling first, then a second container in webhook mode; both start on `--network host` with `MGKE_TELEGRAM_API_BASE_URL` pointing at `scripts/tgstub`, so no CI step ever reaches `api.telegram.org`, and the webhook run must register the endpoint with the secret, answer `405`/`401`/`200` on the live socket, deliver a signed update that comes back as a `sendMessage` call on the stub, deliver the signed callback query of `internal/telegram/testdata/webhook_callback_query.json` that must come back as an `answerCallbackQuery` plus an `editMessageText` of the message id the update carried, and still log `shutdown complete` after `docker stop --time`.
 - Known gap: the race detector runs in CI only — the shutdown and drain paths are covered there, not locally on a machine without a C toolchain.
+
+## Dependency Decisions
+These are settled; do not reopen them without the user asking.
+
+- `gin` stays the REST API router. `internal/api/server.go` keeps its routes, the `/api` key middleware and the panic recovery on gin, because rewriting them on `net/http` buys nothing.
+- `fogleman/gg` stays the timetable PNG renderer: it is pure Go without CGO, and the font lookup in `internal/image` is built around it.
+- `lib/pq` is used only by the one-off `cmd/migrate-pg`, which moves chats and subscriptions from PostgreSQL to SQLite. The bot itself runs on `modernc.org/sqlite`; no new `lib/pq` use may be added.
 
 ## Coding Style & Naming Conventions
 - Go is strict; keep `go vet` clean.

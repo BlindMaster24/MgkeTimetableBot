@@ -25,6 +25,7 @@ old/
 # Local runtime volumes
 /data/
 /.dev/
+/screenshots/
 
 # Config with secrets
 configs/config.yaml
