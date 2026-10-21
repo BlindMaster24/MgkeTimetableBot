@@ -1,6 +1,8 @@
 package image
 
 import (
+	"image"
+	"image/png"
 	"os"
 	"testing"
 	"time"
@@ -154,6 +156,60 @@ func TestFormatTeacherLesson(t *testing.T) {
 	}
 	if cells[4] != "63ТП" {
 		t.Errorf("expected group 63ТП, got %q", cells[4])
+	}
+}
+
+func TestRendererLaysOutLikeTheTypeScriptBot(t *testing.T) {
+	day := func(multiline bool) DayData {
+		lesson := "1. Физика\n2. Информатика"
+		if !multiline {
+			lesson = "Физика"
+		}
+		return DayData{
+			Date:    "21.10.2026",
+			Weekday: "Среда",
+			Lessons: []LessonRow{
+				{Number: 1, Cells: []string{"1", lesson, "Лек", "101", "Иванов А.А."}},
+				{Number: 2, Cells: []string{"2", "Математика", "Пр", "202", "Петров Б.Б."}},
+			},
+		}
+	}
+
+	render := func(t *testing.T, days []DayData) image.Image {
+		t.Helper()
+		r := NewRenderer(t.TempDir())
+		path, err := r.RenderGroupImage("63ТП", days)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { file.Close() })
+
+		img, err := png.Decode(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return img
+	}
+
+	flat := render(t, []DayData{day(false), day(false), day(false)})
+	const expectedWidth = (30+250+60+100+190)*2 + 20
+	if flat.Bounds().Dx() != expectedWidth {
+		t.Errorf("width = %d, want %d (two day tables and the padding)", flat.Bounds().Dx(), expectedWidth)
+	}
+
+	logo := flat.At(20, 20)
+	lr, lg, lb, _ := logo.RGBA()
+	if lr>>8 == 255 && lg>>8 == 255 && lb>>8 == 255 {
+		t.Error("the top-left corner must carry the embedded logo, not white")
+	}
+
+	tall := render(t, []DayData{day(true), day(false), day(false)})
+	if tall.Bounds().Dy() <= flat.Bounds().Dy() {
+		t.Errorf("a two-line cell must grow its row: single-line %d, two-line %d", flat.Bounds().Dy(), tall.Bounds().Dy())
 	}
 }
 

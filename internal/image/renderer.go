@@ -1,6 +1,8 @@
 package image
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
 	"image/color"
 	"image/png"
@@ -12,6 +14,9 @@ import (
 
 	"github.com/fogleman/gg"
 )
+
+//go:embed mgke.png
+var logoPNG []byte
 
 type Renderer struct {
 	outputDir string
@@ -56,16 +61,16 @@ var groupColumns = []Column{
 	{Title: "№", Width: 30, Align: "center"},
 	{Title: "Предмет", Width: 250, Align: "left"},
 	{Title: "Вид", Width: 60, Align: "center"},
-	{Title: "Аудитория", Width: 80, Align: "center"},
-	{Title: "Преподаватель", Width: 200, Align: "left"},
+	{Title: "Аудитория", Width: 100, Align: "center"},
+	{Title: "Преподаватель", Width: 190, Align: "left"},
 }
 
 var teacherColumns = []Column{
 	{Title: "№", Width: 30, Align: "center"},
 	{Title: "Предмет", Width: 250, Align: "left"},
 	{Title: "Вид", Width: 60, Align: "center"},
-	{Title: "Аудитория", Width: 80, Align: "center"},
-	{Title: "Группа", Width: 80, Align: "center"},
+	{Title: "Аудитория", Width: 100, Align: "center"},
+	{Title: "Группа", Width: 68, Align: "center"},
 }
 
 func (r *Renderer) RenderGroupImage(group string, days []DayData) (string, error) {
@@ -87,13 +92,18 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	}
 
 	const (
-		padding  = 20
-		headerH  = 36
-		rowH     = 28
-		titleH   = 60
-		footerH  = 40
-		cellPadX = 5
-		dpr      = 1
+		padding     = 10
+		titleBandH  = 60
+		titleFont   = 30
+		dayTitleH   = 30
+		colHeaderH  = 26
+		minRowH     = 28
+		lineH       = 18
+		cellPadX    = 6
+		cellPadY    = 5
+		footerBandH = 40
+		footerFont  = 8
+		logoSize    = 70
 	)
 
 	colsWidth := 0
@@ -114,11 +124,43 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		maxLessons = 3
 	}
 
-	tableH := headerH + maxLessons*rowH + 10
-	totalW := colsWidth*cellsPerRow + padding*2
-	totalH := titleH + rows*tableH + footerH + padding*2
+	rowHeights := make([][]float64, len(ti.Days))
+	maxTableH := 0.0
+	for di, day := range ti.Days {
+		heights := make([]float64, maxLessons)
+		for i := range heights {
+			heights[i] = minRowH
+			if i >= len(day.Lessons) {
+				continue
+			}
+			lines := 1
+			for _, cell := range day.Lessons[i].Cells {
+				if n := len(textLines(cell)); n > lines {
+					lines = n
+				}
+			}
+			if want := float64(lines*lineH + 2*cellPadY); want > heights[i] {
+				heights[i] = want
+			}
+		}
+		rowHeights[di] = heights
 
-	dc := gg.NewContext(totalW*dpr, totalH*dpr)
+		tableH := float64(dayTitleH+colHeaderH) + 4
+		for _, h := range heights {
+			tableH += h
+		}
+		if tableH > maxTableH {
+			maxTableH = tableH
+		}
+	}
+
+	totalW := colsWidth*cellsPerRow + padding*2
+	totalH := titleBandH + int(maxTableH)*rows + footerBandH
+	if float64(int(maxTableH)) < maxTableH {
+		totalH++
+	}
+
+	dc := gg.NewContext(totalW, totalH)
 	dc.SetColor(color.White)
 	dc.Clear()
 
@@ -127,14 +169,29 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		return "", fmt.Errorf("no suitable font found on this system")
 	}
 
-	dc.LoadFontFace(fontPath, float64(14*dpr))
-	dc.SetColor(color.Black)
+	if logo, err := png.Decode(bytes.NewReader(logoPNG)); err == nil {
+		bounds := logo.Bounds()
+		if bounds.Dx() > 0 && bounds.Dy() > 0 {
+			scale := float64(logoSize) / float64(bounds.Dx())
+			dc.Push()
+			dc.Translate(padding, padding)
+			dc.Scale(scale, scale)
+			dc.DrawImageAnchored(logo, 0, 0, 0, 0)
+			dc.Pop()
+		}
+	}
 
+	dc.SetColor(color.Black)
+	dc.LoadFontFace(fontPath, titleFont)
 	title := fmt.Sprintf("Группа - %s", ti.Group)
 	if !isGroup {
 		title = fmt.Sprintf("Преподаватель - %s", ti.Teacher)
 	}
-	dc.DrawStringAnchored(title, float64(totalW*dpr)/2, float64(padding*dpr+30*dpr), 0.5, 0.5)
+	dc.DrawStringAnchored(title, float64(totalW)/2, 45, 0.5, 0.5)
+
+	grid := color.RGBA{R: 205, G: 205, B: 205, A: 255}
+	headFill := color.RGBA{R: 242, G: 242, B: 242, A: 255}
+	subHeadFill := color.RGBA{R: 248, G: 248, B: 248, A: 255}
 
 	for row := 0; row < rows; row++ {
 		for col := 0; col < cellsPerRow; col++ {
@@ -143,65 +200,95 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 				break
 			}
 			day := ti.Days[idx]
+			heights := rowHeights[idx]
 
-			tx := float64((padding + col*colsWidth) * dpr)
-			ty := float64((titleH + row*tableH + padding) * dpr)
+			tx := float64(padding + col*colsWidth)
+			ty := float64(titleBandH) + float64(row)*maxTableH
+			tableW := float64(colsWidth)
 
-			dc.SetColor(color.RGBA{R: 41, G: 128, B: 185, A: 255})
-			dc.DrawRectangle(tx, ty, float64(colsWidth*dpr), float64(headerH*dpr))
-			dc.Fill()
-
-			dc.SetColor(color.White)
-			dc.LoadFontFace(fontPath, float64(13*dpr))
-			headerText := fmt.Sprintf("%s, %s", day.Weekday, day.Date)
-			dc.DrawStringAnchored(headerText, tx+float64(colsWidth*dpr)/2, ty+float64(headerH*dpr)/2, 0.5, 0.5)
-
-			dc.SetColor(color.RGBA{R: 240, G: 240, B: 240, A: 255})
-			dc.DrawRectangle(tx, ty+float64(headerH*dpr), float64(colsWidth*dpr), float64(headerH*dpr))
+			dc.SetColor(headFill)
+			dc.DrawRectangle(tx, ty, tableW, dayTitleH)
 			dc.Fill()
 
 			dc.SetColor(color.Black)
-			dc.LoadFontFace(fontPath, float64(11*dpr))
+			dc.LoadFontFace(fontPath, 18)
+			dc.DrawStringAnchored(fmt.Sprintf("%s, %s", day.Weekday, day.Date), tx+tableW/2, ty+float64(dayTitleH)/2, 0.5, 0.5)
+
+			dc.SetColor(subHeadFill)
+			dc.DrawRectangle(tx, ty+dayTitleH, tableW, colHeaderH)
+			dc.Fill()
+
+			dc.SetColor(color.Black)
+			dc.LoadFontFace(fontPath, 14)
+			headerY := ty + float64(dayTitleH) + float64(colHeaderH)/2
 			cx := tx
 			for _, c := range cols {
-				titleText := c.Title
-				dc.DrawStringAnchored(titleText, cx+float64(c.Width*dpr)/2, ty+float64(headerH*dpr)+float64(headerH*dpr)/2, 0.5, 0.5)
-				cx += float64(c.Width * dpr)
+				dc.DrawStringAnchored(c.Title, cx+float64(c.Width)/2, headerY, 0.5, 0.5)
+				cx += float64(c.Width)
 			}
 
-			ly := ty + float64(2*headerH*dpr) + 2
-			dc.LoadFontFace(fontPath, float64(12*dpr))
+			bodyTop := ty + float64(dayTitleH+colHeaderH)
+			ry := bodyTop
 			for i := 0; i < maxLessons; i++ {
+				rowH := heights[i]
 				if i < len(day.Lessons) {
 					lesson := day.Lessons[i]
 					cx := tx
 					for ci, c := range cols {
 						if ci < len(lesson.Cells) {
+							lines := textLines(lesson.Cells[ci])
 							dc.SetColor(color.Black)
-							if c.Align == "center" {
-								dc.DrawStringAnchored(lesson.Cells[ci], cx+float64(c.Width*dpr)/2, ly, 0.5, 0.5)
-							} else {
-								dc.DrawString(lesson.Cells[ci], cx+float64(cellPadX*dpr), ly)
+							dc.LoadFontFace(fontPath, 14)
+							startY := ry + float64(cellPadY) + float64(lineH)/2
+							for li, line := range lines {
+								if c.Align == "center" {
+									dc.DrawStringAnchored(line, cx+float64(c.Width)/2, startY+float64(li*lineH), 0.5, 0.5)
+								} else {
+									dc.DrawStringAnchored(line, cx+float64(cellPadX), startY+float64(li*lineH), 0, 0.5)
+								}
 							}
 						}
-						cx += float64(c.Width * dpr)
+						cx += float64(c.Width)
 					}
 				}
-				ly += float64(rowH * dpr)
+				ry += rowH
 			}
 
-			dc.SetColor(color.RGBA{R: 200, G: 200, B: 200, A: 255})
-			dc.DrawRectangle(tx, ty, float64(colsWidth*dpr), float64(tableH*dpr))
+			bodyBottom := bodyTop
+			for _, h := range heights {
+				bodyBottom += h
+			}
+
+			dc.SetColor(grid)
+			dc.SetLineWidth(1)
+			cx = tx
+			for _, c := range cols {
+				cx += float64(c.Width)
+				dc.DrawLine(cx, ty, cx, bodyBottom)
+			}
+			dc.DrawLine(tx, ty+dayTitleH, tx+tableW, ty+dayTitleH)
+			dc.DrawLine(tx, bodyTop, tx+tableW, bodyTop)
+			ryLine := bodyTop
+			for _, h := range heights {
+				ryLine += h
+				dc.DrawLine(tx, ryLine, tx+tableW, ryLine)
+			}
+			dc.Stroke()
+
+			dc.SetColor(grid)
+			dc.DrawRectangle(tx, ty, tableW, bodyBottom-ty)
 			dc.Stroke()
 		}
 	}
 
 	dc.SetColor(color.RGBA{R: 150, G: 150, B: 150, A: 255})
-	dc.LoadFontFace(fontPath, float64(8*dpr))
-	fy := float64((totalH - footerH/2) * dpr)
-	dc.DrawString("TG: https://t.me/mgke_slave_bot", float64(padding*dpr), fy)
-	dc.DrawString(fmt.Sprintf("Сгенерированно в: %s", time.Now().Format("02.01.2006 15:04:05,000")), float64(totalW*dpr-padding*dpr), fy)
-	dc.DrawString("Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы", float64(totalW*dpr-padding*dpr), fy+float64(9*dpr))
+	dc.LoadFontFace(fontPath, footerFont)
+	baseY := float64(totalH - 8)
+	dc.DrawStringAnchored("Viber: https://mgke.keller.by/viber", padding, baseY-18, 0, 0.5)
+	dc.DrawStringAnchored("TG: https://t.me/mgke_slave_bot", padding, baseY-9, 0, 0.5)
+	dc.DrawStringAnchored("VK: https://vk.com/mgke_slave", padding, baseY, 0, 0.5)
+	dc.DrawStringAnchored(fmt.Sprintf("Сгенерированно в: %s", time.Now().Format("02.01.2006 15:04:05,000")), float64(totalW-padding), baseY-9, 1, 0.5)
+	dc.DrawStringAnchored("Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы", float64(totalW-padding), baseY, 1, 0.5)
 
 	fname := fmt.Sprintf("timetable_%d.png", time.Now().UnixNano())
 	outPath := filepath.Join(r.outputDir, fname)
@@ -317,6 +404,13 @@ func firstFontIn(dir string) string {
 		}
 	}
 	return ""
+}
+
+func textLines(s string) []string {
+	if s == "" {
+		return []string{""}
+	}
+	return strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
 }
 
 func FormatGroupLesson(lesson any, index int) []string {
