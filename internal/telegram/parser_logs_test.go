@@ -62,6 +62,31 @@ func TestParserDiagnosticsRenderSkippedItems(t *testing.T) {
 	}
 }
 
+func TestParserDiagnosticsRenderAdvisorySelectors(t *testing.T) {
+	b := setupTestBot(t)
+
+	report := parser.Report{Source: parser.SourceCalls, Items: 2}
+	report.Probes = append(report.Probes, parser.Probe{
+		Source:   parser.SourceCalls,
+		Selector: "[date-updated] with dd.MM.yyyy",
+		Expected: "bell schedule page date",
+		Found:    0,
+		Advisory: true,
+	})
+
+	b.RecordParserReport(report)
+
+	lines := strings.Join(b.parserDiagnostics(), "\n")
+	for _, want := range []string{
+		"[date-updated] with dd.MM.yyyy",
+		b.loc("parser_logs_advisory_prefix"),
+	} {
+		if !strings.Contains(lines, want) {
+			t.Errorf("diagnostics omit %q:\n%s", want, lines)
+		}
+	}
+}
+
 func TestParserDiagnosticsReportCleanState(t *testing.T) {
 	b := setupTestBot(t)
 

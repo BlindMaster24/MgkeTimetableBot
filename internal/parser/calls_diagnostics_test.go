@@ -27,22 +27,28 @@ func failingProbe(t *testing.T, report Report, selector string) Probe {
 	return Probe{}
 }
 
-func TestCallsParserRequiresAParseablePageDate(t *testing.T) {
+func TestCallsParserReportsAMissingPageDateAsAdvisory(t *testing.T) {
 	variants, report := ParseCallsVariants(docFromHTML(t, callsPage("", validCallsRow)))
 
 	if len(variants) != 1 || len(variants[0].Schedule.Weekdays) != 1 {
 		t.Fatalf("the slots must still parse: %+v", variants)
 	}
-	probe := failingProbe(t, report, "[date-updated] with dd.MM.yyyy")
-	if probe.Inverted {
-		t.Errorf("the page date probe is not an inverted probe: %+v", probe)
+	if failing := report.Failing(); len(failing) != 0 {
+		t.Fatalf("a missing page date must not fail the parse: %+v", failing)
 	}
-	if report.OK() {
-		t.Errorf("a page without a date must not look clean: %s", report.Summary())
+	if !report.OK() {
+		t.Errorf("the slots and rows are fine, so the parse stays clean: %s", report.Summary())
+	}
+	advisories := report.Advisories()
+	if len(advisories) != 1 || advisories[0].Selector != "[date-updated] with dd.MM.yyyy" {
+		t.Fatalf("advisories = %+v", advisories)
+	}
+	if !strings.Contains(report.Summary(), "advisory: [date-updated] with dd.MM.yyyy") {
+		t.Errorf("summary = %q", report.Summary())
 	}
 
 	dated := callsPage(`<h5>с 01.09.2026 по 07.09.2026</h5>`, validCallsRow)
-	if _, datedReport := ParseCallsVariants(docFromHTML(t, dated)); !datedReport.OK() {
+	if _, datedReport := ParseCallsVariants(docFromHTML(t, dated)); len(datedReport.Advisories()) != 0 {
 		t.Errorf("a dated heading must satisfy the date probe: %s", datedReport.Summary())
 	}
 }

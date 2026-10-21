@@ -104,7 +104,7 @@ func ParseCallsVariantsCtx(ctx context.Context, doc *goquery.Document) ([]cache.
 	if callsPageDate(doc, scope) {
 		dated = 1
 	}
-	builder.probe("[date-updated] with dd.MM.yyyy", "bell schedule page date", dated, true)
+	builder.probeAdvisory("[date-updated] with dd.MM.yyyy", "bell schedule page date", dated)
 
 	var groups []*callsGroup
 	byName := make(map[string]*callsGroup)

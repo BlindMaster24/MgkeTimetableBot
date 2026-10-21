@@ -797,7 +797,7 @@ func checkCalls(client *http.Client, url string, now time.Time, staleDays int) C
 			hints = append(hints, "error: "+problem)
 		}
 	}
-	if level == LevelOK && len(report.Failing()) > 0 {
+	if level == LevelOK && (len(report.Failing()) > 0 || len(report.Advisories()) > 0) {
 		level = LevelWarn
 	}
 	if len(saturday) == 0 {
@@ -1076,6 +1076,9 @@ func probeHints(report parser.Report) []string {
 			continue
 		}
 		hints = append(hints, fmt.Sprintf("error: no data for %q (expected %s)", probe.Selector, probe.Expected))
+	}
+	for _, probe := range report.Advisories() {
+		hints = append(hints, fmt.Sprintf("warning: no data for %q (expected %s)", probe.Selector, probe.Expected))
 	}
 	for _, fallback := range report.Fallbacks {
 		hints = append(hints, "warning: fallback used: "+fallback)

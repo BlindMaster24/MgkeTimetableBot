@@ -161,14 +161,25 @@ func parserGuard(cfg *config.Config) parserpkg.Guard {
 }
 
 func parserLayoutIssues(report parserpkg.Report) []health.LayoutIssue {
-	issues := make([]health.LayoutIssue, 0, len(report.Failing()))
-	for _, probe := range report.Failing() {
+	failing := report.Failing()
+	advisories := report.Advisories()
+	issues := make([]health.LayoutIssue, 0, len(failing)+len(advisories))
+	for _, probe := range failing {
 		issues = append(issues, health.LayoutIssue{
 			Source:   report.Source,
 			Selector: probe.Selector,
 			Expected: probe.Expected,
 			Found:    probe.Found,
 			Missing:  probe.Missing,
+		})
+	}
+	for _, probe := range advisories {
+		issues = append(issues, health.LayoutIssue{
+			Source:   report.Source,
+			Selector: probe.Selector,
+			Expected: probe.Expected,
+			Found:    probe.Found,
+			Advisory: true,
 		})
 	}
 	return issues

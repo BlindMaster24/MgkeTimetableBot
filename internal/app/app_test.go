@@ -470,7 +470,7 @@ const datedCallsPage = `<html><body><div class="entry"><div class="content" date
 </table>
 </div></div></body></html>`
 
-func parserAlertHarness(t *testing.T, cfg *config.Config) (*parserpkg.Fetcher, *cache.RaspCache, *notification.HealthNotifier, *recordingSender, *health.IncidentLog) {
+func parserAlertHarness(t *testing.T, cfg *config.Config) (*parserpkg.Fetcher, *cache.RaspCache, *health.Tracker, *notification.HealthNotifier, *recordingSender, *health.IncidentLog) {
 	t.Helper()
 
 	raspper := builderCache(t)
@@ -487,7 +487,7 @@ func parserAlertHarness(t *testing.T, cfg *config.Config) (*parserpkg.Fetcher, *
 	notifier := notification.NewHealthNotifier(tracker, logger.New("error", nil), sender, adminFinder{}, time.Minute, nil)
 	notifier.SetIncidents(incidents)
 
-	return fetcher, raspper, notifier, sender, incidents
+	return fetcher, raspper, tracker, notifier, sender, incidents
 }
 
 func TestUndatedDayColumnReachesTheAdminsEndToEnd(t *testing.T) {
@@ -503,7 +503,7 @@ func TestUndatedDayColumnReachesTheAdminsEndToEnd(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &config.Config{Health: &config.HealthConfig{ParserLayoutFailures: 1}}
-	fetcher, raspper, notifier, sender, incidents := parserAlertHarness(t, cfg)
+	fetcher, raspper, _, notifier, sender, incidents := parserAlertHarness(t, cfg)
 
 	if err := fetcher.Timetable(t.Context(), srv.URL+"/groups", srv.URL+"/teachers"); err != nil {
 		t.Fatalf("timetable: %v", err)
@@ -556,7 +556,7 @@ func TestUndatedDayColumnReachesTheAdminsEndToEnd(t *testing.T) {
 	}
 }
 
-func TestUnparseableCallsHeaderReachesTheAdminsEndToEnd(t *testing.T) {
+func TestUndatedBellScheduleStaysVisibleWithoutAnAlert(t *testing.T) {
 	page := &mutablePage{html: undatedCallsPage}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		page.serve(w)
@@ -564,7 +564,7 @@ func TestUnparseableCallsHeaderReachesTheAdminsEndToEnd(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &config.Config{Health: &config.HealthConfig{ParserLayoutFailures: 1}}
-	fetcher, _, notifier, sender, incidents := parserAlertHarness(t, cfg)
+	fetcher, _, tracker, notifier, sender, incidents := parserAlertHarness(t, cfg)
 
 	if err := fetcher.Calls(t.Context(), srv.URL); err != nil {
 		t.Fatalf("calls: %v", err)
@@ -572,22 +572,26 @@ func TestUnparseableCallsHeaderReachesTheAdminsEndToEnd(t *testing.T) {
 
 	notifier.Check()
 
-	delivered := sender.delivered()
-	if len(delivered) != 1 {
-		t.Fatalf("expected one admin alert for the undated bell schedule, got %+v", delivered)
+	if delivered := sender.delivered(); len(delivered) != 0 {
+		t.Fatalf("the page date is advisory, so no admin alert may fire: %+v", delivered)
 	}
-	for _, want := range []string{
-		notification.HealthAlertTitle(health.AlertParserLayout),
-		"[date-updated] with dd.MM.yyyy",
-	} {
-		if !strings.Contains(delivered[0].text, want) {
-			t.Errorf("alert %q misses %q", delivered[0].text, want)
-		}
+	if open := incidents.Open(); len(open) != 0 {
+		t.Fatalf("an advisory issue must not enter the incident history: %+v", open)
 	}
 
-	open := incidents.Open()
-	if len(open) != 1 || open[0].Key != health.AlertParserLayout {
-		t.Fatalf("the undated bell schedule must enter the incident history, got %+v", open)
+	snapshot := tracker.Snapshot()
+	if len(snapshot.Alerts) != 0 {
+		t.Fatalf("a missing page date must keep the bot healthy: %+v", snapshot.Alerts)
+	}
+	if snapshot.Parser.LayoutFailures != 0 {
+		t.Errorf("layout failures = %d, want 0 for an advisory issue", snapshot.Parser.LayoutFailures)
+	}
+	advisory, ok := layoutIssue(snapshot.Parser.Layout, parserpkg.SourceCalls, "[date-updated] with dd.MM.yyyy")
+	if !ok {
+		t.Fatalf("the missing date must stay in the health snapshot: %+v", snapshot.Parser.Layout)
+	}
+	if !advisory.Advisory {
+		t.Errorf("the snapshot must mark the issue as advisory: %+v", advisory)
 	}
 
 	page.set(datedCallsPage)
@@ -596,8 +600,16 @@ func TestUnparseableCallsHeaderReachesTheAdminsEndToEnd(t *testing.T) {
 	}
 	notifier.Check()
 
-	messages := sender.messages()
-	if len(messages) != 2 || !strings.Contains(messages[1], "восстановлено") {
-		t.Fatalf("a dated bell schedule must recover the alert, got %+v", messages)
+	if layout := tracker.Snapshot().Parser.Layout; len(layout) != 0 {
+		t.Fatalf("a dated page must clear the advisory issue: %+v", layout)
 	}
+}
+
+func layoutIssue(issues []health.LayoutIssue, source, selector string) (health.LayoutIssue, bool) {
+	for _, issue := range issues {
+		if issue.Source == source && issue.Selector == selector {
+			return issue, true
+		}
+	}
+	return health.LayoutIssue{}, false
 }

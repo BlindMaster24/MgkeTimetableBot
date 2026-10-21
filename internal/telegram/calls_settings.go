@@ -111,6 +111,8 @@ func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
 
 	if calls.Site.UpdatedAt > 0 {
 		lines = append(lines, fmt.Sprintf("📅 Дата на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
+	} else if siteParsed {
+		lines = append(lines, "📅 "+b.loc("call_site_date_missing"))
 	}
 
 	active := calls.Active.Source
@@ -179,6 +181,8 @@ func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", calls.Site.UpdatedAtRaw))
 	case calls.Active.Source == "site" && calls.Site.UpdatedAt > 0:
 		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
+	case calls.Active.Source == "site":
+		lines = append(lines, b.loc("call_site_date_missing"))
 	case calls.Active.Source == "manual" && calls.ManualReason != "":
 		lines = append(lines, fmt.Sprintf("Причина: %s", calls.ManualReason))
 	case calls.Active.Source == "config" && len(b.cfg.Timetable.Weekdays) > 0:

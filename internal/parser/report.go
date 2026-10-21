@@ -21,9 +21,13 @@ type Probe struct {
 	Missing  int    `json:"missing,omitempty"`
 	Required bool   `json:"required"`
 	Inverted bool   `json:"inverted,omitempty"`
+	Advisory bool   `json:"advisory,omitempty"`
 }
 
 func (p Probe) OK() bool {
+	if p.Advisory {
+		return true
+	}
 	if p.Inverted {
 		return p.Missing == 0
 	}
@@ -79,6 +83,16 @@ func (r Report) Failing() []Probe {
 	return failing
 }
 
+func (r Report) Advisories() []Probe {
+	var advisories []Probe
+	for _, probe := range r.Probes {
+		if probe.Advisory && probe.Found == 0 {
+			advisories = append(advisories, probe)
+		}
+	}
+	return advisories
+}
+
 func (r Report) OK() bool {
 	return len(r.Failing()) == 0 && len(r.Warnings) == 0
 }
@@ -101,6 +115,13 @@ func (r Report) Summary() string {
 		if len(skipped) > 0 {
 			parts = append(parts, "skipped: "+strings.Join(skipped, ", "))
 		}
+	}
+	if advisories := r.Advisories(); len(advisories) > 0 {
+		selectors := make([]string, 0, len(advisories))
+		for _, probe := range advisories {
+			selectors = append(selectors, probe.Selector)
+		}
+		parts = append(parts, "advisory: "+strings.Join(selectors, ", "))
 	}
 	if len(r.Variants) > 0 {
 		parts = append(parts, "variants: "+strings.Join(r.Variants, ", "))
@@ -154,6 +175,16 @@ func (b *reportBuilder) probe(selector, expected string, found int, required boo
 		Expected: expected,
 		Found:    found,
 		Required: required,
+	})
+}
+
+func (b *reportBuilder) probeAdvisory(selector, expected string, found int) {
+	b.report.Probes = append(b.report.Probes, Probe{
+		Source:   b.report.Source,
+		Selector: selector,
+		Expected: expected,
+		Found:    found,
+		Advisory: true,
 	})
 }
 

@@ -110,6 +110,7 @@ type LayoutIssue struct {
 	Expected string `json:"expected,omitempty"`
 	Found    int    `json:"found"`
 	Missing  int    `json:"missing,omitempty"`
+	Advisory bool   `json:"advisory,omitempty"`
 }
 
 type GuardIssue struct {
@@ -328,7 +329,7 @@ func (t *Tracker) ParserReport(source string, issues []LayoutIssue, guard []Guar
 	}
 
 	state := t.parserLayout[source]
-	if len(issues) > 0 {
+	if hasAlertingIssue(issues) {
 		state.failures++
 	} else {
 		state.failures = 0
@@ -558,6 +559,15 @@ func maintenanceDetail(consecutive, threshold int, text string) string {
 	return detail + " error=" + text
 }
 
+func hasAlertingIssue(issues []LayoutIssue) bool {
+	for _, issue := range issues {
+		if !issue.Advisory {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *Tracker) layoutIssuesLocked() []LayoutIssue {
 	sources := make([]string, 0, len(t.parserLayout))
 	for source := range t.parserLayout {
@@ -704,12 +714,18 @@ func layoutDetail(issues []LayoutIssue) string {
 	parts := make([]string, 0, len(issues))
 	prefix := "skipped "
 	for _, issue := range issues {
+		if issue.Advisory {
+			continue
+		}
 		if issue.Missing > 0 {
 			parts = append(parts, fmt.Sprintf("%s: %s (skipped %d)", issue.Source, issue.Selector, issue.Missing))
 			continue
 		}
 		prefix = "missing "
 		parts = append(parts, fmt.Sprintf("%s: %s", issue.Source, issue.Selector))
+	}
+	if len(parts) == 0 {
+		return ""
 	}
 	return prefix + strings.Join(parts, ", ")
 }

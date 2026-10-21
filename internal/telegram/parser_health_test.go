@@ -100,6 +100,29 @@ func TestParserHealthTextRendersSkippedColumns(t *testing.T) {
 	}
 }
 
+func TestParserHealthTextRendersAdvisoryIssues(t *testing.T) {
+	b := setupTestBot(t)
+	b.SetHealthSource(&fakeHealthSource{snapshot: health.Snapshot{
+		Parser: health.ParserStats{
+			Runs:          2,
+			LastSuccessAt: "2026-09-13T12:00:00Z",
+			Layout: []health.LayoutIssue{{
+				Source:   "calls",
+				Selector: "[date-updated] with dd.MM.yyyy",
+				Advisory: true,
+			}},
+		},
+	}})
+
+	text := b.parserHealthText()
+	if !strings.Contains(text, "calls: [date-updated] with dd.MM.yyyy — не найдено (справочно, без алерта)") {
+		t.Errorf("parser health text must show the missing page date as advisory:\n%s", text)
+	}
+	if !strings.Contains(text, "Активных алертов нет") {
+		t.Errorf("an advisory issue must not raise an alert:\n%s", text)
+	}
+}
+
 func TestParserHealthTextReportsAHealthyParser(t *testing.T) {
 	b := setupTestBot(t)
 	b.SetHealthSource(&fakeHealthSource{snapshot: health.Snapshot{

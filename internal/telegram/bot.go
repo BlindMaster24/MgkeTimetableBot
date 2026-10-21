@@ -593,7 +593,8 @@ func (b *Bot) parserDiagnostics() []string {
 	lines := make([]string, 0, len(reports)+1)
 	for _, report := range reports {
 		failing := report.Failing()
-		issues += len(failing) + len(report.Warnings)
+		advisories := report.Advisories()
+		issues += len(failing) + len(report.Warnings) + len(advisories)
 
 		summary := fmt.Sprintf("%s: items=%d", report.Source, report.Items)
 		if len(failing) > 0 {
@@ -609,6 +610,9 @@ func (b *Bot) parserDiagnostics() []string {
 				selectors = append(selectors, fmt.Sprintf("%s (found %d)", probe.Selector, probe.Found))
 			}
 			summary += "\n   " + b.loc("parser_logs_no_data") + strings.Join(selectors, ", ")
+		}
+		for _, probe := range advisories {
+			summary += "\n   " + b.loc("parser_logs_advisory_prefix") + fmt.Sprintf("%s (found %d)", probe.Selector, probe.Found)
 		}
 		for _, warning := range report.Warnings {
 			summary += "\n   " + b.loc("parser_logs_warning_prefix") + warning

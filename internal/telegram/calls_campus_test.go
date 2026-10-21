@@ -179,6 +179,24 @@ func TestE2E_CampusButtonStoresTheChoice(t *testing.T) {
 	}
 }
 
+func TestCallsMenuReportsAMissingSiteDate(t *testing.T) {
+	b, _, _ := setupTestBotWithData(t)
+
+	calls := b.cache.GetCalls()
+	calls.Active.Source = "site"
+	calls.Active.Schedule = cache.CallsSchedule{
+		Weekdays: [][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}},
+	}
+	calls.Site.UpdatedAt = 0
+	calls.Site.UpdatedAtRaw = ""
+	b.cache.SetCallsFromCache(calls)
+
+	text := b.callsMenuText(&Chat{}, true)
+	if !strings.Contains(text, b.loc("call_site_date_missing")) {
+		t.Errorf("the calls menu must say the site date is missing, got %q", text)
+	}
+}
+
 func TestCallsCampusConfirmationMentionsTheCampus(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	withCampusVariants(t, b)
