@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 )
@@ -187,13 +188,16 @@ func TestCallsMenuReportsAMissingSiteDate(t *testing.T) {
 	calls.Active.Schedule = cache.CallsSchedule{
 		Weekdays: [][2][2]string{{{"08:00", "08:45"}, {"08:55", "09:40"}}},
 	}
-	calls.Site.UpdatedAt = 0
+	calls.Site.UpdatedAt = time.Date(2026, 10, 5, 8, 30, 0, 0, time.Local).UnixMilli()
 	calls.Site.UpdatedAtRaw = ""
 	b.cache.SetCallsFromCache(calls)
 
 	text := b.callsMenuText(&Chat{}, true)
 	if !strings.Contains(text, b.loc("call_site_date_missing")) {
 		t.Errorf("the calls menu must say the site date is missing, got %q", text)
+	}
+	if !strings.Contains(text, "Последний разбор: 05.10.2026 08:30") {
+		t.Errorf("the calls menu must fall back to the parse moment, got %q", text)
 	}
 }
 

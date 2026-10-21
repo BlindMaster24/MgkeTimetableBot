@@ -29,6 +29,8 @@
   "parser_health_layout_skipped": "{{.Source}}: {{.Selector}} (пропущено: {{.Count}})",
   "parser_health_layout_advisory": "{{.Source}}: {{.Selector}} — не найдено (справочно, без алерта)",
   "call_site_date_missing": "Дата обновления на сайте не указана",
+  "call_site_parsed_at": "Последний разбор: {{.At}}",
+  "parser_health_calls_parsed_at": "Последний разбор звонков: {{.At}}",
   "force_parse_started": "Принудительная перезагрузка данных...",
   "force_parse_queued": "Запущено",
   "cmd_forceparse": "Спарсить расписание прямо сейчас",

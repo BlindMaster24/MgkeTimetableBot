@@ -109,10 +109,14 @@ func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
 		lines = append(lines, "🧪 Результат парсинга: EMPTY")
 	}
 
-	if calls.Site.UpdatedAt > 0 {
-		lines = append(lines, fmt.Sprintf("📅 Дата на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
-	} else if siteParsed {
+	switch {
+	case calls.Site.UpdatedAtRaw != "":
+		lines = append(lines, fmt.Sprintf("📅 Дата на сайте: %s", calls.Site.UpdatedAtRaw))
+	case siteParsed:
 		lines = append(lines, "📅 "+b.loc("call_site_date_missing"))
+		if at := b.siteCallsParsedAt(); at != "" {
+			lines = append(lines, "🕒 "+b.locData("call_site_parsed_at", map[string]interface{}{"At": at}))
+		}
 	}
 
 	active := calls.Active.Source
@@ -159,6 +163,17 @@ func callsSourceLabel(source string) string {
 	}
 }
 
+func (b *Bot) siteCallsParsedAt() string {
+	if b.cache == nil {
+		return ""
+	}
+	calls := b.cache.GetCalls()
+	if calls.Site.UpdatedAtRaw != "" || calls.Site.UpdatedAt <= 0 {
+		return ""
+	}
+	return time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")
+}
+
 func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 	calls := b.cache.GetCalls()
 
@@ -179,10 +194,11 @@ func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 	switch {
 	case calls.Active.Source == "site" && calls.Site.UpdatedAtRaw != "":
 		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", calls.Site.UpdatedAtRaw))
-	case calls.Active.Source == "site" && calls.Site.UpdatedAt > 0:
-		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", time.UnixMilli(calls.Site.UpdatedAt).Format("02.01.2006 15:04")))
 	case calls.Active.Source == "site":
 		lines = append(lines, b.loc("call_site_date_missing"))
+		if at := b.siteCallsParsedAt(); at != "" {
+			lines = append(lines, b.locData("call_site_parsed_at", map[string]interface{}{"At": at}))
+		}
 	case calls.Active.Source == "manual" && calls.ManualReason != "":
 		lines = append(lines, fmt.Sprintf("Причина: %s", calls.ManualReason))
 	case calls.Active.Source == "config" && len(b.cfg.Timetable.Weekdays) > 0:

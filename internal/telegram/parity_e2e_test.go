@@ -41,8 +41,11 @@ func TestE2E_CallsSettingsMenuTextMatchesTS(t *testing.T) {
 	if !strings.Contains(text, "Источник: авто (сейчас: сайт)") {
 		t.Errorf("auto source line mismatch: %q", text)
 	}
-	if !strings.Contains(text, "Обновлено на сайте:") {
-		t.Errorf("expected site updated line, got %q", text)
+	if !strings.Contains(text, b.loc("call_site_date_missing")) {
+		t.Errorf("expected the missing page date line, got %q", text)
+	}
+	if !strings.Contains(text, "Последний разбор:") {
+		t.Errorf("expected the parse moment fallback, got %q", text)
 	}
 	if strings.Contains(text, "<b>") {
 		t.Errorf("calls menu must not contain html bold: %q", text)

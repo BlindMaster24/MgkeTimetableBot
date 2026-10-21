@@ -138,6 +138,11 @@ func (b *Bot) parserHealthText() string {
 					"Source":   issue.Source,
 					"Selector": issue.Selector,
 				}))
+				if issue.Source == "calls" {
+					if at := b.siteCallsParsedAt(); at != "" {
+						lines = append(lines, b.locData("parser_health_calls_parsed_at", map[string]interface{}{"At": at}))
+					}
+				}
 				continue
 			}
 			if issue.Missing > 0 {
