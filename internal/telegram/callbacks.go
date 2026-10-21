@@ -173,6 +173,9 @@ func (b *Bot) showCalls(u *Update, chat *Chat, full bool) {
 	msg = append(msg, b.callsLines(activeWeekdays, userMax, full, []int{1, 2, 3, 4, 5}))
 	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
 	msg = append(msg, b.callsLines(activeSaturday, userMax, full, []int{6}))
+	if line := b.callsFreshnessLine(); line != "" {
+		msg = append(msg, "\n"+line)
+	}
 
 	text := strings.Join(msg, "\n")
 	if !full {

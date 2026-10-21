@@ -201,6 +201,48 @@ func TestCallsMenuReportsAMissingSiteDate(t *testing.T) {
 	}
 }
 
+func TestCallsShowAddsAFreshnessLineForUsers(t *testing.T) {
+	caller := &recordingCaller{}
+	b, repo := setupE2EBotWithCaller(t, caller, 4242)
+	chat, _ := repo.FindOrCreate("telegram", 4242)
+	chat.Mode = ModeStudent
+	chat.Group = "63ТП"
+	repo.Save(chat)
+
+	calls := b.cache.GetCalls()
+	calls.Site.UpdatedAt = b.nowTime().Add(-3 * time.Hour).UnixMilli()
+	calls.Site.UpdatedAtRaw = ""
+	b.cache.SetCallsFromCache(calls)
+
+	b.showCalls(&Update{Bot: b, ChatID: 4242, UserID: 4242}, chat, false)
+
+	text, _ := lastDeliveredMessage(t, caller)
+	if !strings.Contains(text, "Звонки получены:") || !strings.Contains(text, "3 ч. назад") {
+		t.Errorf("the calls view must show how old the bell schedule is, got %q", text)
+	}
+}
+
+func TestCallsShowPrefersTheSiteDateInTheFreshnessLine(t *testing.T) {
+	caller := &recordingCaller{}
+	b, repo := setupE2EBotWithCaller(t, caller, 4243)
+	chat, _ := repo.FindOrCreate("telegram", 4243)
+	chat.Mode = ModeStudent
+	chat.Group = "63ТП"
+	repo.Save(chat)
+
+	calls := b.cache.GetCalls()
+	calls.Site.UpdatedAt = b.nowTime().Add(-72 * time.Hour).UnixMilli()
+	calls.Site.UpdatedAtRaw = "05.09.2026"
+	b.cache.SetCallsFromCache(calls)
+
+	b.showCalls(&Update{Bot: b, ChatID: 4243, UserID: 4243}, chat, false)
+
+	text, _ := lastDeliveredMessage(t, caller)
+	if !strings.Contains(text, "Звонки обновлены на сайте: 05.09.2026") {
+		t.Errorf("the calls view must show the site date when it exists, got %q", text)
+	}
+}
+
 func TestCallsCampusConfirmationMentionsTheCampus(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 	withCampusVariants(t, b)

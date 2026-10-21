@@ -163,6 +163,38 @@ func callsSourceLabel(source string) string {
 	}
 }
 
+func (b *Bot) callsFreshnessLine() string {
+	if b.cache == nil {
+		return ""
+	}
+	calls := b.cache.GetCalls()
+	if calls.Site.UpdatedAt <= 0 {
+		return ""
+	}
+	if calls.Site.UpdatedAtRaw != "" {
+		return b.locData("calls_freshness_site", map[string]interface{}{"Date": calls.Site.UpdatedAtRaw})
+	}
+	at := time.UnixMilli(calls.Site.UpdatedAt)
+	return b.locData("calls_freshness_parsed", map[string]interface{}{
+		"At":  at.Format("02.01.2006 15:04"),
+		"Ago": b.callsAgeText(at),
+	})
+}
+
+func (b *Bot) callsAgeText(at time.Time) string {
+	age := b.nowTime().Sub(at)
+	switch {
+	case age < time.Minute:
+		return b.loc("calls_freshness_just_now")
+	case age < time.Hour:
+		return b.locData("calls_freshness_minutes", map[string]interface{}{"Minutes": int(age.Minutes())})
+	case age < 24*time.Hour:
+		return b.locData("calls_freshness_hours", map[string]interface{}{"Hours": int(age.Hours())})
+	default:
+		return b.locData("calls_freshness_days", map[string]interface{}{"Days": int(age.Hours() / 24)})
+	}
+}
+
 func (b *Bot) siteCallsParsedAt() string {
 	if b.cache == nil {
 		return ""

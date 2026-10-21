@@ -17,6 +17,7 @@ var (
 	weekNumberRe = regexp.MustCompile(`№\s*\d+`)
 	dayHintRe    = regexp.MustCompile(`\((сегодня|завтра)\)`)
 	loadedAtRe   = regexp.MustCompile(`загружена \d.*? назад`)
+	ageRe        = regexp.MustCompile(`\((?:только что|\d+ (?:мин|ч|дн)\. назад)\)`)
 
 	callbackDigitRe = regexp.MustCompile(`\d+`)
 )
@@ -36,6 +37,7 @@ func Normalize(text string, now time.Time) string {
 	out = weekNumberRe.ReplaceAllString(out, "№{{week}}")
 	out = dayHintRe.ReplaceAllString(out, "{{hint}}")
 	out = loadedAtRe.ReplaceAllString(out, "загружена {{ago}} назад")
+	out = ageRe.ReplaceAllString(out, "({{ago}})")
 	out = strings.ReplaceAll(out, "👉 ", "{{now}} ")
 	out = strings.ReplaceAll(out, " 👈", " {{now}}")
 	return out
