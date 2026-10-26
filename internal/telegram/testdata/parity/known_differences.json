@@ -14,6 +14,7 @@
     { "section": "commands", "kind": "extra_in_go", "value": "google_calendar", "reason": "Go port exposes Google Calendar as its own command and main-menu button" },
     { "section": "commands", "kind": "extra_in_go", "value": "id", "reason": "Go port adds a test command printing the user and chat id" },
     { "section": "commands", "kind": "extra_in_go", "value": "image", "reason": "Go port adds /image as a shortcut for the cached timetable image" },
+    { "section": "commands", "kind": "extra_in_go", "value": "imagelayout", "reason": "Go port adds /imagelayout, which renders the embedded golden reference cases in the running process and reports the font it found, the size of each render and how many pixels differ from the committed layout, so a container missing a font or running a drifted renderer is diagnosable from Telegram; the old bot had no layout goldens" },
     { "section": "commands", "kind": "extra_in_go", "value": "incidents", "reason": "Go port keeps a stored history of parser and calendar incidents for admins" },
     { "section": "commands", "kind": "extra_in_go", "value": "math", "reason": "Go port adds a math helper command" },
     { "section": "commands", "kind": "extra_in_go", "value": "next", "reason": "Go port adds /next, which answers with the pair running right now and the one that starts next, computed from the same bell schedule and day the reminders use; the old bot could only print a whole day" },

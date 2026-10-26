@@ -242,6 +242,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&parserHealthCmd{bot: b})
 	b.RegisterCommand(&incidentsCmd{bot: b})
 	b.RegisterCommand(&webhookCmd{bot: b})
+	b.RegisterCommand(&imageLayoutCmd{bot: b})
 
 	b.RegisterCallback(&callsFullCb{bot: b})
 	b.RegisterCallback(&imageCb{bot: b})
