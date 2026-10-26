@@ -35,6 +35,7 @@ func DefaultOptions() Options {
 
 type Repository struct {
 	db    *sql.DB
+	path  string
 	write sqlitedb.Options
 }
 
@@ -52,7 +53,8 @@ func NewWithOptions(dbPath string, opts Options) (*Repository, error) {
 	}
 
 	repo := &Repository{
-		db: db,
+		db:   db,
+		path: dbPath,
 		write: sqlitedb.Options{
 			BusyTimeout: opts.BusyTimeout,
 			Retries:     opts.Retries,

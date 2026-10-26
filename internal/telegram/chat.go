@@ -64,8 +64,24 @@ type Chat struct {
 	HistoryTeacher           []string
 }
 
+const (
+	chatApplicationID = 0x4D474B43
+	chatSchemaVersion = 1
+)
+
+var chatTables = []string{
+	"bot_chats",
+	"bot_state",
+	"aliases",
+	"subscriptions",
+	"google_accounts",
+	"google_calendars",
+	"api_keys",
+}
+
 type Repository struct {
 	db              *sql.DB
+	path            string
 	mu              sync.RWMutex
 	defaultAccepted bool
 }
@@ -80,8 +96,9 @@ func NewWithBusyTimeout(dbPath string, busyTimeout time.Duration) (*Repository, 
 		return nil, err
 	}
 
-	r := &Repository{db: db, defaultAccepted: true}
+	r := &Repository{db: db, path: dbPath, defaultAccepted: true}
 	if err := r.migrate(); err != nil {
+		db.Close()
 		return nil, err
 	}
 	return r, nil
@@ -92,6 +109,14 @@ func (r *Repository) Close() error {
 }
 
 func (r *Repository) migrate() error {
+	if err := sqlitedb.CheckIdentity(r.db, r.path, sqlitedb.Identity{
+		ApplicationID: chatApplicationID,
+		SchemaVersion: chatSchemaVersion,
+		Tables:        chatTables,
+	}); err != nil {
+		return err
+	}
+
 	_, err := r.db.Exec(`CREATE TABLE IF NOT EXISTS bot_chats (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		service TEXT NOT NULL DEFAULT 'telegram',

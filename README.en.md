@@ -137,6 +137,8 @@ The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQL
 
 The archive used to be called `sqlite3.db`, the single database of the old TypeScript bot. On upgrade the bot keeps working from the old file and logs `archive still lives under the legacy sqlite3.db name`; to move to the new name, stop the bot, rename the file (together with `-wal` and `-shm` when present) and start it again. Hot copies in `archive.backup_dir` survive the rename: retention understands both the old `sqlite3-` prefix and the new `timetable_archive-` one.
 
+Both databases carry a marker in the file header (`PRAGMA application_id` and `user_version`): the archive and the chat database know their own marker, so the bot refuses to open `bot_chats.db` as the archive (or the other way round) and never mixes two schemas in one file. Files written by earlier versions have no marker, are accepted by their table set and are marked on the first start.
+
 ### Update delivery: long polling and webhook
 
 By default the bot fetches updates itself (long polling), so publishing the HTTP API port is enough and no inbound connections from Telegram are needed. If you prefer Telegram to push updates with a POST request to your own HTTPS address, enable the webhook:
