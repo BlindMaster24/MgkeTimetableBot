@@ -41,6 +41,8 @@ func TestValidateRejectsBrokenFields(t *testing.T) {
 		{"activity", func(c *Config) { c.Parser.Activity = [2]int{17, 9} }, "parser.activity"},
 		{"weekday", func(c *Config) { c.Timetable.Weekdays[0][0][0] = "25:00" }, "timetable.weekdays"},
 		{"saturday", func(c *Config) { c.Timetable.Saturday[0][1][1] = "09:00" }, "timetable.saturday"},
+		{"same_database", func(c *Config) { c.DBPath = "./shared.db"; c.ChatDBPath = "./shared.db" }, "db_path and chat_db_path"},
+		{"same_database_cleaned", func(c *Config) { c.DBPath = "shared.db"; c.ChatDBPath = "./shared.db" }, "db_path and chat_db_path"},
 		{"guard_min", func(c *Config) { c.Parser.Guard.MinItems = -1 }, "parser.guard.min_items"},
 		{"guard_drop", func(c *Config) { c.Parser.Guard.MaxDropPercent = 101 }, "parser.guard.max_drop_percent"},
 	}

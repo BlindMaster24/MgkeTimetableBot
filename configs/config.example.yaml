@@ -1,4 +1,4 @@
-db_path: "./sqlite3.db"
+db_path: "./timetable_archive.db"
 chat_db_path: "./bot_chats.db"
 cache_dir: "./cache/rasp"
 

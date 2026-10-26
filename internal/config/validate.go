@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -19,6 +21,12 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.Telegram.Token) == "" {
 		errs = append(errs, errors.New("telegram.token is required"))
+	}
+	if strings.TrimSpace(c.ResolvedDBPath()) == "" {
+		errs = append(errs, errors.New("db_path must not be empty"))
+	}
+	if archive, _, collides := collidingDatabasePaths(c.ResolvedDBPath(), c.ResolvedChatDBPath()); collides {
+		errs = append(errs, fmt.Errorf("db_path and chat_db_path must point at different files, both resolve to %q", archive))
 	}
 	if strings.TrimSpace(c.ResolvedChatDBPath()) == "" {
 		errs = append(errs, errors.New("chat_db_path must not be empty"))
@@ -73,6 +81,21 @@ func (c *Config) Validate() error {
 }
 
 var maintenanceScheduleParser = cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+func collidingDatabasePaths(archive, chats string) (string, string, bool) {
+	archivePath, err := filepath.Abs(archive)
+	if err != nil {
+		archivePath = filepath.Clean(archive)
+	}
+	chatPath, err := filepath.Abs(chats)
+	if err != nil {
+		chatPath = filepath.Clean(chats)
+	}
+	if runtime.GOOS == "windows" {
+		return archivePath, chatPath, strings.EqualFold(archivePath, chatPath)
+	}
+	return archivePath, chatPath, archivePath == chatPath
+}
 
 func checkSlot(section string, index int, slot [2][2]string) error {
 	for half := 0; half < 2; half++ {

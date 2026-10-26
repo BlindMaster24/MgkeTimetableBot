@@ -48,7 +48,7 @@ USER bot
 
 ENV CONFIG_PATH=/app/configs/config.yaml \
 	TZ=Europe/Minsk \
-	MGKE_DB_PATH=/data/sqlite3.db \
+	MGKE_DB_PATH=/data/timetable_archive.db \
 	MGKE_CHAT_DB_PATH=/data/bot_chats.db \
 	MGKE_CACHE_DIR=/data/cache/rasp \
 	MGKE_HTTP_PORT=8081

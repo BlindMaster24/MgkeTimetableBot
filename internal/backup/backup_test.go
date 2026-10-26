@@ -251,7 +251,7 @@ func TestPruneRemovesOnlyItsOwnOldestBackups(t *testing.T) {
 		owned = append(owned, name)
 	}
 
-	removed, kept, err := Prune(dir, "sqlite3", 2)
+	removed, kept, err := Prune(dir, []string{"sqlite3"}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestPruneKeepsEveryBackupWithoutALimit(t *testing.T) {
 		writeFile(t, filepath.Join(dir, name), "snapshot")
 	}
 
-	removed, kept, err := Prune(dir, "sqlite3", 0)
+	removed, kept, err := Prune(dir, []string{"sqlite3"}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,8 +302,30 @@ func TestPruneKeepsEveryBackupWithoutALimit(t *testing.T) {
 	}
 }
 
+func TestPruneCoversTheLegacySnapshotPrefix(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"sqlite3-20260101-000000.db",
+		"timetable_archive-20260102-000000.db",
+		"timetable_archive-20260103-000000.db",
+	} {
+		writeFile(t, filepath.Join(dir, name), "snapshot")
+	}
+
+	removed, kept, err := Prune(dir, []string{"timetable_archive", "sqlite3"}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(removed) != 1 || removed[0] != "sqlite3-20260101-000000.db" {
+		t.Fatalf("removed = %v, want the oldest legacy snapshot", removed)
+	}
+	if len(kept) != 2 {
+		t.Fatalf("kept = %v, want both new snapshots", kept)
+	}
+}
+
 func TestPruneRefusesAnEmptyPrefix(t *testing.T) {
-	if _, _, err := Prune(t.TempDir(), "", 1); err != ErrNoPrefix {
+	if _, _, err := Prune(t.TempDir(), []string{""}, 1); err != ErrNoPrefix {
 		t.Fatalf("err = %v, want %v", err, ErrNoPrefix)
 	}
 }

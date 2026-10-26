@@ -115,7 +115,7 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | Section | Purpose |
 |---------|---------|
 | `dev` | Development mode (verbose logs, dev commands) |
-| `db_path` | SQLite file with the timetable archive (default `./sqlite3.db`) |
+| `db_path` | SQLite file with the timetable archive (default `./timetable_archive.db`); a `./sqlite3.db` left by an older version is adopted automatically while the new file does not exist |
 | `chat_db_path` | SQLite file with chats, aliases, subscriptions and Google accounts (default `./bot_chats.db`) |
 | `cache_dir` | Directory of the file-backed timetable cache (default `./cache/rasp`) |
 | `logging` | Level, log file, rotation settings |
@@ -133,7 +133,9 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `archive` | Archive maintenance: `archive.backup_dir` is the directory of hot SQLite copies (empty disables them), `archive.backup_keep` is how many copies to keep (7 by default, 0 keeps every copy), `archive.retention_days` drops archive rows older than N days (0 never drops any), and `archive.maintenance_schedule` is the cron expression with seconds (default `0 30 4 * * *`) |
 | `encrypt_key` | Encryption key: it signs the REST API keys and encrypts the stored Google OAuth tokens, so it must be at least 32 characters long |
 
-The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQLite (see `db_path`); the archive schema is embedded into the binary (`internal/archive/migrations/`).
+The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQLite (see `db_path`); the archive schema is embedded into the binary (`internal/archive/migrations/`). The archive and `chat_db_path` must point at different files: one shared file would mix two schemas, and the bot refuses to start.
+
+The archive used to be called `sqlite3.db`, the single database of the old TypeScript bot. On upgrade the bot keeps working from the old file and logs `archive still lives under the legacy sqlite3.db name`; to move to the new name, stop the bot, rename the file (together with `-wal` and `-shm` when present) and start it again. Hot copies in `archive.backup_dir` survive the rename: retention understands both the old `sqlite3-` prefix and the new `timetable_archive-` one.
 
 ### Update delivery: long polling and webhook
 
@@ -462,7 +464,7 @@ docker compose up -d --build
 
 The Go version lives in exactly one place — the `go` directive of `go.mod`. The image build receives it through the `GO_VERSION` build argument (CI passes the same value from `actions/setup-go`), so editing `go.mod` moves the image toolchain with it; without `GO_VERSION` compose stops with a clear error instead of building the image on whatever version it happens to find.
 
-`docker-compose.yml` builds the image from the `Dockerfile`, ships the config `configs/config.yaml` and keeps state (`bot_chats.db`, `sqlite3.db`, `cache/`, logs) in a named volume. Secrets are passed as environment variables:
+`docker-compose.yml` builds the image from the `Dockerfile`, ships the config `configs/config.yaml` and keeps state (`bot_chats.db`, `timetable_archive.db`, `cache/`, logs) in a named volume. Secrets are passed as environment variables:
 
 ```yaml
 services:
@@ -470,7 +472,7 @@ services:
     environment:
       MGKE_TELEGRAM_TOKEN: "123:ABC"
       MGKE_TELEGRAM_ADMIN_IDS: "1,2"
-      MGKE_DB_PATH: /data/sqlite3.db
+      MGKE_DB_PATH: /data/timetable_archive.db
       # MGKE_TELEGRAM_WEBHOOK_ENABLED: "true"
       # MGKE_TELEGRAM_WEBHOOK_URL: "https://bot.example.com"
       # MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN: "change-me"

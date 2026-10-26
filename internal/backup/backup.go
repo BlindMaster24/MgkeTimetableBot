@@ -24,11 +24,12 @@ var stampRe = regexp.MustCompile(`^\d{8}-\d{6}$`)
 const stampLayout = "20060102-150405"
 
 type Options struct {
-	DBPath      string
-	Dir         string
-	Keep        int
-	Now         time.Time
-	BusyTimeout time.Duration
+	DBPath        string
+	Dir           string
+	Keep          int
+	Now           time.Time
+	BusyTimeout   time.Duration
+	PrunePrefixes []string
 }
 
 type Result struct {
@@ -56,7 +57,8 @@ func Run(opts Options) (Result, error) {
 		return Result{}, err
 	}
 
-	removed, kept, err := Prune(dir, Prefix(opts.DBPath), opts.Keep)
+	prefixes := append([]string{Prefix(opts.DBPath)}, opts.PrunePrefixes...)
+	removed, kept, err := Prune(dir, prefixes, opts.Keep)
 	result := Result{Path: dest, Removed: removed, Kept: kept}
 	if err != nil {
 		return result, err
@@ -97,8 +99,9 @@ func snapshotBusyTimeout(opts Options) time.Duration {
 	return opts.BusyTimeout
 }
 
-func Prune(dir, prefix string, keep int) ([]string, []string, error) {
-	if prefix == "" {
+func Prune(dir string, prefixes []string, keep int) ([]string, []string, error) {
+	clean := uniquePrefixes(prefixes)
+	if len(clean) == 0 {
 		return nil, nil, ErrNoPrefix
 	}
 
@@ -112,11 +115,14 @@ func Prune(dir, prefix string, keep int) ([]string, []string, error) {
 		if entry.IsDir() || entry.Type()&fs.ModeSymlink != 0 {
 			continue
 		}
-		stamp, ok := parseStamp(entry.Name(), prefix)
-		if !ok {
-			continue
+		for _, prefix := range clean {
+			stamp, ok := parseStamp(entry.Name(), prefix)
+			if !ok {
+				continue
+			}
+			ownedFiles = append(ownedFiles, owned{name: entry.Name(), stamp: stamp})
+			break
 		}
-		ownedFiles = append(ownedFiles, owned{name: entry.Name(), stamp: stamp})
 	}
 
 	sort.Slice(ownedFiles, func(i, j int) bool {
@@ -145,6 +151,20 @@ func Prune(dir, prefix string, keep int) ([]string, []string, error) {
 	sort.Strings(removed)
 
 	return removed, kept, errors.Join(failures...)
+}
+
+func uniquePrefixes(prefixes []string) []string {
+	seen := make(map[string]bool, len(prefixes))
+	var clean []string
+	for _, prefix := range prefixes {
+		prefix = strings.TrimSpace(prefix)
+		if prefix == "" || seen[prefix] {
+			continue
+		}
+		seen[prefix] = true
+		clean = append(clean, prefix)
+	}
+	return clean
 }
 
 func parseStamp(name, prefix string) (time.Time, bool) {

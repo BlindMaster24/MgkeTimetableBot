@@ -295,9 +295,9 @@ Documentation is not a follow-up task; it is part of the same commit and the sam
 
 ## Configuration & Security
 - `configs/config.yaml` is gitignored; start from the tracked template: `cp configs/config.example.yaml configs/config.yaml` and fill in real values (tokens, keys).
-- Keep secrets out of git and avoid committing local DB files (e.g., `sqlite3.db`) or `.env` files.
+- Keep secrets out of git and avoid committing local DB files (e.g., `timetable_archive.db`) or `.env` files.
 - Prefer environment variables over editing YAML for deployment-specific values (tokens, admin IDs, ports, storage paths).
-- Storage paths are configurable: `db_path` (archive), `chat_db_path` (chats and Google data), `cache_dir` (file cache).
+- Storage paths are configurable: `db_path` (archive, default `./timetable_archive.db`; a leftover `sqlite3.db` is adopted and reported with a warning until it is renamed), `chat_db_path` (chats and Google data), `cache_dir` (file cache). `Validate` refuses a config where `db_path` and `chat_db_path` resolve to the same file.
 - Run the bot with an explicit config path: `go run ./cmd/bot/ -config configs/config.yaml` (`-config` wins over `CONFIG_PATH`, both default to `configs/config.yaml`).
 
 ## Bot Behavior Notes

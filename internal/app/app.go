@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
@@ -15,6 +16,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/backup"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/build"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
@@ -66,7 +68,15 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		Int("teachers", len(raspCache.GetTeachers())).
 		Msg("cache loaded from disk")
 
-	archiveRepo, err := archive.NewWithOptions(cfg.DBPath, archive.Options{
+	archivePath := cfg.ResolvedDBPath()
+	if adopted, ok := config.AdoptLegacyDBPath(archivePath); ok {
+		log.Warn().
+			Str("path", absolutePath(adopted)).
+			Msg("archive still lives under the legacy sqlite3.db name, rename it to timetable_archive.db")
+		archivePath = adopted
+	}
+
+	archiveRepo, err := archive.NewWithOptions(archivePath, archive.Options{
 		BusyTimeout: cfg.ResolvedSQLiteBusyTimeout(),
 		Retries:     cfg.ResolvedSQLiteBusyRetries(),
 		OnRetry:     func(int, error) { metrics.ArchiveBusyRetry() },
@@ -77,7 +87,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		return 1
 	}
 	defer archiveRepo.Close()
-	log.Info().Msg("archive DB opened")
+	log.Info().Str("path", absolutePath(archivePath)).Msg("archive DB opened")
 
 	syncArchive := func(tag string) {
 		if err := archiveRepo.SyncFromCache(raspCache.GetGroups(), raspCache.GetTeachers()); err != nil {
@@ -363,4 +373,11 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	log.Info().Msg("shutdown complete")
 	_ = log.Close()
 	return 0
+}
+
+func absolutePath(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		return abs
+	}
+	return path
 }

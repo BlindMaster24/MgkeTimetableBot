@@ -1,9 +1,12 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -175,6 +178,8 @@ type LessonFilter struct {
 }
 
 const (
+	DefaultDBPath              = "./timetable_archive.db"
+	LegacyDBName               = "sqlite3.db"
 	DefaultChatDBPath          = "./bot_chats.db"
 	DefaultCacheDir            = "./cache/rasp"
 	DefaultBackupKeep          = 7
@@ -202,8 +207,31 @@ func (c *Config) ResolvedSQLiteBusyRetries() int {
 	return c.SQLite.BusyRetries
 }
 
+func (c *Config) ResolvedDBPath() string {
+	return pathOr(c.DBPath, DefaultDBPath)
+}
+
 func (c *Config) ResolvedChatDBPath() string {
 	return pathOr(c.ChatDBPath, DefaultChatDBPath)
+}
+
+func AdoptLegacyDBPath(path string) (string, bool) {
+	configured := strings.TrimSpace(path)
+	if configured == "" || filepath.Base(configured) != filepath.Base(DefaultDBPath) {
+		return path, false
+	}
+
+	legacy := filepath.Join(filepath.Dir(configured), LegacyDBName)
+	if filepath.Clean(legacy) == filepath.Clean(configured) {
+		return path, false
+	}
+	if _, err := os.Stat(configured); !errors.Is(err, fs.ErrNotExist) {
+		return path, false
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		return path, false
+	}
+	return legacy, true
 }
 
 func (c *Config) ResolvedCacheDir() string {

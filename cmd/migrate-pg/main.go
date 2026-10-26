@@ -46,14 +46,15 @@ type OldChat struct {
 
 func main() {
 	pgURL := flag.String("pg", "", "PostgreSQL connection string (postgresql://user:pass@host:port/dbname)")
-	sqlitePath := flag.String("sqlite", "sqlite3.db", "Output SQLite file path")
+	sqlitePath := flag.String("sqlite", "bot_chats.db", "Output SQLite file path")
+	force := flag.Bool("force", false, "Replace the output file if it already exists")
 	flag.Parse()
 
 	if *pgURL == "" {
 		*pgURL = os.Getenv("DATABASE_URL")
 	}
 	if *pgURL == "" {
-		log.Fatal("Usage: migrate-pg -pg 'postgresql://user:pass@host:port/dbname' [-sqlite sqlite3.db]")
+		log.Fatal("Usage: migrate-pg -pg 'postgresql://user:pass@host:port/dbname' [-sqlite bot_chats.db] [-force]")
 	}
 
 	log.Printf("Connecting to PostgreSQL...")
@@ -108,7 +109,12 @@ func main() {
 		return
 	}
 
-	os.Remove(*sqlitePath)
+	if _, err := os.Stat(*sqlitePath); err == nil {
+		if !*force {
+			log.Fatalf("%s already exists, pass -force to replace it", *sqlitePath)
+		}
+		os.Remove(*sqlitePath)
+	}
 	log.Printf("Creating SQLite database: %s", *sqlitePath)
 	sqliteDB, err := sql.Open("sqlite", *sqlitePath)
 	if err != nil {

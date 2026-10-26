@@ -115,7 +115,7 @@ go version   # ожидается go1.27.3 или новее
 
 | Секция | Назначение |
 |--------|------------|
-| `db_path` | Путь к SQLite с архивом расписания (по умолчанию `./sqlite3.db`) |
+| `db_path` | Путь к SQLite с архивом расписания (по умолчанию `./timetable_archive.db`); файл `./sqlite3.db`, оставшийся от прежних версий, подхватывается автоматически, пока нового файла нет |
 | `chat_db_path` | Путь к SQLite с чатами, алиасами, подписками, аккаунтами Google (по умолчанию `./bot_chats.db`) |
 | `cache_dir` | Каталог файлового кэша расписания (по умолчанию `./cache/rasp`) |
 | `logging` | Уровень, файл лога, параметры ротации |
@@ -133,7 +133,9 @@ go version   # ожидается go1.27.3 или новее
 | `archive` | Обслуживание архива: `archive.backup_dir` — каталог горячих копий SQLite (пусто — копии выключены), `archive.backup_keep` — сколько копий хранить (по умолчанию 7, 0 — без ограничения), `archive.retention_days` — удалять записи архива старше N дней (0 — не удалять), `archive.maintenance_schedule` — cron-выражение с секундами (по умолчанию `0 30 4 * * *`) |
 | `encrypt_key` | Ключ шифрования: им подписываются ключи REST API и шифруются токены Google OAuth, поэтому короче 32 символов его задавать нельзя |
 
-Кэш расписания лежит в `cache/rasp/` в виде JSON, архив — в SQLite (см. `db_path`); схема архива встроена в бинарник (`internal/archive/migrations/`).
+Кэш расписания лежит в `cache/rasp/` в виде JSON, архив — в SQLite (см. `db_path`); схема архива встроена в бинарник (`internal/archive/migrations/`). Архив и `chat_db_path` должны указывать на разные файлы: общая база смешала бы две схемы, и бот откажется стартовать.
+
+Архив раньше назывался `sqlite3.db` — так называлась единственная база старого TypeScript-бота. При обновлении бот сам продолжает работать со старым файлом и пишет в лог предупреждение `archive still lives under the legacy sqlite3.db name`; чтобы перейти на новое имя, остановите бота, переименуйте файл (вместе с `-wal` и `-shm`, если они есть) и запустите снова. Горячие копии в `archive.backup_dir` переживают переименование: чистка понимает и старый префикс `sqlite3-`, и новый `timetable_archive-`.
 
 ### Переменные окружения
 
@@ -465,7 +467,7 @@ docker compose up -d --build
 
 Версия Go живёт ровно в одном месте — в директиве `go` файла `go.mod`. Сборка образа получает её аргументом `GO_VERSION` (CI передаёт то же значение из `actions/setup-go`), поэтому правка `go.mod` меняет и тулчейн образа; без `GO_VERSION` compose останавливается с понятной ошибкой, а не собирает образ на случайной версии.
 
-`docker-compose.yml` собирает образ из `Dockerfile`, подкладывает конфиг `configs/config.yaml` и хранит состояние (`bot_chats.db`, `sqlite3.db`, `cache/`, логи) в именованном томе. Секреты передаются переменными окружения:
+`docker-compose.yml` собирает образ из `Dockerfile`, подкладывает конфиг `configs/config.yaml` и хранит состояние (`bot_chats.db`, `timetable_archive.db`, `cache/`, логи) в именованном томе. Секреты передаются переменными окружения:
 
 ```yaml
 services:
@@ -473,7 +475,7 @@ services:
     environment:
       MGKE_TELEGRAM_TOKEN: "123:ABC"
       MGKE_TELEGRAM_ADMIN_IDS: "1,2"
-      MGKE_DB_PATH: /data/sqlite3.db
+      MGKE_DB_PATH: /data/timetable_archive.db
       # MGKE_TELEGRAM_WEBHOOK_ENABLED: "true"
       # MGKE_TELEGRAM_WEBHOOK_URL: "https://bot.example.com"
       # MGKE_TELEGRAM_WEBHOOK_SECRET_TOKEN: "change-me"

@@ -119,10 +119,17 @@ func webhookModeForConfig(cfg *config.Config) string {
 }
 
 func archiveAvailable(cfg *config.Config) bool {
-	if cfg == nil || strings.TrimSpace(cfg.DBPath) == "" {
+	if cfg == nil {
 		return false
 	}
-	info, err := os.Stat(cfg.DBPath)
+	path := cfg.ResolvedDBPath()
+	if adopted, ok := config.AdoptLegacyDBPath(path); ok {
+		path = adopted
+	}
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
 }
 

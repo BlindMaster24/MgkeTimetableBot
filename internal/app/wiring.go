@@ -81,10 +81,11 @@ func (m *archiveMaintenance) Run() (telegrambot.BackupReport, error) {
 
 	if report.Backup {
 		result, err := backup.Run(backup.Options{
-			DBPath: m.cfg.DBPath,
-			Dir:    m.cfg.Archive.BackupDir,
-			Keep:   m.cfg.ResolvedBackupKeep(),
-			Now:    m.now(),
+			DBPath:        m.cfg.ResolvedDBPath(),
+			Dir:           m.cfg.Archive.BackupDir,
+			Keep:          m.cfg.ResolvedBackupKeep(),
+			Now:           m.now(),
+			PrunePrefixes: []string{backup.Prefix(config.LegacyDBName)},
 		})
 		report.Path = result.Path
 		report.Removed = len(result.Removed)

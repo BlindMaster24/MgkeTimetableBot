@@ -534,7 +534,7 @@ func checkStorage(cfg *config.Config) Check {
 		name string
 		path string
 	}{
-		{"db_path", cfg.DBPath},
+		{"db_path", cfg.ResolvedDBPath()},
 		{"chat_db_path", cfg.ResolvedChatDBPath()},
 		{"cache_dir", cfg.ResolvedCacheDir()},
 	}
@@ -564,6 +564,13 @@ func checkStorage(cfg *config.Config) Check {
 		}
 		os.Remove(probe)
 		facts = append(facts, entry.path+" writable")
+	}
+
+	if legacy, adopted := config.AdoptLegacyDBPath(cfg.ResolvedDBPath()); adopted {
+		if level == LevelOK {
+			level = LevelWarn
+		}
+		hints = append(hints, fmt.Sprintf("warning: the archive still lives in %s; stop the bot and rename it to %s", legacy, cfg.ResolvedDBPath()))
 	}
 
 	return Check{Name: "storage", Level: level, Detail: strings.Join(facts, ", "), Hints: hints}
