@@ -12,6 +12,9 @@
 # Test binary
 *.test
 
+# Received image kept by a failing golden comparison
+*.got.png
+
 # Output of go coverage
 *.out
 coverage.out

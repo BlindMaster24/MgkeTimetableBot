@@ -190,7 +190,7 @@ func TestRun_LiveSiteChecks(t *testing.T) {
 		HTTPClient: site.server.Client(),
 	})
 
-	for _, name := range []string{"config", "credentials", "locale", "storage", "timetable", "site:groups", "site:teachers", "site:calls"} {
+	for _, name := range []string{"config", "credentials", "locale", "storage", "timetable", "image:layout", "site:groups", "site:teachers", "site:calls"} {
 		check := findCheck(t, report, name)
 		if check.Level == LevelFail {
 			t.Errorf("%s failed: %s %v", name, check.Detail, check.Hints)
@@ -198,6 +198,43 @@ func TestRun_LiveSiteChecks(t *testing.T) {
 	}
 	if report.Failed() {
 		t.Errorf("expected a passing report, got %s", report.Text())
+	}
+}
+
+func TestRun_ChecksTheGoldenImageLayoutWithoutTheSite(t *testing.T) {
+	site := startSite(t, groupHTML(todayPlus(0)), teacherHTML(todayPlus(1)))
+
+	report := Run(Options{ConfigPath: siteConfig(t, site), SkipSite: true, SkipImage: true})
+
+	check := findCheck(t, report, "image:layout")
+	if check.Level != LevelOK {
+		t.Fatalf("the committed layout must render identically, got %s %v", check.Detail, check.Hints)
+	}
+	if !strings.Contains(check.Detail, "2 reference renders") {
+		t.Errorf("the detail must say what was compared, got %q", check.Detail)
+	}
+}
+
+func TestComparePNGReportsADifferentLayout(t *testing.T) {
+	first, err := imagepkg.RenderGoldenSamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	differing, err := imagepkg.ComparePNG(first["group"], first["group"], 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if differing != 0 {
+		t.Errorf("an image must match itself, got %d differing pixels", differing)
+	}
+
+	differing, err = imagepkg.ComparePNG(first["group"], first["teacher"], 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if differing == 0 {
+		t.Error("two different renders must not look identical to the checker")
 	}
 }
 

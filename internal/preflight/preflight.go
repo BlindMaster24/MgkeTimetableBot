@@ -116,6 +116,7 @@ func Run(opts Options) Report {
 	report.add(checkStorage(cfg))
 	report.add(checkTimetable(cfg))
 	report.add(checkMetrics(cfg))
+	report.add(checkImageLayout())
 
 	endpoints := endpointsFor(cfg, opts.Endpoints)
 	switch {
@@ -838,6 +839,34 @@ func checkCalls(client *http.Client, url string, now time.Time, staleDays int) C
 	}
 
 	return Check{Name: "site:calls", Level: level, Detail: detail, Hints: hints}
+}
+
+func checkImageLayout() Check {
+	checks, err := imagepkg.CheckGoldenLayout()
+	if err != nil {
+		return Check{Name: "image:layout", Level: LevelFail, Detail: "render: " + err.Error()}
+	}
+
+	for _, golden := range checks {
+		if golden.Differing < 0 {
+			return Check{
+				Name:   "image:layout",
+				Level:  LevelFail,
+				Detail: golden.Name + ": the rendered sample changed size, so the layout moved",
+				Hints:  []string{"error: run go test ./internal/image -update after reviewing the render"},
+			}
+		}
+		if golden.Differing > 0 {
+			return Check{
+				Name:   "image:layout",
+				Level:  LevelFail,
+				Detail: fmt.Sprintf("%s: %d pixels differ from golden/%s.png", golden.Name, golden.Differing, golden.Name),
+				Hints:  []string{"error: run go test ./internal/image -update after reviewing the render"},
+			}
+		}
+	}
+
+	return Check{Name: "image:layout", Level: LevelOK, Detail: fmt.Sprintf("%d reference renders match the committed layout", len(checks))}
 }
 
 func checkImage(groups model.Groups, opts Options) Check {
