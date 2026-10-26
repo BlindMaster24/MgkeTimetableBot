@@ -90,7 +90,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	log.Info().Str("path", absolutePath(archivePath)).Msg("archive DB opened")
 
 	syncArchive := func(tag string) {
-		if err := archiveRepo.SyncFromCache(raspCache.GetGroups(), raspCache.GetTeachers()); err != nil {
+		if err := archiveRepo.SyncFromCache(ctx, raspCache.GetGroups(), raspCache.GetTeachers()); err != nil {
 			log.Error().Err(err).Str("tag", tag).Msg("archive sync failed")
 		} else {
 			log.Info().Str("tag", tag).Msg("archive synced from cache")
@@ -169,13 +169,13 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 
 	maintenance := newArchiveMaintenance(cfg, archiveRepo, log, metrics)
 
-	bot.SetBackupFunc(func(_ context.Context) (telegrambot.BackupReport, error) {
-		return maintenance.Run()
+	bot.SetBackupFunc(func(ctx context.Context) (telegrambot.BackupReport, error) {
+		return maintenance.Run(ctx)
 	})
 
 	if cfg.MaintenanceEnabled() {
 		scheduler := backup.NewScheduler(cfg.ResolvedMaintenanceSchedule(), log, func() {
-			if _, err := maintenance.Run(); err != nil {
+			if _, err := maintenance.Run(ctx); err != nil {
 				log.Error().Err(err).Msg("archive maintenance failed")
 			}
 		})

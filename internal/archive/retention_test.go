@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -9,7 +10,7 @@ import (
 func appendRetentionDay(t *testing.T, repo *Repository, day, group string) {
 	t.Helper()
 
-	err := repo.AppendDays([]AppendDay{{
+	err := repo.AppendDays(context.Background(), []AppendDay{{
 		Type:  "group",
 		Value: group,
 		Day:   map[string]any{"day": day, "lessons": []any{map[string]any{"lesson": "Математика"}}},
@@ -69,7 +70,7 @@ func TestPruneDaysBeforeKeepsEverythingItDoesNotOwn(t *testing.T) {
 	}
 
 	cutoff := RetentionCutoff(time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC), 30)
-	removed, err := repo.PruneDaysBefore(cutoff)
+	removed, err := repo.PruneDaysBefore(context.Background(), cutoff)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +108,7 @@ func TestPruneDaysBeforeKeepsEverythingItDoesNotOwn(t *testing.T) {
 		t.Fatalf("decoy rows = %d, want 1", planted)
 	}
 
-	if err := repo.Compact(); err != nil {
+	if err := repo.Compact(context.Background()); err != nil {
 		t.Fatalf("compact after a prune: %v", err)
 	}
 	if stats, err = repo.Stats(); err != nil || stats.Total != 1 {

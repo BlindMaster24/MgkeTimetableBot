@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func writeFile(t *testing.T, path, content string) {
 func appendDay(t *testing.T, repo *archive.Repository, day, group string) {
 	t.Helper()
 
-	err := repo.AppendDays([]archive.AppendDay{{
+	err := repo.AppendDays(context.Background(), []archive.AppendDay{{
 		Type:  "group",
 		Value: group,
 		Day:   map[string]any{"day": day, "lessons": []any{map[string]any{"lesson": "Математика"}}},

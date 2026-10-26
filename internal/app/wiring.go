@@ -71,7 +71,7 @@ func newArchiveMaintenance(cfg *config.Config, repo *archive.Repository, log *lo
 	return &archiveMaintenance{cfg: cfg, repo: repo, log: log, tracker: tracker, now: time.Now}
 }
 
-func (m *archiveMaintenance) Run() (telegrambot.BackupReport, error) {
+func (m *archiveMaintenance) Run(ctx context.Context) (telegrambot.BackupReport, error) {
 	report := telegrambot.BackupReport{
 		Backup:        m.cfg.BackupEnabled(),
 		Retention:     m.cfg.RetentionEnabled(),
@@ -98,13 +98,13 @@ func (m *archiveMaintenance) Run() (telegrambot.BackupReport, error) {
 	}
 
 	if report.Retention {
-		pruned, err := m.repo.PruneDaysBefore(archive.RetentionCutoff(m.now(), m.cfg.Archive.RetentionDays))
+		pruned, err := m.repo.PruneDaysBefore(ctx, archive.RetentionCutoff(m.now(), m.cfg.Archive.RetentionDays))
 		report.PrunedRows = int(pruned)
 		switch {
 		case err != nil:
 			failures = append(failures, err)
 		case pruned > 0:
-			if err := m.repo.Compact(); err != nil {
+			if err := m.repo.Compact(ctx); err != nil {
 				failures = append(failures, err)
 			}
 			m.log.Info().Int64("rows", pruned).Int("days", m.cfg.Archive.RetentionDays).Msg("archive pruned")

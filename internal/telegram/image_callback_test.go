@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"strconv"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ func weeklyArchiveDays(t *testing.T, repo *archive.Repository) string {
 	minIdx, _ := week.WeekDayIndexRange()
 	day := utils.DayIndexToDate(minIdx).Format("02.01.2006")
 
-	if err := repo.AppendDays([]archive.AppendDay{
+	if err := repo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "group", Value: "100", Day: map[string]any{"day": day, "lessons": []any{
 			map[string]any{"lesson": "Математика", "type": "Лек", "cabinet": "101"},
 		}}},

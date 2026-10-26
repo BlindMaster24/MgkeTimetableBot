@@ -1,19 +1,21 @@
 package archive
 
 import (
+	"context"
+
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
 
-func (r *Repository) FlushCache(groups, teachers map[string]any) (int, error) {
+func (r *Repository) FlushCache(ctx context.Context, groups, teachers map[string]any) (int, error) {
 	entries := cacheEntries(groups, teachers)
 	if len(entries) == 0 {
 		return 0, nil
 	}
 
-	return len(entries), r.AppendDays(entries)
+	return len(entries), r.AppendDays(ctx, entries)
 }
 
-func (r *Repository) SyncFromCache(groups, teachers map[string]any) error {
+func (r *Repository) SyncFromCache(ctx context.Context, groups, teachers map[string]any) error {
 	entries := cacheEntries(groups, teachers)
 
 	if len(entries) == 0 {
@@ -36,7 +38,7 @@ func (r *Repository) SyncFromCache(groups, teachers map[string]any) error {
 		return nil
 	}
 
-	return r.AppendDays(entries)
+	return r.AppendDays(ctx, entries)
 }
 
 func cacheEntries(groups, teachers map[string]any) []AppendDay {

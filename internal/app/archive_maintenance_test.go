@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ func maintenanceConfig(t *testing.T) (*config.Config, *archive.Repository) {
 	t.Cleanup(func() { repo.Close() })
 
 	for _, day := range []string{"01.02.2026", "02.02.2026", "06.10.2026"} {
-		if err := repo.AppendDays([]archive.AppendDay{{
+		if err := repo.AppendDays(context.Background(), []archive.AppendDay{{
 			Type:  "group",
 			Value: "100",
 			Day:   map[string]any{"day": day, "lessons": []any{map[string]any{"lesson": "Математика"}}},
@@ -89,7 +90,7 @@ func TestArchiveMaintenanceReportsAFailureAndItsRecovery(t *testing.T) {
 	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil), tracker)
 	maintenanceAt(m, time.Date(2026, 10, 6, 4, 30, 15, 0, time.UTC))
 
-	if _, err := m.Run(); err != nil {
+	if _, err := m.Run(context.Background()); err != nil {
 		t.Fatalf("the first run must succeed: %v", err)
 	}
 	if alerts := tracker.Alerts(); len(alerts) != 0 {
@@ -106,7 +107,7 @@ func TestArchiveMaintenanceReportsAFailureAndItsRecovery(t *testing.T) {
 	}
 	cfg.Archive.BackupDir = backupDir
 
-	if _, err := m.Run(); err == nil {
+	if _, err := m.Run(context.Background()); err == nil {
 		t.Fatal("a backup into a file must fail")
 	}
 	alerts := tracker.Alerts()
@@ -124,7 +125,7 @@ func TestArchiveMaintenanceReportsAFailureAndItsRecovery(t *testing.T) {
 	}
 
 	cfg.Archive.BackupDir = filepath.Join(t.TempDir(), "backups")
-	if _, err := m.Run(); err != nil {
+	if _, err := m.Run(context.Background()); err != nil {
 		t.Fatalf("a healthy run after a failure must succeed: %v", err)
 	}
 	if alerts := tracker.Alerts(); len(alerts) != 0 {
@@ -140,7 +141,7 @@ func TestArchiveMaintenanceBacksUpBeforeItPrunes(t *testing.T) {
 	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil), health.NewDefaultTracker())
 	maintenanceAt(m, time.Date(2026, 10, 6, 4, 30, 15, 0, time.UTC))
 
-	report, err := m.Run()
+	report, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("maintenance: %v", err)
 	}
@@ -183,11 +184,11 @@ func TestArchiveMaintenanceRetiresOnlyItsOwnOldestCopies(t *testing.T) {
 	m := newArchiveMaintenance(cfg, repo, logger.New("error", nil), health.NewDefaultTracker())
 
 	maintenanceAt(m, time.Date(2026, 10, 6, 4, 30, 15, 0, time.UTC))
-	if _, err := m.Run(); err != nil {
+	if _, err := m.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	maintenanceAt(m, time.Date(2026, 10, 7, 4, 30, 15, 0, time.UTC))
-	second, err := m.Run()
+	second, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +197,7 @@ func TestArchiveMaintenanceRetiresOnlyItsOwnOldestCopies(t *testing.T) {
 	}
 
 	maintenanceAt(m, time.Date(2026, 10, 8, 4, 30, 15, 0, time.UTC))
-	third, err := m.Run()
+	third, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +218,7 @@ func TestArchiveMaintenanceDoesNothingWhenItIsSwitchedOff(t *testing.T) {
 	cfg := &config.Config{DBPath: filepath.Join(t.TempDir(), "sqlite3.db")}
 	m := newArchiveMaintenance(cfg, nil, logger.New("error", nil), health.NewDefaultTracker())
 
-	report, err := m.Run()
+	report, err := m.Run(context.Background())
 	if err != nil {
 		t.Fatalf("maintenance: %v", err)
 	}

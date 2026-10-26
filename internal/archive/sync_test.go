@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -19,7 +20,7 @@ func newTestRepo(t *testing.T) *Repository {
 
 func TestSyncFromCacheEmpty(t *testing.T) {
 	repo := newTestRepo(t)
-	if err := repo.SyncFromCache(map[string]any{}, map[string]any{}); err != nil {
+	if err := repo.SyncFromCache(context.Background(), map[string]any{}, map[string]any{}); err != nil {
 		t.Fatalf("sync empty cache: %v", err)
 	}
 	bounds, err := repo.DayIndexBounds()
@@ -56,7 +57,7 @@ func TestSyncFromCachePopulatesArchive(t *testing.T) {
 		},
 	}
 
-	if err := repo.SyncFromCache(groups, teachers); err != nil {
+	if err := repo.SyncFromCache(context.Background(), groups, teachers); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 
@@ -89,7 +90,7 @@ func TestSyncFromCacheSkipsWhenNotNewer(t *testing.T) {
 	entries := []AppendDay{
 		{Type: "group", Value: "100", Day: map[string]any{"day": "07.09.2026", "lessons": []any{}}},
 	}
-	if err := repo.AppendDays(entries); err != nil {
+	if err := repo.AppendDays(context.Background(), entries); err != nil {
 		t.Fatal(err)
 	}
 
@@ -98,7 +99,7 @@ func TestSyncFromCacheSkipsWhenNotNewer(t *testing.T) {
 			"days": []any{map[string]any{"day": "07.09.2026", "lessons": []any{}}},
 		},
 	}
-	if err := repo.SyncFromCache(groups, map[string]any{}); err != nil {
+	if err := repo.SyncFromCache(context.Background(), groups, map[string]any{}); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 
@@ -122,7 +123,7 @@ func TestGroupDayRoundTrip(t *testing.T) {
 			&model.GroupLessonExplain{Lesson: "Математика", Cabinet: strPtr("101")},
 		},
 	}
-	if err := repo.AppendDays([]AppendDay{{Type: "group", Value: "100", Day: day}}); err != nil {
+	if err := repo.AppendDays(context.Background(), []AppendDay{{Type: "group", Value: "100", Day: day}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +148,7 @@ func TestTeacherDayRoundTrip(t *testing.T) {
 			&model.TeacherLessonExplain{Lesson: "Математика", Group: "100"},
 		},
 	}
-	if err := repo.AppendDays([]AppendDay{{Type: "teacher", Value: "Иванов И.И.", Day: day}}); err != nil {
+	if err := repo.AppendDays(context.Background(), []AppendDay{{Type: "teacher", Value: "Иванов И.И.", Day: day}}); err != nil {
 		t.Fatal(err)
 	}
 

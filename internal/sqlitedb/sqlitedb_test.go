@@ -1,6 +1,7 @@
 package sqlitedb
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -142,7 +143,7 @@ func TestRetryRepeatsABusyWriteOnceTheBlockerGoesAway(t *testing.T) {
 	}
 	opts.OnFailure = func(error) { failures++ }
 
-	err = opts.Retry(func() error {
+	err = opts.Retry(context.Background(), func() error {
 		attempts++
 		_, err := db.Exec("INSERT INTO rows (n) VALUES (7)")
 		return err
@@ -191,7 +192,7 @@ func TestRetryReportsABusyWriteItCouldNotRetryAway(t *testing.T) {
 		}
 	}
 
-	err = opts.Retry(func() error {
+	err = opts.Retry(context.Background(), func() error {
 		attempts++
 		_, err := db.Exec("INSERT INTO rows (n) VALUES (8)")
 		return err
@@ -217,7 +218,7 @@ func TestRetryDoesNotRepeatOtherErrors(t *testing.T) {
 	opts.OnFailure = func(error) { failures++ }
 
 	wanted := fmt.Errorf("no such column: nope")
-	err := opts.Retry(func() error {
+	err := opts.Retry(context.Background(), func() error {
 		attempts++
 		return wanted
 	})

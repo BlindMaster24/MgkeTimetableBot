@@ -117,7 +117,7 @@ func TestFlushCacheRewritesTheSameDay(t *testing.T) {
 	caller := &capturingCaller{}
 	b.client = botWithCaller(t, caller)
 
-	if err := repo.AppendDays([]archive.AppendDay{{
+	if err := repo.AppendDays(context.Background(), []archive.AppendDay{{
 		Type:  "group",
 		Value: "100",
 		Day:   map[string]any{"day": "31.08.2026", "lessons": []any{map[string]any{"lesson": "Старое"}}},

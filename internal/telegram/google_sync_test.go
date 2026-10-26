@@ -88,7 +88,7 @@ func TestGoogleResyncGroupCalendarFromArchive(t *testing.T) {
 	archiveRepo := setupArchive(t)
 	b.archive = archiveRepo
 
-	if err := archiveRepo.AppendDays([]archive.AppendDay{
+	if err := archiveRepo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "group", Value: "100", Day: &model.GroupDay{
 			Day: "14.09.2026",
 			Lessons: []model.GroupLesson{
@@ -142,7 +142,7 @@ func TestGoogleResyncTeacherCalendarFromArchive(t *testing.T) {
 	archiveRepo := setupArchive(t)
 	b.archive = archiveRepo
 
-	if err := archiveRepo.AppendDays([]archive.AppendDay{
+	if err := archiveRepo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "teacher", Value: "Иванов И.И.", Day: &model.TeacherDay{
 			Day: "14.09.2026",
 			Lessons: []model.TeacherLesson{
@@ -220,7 +220,7 @@ func TestSyncGoogleCalendarsSyncsEveryStoredCalendar(t *testing.T) {
 	archiveRepo := setupArchive(t)
 	b.archive = archiveRepo
 
-	if err := archiveRepo.AppendDays([]archive.AppendDay{
+	if err := archiveRepo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "group", Value: "100", Day: &model.GroupDay{Day: "14.09.2026", Lessons: []model.GroupLesson{
 			&model.GroupLessonExplain{Lesson: "Математика", Cabinet: stringPtr("101")},
 		}}},
@@ -331,7 +331,7 @@ func TestSyncGoogleCalendarChangesClearsEmptiedDay(t *testing.T) {
 	archiveRepo := setupArchive(t)
 	b.archive = archiveRepo
 
-	if err := archiveRepo.AppendDays([]archive.AppendDay{
+	if err := archiveRepo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "group", Value: "100", Day: &model.GroupDay{Day: "16.09.2026", Lessons: nil}},
 	}); err != nil {
 		t.Fatalf("append archive days: %v", err)
@@ -397,7 +397,7 @@ func seedTwoGroupDays(t *testing.T, b *Bot) *archive.Repository {
 	repo := setupArchive(t)
 	b.archive = repo
 
-	if err := repo.AppendDays([]archive.AppendDay{
+	if err := repo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "group", Value: "100", Day: &model.GroupDay{
 			Day: "14.09.2026",
 			Lessons: []model.GroupLesson{

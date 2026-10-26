@@ -137,6 +137,8 @@ The timetable cache is stored as JSON in `cache/rasp/`, the archive lives in SQL
 
 The archive used to be called `sqlite3.db`, the single database of the old TypeScript bot. On upgrade the bot keeps working from the old file and logs `archive still lives under the legacy sqlite3.db name`; to move to the new name, stop the bot, rename the file (together with `-wal` and `-shm` when present) and start it again. Hot copies in `archive.backup_dir` survive the rename: retention understands both the old `sqlite3-` prefix and the new `timetable_archive-` one.
 
+The archive runs in WAL with `synchronous=NORMAL` and `_txlock=immediate`: its data is derived and can be rebuilt by parsing, so losing the last uncommitted batch is cheaper than an fsync per append, and a writing transaction takes the lock up front instead of upgrading a read lock into a write one. Every append and every prune ends with `PRAGMA optimize`.
+
 Both databases carry a marker in the file header (`PRAGMA application_id` and `user_version`): the archive and the chat database know their own marker, so the bot refuses to open `bot_chats.db` as the archive (or the other way round) and never mixes two schemas in one file. Files written by earlier versions have no marker, are accepted by their table set and are marked on the first start.
 
 ### Update delivery: long polling and webhook

@@ -1409,7 +1409,7 @@ func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
 			map[string]any{"lesson": "БудущаяФизика", "cabinet": "9"},
 		}}},
 	}
-	if err := archiveRepo.AppendDays(entries); err != nil {
+	if err := archiveRepo.AppendDays(context.Background(), entries); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1463,7 +1463,7 @@ func TestE2E_ArchiveStatsCommand(t *testing.T) {
 	}
 	b.archive = archiveRepo
 
-	if err := archiveRepo.AppendDays([]archive.AppendDay{
+	if err := archiveRepo.AppendDays(context.Background(), []archive.AppendDay{
 		{Type: "group", Value: "100", Day: map[string]any{"day": "07.09.2026", "lessons": []any{}}},
 		{Type: "teacher", Value: "Иванов И.И.", Day: map[string]any{"day": "07.09.2026", "lessons": []any{}}},
 	}); err != nil {

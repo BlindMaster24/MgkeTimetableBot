@@ -44,7 +44,7 @@ type archiveStore interface {
 	Groups() ([]string, error)
 	Teachers() ([]string, error)
 	Stats() (archive.Stats, error)
-	FlushCache(groups, teachers map[string]any) (int, error)
+	FlushCache(ctx context.Context, groups, teachers map[string]any) (int, error)
 }
 
 type Bot struct {

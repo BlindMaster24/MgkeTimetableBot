@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"testing"
 )
 
@@ -36,7 +37,7 @@ func TestStatsCountsRows(t *testing.T) {
 			},
 		},
 	}
-	if err := repo.SyncFromCache(groups, teachers); err != nil {
+	if err := repo.SyncFromCache(context.Background(), groups, teachers); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 

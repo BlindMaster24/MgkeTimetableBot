@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestNewAppliesTheEmbeddedSchema(t *testing.T) {
 		}
 	}
 
-	if err := repo.AppendDays([]AppendDay{{
+	if err := repo.AppendDays(context.Background(), []AppendDay{{
 		Type:  "group",
 		Value: "100",
 		Day:   map[string]any{"day": "12.02.2026", "lessons": []any{map[string]any{"lesson": "Математика"}}},

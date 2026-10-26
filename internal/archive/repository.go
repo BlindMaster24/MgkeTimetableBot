@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"time"
@@ -47,6 +48,8 @@ func NewWithOptions(dbPath string, opts Options) (*Repository, error) {
 	db, err := sqlitedb.Open(dbPath, sqlitedb.Options{
 		BusyTimeout: opts.BusyTimeout,
 		JournalMode: sqlitedb.JournalWAL,
+		Synchronous: sqlitedb.SyncNormal,
+		TxLock:      sqlitedb.TxLockImmediate,
 	})
 	if err != nil {
 		return nil, err
@@ -235,26 +238,30 @@ type AppendDay struct {
 	Day   interface{}
 }
 
-func (r *Repository) AppendDays(entries []AppendDay) error {
-	return r.write.Retry(func() error {
-		return r.appendDays(entries)
-	})
+func (r *Repository) AppendDays(ctx context.Context, entries []AppendDay) error {
+	if err := r.write.Retry(ctx, func() error {
+		return r.appendDays(ctx, entries)
+	}); err != nil {
+		return err
+	}
+	_, _ = r.db.ExecContext(ctx, "PRAGMA optimize")
+	return nil
 }
 
-func (r *Repository) appendDays(entries []AppendDay) error {
-	tx, err := r.db.Begin()
+func (r *Repository) appendDays(ctx context.Context, entries []AppendDay) error {
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	stmtGroup, err := tx.Prepare("INSERT INTO timetable_archive (day, \"group\", data) VALUES (?, ?, ?) ON CONFLICT(day, \"group\") DO UPDATE SET data = excluded.data")
+	stmtGroup, err := tx.PrepareContext(ctx, "INSERT INTO timetable_archive (day, \"group\", data) VALUES (?, ?, ?) ON CONFLICT(day, \"group\") DO UPDATE SET data = excluded.data")
 	if err != nil {
 		return err
 	}
 	defer stmtGroup.Close()
 
-	stmtTeacher, err := tx.Prepare("INSERT INTO timetable_archive (day, teacher, data) VALUES (?, ?, ?) ON CONFLICT(day, teacher) DO UPDATE SET data = excluded.data")
+	stmtTeacher, err := tx.PrepareContext(ctx, "INSERT INTO timetable_archive (day, teacher, data) VALUES (?, ?, ?) ON CONFLICT(day, teacher) DO UPDATE SET data = excluded.data")
 	if err != nil {
 		return err
 	}
@@ -264,12 +271,12 @@ func (r *Repository) appendDays(entries []AppendDay) error {
 		switch e.Type {
 		case "group":
 			day, data := extractDayData(e.Day)
-			if _, err := stmtGroup.Exec(day, e.Value, data); err != nil {
+			if _, err := stmtGroup.ExecContext(ctx, day, e.Value, data); err != nil {
 				return err
 			}
 		case "teacher":
 			day, data := extractDayData(e.Day)
-			if _, err := stmtTeacher.Exec(day, e.Value, data); err != nil {
+			if _, err := stmtTeacher.ExecContext(ctx, day, e.Value, data); err != nil {
 				return err
 			}
 		}

@@ -519,7 +519,7 @@ func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if c.bot.archive != nil {
-		if _, err := c.bot.archive.FlushCache(c.bot.cache.GetGroups(), c.bot.cache.GetTeachers()); err != nil {
+		if _, err := c.bot.archive.FlushCache(ctx, c.bot.cache.GetGroups(), c.bot.cache.GetTeachers()); err != nil {
 			return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
 		}
 	}
