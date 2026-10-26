@@ -511,7 +511,9 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 		for i := range vals {
 			ptrs[i] = &vals[i]
 		}
-		rows.Scan(ptrs...)
+		if err := rows.Scan(ptrs...); err != nil {
+			return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+		}
 		parts := make([]string, len(cols))
 		for i, v := range vals {
 			switch val := v.(type) {
@@ -524,6 +526,9 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 			}
 		}
 		lines = append(lines, strings.Join(parts, " | "))
+	}
+	if err := rows.Err(); err != nil {
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
 	}
 	if len(lines) > 50 {
 		lines = lines[:50]

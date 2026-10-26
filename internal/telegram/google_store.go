@@ -176,7 +176,9 @@ func (r *Repository) SaveGoogleCalendar(calendar *GoogleCalendar) error {
 	}
 
 	if calendar.ID == 0 {
-		r.db.QueryRow(`SELECT id FROM google_calendars WHERE calendar_id = ?`, calendar.CalendarID).Scan(&calendar.ID)
+		if err := r.db.QueryRow(`SELECT id FROM google_calendars WHERE calendar_id = ?`, calendar.CalendarID).Scan(&calendar.ID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

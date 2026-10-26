@@ -182,7 +182,9 @@ func (r *Repository) migrate() error {
 		{"reminder_lead_minutes", "ALTER TABLE bot_chats ADD COLUMN reminder_lead_minutes INTEGER NOT NULL DEFAULT 0"},
 	} {
 		var count int
-		r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count)
+		if err := r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count); err != nil {
+			return err
+		}
 		if count == 0 {
 			if _, err := r.db.Exec(col.ddl); err != nil {
 				return err

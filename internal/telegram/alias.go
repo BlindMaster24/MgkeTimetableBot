@@ -51,7 +51,7 @@ func (r *AliasRepository) List(userID int64) ([]Alias, error) {
 		}
 		result = append(result, a)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (r *AliasRepository) Add(userID int64, key, value string) error {

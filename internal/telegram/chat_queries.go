@@ -29,7 +29,7 @@ func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
 		var noticeChanges, noticeNextWeek, noticeCalls int
 		err := rows.Scan(&chat.ID, &chat.Service, &chat.PeerID, &mode, &chat.Group, &chat.Teacher, &noticeChanges, &noticeNextWeek, &noticeCalls, &chat.ReminderLeadMinutes)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		chat.Mode = ChatMode(mode)
 		chat.NoticeChanges = noticeChanges != 0
@@ -37,7 +37,7 @@ func (r *Repository) FindAllWithNotifications(service string) ([]*Chat, error) {
 		chat.NoticeCalls = noticeCalls != 0
 		result = append(result, chat)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (r *Repository) DB() *sql.DB {
@@ -154,13 +154,13 @@ func (r *Repository) FindAllTGChats() ([]*Chat, error) {
 		chat := &Chat{}
 		var allowSend, noticeChanges int
 		if err := rows.Scan(&chat.ID, &chat.PeerID, &chat.Mode, &chat.Group, &chat.Teacher, &allowSend, &noticeChanges); err != nil {
-			continue
+			return nil, err
 		}
 		chat.AllowSendMess = allowSend != 0
 		chat.NoticeChanges = noticeChanges != 0
 		result = append(result, chat)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (r *Repository) CountTGChats() (int, int, error) {
@@ -199,11 +199,12 @@ func (r *Repository) CountByMode() (map[string]int, error) {
 	for rows.Next() {
 		var mode string
 		var count int
-		if rows.Scan(&mode, &count) == nil {
-			result[mode] = count
+		if err := rows.Scan(&mode, &count); err != nil {
+			return nil, err
 		}
+		result[mode] = count
 	}
-	return result, err
+	return result, rows.Err()
 }
 
 func (r *Repository) FindChatsByGroups(service string, groups []string, noticeChanges bool) ([]*Chat, error) {
@@ -312,7 +313,7 @@ func scanEventChats(rows *sql.Rows) ([]*Chat, error) {
 			&allowSend, &noticeCh, &noticeWeek, &noticeCall, &noticeErr, &chat.Formatter,
 			&hidePast, &hints, &parserTime, &reminderLead)
 		if err != nil {
-			continue
+			return nil, err
 		}
 		chat.Mode = ChatMode(mode)
 		chat.AllowSendMess = allowSend != 0
@@ -326,7 +327,7 @@ func scanEventChats(rows *sql.Rows) ([]*Chat, error) {
 		chat.ReminderLeadMinutes = reminderLead
 		result = append(result, &chat)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (r *Repository) FindSubscribedChatsByGroup(service, group string, noticeChanges bool) ([]*Chat, error) {

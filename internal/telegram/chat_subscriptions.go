@@ -75,11 +75,11 @@ func (r *Repository) GetSubscriptions(chatID int64) ([]Subscription, error) {
 	for rows.Next() {
 		var s Subscription
 		if err := rows.Scan(&s.ID, &s.ChatID, &s.Type, &s.Value); err != nil {
-			continue
+			return nil, err
 		}
 		result = append(result, s)
 	}
-	return result, nil
+	return result, rows.Err()
 }
 
 func (r *Repository) CountSubscriptions(chatID int64) (int, error) {
