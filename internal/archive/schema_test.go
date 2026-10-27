@@ -14,7 +14,7 @@ func TestNewAppliesTheEmbeddedSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := repo.DayIndexBounds(); err != nil {
+	if _, err := repo.DayIndexBounds(context.Background()); err != nil {
 		t.Fatalf("a fresh archive must be usable right away: %v", err)
 	}
 
@@ -53,7 +53,7 @@ func TestNewAppliesTheEmbeddedSchema(t *testing.T) {
 	}
 	defer reopened.Close()
 
-	days, err := reopened.GroupDays("100", nil)
+	days, err := reopened.GroupDays(context.Background(), "100", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

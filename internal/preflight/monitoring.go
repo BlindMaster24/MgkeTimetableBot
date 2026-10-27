@@ -493,8 +493,8 @@ func fullyWiredMetricsHandler(cacheDir string) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	stats, statsErr := repo.Stats()
-	bounds, boundsErr := repo.DayIndexBounds()
+	stats, statsErr := repo.Stats(context.Background())
+	bounds, boundsErr := repo.DayIndexBounds(context.Background())
 	if err := repo.Close(); err != nil {
 		return nil, err
 	}
@@ -508,8 +508,8 @@ func fullyWiredMetricsHandler(cacheDir string) (http.Handler, error) {
 	server := api.NewServer(raspCache, 0, health.NewDefaultTracker(), build.New(MonitoringTitle, "", ""), nil, nil)
 	server.SetMetricsConfig(api.MetricsConfig{Path: monitoringSurfacePath})
 	server.SetMetricsSources(api.MetricsSources{
-		Archive: func() (archive.Stats, error) { return stats, statsErr },
-		Bounds:  func() (archive.Bounds, error) { return bounds, boundsErr },
+		Archive: func(context.Context) (archive.Stats, error) { return stats, statsErr },
+		Bounds:  func(context.Context) (archive.Bounds, error) { return bounds, boundsErr },
 		Webhook: func(context.Context) api.WebhookMetrics {
 			return api.WebhookMetrics{
 				Enabled:    true,

@@ -31,7 +31,7 @@ func (c *getGroupWeekCmd) MatchText(text string) bool {
 	return groupWeekButtonRe.MatchString(text)
 }
 func (c *getGroupWeekCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetGroup(u, "week")
+	return c.bot.startGetGroup(ctx, u, "week")
 }
 
 type getGroupImageCmd struct{ bot *Bot }
@@ -44,7 +44,7 @@ func (c *getGroupImageCmd) MatchText(text string) bool {
 	return groupImageButtonRe.MatchString(text)
 }
 func (c *getGroupImageCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetGroup(u, "image")
+	return c.bot.startGetGroup(ctx, u, "image")
 }
 
 type getTeacherWeekCmd struct{ bot *Bot }
@@ -57,7 +57,7 @@ func (c *getTeacherWeekCmd) MatchText(text string) bool {
 	return teacherWeekButtonRe.MatchString(text)
 }
 func (c *getTeacherWeekCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetTeacher(u, "week")
+	return c.bot.startGetTeacher(ctx, u, "week")
 }
 
 type getTeacherImageCmd struct{ bot *Bot }
@@ -70,10 +70,10 @@ func (c *getTeacherImageCmd) MatchText(text string) bool {
 	return teacherImageButtonRe.MatchString(text)
 }
 func (c *getTeacherImageCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetTeacher(u, "image")
+	return c.bot.startGetTeacher(ctx, u, "image")
 }
 
-func (b *Bot) startGetGroup(u *Update, kind string) error {
+func (b *Bot) startGetGroup(ctx context.Context, u *Update, kind string) error {
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
@@ -84,7 +84,7 @@ func (b *Bot) startGetGroup(u *Update, kind string) error {
 	}
 
 	if arg := extractCommandArg(u.Text); arg != "" {
-		return b.resolveGroupInput(u, chat, arg, kind)
+		return b.resolveGroupInput(ctx, u, chat, arg, kind)
 	}
 
 	chat.Scene = sceneGetGroup + ":" + kind
@@ -94,7 +94,7 @@ func (b *Bot) startGetGroup(u *Update, kind string) error {
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
 }
 
-func (b *Bot) startGetTeacher(u *Update, kind string) error {
+func (b *Bot) startGetTeacher(ctx context.Context, u *Update, kind string) error {
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
@@ -105,7 +105,7 @@ func (b *Bot) startGetTeacher(u *Update, kind string) error {
 	}
 
 	if arg := extractCommandArg(u.Text); arg != "" {
-		return b.resolveTeacherInput(u, chat, arg, kind)
+		return b.resolveTeacherInput(ctx, u, chat, arg, kind)
 	}
 
 	chat.Scene = sceneGetTeacher + ":" + kind
@@ -126,7 +126,7 @@ func extractCommandArg(text string) string {
 	return strings.TrimSpace(parts[1])
 }
 
-func (b *Bot) resolveGroupInput(u *Update, chat *Chat, input, kind string) error {
+func (b *Bot) resolveGroupInput(ctx context.Context, u *Update, chat *Chat, input, kind string) error {
 	groups := b.cache.GetGroups()
 
 	normalized := strings.TrimRight(strings.TrimSpace(input), "*")
@@ -174,7 +174,7 @@ func (b *Bot) resolveGroupInput(u *Update, chat *Chat, input, kind string) error
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Группа этого чата была успешно изменена на '%s'", normalized), replyMainMenu(b, chat))
 	}
 
-	return b.sendGroupResult(u, chat, normalized, kind)
+	return b.sendGroupResult(ctx, u, chat, normalized, kind)
 }
 
 func (b *Bot) sendGroupError(u *Update, chat *Chat, msg string) error {
@@ -183,7 +183,7 @@ func (b *Bot) sendGroupError(u *Update, chat *Chat, msg string) error {
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, msg, replyMainMenu(b, chat))
 }
 
-func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
+func (b *Bot) sendGroupResult(ctx context.Context, u *Update, chat *Chat, group, kind string) error {
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
 
@@ -192,7 +192,7 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 	switch kind {
 	case "week":
 		week := b.relevantWeekIndex()
-		return b.showWeekDays(u, chat, "group", group, &week)
+		return b.showWeekDays(ctx, u, chat, "group", group, &week)
 	case "image":
 		_, days := b.relevantWeekDays(data)
 		path, err := imagepkg.RenderGroupDays(group, days, "./cache/images")
@@ -209,7 +209,7 @@ func (b *Bot) sendGroupResult(u *Update, chat *Chat, group, kind string) error {
 	}
 }
 
-func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) error {
+func (b *Bot) resolveTeacherInput(ctx context.Context, u *Update, chat *Chat, input, kind string) error {
 	teachers := b.cache.GetTeachers()
 
 	if len(input) < 3 {
@@ -246,7 +246,7 @@ func (b *Bot) resolveTeacherInput(u *Update, chat *Chat, input, kind string) err
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Преподвателя этого чата был успешно изменен на '%s'", teacher), replyMainMenu(b, chat))
 	}
 
-	return b.sendTeacherResult(u, chat, teacher, kind)
+	return b.sendTeacherResult(ctx, u, chat, teacher, kind)
 }
 
 func (b *Bot) sendTeacherError(u *Update, chat *Chat, msg string) error {
@@ -255,7 +255,7 @@ func (b *Bot) sendTeacherError(u *Update, chat *Chat, msg string) error {
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, msg, replyMainMenu(b, chat))
 }
 
-func (b *Bot) sendTeacherResult(u *Update, chat *Chat, teacher, kind string) error {
+func (b *Bot) sendTeacherResult(ctx context.Context, u *Update, chat *Chat, teacher, kind string) error {
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
 
@@ -295,7 +295,7 @@ func (s *teacherWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	chat.Scene = ""
 	s.bot.chatRepo.Save(chat)
 
-	return s.bot.showWeekDays(u, chat, "teacher", teacher, weekIndex)
+	return s.bot.showWeekDays(ctx, u, chat, "teacher", teacher, weekIndex)
 }
 
 type setGroupCmd struct{ bot *Bot }
@@ -314,7 +314,7 @@ func (c *setGroupCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return c.bot.resolveGroupInput(u, chat, extractCommandArg(u.Text), "set")
+	return c.bot.resolveGroupInput(ctx, u, chat, extractCommandArg(u.Text), "set")
 }
 
 type setTeacherCmd struct{ bot *Bot }
@@ -333,7 +333,7 @@ func (c *setTeacherCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return c.bot.resolveTeacherInput(u, chat, extractCommandArg(u.Text), "set")
+	return c.bot.resolveTeacherInput(ctx, u, chat, extractCommandArg(u.Text), "set")
 }
 
 func sortedKeys[V any](values map[string]V) []string {

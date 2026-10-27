@@ -169,7 +169,7 @@ func (c *getGroupsCmd) MatchText(text string) bool {
 func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
 
-	groupNames := c.bot.archiveValues("group")
+	groupNames := c.bot.archiveValues(ctx, "group")
 	if len(groupNames) == 0 {
 		groups := rasp.GetGroups()
 		for name := range groups {
@@ -189,7 +189,7 @@ func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, msg)
 }
 
-func (b *Bot) archiveValues(kind string) []string {
+func (b *Bot) archiveValues(ctx context.Context, kind string) []string {
 	if b.archive == nil {
 		return nil
 	}
@@ -199,9 +199,9 @@ func (b *Bot) archiveValues(kind string) []string {
 		err    error
 	)
 	if kind == "teacher" {
-		values, err = b.archive.Teachers()
+		values, err = b.archive.Teachers(ctx)
 	} else {
-		values, err = b.archive.Groups()
+		values, err = b.archive.Groups(ctx)
 	}
 	if err != nil {
 		return nil
@@ -232,7 +232,7 @@ func (c *getTeachersCmd) MatchText(text string) bool {
 func (c *getTeachersCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
 
-	teacherNames := c.bot.archiveValues("teacher")
+	teacherNames := c.bot.archiveValues(ctx, "teacher")
 	if len(teacherNames) == 0 {
 		for name := range rasp.GetTeachers() {
 			teacherNames = append(teacherNames, name)

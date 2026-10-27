@@ -23,7 +23,7 @@ func TestSyncFromCacheEmpty(t *testing.T) {
 	if err := repo.SyncFromCache(context.Background(), map[string]any{}, map[string]any{}); err != nil {
 		t.Fatalf("sync empty cache: %v", err)
 	}
-	bounds, err := repo.DayIndexBounds()
+	bounds, err := repo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestSyncFromCachePopulatesArchive(t *testing.T) {
 		t.Fatalf("sync: %v", err)
 	}
 
-	days, err := repo.GroupDaysByRange(DateToDayIndex("07.09.2026"), DateToDayIndex("08.09.2026"), "100")
+	days, err := repo.GroupDaysByRange(context.Background(), DateToDayIndex("07.09.2026"), DateToDayIndex("08.09.2026"), "100")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestSyncFromCachePopulatesArchive(t *testing.T) {
 		t.Fatalf("expected 1 lesson on first day, got %d", len(days[0].Lessons))
 	}
 
-	teacherDays, err := repo.TeacherDaysByRange(DateToDayIndex("07.09.2026"), DateToDayIndex("07.09.2026"), "Иванов И.И.")
+	teacherDays, err := repo.TeacherDaysByRange(context.Background(), DateToDayIndex("07.09.2026"), DateToDayIndex("07.09.2026"), "Иванов И.И.")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestSyncFromCacheSkipsWhenNotNewer(t *testing.T) {
 		t.Fatalf("sync: %v", err)
 	}
 
-	bounds, err := repo.DayIndexBounds()
+	bounds, err := repo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestGroupDayRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := repo.GroupDay(DateToDayIndex("07.09.2026"), "100")
+	got, err := repo.GroupDay(context.Background(), DateToDayIndex("07.09.2026"), "100")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestTeacherDayRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := repo.TeacherDay(DateToDayIndex("07.09.2026"), "Иванов И.И.")
+	got, err := repo.TeacherDay(context.Background(), DateToDayIndex("07.09.2026"), "Иванов И.И.")
 	if err != nil {
 		t.Fatal(err)
 	}

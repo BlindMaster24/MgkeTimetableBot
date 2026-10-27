@@ -81,14 +81,14 @@ func (r *Repository) DB() *sql.DB {
 	return r.db
 }
 
-func (r *Repository) DayIndexBounds() (Bounds, error) {
+func (r *Repository) DayIndexBounds(ctx context.Context) (Bounds, error) {
 	var b Bounds
-	err := r.db.QueryRow("SELECT COALESCE(MIN(day),0), COALESCE(MAX(day),0) FROM timetable_archive").Scan(&b.Min, &b.Max)
+	err := r.db.QueryRowContext(ctx, "SELECT COALESCE(MIN(day),0), COALESCE(MAX(day),0) FROM timetable_archive").Scan(&b.Min, &b.Max)
 	return b, err
 }
 
-func (r *Repository) WeekIndexBounds() (Bounds, error) {
-	days, err := r.DayIndexBounds()
+func (r *Repository) WeekIndexBounds(ctx context.Context) (Bounds, error) {
+	days, err := r.DayIndexBounds(ctx)
 	if err != nil {
 		return days, err
 	}
@@ -98,8 +98,8 @@ func (r *Repository) WeekIndexBounds() (Bounds, error) {
 	}, nil
 }
 
-func (r *Repository) Groups() ([]string, error) {
-	rows, err := r.db.Query("SELECT DISTINCT \"group\" FROM timetable_archive WHERE \"group\" IS NOT NULL")
+func (r *Repository) Groups(ctx context.Context) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT DISTINCT \"group\" FROM timetable_archive WHERE \"group\" IS NOT NULL")
 	if err != nil {
 		return nil, err
 	}
@@ -122,14 +122,14 @@ type Stats struct {
 	WithTeacher int
 }
 
-func (r *Repository) Stats() (Stats, error) {
+func (r *Repository) Stats(ctx context.Context) (Stats, error) {
 	var stats Stats
-	err := r.db.QueryRow("SELECT COUNT(*), COUNT(\"group\"), COUNT(teacher) FROM timetable_archive").Scan(&stats.Total, &stats.WithGroup, &stats.WithTeacher)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*), COUNT(\"group\"), COUNT(teacher) FROM timetable_archive").Scan(&stats.Total, &stats.WithGroup, &stats.WithTeacher)
 	return stats, err
 }
 
-func (r *Repository) Teachers() ([]string, error) {
-	rows, err := r.db.Query("SELECT DISTINCT teacher FROM timetable_archive WHERE teacher IS NOT NULL")
+func (r *Repository) Teachers(ctx context.Context) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT DISTINCT teacher FROM timetable_archive WHERE teacher IS NOT NULL")
 	if err != nil {
 		return nil, err
 	}
@@ -146,9 +146,9 @@ func (r *Repository) Teachers() ([]string, error) {
 	return result, rows.Err()
 }
 
-func (r *Repository) GroupDay(dayIndex int64, group string) (*model.GroupDay, error) {
+func (r *Repository) GroupDay(ctx context.Context, dayIndex int64, group string) (*model.GroupDay, error) {
 	var data string
-	err := r.db.QueryRow("SELECT data FROM timetable_archive WHERE day = ? AND \"group\" = ?", dayIndex, group).Scan(&data)
+	err := r.db.QueryRowContext(ctx, "SELECT data FROM timetable_archive WHERE day = ? AND \"group\" = ?", dayIndex, group).Scan(&data)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -159,9 +159,9 @@ func (r *Repository) GroupDay(dayIndex int64, group string) (*model.GroupDay, er
 	return parseGroupDay(dayIndex, data)
 }
 
-func (r *Repository) TeacherDay(dayIndex int64, teacher string) (*model.TeacherDay, error) {
+func (r *Repository) TeacherDay(ctx context.Context, dayIndex int64, teacher string) (*model.TeacherDay, error) {
 	var data string
-	err := r.db.QueryRow("SELECT data FROM timetable_archive WHERE day = ? AND teacher = ?", dayIndex, teacher).Scan(&data)
+	err := r.db.QueryRowContext(ctx, "SELECT data FROM timetable_archive WHERE day = ? AND teacher = ?", dayIndex, teacher).Scan(&data)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -172,8 +172,8 @@ func (r *Repository) TeacherDay(dayIndex int64, teacher string) (*model.TeacherD
 	return parseTeacherDay(dayIndex, data)
 }
 
-func (r *Repository) GroupDaysByRange(min, max int64, group string) ([]model.GroupDay, error) {
-	rows, err := r.db.Query("SELECT day, data FROM timetable_archive WHERE \"group\" = ? AND day BETWEEN ? AND ? ORDER BY day ASC", group, min, max)
+func (r *Repository) GroupDaysByRange(ctx context.Context, min, max int64, group string) ([]model.GroupDay, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT day, data FROM timetable_archive WHERE \"group\" = ? AND day BETWEEN ? AND ? ORDER BY day ASC", group, min, max)
 	if err != nil {
 		return nil, err
 	}
@@ -182,8 +182,8 @@ func (r *Repository) GroupDaysByRange(min, max int64, group string) ([]model.Gro
 	return scanGroupDays(rows)
 }
 
-func (r *Repository) TeacherDaysByRange(min, max int64, teacher string) ([]model.TeacherDay, error) {
-	rows, err := r.db.Query("SELECT day, data FROM timetable_archive WHERE teacher = ? AND day BETWEEN ? AND ? ORDER BY day ASC", teacher, min, max)
+func (r *Repository) TeacherDaysByRange(ctx context.Context, min, max int64, teacher string) ([]model.TeacherDay, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT day, data FROM timetable_archive WHERE teacher = ? AND day BETWEEN ? AND ? ORDER BY day ASC", teacher, min, max)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (r *Repository) TeacherDaysByRange(min, max int64, teacher string) ([]model
 	return scanTeacherDays(rows)
 }
 
-func (r *Repository) GroupDays(group string, fromDay *int64) ([]model.GroupDay, error) {
+func (r *Repository) GroupDays(ctx context.Context, group string, fromDay *int64) ([]model.GroupDay, error) {
 	query := "SELECT day, data FROM timetable_archive WHERE \"group\" = ?"
 	args := []interface{}{group}
 
@@ -203,7 +203,7 @@ func (r *Repository) GroupDays(group string, fromDay *int64) ([]model.GroupDay, 
 
 	query += " ORDER BY day ASC"
 
-	rows, err := r.db.Query(query, args...)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (r *Repository) GroupDays(group string, fromDay *int64) ([]model.GroupDay, 
 	return scanGroupDays(rows)
 }
 
-func (r *Repository) TeacherDays(teacher string, fromDay *int64) ([]model.TeacherDay, error) {
+func (r *Repository) TeacherDays(ctx context.Context, teacher string, fromDay *int64) ([]model.TeacherDay, error) {
 	query := "SELECT day, data FROM timetable_archive WHERE teacher = ?"
 	args := []interface{}{teacher}
 
@@ -223,7 +223,7 @@ func (r *Repository) TeacherDays(teacher string, fromDay *int64) ([]model.Teache
 
 	query += " ORDER BY day ASC"
 
-	rows, err := r.db.Query(query, args...)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

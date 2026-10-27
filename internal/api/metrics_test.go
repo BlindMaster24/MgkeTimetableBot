@@ -62,10 +62,10 @@ func setupMetricsServerWithCounters(t *testing.T, tracker *health.Tracker, token
 	srv := setupTestServerWith(t, tracker)
 	srv.SetMetricsConfig(MetricsConfig{Token: token})
 	srv.SetMetricsSources(MetricsSources{
-		Archive: func() (archive.Stats, error) {
+		Archive: func(context.Context) (archive.Stats, error) {
 			return archive.Stats{Total: 42, WithGroup: 40, WithTeacher: 39}, nil
 		},
-		Bounds: func() (archive.Bounds, error) {
+		Bounds: func(context.Context) (archive.Bounds, error) {
 			return archive.Bounds{Min: 100, Max: 250}, nil
 		},
 		Webhook: func(context.Context) WebhookMetrics {
@@ -235,8 +235,10 @@ func TestMetricsEndpointServesOnlyAggregates(t *testing.T) {
 func TestMetricsEndpointIsSilentOnSourceFailures(t *testing.T) {
 	srv := setupMetricsServer(t, health.NewDefaultTracker(), "")
 	srv.SetMetricsSources(MetricsSources{
-		Archive: func() (archive.Stats, error) { return archive.Stats{}, errors.New("archive is locked") },
-		Bounds:  func() (archive.Bounds, error) { return archive.Bounds{}, errors.New("archive is locked") },
+		Archive: func(context.Context) (archive.Stats, error) { return archive.Stats{}, errors.New("archive is locked") },
+		Bounds: func(context.Context) (archive.Bounds, error) {
+			return archive.Bounds{}, errors.New("archive is locked")
+		},
 	})
 
 	body, _ := scrapeMetrics(t, srv)

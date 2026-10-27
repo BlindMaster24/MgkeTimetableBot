@@ -39,14 +39,14 @@ func (cb *imageCb) Handler(ctx context.Context, u *Update) error {
 		return cb.bot.AnswerCallback(u.Callback.ID, "")
 	}
 
-	toast, err := cb.bot.handleImagePayload(u, payload[:idx], payload[idx+1:])
+	toast, err := cb.bot.handleImagePayload(ctx, u, payload[:idx], payload[idx+1:])
 	if toast != "" {
 		cb.bot.AnswerCallback(u.Callback.ID, toast)
 	}
 	return err
 }
 
-func (b *Bot) handleImagePayload(u *Update, typePart, value string) (string, error) {
+func (b *Bot) handleImagePayload(ctx context.Context, u *Update, typePart, value string) (string, error) {
 	weekIndex := b.relevantWeekIndex().Value()
 	if idx := strings.LastIndexByte(value, ':'); idx >= 0 {
 		if w, err := strconv.Atoi(value[idx+1:]); err == nil {
@@ -72,7 +72,7 @@ func (b *Bot) handleImagePayload(u *Update, typePart, value string) (string, err
 		return b.loc("group_not_exists"), nil
 	}
 
-	days := b.weekDays(daysFromArchive, typeName, value, utils.WeekIndexFromNumber(weekIndex))
+	days := b.weekDays(ctx, daysFromArchive, typeName, value, utils.WeekIndexFromNumber(weekIndex))
 	if len(days) == 0 {
 		return b.loc("no_timetable"), nil
 	}

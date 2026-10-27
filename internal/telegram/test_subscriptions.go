@@ -85,7 +85,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	s.bot.chatRepo.Save(chat)
 
 	week := s.bot.relevantWeekIndex()
-	days := s.bot.weekDays(daysFromArchive, subType, subValue, week)
+	days := s.bot.weekDays(ctx, daysFromArchive, subType, subValue, week)
 
 	label := "Группа"
 	if subType == "teacher" {

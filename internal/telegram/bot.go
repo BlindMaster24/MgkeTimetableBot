@@ -33,17 +33,17 @@ type parseLogEntry struct {
 }
 
 type archiveStore interface {
-	GroupDays(group string, fromDay *int64) ([]model.GroupDay, error)
-	TeacherDays(teacher string, fromDay *int64) ([]model.TeacherDay, error)
-	GroupDaysByRange(min, max int64, group string) ([]model.GroupDay, error)
-	TeacherDaysByRange(min, max int64, teacher string) ([]model.TeacherDay, error)
-	GroupDay(dayIndex int64, group string) (*model.GroupDay, error)
-	TeacherDay(dayIndex int64, teacher string) (*model.TeacherDay, error)
-	DayIndexBounds() (archive.Bounds, error)
-	WeekIndexBounds() (archive.Bounds, error)
-	Groups() ([]string, error)
-	Teachers() ([]string, error)
-	Stats() (archive.Stats, error)
+	GroupDays(ctx context.Context, group string, fromDay *int64) ([]model.GroupDay, error)
+	TeacherDays(ctx context.Context, teacher string, fromDay *int64) ([]model.TeacherDay, error)
+	GroupDaysByRange(ctx context.Context, min, max int64, group string) ([]model.GroupDay, error)
+	TeacherDaysByRange(ctx context.Context, min, max int64, teacher string) ([]model.TeacherDay, error)
+	GroupDay(ctx context.Context, dayIndex int64, group string) (*model.GroupDay, error)
+	TeacherDay(ctx context.Context, dayIndex int64, teacher string) (*model.TeacherDay, error)
+	DayIndexBounds(ctx context.Context) (archive.Bounds, error)
+	WeekIndexBounds(ctx context.Context) (archive.Bounds, error)
+	Groups(ctx context.Context) ([]string, error)
+	Teachers(ctx context.Context) ([]string, error)
+	Stats(ctx context.Context) (archive.Stats, error)
 	FlushCache(ctx context.Context, groups, teachers map[string]any) (int, error)
 }
 

@@ -97,8 +97,8 @@ func metricsAPIHandler(cfg *config.Config, cacheDir, path, token string) (http.H
 		},
 	}
 	if archiveAvailable(cfg) {
-		sources.Archive = func() (archive.Stats, error) { return archive.Stats{}, nil }
-		sources.Bounds = func() (archive.Bounds, error) { return archive.Bounds{}, nil }
+		sources.Archive = func(context.Context) (archive.Stats, error) { return archive.Stats{}, nil }
+		sources.Bounds = func(context.Context) (archive.Bounds, error) { return archive.Bounds{}, nil }
 	}
 	if cfg != nil && cfg.Telegram.Noticer {
 		sources.Scheduler = func() int { return 0 }

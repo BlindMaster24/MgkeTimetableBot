@@ -37,13 +37,13 @@ func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if match := archiveWeekRe.FindStringSubmatch(raw); match != nil {
-		return c.showWeek(u, chat, match[2])
+		return c.showWeek(ctx, u, chat, match[2])
 	}
 
-	return c.showDay(u, chat, raw)
+	return c.showDay(ctx, u, chat, raw)
 }
 
-func (c *archiveCmd) showWeek(u *Update, chat *Chat, rawWeek string) error {
+func (c *archiveCmd) showWeek(ctx context.Context, u *Update, chat *Chat, rawWeek string) error {
 	weekNum, _ := strconv.Atoi(rawWeek)
 	if weekNum < 1 {
 		return u.Bot.SendText(u.ChatID, "Неверный номер недели")
@@ -51,12 +51,12 @@ func (c *archiveCmd) showWeek(u *Update, chat *Chat, rawWeek string) error {
 
 	week := utils.WeekIndexFromAcademicNumber(weekNum, c.bot.nowTime())
 	minIdx, maxIdx := week.WeekDayIndexRange()
-	return c.showRange(u, chat, minIdx, maxIdx, buildWeekLabelFromWeek(week), "Нет данных за указанную неделю", week.Value())
+	return c.showRange(ctx, u, chat, minIdx, maxIdx, buildWeekLabelFromWeek(week), "Нет данных за указанную неделю", week.Value())
 }
 
 const archiveDateFormatHint = "Неверный формат даты. Пример: /archive 12.02 или /archive 12.02.2026 или /archive week 5"
 
-func (c *archiveCmd) showDay(u *Update, chat *Chat, raw string) error {
+func (c *archiveCmd) showDay(ctx context.Context, u *Update, chat *Chat, raw string) error {
 	parts := strings.Split(raw, ".")
 	if len(parts) < 2 || len(parts) > 3 {
 		return u.Bot.SendText(u.ChatID, archiveDateFormatHint)
@@ -76,7 +76,7 @@ func (c *archiveCmd) showDay(u *Update, chat *Chat, raw string) error {
 	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
 	index := int64(utils.DayIndexFromDate(date))
 
-	bounds, err := c.bot.archive.DayIndexBounds()
+	bounds, err := c.bot.archive.DayIndexBounds(ctx)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, "Ошибка чтения архива")
 	}
@@ -88,10 +88,10 @@ func (c *archiveCmd) showDay(u *Update, chat *Chat, raw string) error {
 			fmt.Sprintf("В базе хранятся дни, начиная с %s по %s", from, to))
 	}
 
-	return c.showRange(u, chat, int(index), int(index), "", "Ничего не найдено на данный день", utils.WeekIndexFromDate(date).Value())
+	return c.showRange(ctx, u, chat, int(index), int(index), "", "Ничего не найдено на данный день", utils.WeekIndexFromDate(date).Value())
 }
 
-func (c *archiveCmd) showRange(u *Update, chat *Chat, minIdx, maxIdx int, weekLabel, emptyMessage string, weekIndex int) error {
+func (c *archiveCmd) showRange(ctx context.Context, u *Update, chat *Chat, minIdx, maxIdx int, weekLabel, emptyMessage string, weekIndex int) error {
 	target, ok := scheduleTargetFor(chat)
 	if !ok {
 		return u.Bot.SendText(u.ChatID, c.bot.locData("archive_mode_unsupported", map[string]interface{}{"Mode": chat.Mode}))
@@ -105,7 +105,7 @@ func (c *archiveCmd) showRange(u *Update, chat *Chat, minIdx, maxIdx int, weekLa
 		return u.Bot.SendText(u.ChatID, c.bot.loc(key))
 	}
 
-	days, result := c.bot.archiveDaysForRange(target.typeName, target.value, minIdx, maxIdx)
+	days, result := c.bot.archiveDaysForRange(ctx, target.typeName, target.value, minIdx, maxIdx)
 	if result != archiveAnswered || len(days) == 0 {
 		return u.Bot.SendText(u.ChatID, emptyMessage)
 	}

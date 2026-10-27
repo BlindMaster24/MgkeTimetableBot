@@ -662,7 +662,7 @@ func TestE2E_CurrentSettings(t *testing.T) {
 func TestE2E_WeekControlKeyboard(t *testing.T) {
 	b, _ := setupE2EBot(t)
 	currentWeek := utils.WeekIndexFromDate(time.Now())
-	kb := b.weekControlKeyboard("group", "100", currentWeek.Value(), true)
+	kb := b.weekControlKeyboard(context.Background(), "group", "100", currentWeek.Value(), true)
 	texts := flattenKeyboardTexts(kb)
 
 	if !strings.Contains(texts, "📷 Сгенерировать изображение") {
@@ -672,7 +672,7 @@ func TestE2E_WeekControlKeyboard(t *testing.T) {
 		t.Error("week control should have show-full button when hidePastDays=true and current week")
 	}
 
-	kb2 := b.weekControlKeyboard("group", "100", currentWeek.Value()-1, true)
+	kb2 := b.weekControlKeyboard(context.Background(), "group", "100", currentWeek.Value()-1, true)
 	texts2 := flattenKeyboardTexts(kb2)
 	if !strings.Contains(texts2, "➡️") {
 		t.Error("past week should have forward arrow")
@@ -1209,7 +1209,7 @@ func TestE2E_GetWeekTimetableKeyboard(t *testing.T) {
 
 func TestE2E_WeekControlKeyboardPrefix(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	kb := b.weekControlKeyboard("group", "100", utils.WeekIndexFromDate(time.Now()).Value(), false)
+	kb := b.weekControlKeyboard(context.Background(), "group", "100", utils.WeekIndexFromDate(time.Now()).Value(), false)
 
 	for _, row := range kb.InlineKeyboard {
 		for _, btn := range row {
@@ -1418,7 +1418,7 @@ func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
 	}
 
 	minIdx, maxIdx := utils.WeekIndexFromNumber(pastWeek).WeekDayIndexRange()
-	days := b.daysForRange(daysFromArchive, "group", "100", minIdx, maxIdx)
+	days := b.daysForRange(context.Background(), daysFromArchive, "group", "100", minIdx, maxIdx)
 	if len(days) != 1 {
 		t.Fatalf("expected 1 past-week day from archive, got %d", len(days))
 	}
@@ -1427,7 +1427,7 @@ func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
 	}
 
 	minIdx, maxIdx = utils.WeekIndexFromNumber(futureWeek).WeekDayIndexRange()
-	days = b.daysForRange(daysFromArchive, "group", "100", minIdx, maxIdx)
+	days = b.daysForRange(context.Background(), daysFromArchive, "group", "100", minIdx, maxIdx)
 	if len(days) != 1 {
 		t.Fatalf("expected 1 future-week day from archive, got %d", len(days))
 	}

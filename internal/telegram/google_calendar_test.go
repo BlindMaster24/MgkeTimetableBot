@@ -398,7 +398,7 @@ func TestGoogleCalendarListAndProgress(t *testing.T) {
 
 	u := makeUpdate(5003, "")
 	u.Bot = b
-	if err := b.showGoogleCalendarList(u, chat); err != nil {
+	if err := b.showGoogleCalendarList(context.Background(), u, chat); err != nil {
 		t.Fatalf("list: %v", err)
 	}
 	if !strings.Contains(caller.last(), "Список календарей с расписанием:") {
@@ -409,7 +409,7 @@ func TestGoogleCalendarListAndProgress(t *testing.T) {
 	}
 
 	service.api.calendars = nil
-	if err := b.showGoogleCalendarList(u, chat); err != nil {
+	if err := b.showGoogleCalendarList(context.Background(), u, chat); err != nil {
 		t.Fatalf("empty list: %v", err)
 	}
 	if caller.last() != "Нет добавленных календарей" {

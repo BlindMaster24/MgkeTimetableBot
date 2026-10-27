@@ -88,11 +88,11 @@ func (b *Bot) buildSceneRoutes() []sceneRoute {
 		{match: scenePrefixed(sceneCompareInput), handle: (&compareGroupsInputScene{bot: b}).Handle},
 		{match: scenePrefixed(sceneGetGroup + ":"), handle: func(ctx context.Context, u *Update, chat *Chat) error {
 			kind := strings.TrimPrefix(chat.Scene, sceneGetGroup+":")
-			return b.resolveGroupInput(u, chat, strings.TrimSpace(u.Text), kind)
+			return b.resolveGroupInput(ctx, u, chat, strings.TrimSpace(u.Text), kind)
 		}},
 		{match: scenePrefixed(sceneGetTeacher + ":"), handle: func(ctx context.Context, u *Update, chat *Chat) error {
 			kind := strings.TrimPrefix(chat.Scene, sceneGetTeacher+":")
-			return b.resolveTeacherInput(u, chat, strings.TrimSpace(u.Text), kind)
+			return b.resolveTeacherInput(ctx, u, chat, strings.TrimSpace(u.Text), kind)
 		}},
 		{match: scenePrefixed(sceneGetTeacherWeek + ":"), handle: (&teacherWeekScene{bot: b}).Handle},
 	}

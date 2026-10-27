@@ -30,7 +30,7 @@ func (r *Repository) SyncFromCache(ctx context.Context, groups, teachers map[str
 	}
 
 	dbMaxDay := int64(0)
-	if bounds, err := r.DayIndexBounds(); err == nil {
+	if bounds, err := r.DayIndexBounds(ctx); err == nil {
 		dbMaxDay = bounds.Max
 	}
 

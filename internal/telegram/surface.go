@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"os"
 	"sort"
 
@@ -169,7 +170,7 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		}),
 		inline("callsFullKeyboard", callsFullKeyboard),
 		inline("weekControlKeyboard", func() *telego.InlineKeyboardMarkup {
-			return b.weekControlKeyboard("group", "100", 0, false)
+			return b.weekControlKeyboard(context.Background(), "group", "100", 0, false)
 		}),
 		inline("googleMenuKeyboard", googleMenuKeyboard),
 		inline("googleListKeyboard(empty)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(false) }),
@@ -179,7 +180,7 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		inline("googleControlCalendarKeyboard", googleControlCalendarKeyboard),
 		inline("googlePermissionsControl", func() *telego.InlineKeyboardMarkup { return googlePermissionsControl(1) }),
 		inline("weekControlKeyboard(hidePast)", func() *telego.InlineKeyboardMarkup {
-			return b.weekControlKeyboardHeader("group", "100", 0, true, true)
+			return b.weekControlKeyboardHeader(context.Background(), "group", "100", 0, true, true)
 		}),
 		inline("parserAlertKeyboard", func() *telego.InlineKeyboardMarkup {
 			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserLayout))

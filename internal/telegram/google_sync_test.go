@@ -124,7 +124,7 @@ func TestGoogleResyncGroupCalendarFromArchive(t *testing.T) {
 		t.Errorf("synced lessons = %+v", service.syncedLessons)
 	}
 
-	bounds, err := archiveRepo.DayIndexBounds()
+	bounds, err := archiveRepo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatalf("bounds: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestSyncGoogleCalendarDaysSkipsOutOfBoundsAndKeepsGoing(t *testing.T) {
 	b, _, _, service := setupGoogleBot(t)
 	archiveRepo := seedTwoGroupDays(t, b)
 
-	bounds, err := archiveRepo.DayIndexBounds()
+	bounds, err := archiveRepo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatalf("bounds: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestSyncGoogleCalendarsSkipsReconciledCalendar(t *testing.T) {
 	b, repo, _, service := setupGoogleBot(t)
 	archiveRepo := seedTwoGroupDays(t, b)
 
-	bounds, err := archiveRepo.DayIndexBounds()
+	bounds, err := archiveRepo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatalf("bounds: %v", err)
 	}

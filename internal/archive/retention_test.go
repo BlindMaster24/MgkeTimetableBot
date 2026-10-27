@@ -78,7 +78,7 @@ func TestPruneDaysBeforeKeepsEverythingItDoesNotOwn(t *testing.T) {
 		t.Fatalf("removed %d rows, want 3 (two group days and one teacher day before the cutoff)", removed)
 	}
 
-	stats, err := repo.Stats()
+	stats, err := repo.Stats(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestPruneDaysBeforeKeepsEverythingItDoesNotOwn(t *testing.T) {
 		t.Fatalf("archive after pruning = %+v, want the day inside the window only", stats)
 	}
 
-	days, err := repo.GroupDays("100", nil)
+	days, err := repo.GroupDays(context.Background(), "100", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestPruneDaysBeforeKeepsEverythingItDoesNotOwn(t *testing.T) {
 	if err := repo.Compact(context.Background()); err != nil {
 		t.Fatalf("compact after a prune: %v", err)
 	}
-	if stats, err = repo.Stats(); err != nil || stats.Total != 1 {
+	if stats, err = repo.Stats(context.Background()); err != nil || stats.Total != 1 {
 		t.Fatalf("compaction changed the archive: %+v %v", stats, err)
 	}
 }

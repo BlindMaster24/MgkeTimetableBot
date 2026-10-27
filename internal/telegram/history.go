@@ -80,15 +80,15 @@ func (s *historyWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	chat.Scene = ""
 	s.bot.chatRepo.Save(chat)
 
-	return s.bot.showWeekDays(u, chat, "teacher", chat.Teacher, weekIndex)
+	return s.bot.showWeekDays(ctx, u, chat, "teacher", chat.Teacher, weekIndex)
 }
 
-func (b *Bot) showWeekDays(u *Update, chat *Chat, kind, value string, weekIndex *utils.WeekIndex) error {
+func (b *Bot) showWeekDays(ctx context.Context, u *Update, chat *Chat, kind, value string, weekIndex *utils.WeekIndex) error {
 	if b.archive == nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
-	bounds, err := b.archive.WeekIndexBounds()
+	bounds, err := b.archive.WeekIndexBounds(ctx)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
@@ -103,7 +103,7 @@ func (b *Bot) showWeekDays(u *Update, chat *Chat, kind, value string, weekIndex 
 	opts.WeekLabel = buildWeekLabelFromWeek(*weekIndex)
 
 	minIdx, maxIdx := weekIndex.WeekDayIndexRange()
-	days, result := b.archiveDaysForRange(kind, value, minIdx, maxIdx)
+	days, result := b.archiveDaysForRange(ctx, kind, value, minIdx, maxIdx)
 	if result != archiveAnswered {
 		return u.Bot.SendText(u.ChatID, b.loc("history_no_data"))
 	}
@@ -114,7 +114,7 @@ func (b *Bot) showWeekDays(u *Update, chat *Chat, kind, value string, weekIndex 
 		text = b.loc("no_timetable")
 	}
 
-	kb := b.weekControlKeyboard(kind, value, weekIndex.Value(), false)
+	kb := b.weekControlKeyboard(ctx, kind, value, weekIndex.Value(), false)
 	return u.Bot.SendTextWithKeyboard(u.ChatID, text, kb)
 }
 

@@ -200,25 +200,25 @@ func googleProgress(calendar *GoogleCalendar, bounds archive.Bounds, hasBounds b
 	return float64(current) * 100 / float64(span)
 }
 
-func (b *Bot) googleDayBounds() (archive.Bounds, bool) {
+func (b *Bot) googleDayBounds(ctx context.Context) (archive.Bounds, bool) {
 	if b.archive == nil {
 		return archive.Bounds{}, false
 	}
-	bounds, err := b.archive.DayIndexBounds()
+	bounds, err := b.archive.DayIndexBounds(ctx)
 	if err != nil {
 		return archive.Bounds{}, false
 	}
 	return bounds, true
 }
 
-func (b *Bot) showGoogleCalendarList(u *Update, chat *Chat) error {
+func (b *Bot) showGoogleCalendarList(ctx context.Context, u *Update, chat *Chat) error {
 	api, err := b.googleUserClient(context.Background(), chat)
 	if err != nil {
 		return b.showGoogleAuth(u, chat)
 	}
 
 	current := b.googleCalendars(api)
-	bounds, hasBounds := b.googleDayBounds()
+	bounds, hasBounds := b.googleDayBounds(ctx)
 
 	var lines []string
 	for i, calendar := range current {
@@ -490,7 +490,7 @@ func (b *Bot) SyncGoogleCalendars(ctx context.Context) (int, error) {
 	if b.archive == nil {
 		return 0, nil
 	}
-	bounds, err := b.archive.DayIndexBounds()
+	bounds, err := b.archive.DayIndexBounds(ctx)
 	if err != nil || bounds.Max < bounds.Min {
 		return 0, err
 	}
@@ -532,7 +532,7 @@ func (b *Bot) SyncGoogleCalendarChanges(ctx context.Context, changes []GoogleDay
 	if b.archive == nil {
 		return 0, nil
 	}
-	bounds, err := b.archive.DayIndexBounds()
+	bounds, err := b.archive.DayIndexBounds(ctx)
 	if err != nil || bounds.Max < bounds.Min {
 		return 0, err
 	}
@@ -595,7 +595,7 @@ func (b *Bot) syncGoogleCalendarDays(ctx context.Context, repo archiveStore, cal
 			continue
 		}
 
-		lessons, err := archiveDayLessons(repo, calendar, dayIndex)
+		lessons, err := archiveDayLessons(ctx, repo, calendar, dayIndex)
 		if err != nil {
 			failures = append(failures, err)
 			continue
@@ -609,16 +609,16 @@ func (b *Bot) syncGoogleCalendarDays(ctx context.Context, repo archiveStore, cal
 	return synced, errors.Join(failures...)
 }
 
-func archiveDayLessons(repo archiveStore, calendar *GoogleCalendar, dayIndex int64) ([]google.DayLesson, error) {
+func archiveDayLessons(ctx context.Context, repo archiveStore, calendar *GoogleCalendar, dayIndex int64) ([]google.DayLesson, error) {
 	switch calendar.Type {
 	case "group":
-		day, err := repo.GroupDay(dayIndex, calendar.Value)
+		day, err := repo.GroupDay(ctx, dayIndex, calendar.Value)
 		if err != nil || day == nil {
 			return nil, err
 		}
 		return groupDayLessons(*day), nil
 	case "teacher":
-		day, err := repo.TeacherDay(dayIndex, calendar.Value)
+		day, err := repo.TeacherDay(ctx, dayIndex, calendar.Value)
 		if err != nil || day == nil {
 			return nil, err
 		}
@@ -639,7 +639,7 @@ func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCale
 		return 0, nil
 	}
 
-	bounds, err := b.archive.DayIndexBounds()
+	bounds, err := b.archive.DayIndexBounds(ctx)
 	if err != nil || bounds.Max < bounds.Min {
 		return 0, err
 	}
@@ -652,7 +652,7 @@ func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCale
 
 	switch calendar.Type {
 	case "group":
-		days, err := b.archive.GroupDaysByRange(from, bounds.Max, calendar.Value)
+		days, err := b.archive.GroupDaysByRange(ctx, from, bounds.Max, calendar.Value)
 		if err != nil {
 			return synced, err
 		}
@@ -663,7 +663,7 @@ func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCale
 			synced++
 		}
 	case "teacher":
-		days, err := b.archive.TeacherDaysByRange(from, bounds.Max, calendar.Value)
+		days, err := b.archive.TeacherDaysByRange(ctx, from, bounds.Max, calendar.Value)
 		if err != nil {
 			return synced, err
 		}
@@ -861,18 +861,18 @@ func (cb *googleCalCb) Handler(ctx context.Context, u *Update) error {
 	case googleActionMenu:
 		return cb.bot.showGoogleCalendarMenu(u, chat)
 	case googleActionList:
-		return cb.bot.showGoogleCalendarList(u, chat)
+		return cb.bot.showGoogleCalendarList(ctx, u, chat)
 	case googleActionAdd:
 		return cb.bot.showGoogleCalendarAdd(u, chat)
 	case googleActionDelete:
 		return cb.bot.showGoogleCalendarDelete(u, chat)
 	case googleActionDrop:
 		if len(parts) < 2 {
-			return cb.bot.showGoogleCalendarList(u, chat)
+			return cb.bot.showGoogleCalendarList(ctx, u, chat)
 		}
 		localID, ok := parseGoogleLocalID(parts[1])
 		if !ok {
-			return cb.bot.showGoogleCalendarList(u, chat)
+			return cb.bot.showGoogleCalendarList(ctx, u, chat)
 		}
 		return cb.bot.dropGoogleCalendar(u, chat, localID)
 	case googleActionPermMenu:

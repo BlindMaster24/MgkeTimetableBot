@@ -118,8 +118,8 @@ type WebhookMetrics struct {
 }
 
 type MetricsSources struct {
-	Archive   func() (archive.Stats, error)
-	Bounds    func() (archive.Bounds, error)
+	Archive   func(ctx context.Context) (archive.Stats, error)
+	Bounds    func(ctx context.Context) (archive.Bounds, error)
 	Webhook   func(ctx context.Context) WebhookMetrics
 	Scheduler func() int
 	Reminders func() int
@@ -251,7 +251,7 @@ func (s *Server) renderEndpointMetrics(w *prometheusWriter, endpoints []health.A
 
 func (s *Server) renderSourceMetrics(w *prometheusWriter, ctx context.Context) {
 	if s.metricsSources.Archive != nil {
-		if stats, err := s.metricsSources.Archive(); err == nil {
+		if stats, err := s.metricsSources.Archive(ctx); err == nil {
 			w.emit("mgke_archive_rows", "gauge", "Rows stored in the timetable archive.", strconv.Itoa(stats.Total))
 			w.emit("mgke_archive_rows_with_group", "gauge", "Archive rows that belong to a group.", strconv.Itoa(stats.WithGroup))
 			w.emit("mgke_archive_rows_with_teacher", "gauge", "Archive rows that belong to a teacher.", strconv.Itoa(stats.WithTeacher))
@@ -259,7 +259,7 @@ func (s *Server) renderSourceMetrics(w *prometheusWriter, ctx context.Context) {
 	}
 
 	if s.metricsSources.Bounds != nil {
-		if bounds, err := s.metricsSources.Bounds(); err == nil {
+		if bounds, err := s.metricsSources.Bounds(ctx); err == nil {
 			w.emit("mgke_archive_first_day_index", "gauge", "Oldest day kept in the archive.", strconv.FormatInt(bounds.Min, 10))
 			w.emit("mgke_archive_last_day_index", "gauge", "Newest day kept in the archive.", strconv.FormatInt(bounds.Max, 10))
 		}

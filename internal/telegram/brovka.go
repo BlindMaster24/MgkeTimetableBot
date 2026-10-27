@@ -82,7 +82,7 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Для данного чата учитель не был выбран.")
 	}
 
-	bounds, err := c.bot.archive.DayIndexBounds()
+	bounds, err := c.bot.archive.DayIndexBounds(ctx)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
@@ -98,7 +98,7 @@ func (c *brovkaCmd) Handler(ctx context.Context, u *Update) error {
 		fromDay = bounds.Min
 	}
 
-	entries, err := c.bot.archive.TeacherDays(chat.Teacher, &fromDay)
+	entries, err := c.bot.archive.TeacherDays(ctx, chat.Teacher, &fromDay)
 	if err != nil || len(entries) == 0 {
 		return u.Bot.SendText(u.ChatID, "Нет данных за указанный период")
 	}

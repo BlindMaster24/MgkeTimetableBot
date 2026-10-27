@@ -406,14 +406,14 @@ func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Архив недоступен")
 	}
 
-	stats, err := c.bot.archive.Stats()
+	stats, err := c.bot.archive.Stats(ctx)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, "Ошибка чтения архива: "+err.Error())
 	}
 
 	var lines []string
 	lines = append(lines, "-- Архив --")
-	if bounds, err := c.bot.archive.DayIndexBounds(); err == nil && bounds.Max > 0 {
+	if bounds, err := c.bot.archive.DayIndexBounds(ctx); err == nil && bounds.Max > 0 {
 		lines = append(lines, fmt.Sprintf("Дни: %s — %s", archive.DayIndexToDate(bounds.Min), archive.DayIndexToDate(bounds.Max)))
 		minWeek := int(bounds.Min) / 7
 		maxWeek := int(bounds.Max) / 7
@@ -423,10 +423,10 @@ func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 	lines = append(lines, fmt.Sprintf("Записей: %d (группы: %d, преподаватели: %d)", stats.Total, stats.WithGroup, stats.WithTeacher))
 
-	if groups, err := c.bot.archive.Groups(); err == nil && len(groups) > 0 {
+	if groups, err := c.bot.archive.Groups(ctx); err == nil && len(groups) > 0 {
 		lines = append(lines, fmt.Sprintf("Групп в архиве: %d", len(groups)))
 	}
-	if teachers, err := c.bot.archive.Teachers(); err == nil && len(teachers) > 0 {
+	if teachers, err := c.bot.archive.Teachers(ctx); err == nil && len(teachers) > 0 {
 		lines = append(lines, fmt.Sprintf("Преподавателей в архиве: %d", len(teachers)))
 	}
 

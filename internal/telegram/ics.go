@@ -54,18 +54,18 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 		if chat.Group == "" {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Группа не выбрана. Используйте /setup.", replyMainMenu(c.bot, chat))
 		}
-		return c.bot.buildAndSendICS(u, chat, "group", chat.Group, minIdx, maxIdx, week)
+		return c.bot.buildAndSendICS(ctx, u, chat, "group", chat.Group, minIdx, maxIdx, week)
 	case ModeTeacher:
 		if chat.Teacher == "" {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Преподаватель не выбран. Используйте /setup.", replyMainMenu(c.bot, chat))
 		}
-		return c.bot.buildAndSendICS(u, chat, "teacher", chat.Teacher, minIdx, maxIdx, week)
+		return c.bot.buildAndSendICS(ctx, u, chat, "teacher", chat.Teacher, minIdx, maxIdx, week)
 	}
 
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Режим чата не поддерживает экспорт расписания.", replyMainMenu(c.bot, chat))
 }
 
-func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
+func (bot *Bot) buildAndSendICS(ctx context.Context, u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
 	if bot.archive == nil {
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Архив недоступен", replyMainMenu(bot, chat))
 	}
@@ -75,7 +75,7 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 
 	switch typeName {
 	case "group":
-		days, err := bot.archive.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
+		days, err := bot.archive.GroupDaysByRange(ctx, int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
 		}
@@ -83,7 +83,7 @@ func (bot *Bot) buildAndSendICS(u *Update, chat *Chat, typeName, value string, m
 			builder.AddGroupDay(d, value)
 		}
 	case "teacher":
-		days, err := bot.archive.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
+		days, err := bot.archive.TeacherDaysByRange(ctx, int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
 		}

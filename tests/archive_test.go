@@ -55,7 +55,7 @@ func TestArchiveDaysAlignWithTheWeekIndex(t *testing.T) {
 
 	week := utils.WeekIndexFromDate(day)
 	minIdx, maxIdx := week.WeekDayIndexRange()
-	days, err := repo.GroupDaysByRange(int64(minIdx), int64(maxIdx), "100")
+	days, err := repo.GroupDaysByRange(context.Background(), int64(minIdx), int64(maxIdx), "100")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestArchiveDaysAlignWithTheWeekIndex(t *testing.T) {
 		t.Errorf("archived day = %s, want %s", days[0].Day, day.Format("02.01.2006"))
 	}
 
-	exact, err := repo.GroupDay(int64(utils.DayIndexFromDate(day)), "100")
+	exact, err := repo.GroupDay(context.Background(), int64(utils.DayIndexFromDate(day)), "100")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestArchiveDaysAlignWithTheWeekIndex(t *testing.T) {
 		t.Fatal("an exact day lookup by the bot's index must find the archived day")
 	}
 
-	bounds, err := repo.DayIndexBounds()
+	bounds, err := repo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestArchiveRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bounds, err := repo.DayIndexBounds()
+	bounds, err := repo.DayIndexBounds(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestArchiveRepository(t *testing.T) {
 		t.Errorf("bounds = %+v, want min=%d max=%d", bounds, dayIdx, dayIdx)
 	}
 
-	groups, err := repo.Groups()
+	groups, err := repo.Groups(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestArchiveRepository(t *testing.T) {
 		t.Errorf("groups = %v, want [63]", groups)
 	}
 
-	teachers, err := repo.Teachers()
+	teachers, err := repo.Teachers(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestArchiveRepository(t *testing.T) {
 		t.Errorf("teachers = %v, want [Ivanov]", teachers)
 	}
 
-	gd, err := repo.GroupDay(dayIdx, "63")
+	gd, err := repo.GroupDay(context.Background(), dayIdx, "63")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestArchiveRepository(t *testing.T) {
 		t.Fatalf("expected 1 lesson, got %d", len(gd.Lessons))
 	}
 
-	td, err := repo.TeacherDay(dayIdx, "Ivanov")
+	td, err := repo.TeacherDay(context.Background(), dayIdx, "Ivanov")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestArchiveRepository(t *testing.T) {
 		t.Fatalf("expected 1 lesson, got %d", len(td.Lessons))
 	}
 
-	days, err := repo.GroupDaysByRange(dayIdx, dayIdx, "63")
+	days, err := repo.GroupDaysByRange(context.Background(), dayIdx, dayIdx, "63")
 	if err != nil {
 		t.Fatal(err)
 	}

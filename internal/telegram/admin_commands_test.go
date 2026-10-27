@@ -91,7 +91,7 @@ func TestFlushCachePushesEveryCachedDayIntoTheArchive(t *testing.T) {
 		t.Fatal("the archive must be wired")
 	}
 
-	days, err := archiveRepo.GroupDays("100", nil)
+	days, err := archiveRepo.GroupDays(context.Background(), "100", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestFlushCachePushesEveryCachedDayIntoTheArchive(t *testing.T) {
 		t.Fatalf("the archived days must keep their order, got %q, %q", days[0].Day, days[1].Day)
 	}
 
-	teachers, err := archiveRepo.Teachers()
+	teachers, err := archiveRepo.Teachers(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestFlushCacheRewritesTheSameDay(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	days, err := repo.GroupDaysByRange(int64(utils.DayIndexFromDate(time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC))), int64(utils.DayIndexFromDate(time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC))), "100")
+	days, err := repo.GroupDaysByRange(context.Background(), int64(utils.DayIndexFromDate(time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC))), int64(utils.DayIndexFromDate(time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC))), "100")
 	if err != nil {
 		t.Fatal(err)
 	}

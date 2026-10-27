@@ -22,20 +22,20 @@ func (c *statsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" {
-		msg := c.getGroupStats(c.bot.archive, chat.Group)
+		msg := c.getGroupStats(ctx, c.bot.archive, chat.Group)
 		return u.Bot.SendText(u.ChatID, msg)
 	}
 
 	if chat.Mode == ModeTeacher && chat.Teacher != "" {
-		msg := c.getTeacherStats(c.bot.archive, chat.Teacher)
+		msg := c.getTeacherStats(ctx, c.bot.archive, chat.Teacher)
 		return u.Bot.SendText(u.ChatID, msg)
 	}
 
 	return u.Bot.SendText(u.ChatID, c.bot.loc("stats_no_group"))
 }
 
-func (c *statsCmd) getGroupStats(repo archiveStore, group string) string {
-	days, err := repo.GroupDays(group, nil)
+func (c *statsCmd) getGroupStats(ctx context.Context, repo archiveStore, group string) string {
+	days, err := repo.GroupDays(ctx, group, nil)
 	if err != nil || len(days) == 0 {
 		return c.bot.loc("no_timetable")
 	}
@@ -78,8 +78,8 @@ func (c *statsCmd) getGroupStats(repo archiveStore, group string) string {
 	return strings.Join(lines, "\n")
 }
 
-func (c *statsCmd) getTeacherStats(repo archiveStore, teacher string) string {
-	days, err := repo.TeacherDays(teacher, nil)
+func (c *statsCmd) getTeacherStats(ctx context.Context, repo archiveStore, teacher string) string {
+	days, err := repo.TeacherDays(ctx, teacher, nil)
 	if err != nil || len(days) == 0 {
 		return c.bot.loc("no_timetable")
 	}

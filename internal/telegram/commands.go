@@ -235,7 +235,7 @@ func (c *weekCmd) Handler(ctx context.Context, u *Update) error {
 	if chat.Mode == "" {
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard())
 	}
-	return c.bot.showWeekSchedule(u, chat)
+	return c.bot.showWeekSchedule(ctx, u, chat)
 }
 
 type callsCmd struct{ bot *Bot }
@@ -277,7 +277,7 @@ func (c *groupCmd) MatchText(text string) bool {
 	return groupDayButtonRe.MatchString(text)
 }
 func (c *groupCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetGroup(u, "day")
+	return c.bot.startGetGroup(ctx, u, "day")
 }
 
 type teacherCmd struct{ bot *Bot }
@@ -288,7 +288,7 @@ func (c *teacherCmd) MatchText(text string) bool {
 	return teacherDayButtonRe.MatchString(text)
 }
 func (c *teacherCmd) Handler(ctx context.Context, u *Update) error {
-	return c.bot.startGetTeacher(u, "day")
+	return c.bot.startGetTeacher(ctx, u, "day")
 }
 
 type imageCmd struct{ bot *Bot }

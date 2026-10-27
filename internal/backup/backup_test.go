@@ -46,7 +46,7 @@ func storedDays(t *testing.T, path string) []string {
 	}
 	defer repo.Close()
 
-	days, err := repo.GroupDays("100", nil)
+	days, err := repo.GroupDays(context.Background(), "100", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

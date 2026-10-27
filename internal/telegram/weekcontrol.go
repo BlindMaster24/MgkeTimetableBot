@@ -11,12 +11,12 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-func (b *Bot) weekControlKeyboard(typeName, value string, weekIndex int, hidePastDays bool) *telego.InlineKeyboardMarkup {
-	return b.weekControlKeyboardHeader(typeName, value, weekIndex, hidePastDays, false)
+func (b *Bot) weekControlKeyboard(ctx context.Context, typeName, value string, weekIndex int, hidePastDays bool) *telego.InlineKeyboardMarkup {
+	return b.weekControlKeyboardHeader(ctx, typeName, value, weekIndex, hidePastDays, false)
 }
 
-func (b *Bot) weekControlKeyboardHeader(typeName, value string, weekIndex int, hidePastDays bool, showHeader bool) *telego.InlineKeyboardMarkup {
-	minWeek, maxWeek := b.weekIndexBounds()
+func (b *Bot) weekControlKeyboardHeader(ctx context.Context, typeName, value string, weekIndex int, hidePastDays bool, showHeader bool) *telego.InlineKeyboardMarkup {
+	minWeek, maxWeek := b.weekIndexBounds(ctx)
 	currentWeek := utils.WeekIndexFromDate(b.nowTime()).Value()
 
 	typeLetter := string(typeName[0])
@@ -62,9 +62,9 @@ func (b *Bot) weekControlKeyboardHeader(typeName, value string, weekIndex int, h
 	return keyboard
 }
 
-func (b *Bot) weekIndexBounds() (int, int) {
+func (b *Bot) weekIndexBounds(ctx context.Context) (int, int) {
 	if b.archive != nil {
-		if bounds, err := b.archive.WeekIndexBounds(); err == nil && bounds.Max > 0 {
+		if bounds, err := b.archive.WeekIndexBounds(ctx); err == nil && bounds.Max > 0 {
 			return int(bounds.Min), int(bounds.Max)
 		}
 	}
@@ -97,7 +97,7 @@ func (cb *timetableGroupCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	return cb.bot.handleTimetableCb(u, chat, "group", u.Data)
+	return cb.bot.handleTimetableCb(ctx, u, chat, "group", u.Data)
 }
 
 type timetableTeacherCb struct{ bot *Bot }
@@ -109,10 +109,10 @@ func (cb *timetableTeacherCb) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
 	}
-	return cb.bot.handleTimetableCb(u, chat, "teacher", u.Data)
+	return cb.bot.handleTimetableCb(ctx, u, chat, "teacher", u.Data)
 }
 
-func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) error {
+func (b *Bot) handleTimetableCb(ctx context.Context, u *Update, chat *Chat, typeName, data string) error {
 	payload := strings.TrimPrefix(data, "timetable_"+string(typeName[0])+":")
 
 	type timetablePayload struct {
@@ -156,7 +156,7 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 		return b.sendOrEdit(u, b.loc("group_not_exists"), nil)
 	}
 
-	days := b.weekDays(daysFromArchive, typeName, p.Value, week)
+	days := b.weekDays(ctx, daysFromArchive, typeName, p.Value, week)
 	if p.HidePastDays && p.WeekIndex == b.relevantWeekIndex().Value() {
 		days = b.removePastDays(days)
 	}
@@ -169,11 +169,11 @@ func (b *Bot) handleTimetableCb(u *Update, chat *Chat, typeName, data string) er
 		text = b.loc("no_timetable")
 	}
 
-	kb := b.weekControlKeyboardHeader(typeName, p.Value, p.WeekIndex, p.HidePastDays, p.ShowHeader)
+	kb := b.weekControlKeyboardHeader(ctx, typeName, p.Value, p.WeekIndex, p.HidePastDays, p.ShowHeader)
 	return b.sendOrEdit(u, text, kb)
 }
 
-func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
+func (b *Bot) showWeekSchedule(ctx context.Context, u *Update, chat *Chat) error {
 	target, ok := scheduleTargetFor(chat)
 	if !ok {
 		return u.Bot.SendText(u.ChatID, b.loc("need_group"))
@@ -189,13 +189,13 @@ func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
 	}
 
 	week := b.relevantWeekIndex()
-	days := b.weekDays(daysFromCache, target.typeName, target.value, week)
+	days := b.weekDays(ctx, daysFromCache, target.typeName, target.value, week)
 	allDays := days
 	if chat.HidePastDays {
 		days = b.removePastDays(days)
 		if target.rolloverWhenPastHidden && len(days) == 0 && len(allDays) > 0 {
 			week = utils.WeekIndexFromNumber(week.Value() + 1)
-			days = b.weekDays(daysFromCache, target.typeName, target.value, week)
+			days = b.weekDays(ctx, daysFromCache, target.typeName, target.value, week)
 		}
 	}
 
@@ -206,7 +206,7 @@ func (b *Bot) showWeekSchedule(u *Update, chat *Chat) error {
 		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 	}
 
-	kb := b.weekControlKeyboard(target.typeName, target.value, week.Value(), chat.HidePastDays)
+	kb := b.weekControlKeyboard(ctx, target.typeName, target.value, week.Value(), chat.HidePastDays)
 	return b.sendOrEdit(u, text, kb)
 }
 

@@ -47,7 +47,7 @@ func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *C
 	chat.AppendGroupHistory(groupB)
 	s.bot.chatRepo.Save(chat)
 
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.compareGroupsMessage(groupA, groupB), replyMainMenu(s.bot, chat))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.compareGroupsMessage(ctx, groupA, groupB), replyMainMenu(s.bot, chat))
 }
 
 func (b *Bot) findGroup(u *Update, chat *Chat, input string) (string, bool) {
@@ -102,12 +102,12 @@ func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keybo
 	return matched[0], true, false
 }
 
-func (b *Bot) compareGroupsMessage(groupA, groupB string) string {
+func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) string {
 	week := b.relevantWeekIndex()
 	minIdx, maxIdx := week.WeekDayIndexRange()
 
-	daysA := b.weekDayLessons(minIdx, maxIdx, groupA)
-	daysB := b.weekDayLessons(minIdx, maxIdx, groupB)
+	daysA := b.weekDayLessons(ctx, minIdx, maxIdx, groupA)
+	daysB := b.weekDayLessons(ctx, minIdx, maxIdx, groupB)
 
 	lines := []string{
 		fmt.Sprintf("Сравнение групп %s и %s", groupA, groupB),
@@ -193,11 +193,11 @@ func (b *Bot) compareGroupsMessage(groupA, groupB string) string {
 	return strings.Join(lines, "\n")
 }
 
-func (b *Bot) weekDayLessons(minIdx, maxIdx int, group string) map[string][]any {
+func (b *Bot) weekDayLessons(ctx context.Context, minIdx, maxIdx int, group string) map[string][]any {
 	result := make(map[string][]any)
 
 	if b.archive != nil {
-		days, err := b.archive.GroupDaysByRange(int64(minIdx), int64(maxIdx), group)
+		days, err := b.archive.GroupDaysByRange(ctx, int64(minIdx), int64(maxIdx), group)
 		if err == nil {
 			for _, day := range daysToMaps(days) {
 				date, _ := day["day"].(string)

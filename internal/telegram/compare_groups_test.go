@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -154,7 +155,7 @@ func TestCompareGroupsKeepsTheWeekInsideTheRange(t *testing.T) {
 	seedArchivedDay(t, archiveRepo, "group", "100", first, groupLesson("Математика"))
 	seedArchivedDay(t, archiveRepo, "group", "101", first.AddDate(0, 0, 6), groupLesson("Химия"))
 
-	text := b.compareGroupsMessage("100", "101")
+	text := b.compareGroupsMessage(context.Background(), "100", "101")
 	if !strings.Contains(text, "Сравнение групп 100 и 101") {
 		t.Fatalf("the header is missing: %q", text)
 	}

@@ -8,7 +8,7 @@ import (
 func TestStatsCountsRows(t *testing.T) {
 	repo := newTestRepo(t)
 
-	empty, err := repo.Stats()
+	empty, err := repo.Stats(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestStatsCountsRows(t *testing.T) {
 		t.Fatalf("sync: %v", err)
 	}
 
-	stats, err := repo.Stats()
+	stats, err := repo.Stats(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

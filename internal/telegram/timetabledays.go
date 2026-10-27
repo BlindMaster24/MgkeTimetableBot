@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -96,29 +97,29 @@ func (b *Bot) cacheDaysForRange(typeName, value string, minIdx, maxIdx int) []ma
 	return extractDaysFromRange(data, minIdx, maxIdx)
 }
 
-func (b *Bot) archiveDaysForRange(typeName, value string, minIdx, maxIdx int) ([]map[string]any, archiveResult) {
+func (b *Bot) archiveDaysForRange(ctx context.Context, typeName, value string, minIdx, maxIdx int) ([]map[string]any, archiveResult) {
 	if b.archive == nil {
 		return nil, archiveUnavailable
 	}
 
 	if typeName == "teacher" {
-		days, err := b.archive.TeacherDaysByRange(int64(minIdx), int64(maxIdx), value)
+		days, err := b.archive.TeacherDaysByRange(ctx, int64(minIdx), int64(maxIdx), value)
 		if err != nil {
 			return nil, archiveFailed
 		}
 		return daysToMaps(days), archiveAnswered
 	}
 
-	days, err := b.archive.GroupDaysByRange(int64(minIdx), int64(maxIdx), value)
+	days, err := b.archive.GroupDaysByRange(ctx, int64(minIdx), int64(maxIdx), value)
 	if err != nil {
 		return nil, archiveFailed
 	}
 	return daysToMaps(days), archiveAnswered
 }
 
-func (b *Bot) daysForRange(source daySource, typeName, value string, minIdx, maxIdx int) []map[string]any {
+func (b *Bot) daysForRange(ctx context.Context, source daySource, typeName, value string, minIdx, maxIdx int) []map[string]any {
 	if source == daysFromArchive {
-		days, result := b.archiveDaysForRange(typeName, value, minIdx, maxIdx)
+		days, result := b.archiveDaysForRange(ctx, typeName, value, minIdx, maxIdx)
 		switch result {
 		case archiveAnswered:
 			return days
@@ -129,9 +130,9 @@ func (b *Bot) daysForRange(source daySource, typeName, value string, minIdx, max
 	return b.cacheDaysForRange(typeName, value, minIdx, maxIdx)
 }
 
-func (b *Bot) weekDays(source daySource, typeName, value string, week utils.WeekIndex) []map[string]any {
+func (b *Bot) weekDays(ctx context.Context, source daySource, typeName, value string, week utils.WeekIndex) []map[string]any {
 	minIdx, maxIdx := week.WeekDayIndexRange()
-	return b.daysForRange(source, typeName, value, minIdx, maxIdx)
+	return b.daysForRange(ctx, source, typeName, value, minIdx, maxIdx)
 }
 
 func daysToMaps[T any](days []T) []map[string]any {
