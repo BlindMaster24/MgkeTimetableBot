@@ -26,6 +26,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	"github.com/mymmrac/telego"
+	"github.com/mymmrac/telego/telegoapi"
 )
 
 type parseLogEntry struct {
@@ -435,7 +436,25 @@ func (b *Bot) SendText(chatID int64, text string) error {
 		Text:      text,
 		ParseMode: "HTML",
 	})
+	b.noteUndeliverable(chatID, err)
 	return b.countSendError(transportSendMessage, err)
+}
+
+func (b *Bot) noteUndeliverable(chatID int64, err error) {
+	if err == nil || b.chatRepo == nil {
+		return
+	}
+
+	var apiErr *telegoapi.Error
+	if !errors.As(err, &apiErr) {
+		return
+	}
+	if apiErr.ErrorCode != 403 && !strings.Contains(strings.ToLower(apiErr.Description), "blocked") {
+		return
+	}
+	if b.chatRepo.SetAllowSendMess("telegram", chatID, false) == nil {
+		b.log.Warn().Int64("chatID", chatID).Msg("the chat blocked the bot, notifications disabled")
+	}
 }
 
 func (b *Bot) SendTextWithKeyboard(chatID int64, text string, kb *telego.InlineKeyboardMarkup) error {

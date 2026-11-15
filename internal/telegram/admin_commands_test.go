@@ -241,6 +241,29 @@ func TestAcceptBotGrantsAccess(t *testing.T) {
 	}
 }
 
+func TestBlockedChatStopsReceivingMessages(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+
+	chat, err := b.chatRepo.FindOrCreate("telegram", 4242)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !chat.AllowSendMess {
+		t.Fatal("a fresh chat must accept messages")
+	}
+
+	b.noteUndeliverable(4242, &telegoapi.Error{ErrorCode: 403, Description: "Forbidden: bot was blocked by the user"})
+
+	chat, err = b.chatRepo.FindOrCreate("telegram", 4242)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chat.AllowSendMess {
+		t.Fatal("a chat that blocked the bot must not be messaged again")
+	}
+}
+
 func TestSendRefusesASecondBroadcast(t *testing.T) {
 	caller := &capturingCaller{}
 	b, _ := setupE2EBotWithCaller(t, caller, 777)

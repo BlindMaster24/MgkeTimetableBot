@@ -216,6 +216,19 @@ func (r *Repository) migrate() error {
 	return r.migrateGoogle()
 }
 
+func (r *Repository) SetAllowSendMess(service string, peerID int64, allow bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	value := 0
+	if allow {
+		value = 1
+	}
+
+	_, err := r.db.Exec(`UPDATE bot_chats SET allow_send_mess = ? WHERE service = ? AND peer_id = ?`, value, service, peerID)
+	return err
+}
+
 func (r *Repository) SetDefaultAccepted(accepted bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
