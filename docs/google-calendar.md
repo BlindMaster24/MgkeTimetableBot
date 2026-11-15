@@ -1,5 +1,7 @@
 # Google Calendar: настройка и права доступа
 
+[English version](google-calendar.en.md)
+
 Документ описывает, как настроить Google Calendar в боте, пройти авторизацию пользователю и управлять правами (reader/writer). Требуется Go 1.27.4+.
 
 ## 1. Подготовка Google Cloud
