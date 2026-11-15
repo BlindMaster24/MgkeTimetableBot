@@ -470,6 +470,22 @@ func (c *createApiKeyCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
 
+var readOnlyQueryPrefixes = map[string]bool{
+	"select":  true,
+	"with":    true,
+	"pragma":  true,
+	"explain": true,
+	"values":  true,
+}
+
+func readOnlyQuery(query string) bool {
+	fields := strings.Fields(query)
+	if len(fields) == 0 {
+		return false
+	}
+	return readOnlyQueryPrefixes[strings.ToLower(fields[0])]
+}
+
 func trimSqlPrefix(text string) string {
 	lower := strings.ToLower(text)
 	for _, prefix := range []string{"/sql_run", "/sqlrun", "/db_run", "/dbrun", "/sql", "/db"} {
@@ -498,9 +514,20 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 	if query == "" {
 		return u.Bot.SendText(u.ChatID, "Укажите SQL запрос после /sql")
 	}
+	if !readOnlyQuery(query) {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("sql_read_only"))
+	}
+
 	c.bot.chatRepo.mu.Lock()
 	defer c.bot.chatRepo.mu.Unlock()
-	rows, err := c.bot.chatRepo.db.Query(query)
+
+	tx, err := c.bot.chatRepo.db.BeginTx(ctx, nil)
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
 	}

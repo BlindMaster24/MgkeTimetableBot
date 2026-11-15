@@ -14,6 +14,7 @@
   "group_not_exists": "Данной учебной группы не существует",
   "teacher_not_exists": "Данного преподавателя не существует",
   "data_not_loaded": "Данные с сервера ещё не загружены, ожидайте...",
+  "sql_read_only": "Только чтение: SELECT, WITH, PRAGMA, EXPLAIN, VALUES.",
   "parser_logs_no_logs": "Логов нет",
   "parser_logs_diagnostics": "Диагностика парсера (что перестало находиться на сайте):",
   "parser_logs_clean": "Диагностика парсера: все селекторы находят данные",

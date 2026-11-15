@@ -241,6 +241,42 @@ func TestAcceptBotGrantsAccess(t *testing.T) {
 	}
 }
 
+func TestSqlCommandKeepsTheDatabaseReadOnly(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+
+	if _, err := b.chatRepo.FindOrCreate("telegram", 4242); err != nil {
+		t.Fatal(err)
+	}
+	var before int
+	if err := b.chatRepo.db.QueryRow("SELECT COUNT(*) FROM bot_chats").Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+
+	u := makeUpdate(777, "/sql SELECT COUNT(*) FROM bot_chats")
+	u.Bot = b
+	if err := (&sqlCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(caller.last(), "1") {
+		t.Fatalf("a read-only query must return its rows, got %q", caller.last())
+	}
+
+	caller.reset()
+	u = makeUpdate(777, "/sql DELETE FROM bot_chats")
+	u.Bot = b
+	if err := (&sqlCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	var after int
+	if err := b.chatRepo.db.QueryRow("SELECT COUNT(*) FROM bot_chats").Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if after != before {
+		t.Fatalf("the debug command changed the database: %d chats before, %d after", before, after)
+	}
+}
+
 func TestVanishReportsAFailedVacuum(t *testing.T) {
 	caller := &capturingCaller{}
 	b, _ := setupE2EBotWithCaller(t, caller, 777)
