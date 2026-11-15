@@ -315,7 +315,7 @@ The server listens on `0.0.0.0:http.port`:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/info` | Service information, version and build metadata, plus the `groups`/`teachers`/`team` cache envelopes (`update`, `changed`, `hash`) and the `lastSuccess` flag — matching the old TS API; a `webhook` block with the update delivery mode (address, pending updates, last delivery error) |
+| GET | `/api/info` | Service information, version and build metadata, plus the `groups`/`teachers`/`team` cache envelopes (`update`, `changed`, `hash`) and the `lastSuccess` flag — matching the old TS API; a `webhook` block with the update delivery mode (address, pending updates, last delivery error; the snapshot is refreshed at most once every 30 seconds) |
 | GET | `/api/groups` | Group list (numeric names sort first, ascending — as in the old API) |
 | GET | `/api/teachers` | Teacher list (same ordering) |
 | GET | `/api/group/:name` | Group timetable: `days` (each day carries `weekday`), `update`, `changed`, `lastSuccess`; an unknown name gets `404` |

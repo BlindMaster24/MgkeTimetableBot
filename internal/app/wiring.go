@@ -33,20 +33,20 @@ func webhookMetrics(status telegrambot.WebhookStatus) api.WebhookMetrics {
 	}
 }
 
-type webhookMetricsSource struct {
+type webhookStatusSource struct {
 	mu       sync.Mutex
 	interval time.Duration
 	fetch    func(ctx context.Context) telegrambot.WebhookStatus
 	now      func() time.Time
 	at       time.Time
-	cached   api.WebhookMetrics
+	cached   telegrambot.WebhookStatus
 }
 
-func newWebhookMetricsSource(fetch func(ctx context.Context) telegrambot.WebhookStatus) *webhookMetricsSource {
-	return &webhookMetricsSource{interval: webhookMetricsInterval, fetch: fetch, now: time.Now}
+func newWebhookStatusSource(fetch func(ctx context.Context) telegrambot.WebhookStatus) *webhookStatusSource {
+	return &webhookStatusSource{interval: webhookMetricsInterval, fetch: fetch, now: time.Now}
 }
 
-func (s *webhookMetricsSource) Get(ctx context.Context) api.WebhookMetrics {
+func (s *webhookStatusSource) Get(ctx context.Context) telegrambot.WebhookStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -54,9 +54,21 @@ func (s *webhookMetricsSource) Get(ctx context.Context) api.WebhookMetrics {
 		return s.cached
 	}
 
-	s.cached = webhookMetrics(s.fetch(ctx))
+	s.cached = s.fetch(ctx)
 	s.at = s.now()
 	return s.cached
+}
+
+type webhookMetricsSource struct {
+	*webhookStatusSource
+}
+
+func newWebhookMetricsSource(fetch func(ctx context.Context) telegrambot.WebhookStatus) *webhookMetricsSource {
+	return &webhookMetricsSource{webhookStatusSource: newWebhookStatusSource(fetch)}
+}
+
+func (s *webhookMetricsSource) Get(ctx context.Context) api.WebhookMetrics {
+	return webhookMetrics(s.webhookStatusSource.Get(ctx))
 }
 
 type archiveMaintenance struct {

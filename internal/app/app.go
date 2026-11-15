@@ -191,7 +191,8 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	googleService := google.NewCalendarService(cfg)
 	bot.SetGoogleService(googleService)
 	calendarSyncEnabled := googleService.SyncEnabled()
-	apiServer.SetWebhookStatus(func(ctx context.Context) any { return bot.WebhookStatus(ctx) })
+	webhookStatus := newWebhookStatusSource(bot.WebhookStatus)
+	apiServer.SetWebhookStatus(func(ctx context.Context) any { return webhookStatus.Get(ctx) })
 	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(googleService, chatRepo, bot, log, loc))
 
 	go func() {
@@ -262,7 +263,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		apiServer.SetMetricsSources(api.MetricsSources{
 			Archive:   archiveRepo.Stats,
 			Bounds:    archiveRepo.DayIndexBounds,
-			Webhook:   newWebhookMetricsSource(bot.WebhookStatus).Get,
+			Webhook:   func(ctx context.Context) api.WebhookMetrics { return webhookMetrics(webhookStatus.Get(ctx)) },
 			Scheduler: schedulerEntries,
 			Reminders: trackedReminders,
 			Telegram:  telegramCounters.TelegramStats,

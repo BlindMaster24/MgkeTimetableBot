@@ -137,3 +137,36 @@ func TestWebhookMetricsKeepLongPollingHonest(t *testing.T) {
 		t.Errorf("a stale registration must stay visible without claiming webhook mode: %+v", stale)
 	}
 }
+
+func TestWebhookStatusSourceAnswersFromOneLiveCheck(t *testing.T) {
+	fetches := 0
+	source := newWebhookStatusSource(func(context.Context) telegrambot.WebhookStatus {
+		fetches++
+		return telegrambot.WebhookStatus{
+			Enabled:        true,
+			Mode:           "webhook",
+			Endpoint:       "https://bot.example.com/telegram/webhook",
+			PendingUpdates: 2,
+		}
+	})
+
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	source.now = func() time.Time { return now }
+
+	first := source.Get(context.Background())
+	for i := 0; i < 5; i++ {
+		source.Get(context.Background())
+	}
+	if fetches != 1 {
+		t.Fatalf("requests inside the interval must reuse the snapshot, fetches = %d", fetches)
+	}
+	if first.Endpoint != "https://bot.example.com/telegram/webhook" || first.PendingUpdates != 2 {
+		t.Fatalf("the snapshot = %+v", first)
+	}
+
+	now = now.Add(webhookMetricsInterval)
+	source.Get(context.Background())
+	if fetches != 2 {
+		t.Fatalf("the interval elapsed, fetches = %d", fetches)
+	}
+}
