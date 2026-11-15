@@ -48,8 +48,11 @@ func (c *vanishCmd) MatchText(text string) bool {
 }
 func (c *vanishCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.chatRepo.mu.Lock()
-	c.bot.chatRepo.db.Exec("VACUUM")
+	_, err := c.bot.chatRepo.db.Exec("VACUUM")
 	c.bot.chatRepo.mu.Unlock()
+	if err != nil {
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+	}
 	return u.Bot.SendText(u.ChatID, "Бд почищена")
 }
 

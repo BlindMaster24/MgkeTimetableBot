@@ -241,6 +241,23 @@ func TestAcceptBotGrantsAccess(t *testing.T) {
 	}
 }
 
+func TestVanishReportsAFailedVacuum(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+	if err := b.chatRepo.db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	u := makeUpdate(777, "/vanish")
+	u.Bot = b
+	if err := (&vanishCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if caller.last() == "Бд почищена" {
+		t.Fatal("a failed VACUUM was reported as success")
+	}
+}
+
 func TestAcceptedChatRunsCommands(t *testing.T) {
 	caller := &capturingCaller{}
 	b, _ := setupE2EBotWithCaller(t, caller)
