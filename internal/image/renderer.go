@@ -130,6 +130,7 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 
 	cellsPerRow := 2
 	rows := (len(ti.Days) + cellsPerRow - 1) / cellsPerRow
+	const tableGap = 6
 
 	maxLessons := 0
 	for _, d := range ti.Days {
@@ -171,8 +172,8 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		}
 	}
 
-	totalW := colsWidth*cellsPerRow + padding*2
-	totalH := titleBandH + int(maxTableH)*rows + footerBandH
+	totalW := colsWidth*cellsPerRow + padding*2 + tableGap*(cellsPerRow-1)
+	totalH := titleBandH + int(maxTableH)*rows + tableGap*(rows-1) + footerBandH
 	if float64(int(maxTableH)) < maxTableH {
 		totalH++
 	}
@@ -222,8 +223,8 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 			day := ti.Days[idx]
 			heights := rowHeights[idx]
 
-			tx := float64(padding + col*colsWidth)
-			ty := float64(titleBandH) + float64(row)*maxTableH
+			tx := float64(padding + col*(colsWidth+tableGap))
+			ty := float64(titleBandH) + float64(row)*(maxTableH+tableGap)
 			tableW := float64(colsWidth)
 
 			dc.SetColor(headFill)

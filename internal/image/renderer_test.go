@@ -227,9 +227,9 @@ func TestRendererLaysOutLikeTheTypeScriptBot(t *testing.T) {
 	}
 
 	flat := render(t, []DayData{day(false), day(false), day(false)})
-	const expectedWidth = (30+250+60+100+190)*2 + 20
+	const expectedWidth = (30+250+60+100+190)*2 + 20 + 6
 	if flat.Bounds().Dx() != expectedWidth {
-		t.Errorf("width = %d, want %d (two day tables and the padding)", flat.Bounds().Dx(), expectedWidth)
+		t.Errorf("width = %d, want %d (two day tables, the gap and the padding)", flat.Bounds().Dx(), expectedWidth)
 	}
 
 	logo := flat.At(20, 20)
