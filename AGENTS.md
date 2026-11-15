@@ -54,7 +54,7 @@
 - Output is delivered through telego (Telegram) or gin (HTTP API).
 
 ## Where to Add New Code
-- New bot command: add struct either to `internal/telegram/commands.go` (user surface) or to the feature file it belongs to, implement `Command` interface, register in `registerAll()`. Do not create a catch-all file: one feature, one file.
+- New bot command: add struct either to `internal/telegram/commands.go` (user surface) or to the feature file it belongs to, implement `Command` interface, register in `registerAll()`. Do not create a catch-all file: one feature, one file. The name must fit Telegram (`a-z`, `0-9`, `_`, 1-32 characters) and the description 3-256 characters: `validateBotCommands` refuses anything else before `setMyCommands` is called, and `botcommands_test.go` holds the whole registered surface to that rule.
 - New callback: add struct in `internal/telegram/callbacks.go`, implement `Callback` interface, register in `registerAll()`.
 - New menu: add one spec to the table in `internal/telegram/menus.go`; do not hand-register its command or text handlers.
 - New input scene: add a typed scene constant and a route in `internal/telegram/scenes.go`; never compare raw scene strings in handlers.

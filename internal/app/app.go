@@ -337,7 +337,7 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	bot.SetParseFunc(func() error { return parseOnce(true) })
 
 	if err := bot.SetMyCommands(); err != nil {
-		log.Warn().Err(err).Msg("failed to set bot commands")
+		log.Error().Err(err).Msg("failed to set bot commands")
 	}
 
 	if cfg.Parser.Enabled {

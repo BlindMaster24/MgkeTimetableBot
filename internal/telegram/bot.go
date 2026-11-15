@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apiprobe"
@@ -374,9 +376,34 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 	}
 }
 
+var telegramCommandName = regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
+
+const (
+	telegramCommandDescriptionMin = 3
+	telegramCommandDescriptionMax = 256
+)
+
+func validateBotCommands(commands []telego.BotCommand) error {
+	var errs []error
+	for _, command := range commands {
+		if !telegramCommandName.MatchString(command.Command) {
+			errs = append(errs, fmt.Errorf("telegram command %q must be 1-32 characters of a-z, 0-9 and _", command.Command))
+		}
+		if length := utf8.RuneCountInString(command.Description); length < telegramCommandDescriptionMin || length > telegramCommandDescriptionMax {
+			errs = append(errs, fmt.Errorf("telegram command %q description must be %d-%d characters, got %d", command.Command, telegramCommandDescriptionMin, telegramCommandDescriptionMax, length))
+		}
+	}
+	return errors.Join(errs...)
+}
 func (b *Bot) SetMyCommands() error {
+	commands := b.botCommands(false)
+	adminCommands := b.botCommands(true)
+	if err := errors.Join(validateBotCommands(commands), validateBotCommands(adminCommands)); err != nil {
+		return err
+	}
+
 	params := &telego.SetMyCommandsParams{
-		Commands: b.botCommands(false),
+		Commands: commands,
 		Scope:    &telego.BotCommandScopeDefault{Type: "default"},
 	}
 
@@ -385,7 +412,6 @@ func (b *Bot) SetMyCommands() error {
 		errs = append(errs, err)
 	}
 
-	adminCommands := b.botCommands(true)
 	for _, adminID := range b.cfg.Telegram.AdminIDs {
 		scope := &telego.BotCommandScopeChat{
 			Type:   "chat",
