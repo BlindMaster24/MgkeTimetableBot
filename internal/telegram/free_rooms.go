@@ -29,10 +29,9 @@ func (c *freeRoomsCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("free_no_data"))
 	}
 
-	calls := reminder.Schedule{
-		Weekdays: c.bot.cache.GetCallsWeekdays(),
-		Saturday: c.bot.cache.GetCallsSaturday(),
-	}
+	chat, _ := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
+	schedule := c.bot.callsScheduleFor(chat)
+	calls := reminder.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}
 
 	num, requested := freePairArgument(u.Text)
 	if requested {

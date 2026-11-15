@@ -213,7 +213,7 @@ The bell schedule refreshes itself from the college site; it can still be edited
 
 #### Campuses
 
-The bell schedule page can hold several tables, one per campus. The parser keeps every variant and shows their names as `🏫 Корпус: …` buttons in the calls menu (only when there is more than one). A user picks their campus, it is stored in the chat database and used both for the displayed bell schedule and for Google Calendar sync. The `🏫 Корпус: авто` button clears the choice back to the default variant (`parser.calls.campus`, otherwise the schedule with the most periods). A single campus for the whole installation is set with `parser.calls.campus`.
+The bell schedule page can hold several tables, one per campus. The parser keeps every variant and shows their names as `🏫 Корпус: …` buttons in the calls menu (only when there is more than one). A user picks their campus, it is stored in the chat database and used for that chat's bell schedule: `/calls`, `/next`, `/free` and `/ics`. A Google calendar is shared by the whole group or teacher, so its times come from `parser.calls.campus` or from the default variant. The `🏫 Корпус: авто` button clears the choice back to the default variant (`parser.calls.campus`, otherwise the schedule with the most periods). A single campus for the whole installation is set with `parser.calls.campus`.
 
 #### Resistance to layout changes
 

@@ -71,7 +71,8 @@ func (bot *Bot) buildAndSendICS(ctx context.Context, u *Update, chat *Chat, type
 	}
 
 	weekNum := week.AcademicWeekNumber()
-	builder := calendar.NewICSBuilder(bot.cache.GetCallsWeekdays(), bot.cache.GetCallsSaturday(), weekNum)
+	schedule := bot.callsScheduleFor(chat)
+	builder := calendar.NewICSBuilder(schedule.Weekdays, schedule.Saturday, weekNum)
 
 	switch typeName {
 	case "group":

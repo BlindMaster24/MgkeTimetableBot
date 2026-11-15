@@ -41,10 +41,8 @@ func (c *nextLessonCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("next_no_data"))
 	}
 
-	calls := reminder.Schedule{
-		Weekdays: c.bot.cache.GetCallsWeekdays(),
-		Saturday: c.bot.cache.GetCallsSaturday(),
-	}
+	schedule := c.bot.callsScheduleFor(chat)
+	calls := reminder.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}
 
 	var lines []string
 	if current, ok := reminder.Current(day, now, calls); ok {
