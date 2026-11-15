@@ -1,5 +1,7 @@
 package notification
 
+import "time"
+
 const (
 	kindDayNotice     = "day"
 	kindDayChange     = "day_update"
@@ -27,12 +29,18 @@ func (n *EventNotifier) SetCounterSink(sink notificationSink) {
 }
 
 func (n *EventNotifier) sendText(chatID int64, text, kind string) error {
+	if delay := n.pacer.wait(time.Now()); delay > 0 {
+		time.Sleep(delay)
+	}
 	err := n.sender.SendText(chatID, text)
 	countNotification(n.counters, kind, err)
 	return err
 }
 
 func (n *EventNotifier) sendTextWithButtons(chatID int64, text string, buttons []KeyboardButton, kind string) error {
+	if delay := n.pacer.wait(time.Now()); delay > 0 {
+		time.Sleep(delay)
+	}
 	err := n.sender.SendTextWithButtons(chatID, text, buttons)
 	countNotification(n.counters, kind, err)
 	return err

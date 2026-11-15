@@ -44,7 +44,7 @@
 - Bot commands are routed in `internal/telegram/bot.go` via command name or text matching; messages landing in an input scene go through the scene registry in `internal/telegram/scenes.go`.
 - `Bot.Run` picks the update transport between long polling (the default) and the webhook in `internal/telegram/webhook.go`; the whole contract — validation, listener, statuses, shutdown, observability and tests — is in the “Webhook Transport” section below.
 - Parser fetches HTML from the college site, normalizes via goquery, emits events into `cache/`.
-- `cmd/bot/main.go` drains those events after every parse into `internal/notification`, then syncs only the changed days into Google Calendar and finally reconciles calendars that fell behind.
+- `cmd/bot/main.go` drains those events after every parse into `internal/notification` (which paces its sends at 25 per second so a fan-out cannot hit the Telegram flood limits), then syncs only the changed days into Google Calendar and finally reconciles calendars that fell behind.
 - `internal/health` records parser, calendar and API outcomes; the scheduler polls it and messages admins while an alert is active.
 - Parsed data is stored in `cache/` (file-backed JSON in `cache/rasp/`) and `archive/` (SQLite).
 - The site publishes several weeks at once, one content block per week: `internal/parser` walks every block (`findScopes`/`eachTable`), never the first one only, and merges the days of a group/teacher by date (`mergeDays`), so a repeated date is overwritten by the later block and the cache always holds every published week.

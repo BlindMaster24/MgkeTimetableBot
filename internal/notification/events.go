@@ -81,6 +81,7 @@ type EventNotifier struct {
 	now       func() time.Time
 	localizer *i18n.Localizer
 	counters  notificationSink
+	pacer     sendPacer
 	remMu     sync.Mutex
 	remDue    map[reminderKey]time.Time
 	remSent   map[reminderKey]bool
