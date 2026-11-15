@@ -56,6 +56,7 @@ type Bot struct {
 	botState
 	client       *telego.Bot
 	googleSyncMu sync.Mutex
+	broadcast    sync.Mutex
 }
 
 type Update struct {

@@ -190,19 +190,33 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "Сообщение не введено")
 	}
 
+	if !c.bot.broadcast.TryLock() {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("send_busy"))
+	}
+
 	chats, err := c.bot.chatRepo.FindAllTGChats()
 	if err != nil {
+		c.bot.broadcast.Unlock()
 		return u.Bot.SendText(u.ChatID, "Ошибка получения чатов: "+err.Error())
 	}
 
 	if len(chats) == 0 {
+		c.bot.broadcast.Unlock()
 		return u.Bot.SendText(u.ChatID, "Нет активных чатов для рассылки")
 	}
 
 	progressID, err := c.bot.sendMessageForID(u.ChatID, "Начинаю отправку сообщений.")
 	if err != nil {
+		c.bot.broadcast.Unlock()
 		return err
 	}
+
+	go c.runBroadcast(u.ChatID, progressID, chats, text)
+	return nil
+}
+
+func (c *sendCmd) runBroadcast(chatID int64, progressID int, chats []*Chat, text string) {
+	defer c.bot.broadcast.Unlock()
 
 	sent := 0
 	failed := 0
@@ -234,7 +248,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 			if failed > 0 {
 				editText += fmt.Sprintf("\n❌ Ошибок: %d", failed)
 			}
-			c.bot.EditMessageText(u.ChatID, progressID, editText, nil)
+			c.bot.EditMessageText(chatID, progressID, editText, nil)
 			lastEdit = time.Now()
 		}
 	}
@@ -244,9 +258,7 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 		result += fmt.Sprintf("\n❌ Ошибок: %d", failed)
 	}
 
-	c.bot.EditMessageText(u.ChatID, progressID, result, nil)
-
-	return nil
+	c.bot.EditMessageText(chatID, progressID, result, nil)
 }
 
 type triggerCmd struct{ bot *Bot }

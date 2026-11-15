@@ -241,6 +241,26 @@ func TestAcceptBotGrantsAccess(t *testing.T) {
 	}
 }
 
+func TestSendRefusesASecondBroadcast(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+
+	if !b.broadcast.TryLock() {
+		t.Fatal("the test could not take the broadcast slot")
+	}
+
+	u := makeUpdate(777, "/send привет")
+	u.Bot = b
+	if err := (&sendCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if caller.last() != b.loc("send_busy") {
+		t.Fatalf("a running broadcast must be reported, got %q", caller.last())
+	}
+
+	b.broadcast.Unlock()
+}
+
 func TestRestartSavesTheStateBeforeItExits(t *testing.T) {
 	caller := &capturingCaller{}
 	b, _ := setupE2EBotWithCaller(t, caller, 777)
