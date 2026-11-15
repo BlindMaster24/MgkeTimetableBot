@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"sort"
+	"sync"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
@@ -333,6 +334,15 @@ func serializeRows(rows [][]string) string {
 	return out
 }
 
+var surfaceCache = sync.OnceValue(func() *cache.RaspCache {
+	dir, err := os.MkdirTemp("", "mgke-surface")
+	if err != nil {
+		return nil
+	}
+	rasp, _ := cache.New(dir)
+	return rasp
+})
+
 func newSurfaceBot() *Bot {
 	cfg := &config.Config{}
 	cfg.Telegram.Token = "0:surface"
@@ -340,16 +350,11 @@ func newSurfaceBot() *Bot {
 	cfg.Calendar.ICS.Enabled = true
 	cfg.Google.OAuth.ClientID = "surface"
 
-	var raspCache *cache.RaspCache
-	if dir, err := os.MkdirTemp("", "mgke-surface"); err == nil {
-		raspCache, _ = cache.New(dir)
-	}
-
 	b := &Bot{
 		cfg:       cfg,
 		log:       logger.New("error", nil),
 		i18n:      i18n.New("ru"),
-		cache:     raspCache,
+		cache:     surfaceCache(),
 		commands:  make(map[string]Command),
 		callbacks: make(map[string]Callback),
 	}
