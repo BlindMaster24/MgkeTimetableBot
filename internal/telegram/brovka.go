@@ -1,7 +1,9 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +14,10 @@ import (
 )
 
 func brovkaCSV(entries []model.TeacherDay) []string {
-	csv := []string{"День,Подгруппа,Группа,Тип,Предмет"}
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+
+	_ = writer.Write([]string{"День", "Подгруппа", "Группа", "Тип", "Предмет"})
 
 	for _, entry := range entries {
 		dayLabel := entry.Day
@@ -35,17 +40,18 @@ func brovkaCSV(entries []model.TeacherDay) []string {
 				subgroup = fmt.Sprint(*lesson.Subgroup)
 			}
 
-			csv = append(csv, strings.Join([]string{
+			_ = writer.Write([]string{
 				dayLabel,
 				subgroup,
 				lesson.Group,
 				lessonType,
 				utils.GetFullSubjectName(lesson.Lesson),
-			}, ","))
+			})
 		}
 	}
 
-	return csv
+	writer.Flush()
+	return strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
 }
 
 type brovkaCmd struct{ bot *Bot }

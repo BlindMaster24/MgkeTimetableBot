@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"encoding/csv"
 	"strings"
 	"testing"
 	"time"
@@ -154,6 +155,29 @@ func TestBrovkaExportsAWindows1251Csv(t *testing.T) {
 	}
 	if !strings.Contains(payload, start.Format("02.01")) {
 		t.Error("the day must be written without the year")
+	}
+}
+
+func TestBrovkaCsvQuotesAFieldWithAComma(t *testing.T) {
+	lines := brovkaCSV([]model.TeacherDay{{
+		Day: "01.09.2026",
+		Lessons: []model.TeacherLesson{
+			{Lesson: "Матем, физика", Group: "100"},
+		},
+	}})
+	if len(lines) != 2 {
+		t.Fatalf("unexpected csv lines: %#v", lines)
+	}
+
+	fields, err := csv.NewReader(strings.NewReader(lines[1])).Read()
+	if err != nil {
+		t.Fatalf("the csv row is unreadable: %v", err)
+	}
+	if len(fields) != 5 {
+		t.Fatalf("a comma inside a field split the row: %v", fields)
+	}
+	if fields[4] != "Матем, физика" {
+		t.Fatalf("the subject = %q", fields[4])
 	}
 }
 
