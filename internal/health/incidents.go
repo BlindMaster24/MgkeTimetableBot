@@ -80,6 +80,7 @@ type IncidentLog struct {
 	stamp    StartupStamp
 	records  []Incident
 	restored bool
+	onError  func(error)
 }
 
 func NewIncidentLog(store StateStore, limit int) *IncidentLog {
@@ -101,6 +102,12 @@ func AlertScope(key string) string {
 		return ScopeBackup
 	}
 	return ""
+}
+
+func (l *IncidentLog) SetErrorHandler(fn func(error)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.onError = fn
 }
 
 func (l *IncidentLog) SetStartupStamp(stamp StartupStamp) {
@@ -283,5 +290,7 @@ func (l *IncidentLog) flushLocked() {
 		return
 	}
 	state := incidentState{Records: l.records}
-	_ = SaveState(l.store, IncidentsStateKey, state)
+	if err := SaveState(l.store, IncidentsStateKey, state); err != nil && l.onError != nil {
+		l.onError(err)
+	}
 }

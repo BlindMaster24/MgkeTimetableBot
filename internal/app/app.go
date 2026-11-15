@@ -153,6 +153,9 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	incidents := health.NewIncidentLog(chatRepo, health.IncidentLimit)
 	stamp := health.StartupStamp{Build: buildInfo.Summary(), Config: configStamp(cfgPath)}
 	incidents.SetStartupStamp(stamp)
+	incidents.SetErrorHandler(func(err error) {
+		log.Warn().Err(err).Msg("failed to persist the incident history")
+	})
 	bot.SetIncidentLog(incidents)
 	bot.SetShutdownFunc(func() {
 		saveMetrics("restart")

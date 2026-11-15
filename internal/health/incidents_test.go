@@ -1,9 +1,29 @@
 package health
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
+
+type failingIncidentStore struct{ err error }
+
+func (s failingIncidentStore) LoadState(string) (string, bool, error) { return "", false, nil }
+
+func (s failingIncidentStore) SaveState(string, string) error { return s.err }
+
+func TestIncidentLogReportsAFailedFlush(t *testing.T) {
+	boom := errors.New("disk full")
+	var reported error
+
+	log := NewIncidentLog(failingIncidentStore{err: boom}, 5)
+	log.SetErrorHandler(func(err error) { reported = err })
+	log.Record(AlertParserLayout, "missing groups: .table")
+
+	if !errors.Is(reported, boom) {
+		t.Fatalf("a failed flush must reach the error handler, got %v", reported)
+	}
+}
 
 func TestIncidentLogRecordsStartAndAutoRecovery(t *testing.T) {
 	log := NewIncidentLog(nil, 0)
