@@ -456,21 +456,3 @@ func TestHandleParserHealth(t *testing.T) {
 		t.Errorf("expected 1 teacher in stats, got %d", body.Cache.TeachersCount)
 	}
 }
-
-func TestItoa(t *testing.T) {
-	cases := []struct {
-		n    int
-		want string
-	}{
-		{0, "0"},
-		{8080, "8080"},
-		{300, "300"},
-		{9999, "9999"},
-	}
-	for _, c := range cases {
-		got := itoa(c.n)
-		if got != c.want {
-			t.Errorf("itoa(%d) = %s, want %s", c.n, got, c.want)
-		}
-	}
-}

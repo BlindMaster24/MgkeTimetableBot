@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -203,7 +204,7 @@ func (s *Server) HandleGoogleOAuth(path string, handler http.HandlerFunc) {
 }
 
 func (s *Server) Run() error {
-	return s.engine.Run(":" + itoa(s.port))
+	return s.engine.Run(":" + strconv.Itoa(s.port))
 }
 
 func (s *Server) Handler() http.Handler {
@@ -327,16 +328,4 @@ func (s *Server) handleHealth(c *gin.Context) {
 		status = http.StatusServiceUnavailable
 	}
 	c.JSON(status, snapshot)
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	buf := make([]byte, 0, 10)
-	for n > 0 {
-		buf = append([]byte{byte('0' + n%10)}, buf...)
-		n /= 10
-	}
-	return string(buf)
 }

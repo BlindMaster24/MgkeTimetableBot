@@ -373,13 +373,13 @@ func (c *RaspCache) setCallsInternal(ctx context.Context, site Schedule, manual 
 	c.Calls.Site = CallsSource{
 		Schedule:  CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
 		UpdatedAt: now,
-		Hash:      hashSchedule(site),
+		Hash:      scheduleDigest(site),
 	}
 	if len(manual.Weekdays) > 0 || len(manual.Saturday) > 0 {
 		c.Calls.Manual = CallsSource{
 			Schedule:  CallsSchedule{Weekdays: manual.Weekdays, Saturday: manual.Saturday},
 			UpdatedAt: now,
-			Hash:      hashSchedule(manual),
+			Hash:      scheduleDigest(manual),
 		}
 	}
 	c.Calls.Update = now
@@ -476,7 +476,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 		}
 	}
 
-	activeHash := hashSchedule(Schedule{Weekdays: activeSchedule.Weekdays, Saturday: activeSchedule.Saturday})
+	activeHash := scheduleDigest(Schedule{Weekdays: activeSchedule.Weekdays, Saturday: activeSchedule.Saturday})
 	sourceChanged := c.Calls.Active.Source != activeSource
 	updatedChanged := c.Calls.Active.UpdatedAt != activeUpdatedAt
 	if c.Calls.Active.Hash != "" && c.Calls.Active.Hash == activeHash && !sourceChanged && !updatedChanged {
@@ -697,7 +697,7 @@ func mapsEqual(a, b map[string]any) bool {
 	return true
 }
 
-func hashSchedule(s Schedule) string {
+func scheduleDigest(s Schedule) string {
 	data, _ := json.Marshal(s)
 	h := fmt.Sprintf("%x", data)
 	return h
@@ -769,7 +769,7 @@ func (c *RaspCache) SetCallsManualNotify(weekdays, saturday [][2][2]string, reas
 	c.Calls.Manual = CallsSource{
 		Schedule:  CallsSchedule{Weekdays: weekdays, Saturday: saturday},
 		UpdatedAt: now,
-		Hash:      hashSchedule(Schedule{Weekdays: weekdays, Saturday: saturday}),
+		Hash:      scheduleDigest(Schedule{Weekdays: weekdays, Saturday: saturday}),
 	}
 	c.Calls.ManualReason = reason
 	c.Calls.OverrideSource = "manual"

@@ -64,3 +64,6 @@ Thumbs.db
 
 # Freebuff
 .freebuff/
+
+# Local conversation dumps
+/.cloud-attachments/
