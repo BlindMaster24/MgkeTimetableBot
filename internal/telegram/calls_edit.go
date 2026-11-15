@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/mymmrac/telego"
 )
 
@@ -82,6 +83,8 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 	return u.Bot.SendText(u.ChatID, "Расписание звонков обновлено вручную.")
 }
 
+var callsRowRe = regexp.MustCompile(`\b(\d{1,2})[:.](\d{2})\b`)
+
 type callsParsed struct {
 	Weekdays [][2][2]string
 	Saturday [][2][2]string
@@ -118,12 +121,15 @@ func parseCallsInput(text string) *callsParsed {
 		return nil
 	}
 
+	if err := (cache.CallsSchedule{Weekdays: weekdays, Saturday: saturday}).Validate(); err != nil {
+		return nil
+	}
+
 	return &callsParsed{Weekdays: weekdays, Saturday: saturday}
 }
 
 func parseCallRow(line string) *[2][2]string {
-	re := regexp.MustCompile(`\b(\d{1,2})[:.](\d{2})\b`)
-	matches := re.FindAllStringSubmatch(line, -1)
+	matches := callsRowRe.FindAllStringSubmatch(line, -1)
 	if len(matches) < 4 {
 		return nil
 	}
