@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const renderRetention = 24 * time.Hour
+
 func RenderGroupDays(group string, dayMaps []map[string]any, outputDir string) (string, error) {
 	days := daysFromMaps(dayMaps, true)
 	if len(days) == 0 {
@@ -12,7 +14,12 @@ func RenderGroupDays(group string, dayMaps []map[string]any, outputDir string) (
 	}
 
 	r := NewRenderer(outputDir)
-	return r.RenderGroupImage(group, days)
+	path, err := r.RenderGroupImage(group, days)
+	if err != nil {
+		return "", err
+	}
+	r.Cleanup(renderRetention)
+	return path, nil
 }
 
 func RenderTeacherDays(teacher string, dayMaps []map[string]any, outputDir string) (string, error) {
@@ -22,7 +29,12 @@ func RenderTeacherDays(teacher string, dayMaps []map[string]any, outputDir strin
 	}
 
 	r := NewRenderer(outputDir)
-	return r.RenderTeacherImage(teacher, days)
+	path, err := r.RenderTeacherImage(teacher, days)
+	if err != nil {
+		return "", err
+	}
+	r.Cleanup(renderRetention)
+	return path, nil
 }
 
 func daysFromMaps(dayMaps []map[string]any, isGroup bool) []DayData {

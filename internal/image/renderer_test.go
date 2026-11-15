@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -95,26 +96,56 @@ func TestRenderer_Cleanup(t *testing.T) {
 			{Number: 1, Cells: []string{"1", "Math", "", "", ""}},
 		}},
 	}
-
 	path, err := r.RenderGroupImage("63", days)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(entries))
+	stale := filepath.Join(dir, "stale.png")
+	if err := os.WriteFile(stale, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
 	}
 
 	r.Cleanup(time.Hour)
-	entries, _ = os.ReadDir(dir)
-	if len(entries) != 1 {
-		t.Errorf("file should not be cleaned up yet, got %d files", len(entries))
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("a render older than the retention must be removed: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the fresh render must stay: %v", err)
+	}
+}
+
+func TestRenderDaysPrunesOldRenders(t *testing.T) {
+	dir := t.TempDir()
+
+	stale := filepath.Join(dir, "old.png")
+	if err := os.WriteFile(stale, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
 	}
 
-	t.Log("cleanup test: file has age 0, may or may not be cleaned depending on timing")
-
-	_ = path
+	days := []map[string]any{{
+		"day":     "07.09.2026",
+		"lessons": []any{map[string]any{"lesson": "Математика", "cabinet": "101"}},
+	}}
+	path, err := RenderGroupDays("63", days, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("a render older than the retention must be removed: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the fresh render is missing: %v", err)
+	}
 }
 
 func TestFormatGroupLesson(t *testing.T) {
