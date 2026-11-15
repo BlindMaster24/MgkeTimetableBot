@@ -2,8 +2,8 @@ package archive
 
 import (
 	"context"
-
-	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
+	"database/sql"
+	"strconv"
 )
 
 func (r *Repository) FlushCache(ctx context.Context, groups, teachers map[string]any) (int, error) {
@@ -15,30 +15,87 @@ func (r *Repository) FlushCache(ctx context.Context, groups, teachers map[string
 	return len(entries), r.AppendDays(ctx, entries)
 }
 
-func (r *Repository) SyncFromCache(ctx context.Context, groups, teachers map[string]any) error {
-	entries := cacheEntries(groups, teachers)
+type pendingDay struct {
+	entry   AppendDay
+	day     int64
+	payload string
+}
 
-	if len(entries) == 0 {
+func (r *Repository) SyncFromCache(ctx context.Context, groups, teachers map[string]any) error {
+	pending := pendingDays(cacheEntries(groups, teachers))
+	if len(pending) == 0 {
 		return nil
 	}
 
-	cacheMaxDay := int64(0)
-	for _, e := range entries {
-		if idx := dayIndexOf(e.Day); idx > cacheMaxDay {
-			cacheMaxDay = idx
+	minDay, maxDay := pending[0].day, pending[0].day
+	for _, day := range pending[1:] {
+		if day.day < minDay {
+			minDay = day.day
+		}
+		if day.day > maxDay {
+			maxDay = day.day
 		}
 	}
 
-	dbMaxDay := int64(0)
-	if bounds, err := r.DayIndexBounds(ctx); err == nil {
-		dbMaxDay = bounds.Max
+	stored, err := r.storedDays(ctx, minDay, maxDay)
+	if err != nil {
+		return err
 	}
 
-	if cacheMaxDay <= dbMaxDay {
+	changed := make([]AppendDay, 0, len(pending))
+	for _, day := range pending {
+		if payload, ok := stored[dayKey(day.entry.Type, day.entry.Value, day.day)]; ok && payload == day.payload {
+			continue
+		}
+		changed = append(changed, day.entry)
+	}
+
+	if len(changed) == 0 {
 		return nil
 	}
+	return r.AppendDays(ctx, changed)
+}
 
-	return r.AppendDays(ctx, entries)
+func pendingDays(entries []AppendDay) []pendingDay {
+	pending := make([]pendingDay, 0, len(entries))
+	for _, entry := range entries {
+		day, payload := extractDayData(entry.Day)
+		if day <= 0 {
+			continue
+		}
+		pending = append(pending, pendingDay{entry: entry, day: day, payload: payload})
+	}
+	return pending
+}
+
+func dayKey(kind, value string, day int64) string {
+	return kind + "\x00" + value + "\x00" + strconv.FormatInt(day, 10)
+}
+
+func (r *Repository) storedDays(ctx context.Context, minDay, maxDay int64) (map[string]string, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT day, "group", teacher, data FROM timetable_archive WHERE day BETWEEN ? AND ?`, minDay, maxDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stored := make(map[string]string)
+	for rows.Next() {
+		var day int64
+		var group, teacher sql.NullString
+		var data string
+		if err := rows.Scan(&day, &group, &teacher, &data); err != nil {
+			return nil, err
+		}
+		if group.Valid {
+			stored[dayKey("group", group.String, day)] = data
+		}
+		if teacher.Valid {
+			stored[dayKey("teacher", teacher.String, day)] = data
+		}
+	}
+	return stored, rows.Err()
 }
 
 func cacheEntries(groups, teachers map[string]any) []AppendDay {
@@ -73,17 +130,4 @@ func cacheEntries(groups, teachers map[string]any) []AppendDay {
 	}
 
 	return entries
-}
-
-func dayIndexOf(v interface{}) int64 {
-	switch d := v.(type) {
-	case map[string]any:
-		dateStr, _ := d["day"].(string)
-		return DateToDayIndex(dateStr)
-	case *model.GroupDay:
-		return DateToDayIndex(d.Day)
-	case *model.TeacherDay:
-		return DateToDayIndex(d.Day)
-	}
-	return 0
 }

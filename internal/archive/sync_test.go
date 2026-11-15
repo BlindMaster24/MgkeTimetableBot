@@ -163,3 +163,69 @@ func TestTeacherDayRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected day: %+v", got)
 	}
 }
+
+func TestSyncFromCacheRewritesADayThatChanged(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+
+	stored := &model.GroupDay{
+		Day: "07.09.2026",
+		Lessons: []model.GroupLesson{
+			&model.GroupLessonExplain{Lesson: "Математика", Cabinet: strPtr("101")},
+		},
+	}
+	teacher := &model.TeacherDay{
+		Day: "07.09.2026",
+		Lessons: []model.TeacherLesson{
+			&model.TeacherLessonExplain{Lesson: "Математика", Group: "100"},
+		},
+	}
+	if err := repo.AppendDays(ctx, []AppendDay{
+		{Type: "group", Value: "100", Day: stored},
+		{Type: "teacher", Value: "Иванов И.И.", Day: teacher},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	groups := map[string]any{
+		"100": map[string]any{"days": []any{
+			map[string]any{"day": "07.09.2026", "lessons": []any{
+				map[string]any{"lesson": "Физика", "cabinet": "202"},
+			}},
+		}},
+	}
+	teachers := map[string]any{
+		"Иванов И.И.": map[string]any{"days": []any{
+			map[string]any{"day": "07.09.2026", "lessons": []any{
+				map[string]any{"lesson": "Физика", "group": "100"},
+			}},
+		}},
+	}
+
+	if err := repo.SyncFromCache(ctx, groups, teachers); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	groupDay, err := repo.GroupDay(ctx, DateToDayIndex("07.09.2026"), "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if groupDay == nil || len(groupDay.Lessons) != 1 {
+		t.Fatalf("a changed group day is still stored: %+v", groupDay)
+	}
+	if lesson, _ := groupDay.Lessons[0].(map[string]any); lesson["lesson"] != "Физика" {
+		t.Fatalf("the archive kept the old group lesson: %+v", groupDay.Lessons[0])
+	}
+
+	teacherDay, err := repo.TeacherDay(ctx, DateToDayIndex("07.09.2026"), "Иванов И.И.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if teacherDay == nil || len(teacherDay.Lessons) != 1 {
+		t.Fatalf("a changed teacher day is still stored: %+v", teacherDay)
+	}
+	if teacherDay.Lessons[0].Lesson != "Физика" {
+		t.Fatalf("the archive kept the old teacher lesson: %+v", teacherDay.Lessons[0])
+	}
+
+}
