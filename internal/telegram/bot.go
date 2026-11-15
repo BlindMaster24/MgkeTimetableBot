@@ -154,6 +154,7 @@ func (b *Bot) SetNoticeDayFunc(fn func(index int)) {
 	b.noticeDay = fn
 }
 func (b *Bot) SetNow(fn func() time.Time) { b.now = fn }
+func (b *Bot) SetShutdownFunc(fn func())  { b.shutdown = fn }
 func (b *Bot) SetHealthSource(src healthSource) {
 	b.health = src
 }

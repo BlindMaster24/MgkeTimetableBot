@@ -241,6 +241,27 @@ func TestAcceptBotGrantsAccess(t *testing.T) {
 	}
 }
 
+func TestRestartSavesTheStateBeforeItExits(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+
+	saved := 0
+	b.SetShutdownFunc(func() { saved++ })
+
+	u := makeUpdate(777, "/restart")
+	u.Bot = b
+	cmd := &restartCmd{bot: b, delay: time.Millisecond, exit: func(int) {}}
+	if err := cmd.Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if saved != 1 {
+		t.Fatalf("a restart must flush the state first, calls = %d", saved)
+	}
+	if caller.last() != "🔄 Перезапуск..." {
+		t.Fatalf("the admin must be told about the restart, got %q", caller.last())
+	}
+}
+
 func TestSqlCommandKeepsTheDatabaseReadOnly(t *testing.T) {
 	caller := &capturingCaller{}
 	b, _ := setupE2EBotWithCaller(t, caller, 777)

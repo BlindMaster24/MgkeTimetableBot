@@ -567,7 +567,11 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
 
-type restartCmd struct{ bot *Bot }
+type restartCmd struct {
+	bot   *Bot
+	delay time.Duration
+	exit  func(int)
+}
 
 func (c *restartCmd) AdminOnly() bool { return true }
 
@@ -583,9 +587,26 @@ func (c *restartCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
 	u.Bot.SendText(u.ChatID, "🔄 Перезапуск...")
+	if c.bot.shutdown != nil {
+		c.bot.shutdown()
+	}
 	go func() {
-		time.Sleep(500 * time.Millisecond)
-		os.Exit(0)
+		time.Sleep(c.wait())
+		c.quit()(0)
 	}()
 	return nil
+}
+
+func (c *restartCmd) wait() time.Duration {
+	if c.delay > 0 {
+		return c.delay
+	}
+	return 500 * time.Millisecond
+}
+
+func (c *restartCmd) quit() func(int) {
+	if c.exit != nil {
+		return c.exit
+	}
+	return os.Exit
 }

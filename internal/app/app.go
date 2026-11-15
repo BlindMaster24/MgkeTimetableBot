@@ -154,6 +154,12 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	stamp := health.StartupStamp{Build: buildInfo.Summary(), Config: configStamp(cfgPath)}
 	incidents.SetStartupStamp(stamp)
 	bot.SetIncidentLog(incidents)
+	bot.SetShutdownFunc(func() {
+		saveMetrics("restart")
+		if err := raspCache.Save(context.Background()); err != nil {
+			log.Error().Err(err).Msg("failed to save the cache before a restart")
+		}
+	})
 
 	for _, record := range incidents.NoteStartup(health.ScopeAPI, stamp, func(change health.StartupChange, previous, current health.StartupStamp) string {
 		switch change {

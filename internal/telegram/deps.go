@@ -27,6 +27,7 @@ type botDeps struct {
 	incidents    *health.IncidentLog
 	parseFunc    func() error
 	noticeDay    func(index int)
+	shutdown     func()
 	calendarSync func(ctx context.Context) (int, error)
 	apiProbe     func(ctx context.Context) []apiprobe.Result
 	backupFunc   func(ctx context.Context) (BackupReport, error)
