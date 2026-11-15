@@ -3,7 +3,7 @@
 [Русская версия](README.md)
 
 [![CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)
-[![Go 1.27.3](https://img.shields.io/badge/go-1.27.3-00ADD8)](https://go.dev/dl/)
+[![Go 1.27.4](https://img.shields.io/badge/go-1.27.4-00ADD8)](https://go.dev/dl/)
 
 ## Overview
 
@@ -57,14 +57,14 @@ college site ──> parser ──> cache (JSON + event queue)
 
 ## Requirements
 
-- **Minimum Go version: 1.27.3** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
+- **Minimum Go version: 1.27.4** (see [CI](https://github.com/BlindMaster24/MgkeTimetableBot/actions/workflows/ci.yml)).
 - No CGO: SQLite and image rendering are pure Go.
 - A writable directory for `cache/` and the database files.
 
 Check your version:
 
 ```bash
-go version   # expect go1.27.3 or newer
+go version   # expect go1.27.4 or newer
 ```
 
 ## Install and run
@@ -342,7 +342,7 @@ Counters are kept in memory (`internal/health`) and served by `GET /api/health`.
 
 ```bash
 curl -s localhost:8081/api/health | jq .build
-# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.3", "os": "linux", "arch": "amd64" }
+# { "version": "<release tag>", "commit": "89da52c...", "date": "2026-09-13T08:00:00Z", "go": "go1.27.4", "os": "linux", "arch": "amd64" }
 ```
 
 Metrics and the alert state are persisted to the chat database (the `bot_state` table) after every parse cycle and on shutdown, and read back on startup. A restart therefore never hides a problem: if the timetable has not refreshed for an hour, the `parser_stale` alert fires right after the start, and alerts that were already sent are not repeated until `cooldown_minutes` expires.
