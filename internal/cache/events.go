@@ -212,32 +212,37 @@ func (c *RaspCache) SetLastNoticedDay(kind, value string, dayIdx int64) {
 	defer c.mu.Unlock()
 
 	if kind == KindTeachers {
-		if m, ok := c.teachersAny[value].(map[string]any); ok {
-			cp := make(map[string]any, len(m)+1)
-			for k, v := range m {
-				cp[k] = v
-			}
-			cp["lastNoticedDay"] = float64(dayIdx)
-			c.teachersAny[value] = cp
-		}
+		c.teachersAny = withLastNoticedDay(c.teachersAny, value, dayIdx)
 		if schedule, ok := c.Teachers.Timetable[value]; ok {
 			schedule.LastNoticed = dayIdx
 			c.Teachers.Timetable[value] = schedule
 		}
 		return
 	}
-	if m, ok := c.groupsAny[value].(map[string]any); ok {
-		cp := make(map[string]any, len(m)+1)
-		for k, v := range m {
-			cp[k] = v
-		}
-		cp["lastNoticedDay"] = float64(dayIdx)
-		c.groupsAny[value] = cp
-	}
+	c.groupsAny = withLastNoticedDay(c.groupsAny, value, dayIdx)
 	if schedule, ok := c.Groups.Timetable[value]; ok {
 		schedule.LastNoticed = dayIdx
 		c.Groups.Timetable[value] = schedule
 	}
+}
+
+func withLastNoticedDay(entries map[string]any, value string, dayIdx int64) map[string]any {
+	entry, ok := entries[value].(map[string]any)
+	if !ok {
+		return entries
+	}
+
+	updated := make(map[string]any, len(entries))
+	for name, schedule := range entries {
+		updated[name] = schedule
+	}
+	marked := make(map[string]any, len(entry)+1)
+	for key, field := range entry {
+		marked[key] = field
+	}
+	marked["lastNoticedDay"] = float64(dayIdx)
+	updated[value] = marked
+	return updated
 }
 
 func (c *RaspCache) DrainEvents(ctx context.Context) []Event {
