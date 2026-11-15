@@ -4,7 +4,39 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestSaveLeavesAnUnchangedFileAlone(t *testing.T) {
+	dir := t.TempDir()
+	c, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.SetGroups(t.Context(), map[string]any{"100": map[string]any{"days": []any{}}}, "hash")
+	if err := c.Save(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(dir, "groups.json")
+	first, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+	if err := c.Save(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first.ModTime().Equal(second.ModTime()) {
+		t.Fatalf("an unchanged cache file was rewritten: %v -> %v", first.ModTime(), second.ModTime())
+	}
+}
 
 func TestCacheSaveLoadRoundtrip(t *testing.T) {
 	dir := t.TempDir()

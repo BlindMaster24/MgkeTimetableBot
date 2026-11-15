@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -623,6 +624,9 @@ func (c *RaspCache) Save(ctx context.Context) error {
 		data, err := json.MarshalIndent(e.data, "", "  ")
 		if err != nil {
 			return fmt.Errorf("marshal %s: %w", e.name, err)
+		}
+		if existing, err := os.ReadFile(path); err == nil && bytes.Equal(existing, data) {
+			continue
 		}
 		if err := writeFileAtomic(path, data, 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", e.name, err)
