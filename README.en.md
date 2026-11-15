@@ -121,7 +121,6 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `logging` | Level, log file, rotation settings |
 | `http` | HTTP port of the server (API and Google OAuth) |
 | `telegram` | Bot token, the Bot API base URL (`telegram.api_base_url`), admin IDs, the `noticer` flag, the update delivery mode (`telegram.webhook`) |
-| `api` | Base path of the REST API |
 | `google` | OAuth client and service account for Google Calendar |
 | `calendar.ics.enabled` | Enable the ICS export and its menu button |
 | `accept` | Whether a new user gets access right away (`private`). With `false` the bot answers that there is no access yet and waits for an admin to run `/acceptbot <id>`; `room` is kept for compatibility with the old config — records are keyed by user, so access is granted once per user |

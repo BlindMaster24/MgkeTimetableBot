@@ -19,9 +19,6 @@ telegram:
   webhook:
     enabled: false
 
-api:
-  url: "/api"
-
 google:
   oauth:
     client_id: ""

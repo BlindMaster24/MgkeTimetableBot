@@ -33,9 +33,6 @@ telegram:
     drop_pending_updates: false
     allowed_updates: []
 
-api:
-  url: "/api"
-
 google:
   redirect_domain: "https://mgke.keller.by"
   url: "/google/oauth"

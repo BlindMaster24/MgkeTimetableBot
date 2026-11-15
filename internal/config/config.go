@@ -108,10 +108,6 @@ type Config struct {
 		} `yaml:"webhook"`
 	} `yaml:"telegram"`
 
-	API struct {
-		URL string `yaml:"url"`
-	} `yaml:"api"`
-
 	Google struct {
 		RedirectDomain string `yaml:"redirect_domain"`
 		URL            string `yaml:"url"`
