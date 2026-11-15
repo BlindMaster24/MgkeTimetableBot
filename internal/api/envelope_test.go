@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 )
 
 func TestSortNamesMatchesTSSort(t *testing.T) {
@@ -40,9 +42,10 @@ func TestWeekdayName(t *testing.T) {
 		time.Saturday:  "Суббота",
 		time.Sunday:    "Воскресенье",
 	}
+	server := &Server{loc: i18n.New("ru")}
 	for weekday, want := range cases {
 		date := time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(weekday)-int(time.Monday))
-		if got := weekdayName(date); got != want {
+		if got, ok := server.weekdayName(date); !ok || got != want {
 			t.Errorf("weekdayName(%v) = %q, want %q", weekday, got, want)
 		}
 	}
@@ -50,7 +53,8 @@ func TestWeekdayName(t *testing.T) {
 
 func TestDecorateDays(t *testing.T) {
 	entry := map[string]any{"days": []any{map[string]any{"day": "01.09.2026", "subject": "Математика"}}}
-	days := decorateDays(entry)
+	server := &Server{loc: i18n.New("ru")}
+	days := decorateDays(entry, server.weekdayName)
 	if len(days) != 1 {
 		t.Fatalf("days = %v", days)
 	}
@@ -66,16 +70,16 @@ func TestDecorateDays(t *testing.T) {
 	}
 
 	override := map[string]any{"days": []any{map[string]any{"day": "01.09.2026", "weekday": "Своя"}}}
-	day = decorateDays(override)[0].(map[string]any)
+	day = decorateDays(override, server.weekdayName)[0].(map[string]any)
 	if day["weekday"] != "Своя" {
 		t.Errorf("the day's own weekday must win, got %v", day["weekday"])
 	}
 
-	if got := decorateDays(map[string]any{}); got != nil {
+	if got := decorateDays(map[string]any{}, server.weekdayName); got != nil {
 		t.Errorf("entry without days = %v, want nil", got)
 	}
 
-	raw := decorateDays(map[string]any{"days": []any{"raw", map[string]any{"day": "вчера"}}})
+	raw := decorateDays(map[string]any{"days": []any{"raw", map[string]any{"day": "вчера"}}}, server.weekdayName)
 	if raw[0] != "raw" {
 		t.Errorf("non-map items must pass through, got %v", raw[0])
 	}

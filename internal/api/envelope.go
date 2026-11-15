@@ -7,10 +7,11 @@ import (
 	"time"
 )
 
-var weekdayNames = [...]string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}
-
-func weekdayName(date time.Time) string {
-	return weekdayNames[date.Weekday()]
+func (s *Server) weekdayName(date time.Time) (string, bool) {
+	if s.loc == nil {
+		return "", false
+	}
+	return s.message("weekday_" + strconv.Itoa(int(date.Weekday()))), true
 }
 
 func nameKey(value string) (int, float64, string) {
@@ -37,7 +38,7 @@ func sortNames(values []string) []string {
 	return sorted
 }
 
-func decorateDays(entry map[string]any) []any {
+func decorateDays(entry map[string]any, weekdayOf func(time.Time) (string, bool)) []any {
 	raw, ok := entry["days"].([]any)
 	if !ok {
 		return nil
@@ -52,7 +53,9 @@ func decorateDays(entry map[string]any) []any {
 		decorated := map[string]any{}
 		if date, ok := day["day"].(string); ok {
 			if parsed, err := time.Parse("02.01.2006", date); err == nil {
-				decorated["weekday"] = weekdayName(parsed)
+				if name, ok := weekdayOf(parsed); ok {
+					decorated["weekday"] = name
+				}
 			}
 		}
 		for key, value := range day {

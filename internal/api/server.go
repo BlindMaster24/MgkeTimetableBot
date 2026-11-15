@@ -263,7 +263,7 @@ func (s *Server) handleGroupByName(c *gin.Context) {
 	entry, _ := data.(map[string]any)
 	meta := s.cache.GetGroupsMeta()
 	c.JSON(http.StatusOK, gin.H{
-		"days":        decorateDays(entry),
+		"days":        decorateDays(entry, s.weekdayName),
 		"update":      meta.Update,
 		"changed":     meta.Changed,
 		"lastSuccess": s.cache.LastSuccess(),
@@ -282,7 +282,7 @@ func (s *Server) handleTeacherByName(c *gin.Context) {
 	entry, _ := data.(map[string]any)
 	meta := s.cache.GetTeachersMeta()
 	c.JSON(http.StatusOK, gin.H{
-		"days":        decorateDays(entry),
+		"days":        decorateDays(entry, s.weekdayName),
 		"update":      meta.Update,
 		"changed":     meta.Changed,
 		"lastSuccess": s.cache.LastSuccess(),
