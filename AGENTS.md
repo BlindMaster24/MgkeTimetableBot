@@ -243,7 +243,7 @@ These are settled; do not reopen them without the user asking.
 - Naming: `camelCase` vars/functions, `PascalCase` exported types/methods, `SCREAMING_SNAKE_CASE` constants.
 - Do not add code comments.
 - Keep package boundaries: cross-package access goes through exported APIs.
-- Russian text only in `internal/i18n/locales/ru.json` — never in Go source.
+- New user-facing text goes to `internal/i18n/locales/ru.json`. Literals that reproduce the old TypeScript wording (formatters, weekday names, menu prompts pinned by the parity and golden tests) stay inline: they are the contract, not a translation key.
 
 ## Testing Guidelines
 - Test runner: `go test`.

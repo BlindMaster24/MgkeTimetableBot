@@ -316,8 +316,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *telego.Message) {
 	b.handleMessageText(ctx, u)
 }
 
-func (b *Bot) sendNeedAccept(u *Update, chat *Chat) {
-	_ = chat
+func (b *Bot) sendNeedAccept(u *Update) {
 	b.SendText(u.ChatID, b.locData("need_accept", map[string]interface{}{"Key": u.UserID}))
 }
 
@@ -361,7 +360,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 	}
 
 	if !chat.Accepted {
-		b.sendNeedAccept(u, chat)
+		b.sendNeedAccept(u)
 		return
 	}
 

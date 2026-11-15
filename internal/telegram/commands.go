@@ -534,7 +534,7 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	}
 
 	if !chat.Accepted {
-		b.sendNeedAccept(u, chat)
+		b.sendNeedAccept(u)
 		return
 	}
 
