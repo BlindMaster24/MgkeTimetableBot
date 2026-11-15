@@ -55,6 +55,7 @@ type EventChat struct {
 	NoticeParserErrs    bool
 	AllowSendMess       bool
 	ReminderLeadMinutes int
+	CallsCampus         string
 
 	Formatter      int
 	HidePastDays   bool

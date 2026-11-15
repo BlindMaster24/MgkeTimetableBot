@@ -40,33 +40,8 @@ func (b *Bot) selectedCampus(chat *Chat) string {
 }
 
 func (b *Bot) callsScheduleFor(chat *Chat) cache.CallsSchedule {
-	active := b.cache.GetCalls().Active
-
-	weekdays := active.Schedule.Weekdays
-	saturday := active.Schedule.Saturday
-
-	if active.Source != "site" {
-		return b.withFallbackCalls(weekdays, saturday)
-	}
-
-	if name := b.selectedCampus(chat); name != "" {
-		if variant, ok := b.cache.GetCallsVariant(name); ok {
-			return b.withFallbackCalls(variant.Weekdays, variant.Saturday)
-		}
-	}
-
-	return b.withFallbackCalls(weekdays, saturday)
-}
-
-func (b *Bot) withFallbackCalls(weekdays, saturday [][2][2]string) cache.CallsSchedule {
-	if len(weekdays) == 0 {
-		weekdays = b.cfg.Timetable.Weekdays
-		saturday = b.cfg.Timetable.Saturday
-	}
-	if len(saturday) == 0 {
-		saturday = weekdays
-	}
-	return cache.CallsSchedule{Weekdays: weekdays, Saturday: saturday}
+	fallback := cache.CallsSchedule{Weekdays: b.cfg.Timetable.Weekdays, Saturday: b.cfg.Timetable.Saturday}
+	return b.cache.ActiveCallsForCampus(b.selectedCampus(chat), fallback)
 }
 
 func campusButtonText(name string, selected bool) string {

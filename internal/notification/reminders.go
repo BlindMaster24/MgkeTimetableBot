@@ -22,7 +22,6 @@ func (n *EventNotifier) RemindUpcoming(now time.Time, lead, window time.Duration
 		return
 	}
 	n.pruneReminders(now)
-	schedule := reminder.Schedule{Weekdays: n.cache.GetCallsWeekdays(), Saturday: n.cache.GetCallsSaturday()}
 	date := timetable.FormatDate(now)
 	for _, kind := range []string{cache.KindGroups, cache.KindTeachers} {
 		days := n.cache.TimetableDays(kind, date)
@@ -32,29 +31,29 @@ func (n *EventNotifier) RemindUpcoming(now time.Time, lead, window time.Duration
 		}
 		sort.Strings(values)
 		for _, value := range values {
-			n.remindValue(kind, value, days[value], now, schedule, lead, window, r)
+			n.remindValue(kind, value, days[value], now, lead, window, r)
 		}
 	}
 }
 
-func (n *EventNotifier) remindValue(kind, value string, day timetable.Day, now time.Time, schedule reminder.Schedule, lead, window time.Duration, r *rand.Rand) {
-	next, ok := reminder.NextLesson(day, now, schedule)
-	if !ok {
-		return
-	}
+func (n *EventNotifier) remindValue(kind, value string, day timetable.Day, now time.Time, lead, window time.Duration, r *rand.Rand) {
 	chats := n.reminderChats(kind, value)
 	if len(chats) == 0 {
 		return
 	}
-	text := n.locData("notify_lesson_reminder", map[string]any{
-		"Subject": next.Lesson.Subject,
-		"Time":    next.Start.Format("15:04"),
-		"Room":    next.Lesson.Room,
-	})
 	for _, chat := range chats {
+		next, ok := reminder.NextLesson(day, now, n.chatSchedule(chat))
+		if !ok {
+			continue
+		}
 		if !n.reminderDue(chat, kind, value, next.Start, lead, window, now, r) {
 			continue
 		}
+		text := n.locData("notify_lesson_reminder", map[string]any{
+			"Subject": next.Lesson.Subject,
+			"Time":    next.Start.Format("15:04"),
+			"Room":    next.Lesson.Room,
+		})
 		target := chat.ID
 		if chat.PeerID != 0 {
 			target = chat.PeerID
@@ -63,6 +62,15 @@ func (n *EventNotifier) remindValue(kind, value string, day timetable.Day, now t
 			n.log.Error().Err(err).Int64("chatID", target).Msg("lesson reminder send failed")
 		}
 	}
+}
+
+func (n *EventNotifier) chatSchedule(chat *EventChat) reminder.Schedule {
+	fallback := cache.CallsSchedule{}
+	if n.cfg != nil {
+		fallback = cache.CallsSchedule{Weekdays: n.cfg.Timetable.Weekdays, Saturday: n.cfg.Timetable.Saturday}
+	}
+	schedule := n.cache.ActiveCallsForCampus(chat.CallsCampus, fallback)
+	return reminder.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}
 }
 
 func (n *EventNotifier) reminderDue(chat *EventChat, kind, value string, start time.Time, lead, window time.Duration, now time.Time, r *rand.Rand) bool {

@@ -57,6 +57,49 @@ func TestRemindUpcomingLessonFires(t *testing.T) {
 	}
 }
 
+func TestReminderUsesTheCallsCampusOfTheChat(t *testing.T) {
+	n, sender, finder, c := newTestNotifier(t)
+	now := reminderMoment()
+
+	kazinca := [][2][2]string{reminderSlot(now.Add(30*time.Minute), now.Add(75*time.Minute))}
+	knorina := [][2][2]string{reminderSlot(now.Add(60*time.Minute), now.Add(105*time.Minute))}
+
+	c.SetCallsNotify(t.Context(), cache.Schedule{Weekdays: kazinca}, cache.Schedule{}, "site", "")
+	c.SetCallsSiteVariants(t.Context(), []cache.CallsVariant{
+		{Name: "Казинца", Schedule: cache.CallsSchedule{Weekdays: kazinca, Saturday: kazinca}},
+		{Name: "Кнорина", Schedule: cache.CallsSchedule{Weekdays: knorina, Saturday: knorina}},
+	})
+	c.SetGroups(t.Context(), map[string]any{
+		"63": entryWithDays(dayMap(now.Format("02.01.2006"), []any{
+			map[string]any{"lesson": "Математика", "cabinet": "101"},
+		})),
+	}, "hash1")
+
+	finder.byGroups = []*EventChat{
+		{ID: 1, PeerID: 1001, Group: "63", Mode: "student", CallsCampus: "Казинца"},
+		{ID: 2, PeerID: 1002, Group: "63", Mode: "student", CallsCampus: "Кнорина"},
+	}
+
+	n.RemindUpcoming(now, time.Hour, 0, nil)
+
+	if len(sender.sent) != 2 {
+		t.Fatalf("expected a reminder per chat, got %d", len(sender.sent))
+	}
+	want := map[int64]string{
+		1001: now.Add(30 * time.Minute).Format("15:04"),
+		1002: now.Add(60 * time.Minute).Format("15:04"),
+	}
+	for _, msg := range sender.sent {
+		expected, ok := want[msg.chatID]
+		if !ok {
+			t.Fatalf("a reminder went to an unexpected chat: %d", msg.chatID)
+		}
+		if !strings.Contains(msg.text, expected) {
+			t.Errorf("chat %d must see its own campus time %s, got %q", msg.chatID, expected, msg.text)
+		}
+	}
+}
+
 func TestRemindUpcomingLessonWithoutRoomSkipsSuffix(t *testing.T) {
 	n, sender, finder, c := newTestNotifier(t)
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}

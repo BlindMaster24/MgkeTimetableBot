@@ -21,6 +21,7 @@ func (f *EventChatFinder) toEventChats(chats []*Chat) []*notification.EventChat 
 			Group:               c.Group,
 			Teacher:             c.Teacher,
 			ReminderLeadMinutes: c.ReminderLeadMinutes,
+			CallsCampus:         c.CallsCampus,
 			NoticeChanges:       c.NoticeChanges,
 			NoticeNextWeek:      c.NoticeNextWeek,
 			NoticeCalls:         c.NoticeCalls,
