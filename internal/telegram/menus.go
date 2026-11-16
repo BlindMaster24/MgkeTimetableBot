@@ -38,10 +38,10 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "buttons",
 			name:     "buttons",
-			desc:     "Настройки кнопок бота",
+			desc:     b.loc("menu_buttons_desc"),
 			scene:    sceneSettings,
-			prompt:   "Меню настройки кнопок.",
-			openText: []string{"⌨️ Кнопки"},
+			prompt:   b.loc("menu_buttons_prompt"),
+			openText: []string{b.loc("menu_buttons_label")},
 			keyboard: func(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsButtons(chat) },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &btnToggleTextCmd{bot: b, kind: "daily"} },
@@ -55,19 +55,19 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "formatter",
 			name:     "formatter",
-			desc:     "Настройки форматировщика",
+			desc:     b.loc("menu_formatter_desc"),
 			scene:    sceneSettings,
-			prompt:   "Меню настройки форматировщика.",
-			openText: []string{"📃 Форматировщик"},
+			prompt:   b.loc("menu_formatter_prompt"),
+			openText: []string{b.loc("menu_formatter_label")},
 			keyboard: func(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsFormatters(chat) },
 		},
 		{
 			id:       "notice",
 			name:     "notice",
-			desc:     "Настройки оповещений",
+			desc:     b.loc("menu_notice_desc"),
 			scene:    sceneSettings,
-			prompt:   "Меню настройки оповещений.",
-			openText: []string{"🔊 Оповещения"},
+			prompt:   b.loc("menu_notice_prompt"),
+			openText: []string{b.loc("menu_notice_label")},
 			keyboard: func(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsNotice(chat) },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &noticeToggleTextCmd{bot: b, kind: "changes"} },
@@ -93,10 +93,10 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "view",
 			name:     "view",
-			desc:     "Настройки отображения расписания",
+			desc:     b.loc("menu_view_desc"),
 			scene:    sceneSettings,
-			prompt:   "Меню настройки отображения внешнего вида расписания.",
-			openText: []string{"🖼️ Отображение"},
+			prompt:   b.loc("menu_view_prompt"),
+			openText: []string{b.loc("menu_view_label")},
 			keyboard: func(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsView(chat) },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &viewToggleTextCmd{bot: b, kind: "hide_past_days"} },
@@ -107,10 +107,10 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "diff",
 			name:     "diff",
-			desc:     "Настройки отображения изменений расписания",
+			desc:     b.loc("menu_diff_desc"),
 			scene:    sceneSettings,
-			prompt:   "Меню настроек раздела \"Что изменилось\".",
-			openText: []string{"📊 Сравнение"},
+			prompt:   b.loc("menu_diff_prompt"),
+			openText: []string{b.loc("menu_diff_label")},
 			keyboard: func(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsDiff(chat) },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &diffToggleTextCmd{bot: b, kind: "enabled"} },
@@ -125,8 +125,8 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "schedules",
 			scene:    sceneSettingsSchedules,
-			prompt:   "Управление расписаниями.",
-			openText: []string{"🗓️ Управление расписаниями"},
+			prompt:   b.loc("menu_schedules_prompt"),
+			openText: []string{b.loc("menu_schedules_label")},
 			keyboard: func(b *Bot, _ *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsSchedules() },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &callsManageTextCmd{bot: b, menu: "calls"} },
@@ -135,7 +135,7 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "calls",
 			scene:    sceneSettingsCalls,
-			openText: []string{"🕐 Звонки: управление"},
+			openText: []string{b.loc("menu_calls_label")},
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &callsSettingsTextCmd{bot: b, kind: "show"} },
 				func(b *Bot) Command { return &callsSettingsTextCmd{bot: b, kind: "refresh"} },
@@ -152,8 +152,8 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "aliases",
 			scene:    sceneSettingsAlias,
-			prompt:   "Меню настройки алиасов.",
-			openText: []string{"Алиасы", "Настройка алиасов"},
+			prompt:   b.loc("menu_aliases_prompt"),
+			openText: []string{b.loc("menu_aliases_label"), b.loc("menu_aliases_label_alt")},
 			keyboard: func(b *Bot, _ *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsAliases() },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &aliasActionTextCmd{bot: b, kind: "list"} },
@@ -165,10 +165,10 @@ func (b *Bot) menuSpecs() []menuSpec {
 		{
 			id:       "subscriptions",
 			name:     "subscriptions",
-			desc:     "Управление подписками на другие группы/преподавателей",
+			desc:     b.loc("menu_subs_desc"),
 			scene:    sceneSettings,
-			prompt:   "Подписки позволяют получать уведомления об изменениях расписания другой группы или преподавателя.",
-			openText: []string{"🔔 Подписки", "Подписки"},
+			prompt:   b.loc("menu_subs_prompt"),
+			openText: []string{b.loc("menu_subs_label"), b.loc("menu_subs_label_alt")},
 			keyboard: func(b *Bot, _ *Chat) *telego.ReplyKeyboardMarkup { return b.replySubscriptionsMenu() },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &subsActionTextCmd{bot: b, kind: "add_group"} },
