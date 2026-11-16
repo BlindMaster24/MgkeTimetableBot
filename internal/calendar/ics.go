@@ -11,7 +11,15 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
 
+type Texts struct {
+	Teacher  string
+	Group    string
+	Cabinet  string
+	Subgroup string
+}
+
 type ICSBuilder struct {
+	texts      Texts
 	events     []icsEvent
 	weekdays   [][2][2]string
 	saturday   [][2][2]string
@@ -29,8 +37,9 @@ type icsEvent struct {
 	location    string
 }
 
-func NewICSBuilder(weekdays, saturday [][2][2]string, weekNumber int) *ICSBuilder {
+func NewICSBuilder(weekdays, saturday [][2][2]string, weekNumber int, texts Texts) *ICSBuilder {
 	return &ICSBuilder{
+		texts:      texts,
 		weekdays:   weekdays,
 		saturday:   saturday,
 		weekNumber: weekNumber,
@@ -153,7 +162,7 @@ func (b *ICSBuilder) callsFor(day string) ([][2][2]string, bool) {
 func (b *ICSBuilder) groupEvent(value, day string, index int, start, end time.Time, lesson *model.GroupLessonExplain) icsEvent {
 	var parts []string
 	if lesson.Teacher != nil && *lesson.Teacher != "" {
-		parts = append(parts, "Преподаватель: "+*lesson.Teacher)
+		parts = append(parts, b.texts.Teacher+*lesson.Teacher)
 	}
 	subgroup := 0
 	if lesson.Subgroup != nil {
@@ -165,7 +174,7 @@ func (b *ICSBuilder) groupEvent(value, day string, index int, start, end time.Ti
 func (b *ICSBuilder) teacherEvent(value, day string, index int, start, end time.Time, lesson *model.TeacherLessonExplain) icsEvent {
 	var parts []string
 	if lesson.Group != "" {
-		parts = append(parts, "Группа: "+lesson.Group)
+		parts = append(parts, b.texts.Group+lesson.Group)
 	}
 	subgroup := 0
 	if lesson.Subgroup != nil {
@@ -175,11 +184,11 @@ func (b *ICSBuilder) teacherEvent(value, day string, index int, start, end time.
 }
 
 func (b *ICSBuilder) newEvent(kind, value, day string, index int, start, end time.Time, lesson string, lessonType, cabinet *string, subgroup int, parts []string) icsEvent {
-	summary := lesson + lessonTypeSuffix(lessonType) + subgroupSuffix(subgroup)
+	summary := lesson + lessonTypeSuffix(lessonType) + subgroupSuffix(b.texts.Subgroup, subgroup)
 
 	cabinetValue := deref(cabinet)
 	if cabinetValue != "" {
-		parts = append(parts, "Кабинет: "+cabinetValue)
+		parts = append(parts, b.texts.Cabinet+cabinetValue)
 	}
 
 	return icsEvent{
@@ -218,11 +227,11 @@ func lessonTypeSuffix(lessonType *string) string {
 	return fmt.Sprintf(" (%s)", *lessonType)
 }
 
-func subgroupSuffix(subgroup int) string {
-	if subgroup == 0 {
+func subgroupSuffix(format string, subgroup int) string {
+	if subgroup == 0 || format == "" {
 		return ""
 	}
-	return fmt.Sprintf(", подгр. %d", subgroup)
+	return fmt.Sprintf(format, subgroup)
 }
 
 func deref(value *string) string {

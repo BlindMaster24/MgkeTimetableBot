@@ -19,7 +19,7 @@ var (
 )
 
 func fixedBuilder(weekdays, saturday [][2][2]string, weekNumber int) *ICSBuilder {
-	b := NewICSBuilder(weekdays, saturday, weekNumber)
+	b := NewICSBuilder(weekdays, saturday, weekNumber, Texts{Teacher: "Преподаватель: ", Group: "Группа: ", Cabinet: "Кабинет: ", Subgroup: ", подгр. %d"})
 	b.now = time.Date(2025, 9, 1, 12, 30, 45, 0, time.Local)
 	return b
 }
