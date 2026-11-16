@@ -21,7 +21,7 @@ func (c *imageLayoutCmd) MatchText(text string) bool {
 
 func (c *imageLayoutCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("access_denied"))
 	}
 	return u.Bot.SendText(u.ChatID, c.bot.imageLayoutText())
 }

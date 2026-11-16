@@ -435,7 +435,7 @@ func (c *webhookCmd) Description() string {
 }
 func (c *webhookCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("access_denied"))
 	}
 
 	status := c.bot.WebhookStatus(ctx)

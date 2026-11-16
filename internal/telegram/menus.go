@@ -26,7 +26,7 @@ func (b *Bot) menuSpecs() []menuSpec {
 			desc:     b.loc("cmd_settings"),
 			scene:    sceneSettings,
 			prompt:   b.loc("settings_menu"),
-			openText: []string{b.loc("button_settings"), "Настройки"},
+			openText: []string{b.loc("button_settings"), b.loc("menu_settings_label_alt")},
 			keyboard: func(b *Bot, _ *Chat) *telego.ReplyKeyboardMarkup { return b.replySettingsMain() },
 			items: []func(b *Bot) Command{
 				func(b *Bot) Command { return &formatterSelectTextCmd{bot: b} },

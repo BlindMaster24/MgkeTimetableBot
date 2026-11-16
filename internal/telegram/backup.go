@@ -33,7 +33,7 @@ func (c *backupCmd) MatchText(text string) bool {
 
 func (c *backupCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("access_denied"))
 	}
 	if c.bot.backupFunc == nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("backup_disabled"))
