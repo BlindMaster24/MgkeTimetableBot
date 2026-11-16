@@ -26,6 +26,35 @@ import (
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
 
+// runtime carries the objects one bot process wires together. The steps live
+// in the order they must run: stores, chats, API, bot, background services.
+type runtime struct {
+	cfg      *config.Config
+	cfgPath  string
+	build    build.Info
+	log      *logger.Logger
+	loc      *i18n.Localizer
+	metrics  *health.Tracker
+	counters *health.TelegramCounters
+
+	cache   *cache.RaspCache
+	archive *archive.Repository
+	chats   *telegrambot.Repository
+	keys    *apikey.Store
+
+	incidents  *health.IncidentLog
+	webhook    *webhookStatusSource
+	google     *google.CalendarService
+	api        *api.Server
+	bot        *telegrambot.Bot
+	probeToken string
+
+	calendarSyncEnabled bool
+	notifier            *notification.EventNotifier
+	schedulerEntries    func() int
+	trackedReminders    func() int
+}
+
 func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 	cfg, err := loadConfig(cfgPath)
 	if err != nil {
@@ -47,342 +76,422 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 
 	log := logger.New(cfg.Logging.Level, fileCfg)
 	log.Info().Str("version", buildInfo.Version).Str("commit", buildInfo.ShortCommit()).Msg("bot starting")
-	loc := i18n.New("ru")
 
-	metrics := health.NewTracker(healthThresholds(cfg))
-	telegramCounters := health.NewTelegramCounters()
+	r := &runtime{
+		cfg:      cfg,
+		cfgPath:  cfgPath,
+		build:    buildInfo,
+		log:      log,
+		loc:      i18n.New("ru"),
+		metrics:  health.NewTracker(healthThresholds(cfg)),
+		counters: health.NewTelegramCounters(),
+	}
 
 	ctx, cancel := signal.NotifyContext(ctx, stopSignals()...)
 	defer cancel()
 
 	log.Info().Strs("signals", signalNames(stopSignals())).Msg("graceful shutdown armed")
 
-	raspCache, err := cache.New(cfg.ResolvedCacheDir())
-	if err != nil {
-		log.Error().Err(err).Msg("failed to init cache")
+	if !r.openStores() {
 		return 1
 	}
-	raspCache.SetCallsPreferSite(cfg.Parser.Calls == nil || cfg.Parser.Calls.PreferSite)
-	log.Info().
+	defer r.close()
+
+	if !r.openChats() {
+		return 1
+	}
+	if !r.startAPI() {
+		return 1
+	}
+	if !r.startBot() {
+		return 1
+	}
+
+	r.startMaintenance(ctx)
+	r.startCalendar()
+	r.startNotifier()
+	r.configureMetrics()
+	r.startParser(ctx)
+
+	return r.serve(ctx)
+}
+
+func (r *runtime) close() {
+	if r.chats != nil {
+		r.chats.Close()
+	}
+	if r.archive != nil {
+		r.archive.Close()
+	}
+}
+
+// openStores opens the timetable cache and the archive that mirrors it.
+func (r *runtime) openStores() bool {
+	raspCache, err := cache.New(r.cfg.ResolvedCacheDir())
+	if err != nil {
+		r.log.Error().Err(err).Msg("failed to init cache")
+		return false
+	}
+	raspCache.SetCallsPreferSite(r.cfg.Parser.Calls == nil || r.cfg.Parser.Calls.PreferSite)
+	r.log.Info().
 		Int("groups", len(raspCache.GetGroups())).
 		Int("teachers", len(raspCache.GetTeachers())).
 		Msg("cache loaded from disk")
 
-	archivePath := cfg.ResolvedDBPath()
+	archivePath := r.cfg.ResolvedDBPath()
 	if adopted, ok := config.AdoptLegacyDBPath(archivePath); ok {
-		log.Warn().
+		r.log.Warn().
 			Str("path", absolutePath(adopted)).
 			Msg("archive still lives under the legacy sqlite3.db name, rename it to timetable_archive.db")
 		archivePath = adopted
 	}
 
 	archiveRepo, err := archive.NewWithOptions(archivePath, archive.Options{
-		BusyTimeout: cfg.ResolvedSQLiteBusyTimeout(),
-		Retries:     cfg.ResolvedSQLiteBusyRetries(),
-		OnRetry:     func(int, error) { metrics.ArchiveBusyRetry() },
-		OnFailure:   func(error) { metrics.ArchiveBusyFailure() },
+		BusyTimeout: r.cfg.ResolvedSQLiteBusyTimeout(),
+		Retries:     r.cfg.ResolvedSQLiteBusyRetries(),
+		OnRetry:     func(int, error) { r.metrics.ArchiveBusyRetry() },
+		OnFailure:   func(error) { r.metrics.ArchiveBusyFailure() },
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("failed to open archive DB")
-		return 1
-	}
-	defer archiveRepo.Close()
-	log.Info().Str("path", absolutePath(archivePath)).Msg("archive DB opened")
-
-	syncArchive := func(tag string) {
-		if err := archiveRepo.SyncFromCache(ctx, raspCache.GetGroups(), raspCache.GetTeachers()); err != nil {
-			log.Error().Err(err).Str("tag", tag).Msg("archive sync failed")
-		} else {
-			log.Info().Str("tag", tag).Msg("archive synced from cache")
-		}
+		r.log.Error().Err(err).Msg("failed to open archive DB")
+		return false
 	}
 
-	syncArchive("startup")
+	r.cache = raspCache
+	r.archive = archiveRepo
+	r.log.Info().Str("path", absolutePath(archivePath)).Msg("archive DB opened")
 
-	chatRepo, err := telegrambot.NewChatRepo(cfg.ResolvedChatDBPath(), cfg.ResolvedSQLiteBusyTimeout())
+	r.syncArchive(context.Background(), "startup")
+	return true
+}
+
+// openChats opens the chat database and prepares the API keys.
+func (r *runtime) openChats() bool {
+	chatRepo, err := telegrambot.NewChatRepo(r.cfg.ResolvedChatDBPath(), r.cfg.ResolvedSQLiteBusyTimeout())
 	if err != nil {
-		log.Error().Err(err).Msg("failed to open chat DB")
-		return 1
+		r.log.Error().Err(err).Msg("failed to open chat DB")
+		return false
 	}
-	defer chatRepo.Close()
-	chatRepo.SetDefaultAccepted(cfg.Accept.Private)
+	chatRepo.SetDefaultAccepted(r.cfg.Accept.Private)
+	r.chats = chatRepo
 
-	keyStore := apikey.NewStore(chatRepo.DB(), cfg.EncryptKey)
+	keyStore := apikey.NewStore(chatRepo.DB(), r.cfg.EncryptKey)
 	if err := keyStore.EnsureSchema(); err != nil {
-		log.Error().Err(err).Msg("failed to prepare the api key table")
-		return 1
+		r.log.Error().Err(err).Msg("failed to prepare the api key table")
+		return false
 	}
 	if !keyStore.Enabled() {
-		log.Warn().Msg("encrypt_key is missing or shorter than 32 characters, every /api request will be rejected")
+		r.log.Warn().Msg("encrypt_key is missing or shorter than 32 characters, every /api request will be rejected")
 	}
+	r.keys = keyStore
 
-	probeToken := ""
 	if keyStore.Enabled() {
 		if token, err := keyStore.SystemToken(); err != nil {
-			log.Error().Err(err).Msg("failed to prepare the api probe key")
+			r.log.Error().Err(err).Msg("failed to prepare the api probe key")
 		} else {
-			probeToken = token
+			r.probeToken = token
 		}
 	}
+	return true
+}
 
-	apiServer := api.NewServer(raspCache, cfg.HTTP.Port, metrics, buildInfo, keyStore, loc)
+// startAPI creates the HTTP server and restores the persisted health state.
+func (r *runtime) startAPI() bool {
+	r.api = api.NewServer(r.cache, r.cfg.HTTP.Port, r.metrics, r.build, r.keys, r.loc)
 
-	if err := metrics.Restore(chatRepo); err != nil {
-		log.Warn().Err(err).Msg("failed to restore health metrics")
+	if err := r.metrics.Restore(r.chats); err != nil {
+		r.log.Warn().Err(err).Msg("failed to restore health metrics")
 	}
+	return true
+}
 
-	saveMetrics := func(tag string) {
-		if err := metrics.Flush(chatRepo); err != nil {
-			log.Warn().Err(err).Str("tag", tag).Msg("failed to persist health metrics")
-		}
-	}
-
-	bot, err := telegrambot.NewBot(cfg, log, loc, chatRepo, raspCache, archiveRepo)
+// startBot creates the bot and gives it every source it reports through.
+func (r *runtime) startBot() bool {
+	bot, err := telegrambot.NewBot(r.cfg, r.log, r.loc, r.chats, r.cache, r.archive)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to create bot")
-		return 1
+		r.log.Error().Err(err).Msg("failed to create bot")
+		return false
 	}
-	bot.SetBuildInfo(buildInfo)
-	bot.SetHealthSource(metrics)
-	bot.SetCounterSink(telegramCounters)
-	bot.SetKeyStore(keyStore)
+	bot.SetBuildInfo(r.build)
+	bot.SetHealthSource(r.metrics)
+	bot.SetCounterSink(r.counters)
+	bot.SetKeyStore(r.keys)
 	bot.SetAPIProbeFunc(func(ctx context.Context) []apiprobe.Result {
-		return apiprobe.Run(ctx, apiProbeClient, apiProbeBaseURL(cfg), apiprobe.Targets(raspCache), probeToken)
+		return apiprobe.Run(ctx, apiProbeClient, apiProbeBaseURL(r.cfg), apiprobe.Targets(r.cache), r.probeToken)
 	})
 
-	incidents := health.NewIncidentLog(chatRepo, health.IncidentLimit)
-	stamp := health.StartupStamp{Build: buildInfo.Summary(), Config: configStamp(cfgPath)}
+	incidents := health.NewIncidentLog(r.chats, health.IncidentLimit)
+	stamp := health.StartupStamp{Build: r.build.Summary(), Config: configStamp(r.cfgPath)}
 	incidents.SetStartupStamp(stamp)
 	incidents.SetErrorHandler(func(err error) {
-		log.Warn().Err(err).Msg("failed to persist the incident history")
+		r.log.Warn().Err(err).Msg("failed to persist the incident history")
 	})
 	bot.SetIncidentLog(incidents)
 	bot.SetShutdownFunc(func() {
-		saveMetrics("restart")
-		if err := raspCache.Save(context.Background()); err != nil {
-			log.Error().Err(err).Msg("failed to save the cache before a restart")
+		r.saveMetrics("restart")
+		if err := r.cache.Save(context.Background()); err != nil {
+			r.log.Error().Err(err).Msg("failed to save the cache before a restart")
 		}
 	})
 
 	for _, record := range incidents.NoteStartup(health.ScopeAPI, stamp, func(change health.StartupChange, previous, current health.StartupStamp) string {
 		switch change {
 		case health.ChangeDeploy:
-			return loc.T("ru", "incident_note_deploy", map[string]interface{}{"Current": current.Build, "Previous": previous.Build})
+			return r.loc.T("ru", "incident_note_deploy", map[string]interface{}{"Current": current.Build, "Previous": previous.Build})
 		case health.ChangeConfig:
-			return loc.T("ru", "incident_note_config", map[string]interface{}{"Current": current.Config, "Previous": previous.Config})
+			return r.loc.T("ru", "incident_note_config", map[string]interface{}{"Current": current.Config, "Previous": previous.Config})
 		}
-		return loc.T("ru", "incident_note_restart", map[string]interface{}{"Current": current.Build})
+		return r.loc.T("ru", "incident_note_restart", map[string]interface{}{"Current": current.Build})
 	}) {
-		log.Info().Str("key", record.Key).Str("note", record.Note).Msg("open api incident annotated at startup")
+		r.log.Info().Str("key", record.Key).Str("note", record.Note).Msg("open api incident annotated at startup")
 	}
 
-	maintenance := newArchiveMaintenance(cfg, archiveRepo, log, metrics)
+	r.bot = bot
+	r.incidents = incidents
+	return true
+}
 
-	bot.SetBackupFunc(func(ctx context.Context) (telegrambot.BackupReport, error) {
+// startMaintenance arms the archive backup and prune schedule.
+func (r *runtime) startMaintenance(ctx context.Context) {
+	maintenance := newArchiveMaintenance(r.cfg, r.archive, r.log, r.metrics)
+	r.bot.SetBackupFunc(func(ctx context.Context) (telegrambot.BackupReport, error) {
 		return maintenance.Run(ctx)
 	})
 
-	if cfg.MaintenanceEnabled() {
-		scheduler := backup.NewScheduler(cfg.ResolvedMaintenanceSchedule(), log, func() {
-			if _, err := maintenance.Run(ctx); err != nil {
-				log.Error().Err(err).Msg("archive maintenance failed")
-			}
-		})
-		scheduler.Start()
-		defer scheduler.Stop()
-		log.Info().
-			Str("expr", cfg.ResolvedMaintenanceSchedule()).
-			Str("backup_dir", cfg.Archive.BackupDir).
-			Int("retention_days", cfg.Archive.RetentionDays).
-			Msg("archive maintenance armed")
+	if !r.cfg.MaintenanceEnabled() {
+		return
 	}
 
-	googleService := google.NewCalendarService(cfg)
-	bot.SetGoogleService(googleService)
-	calendarSyncEnabled := googleService.SyncEnabled()
-	webhookStatus := newWebhookStatusSource(bot.WebhookStatus)
-	apiServer.SetWebhookStatus(func(ctx context.Context) any { return webhookStatus.Get(ctx) })
-	apiServer.HandleGoogleOAuth(cfg.Google.URL, googleOAuthHandler(googleService, chatRepo, bot, log, loc))
+	scheduler := backup.NewScheduler(r.cfg.ResolvedMaintenanceSchedule(), r.log, func() {
+		if _, err := maintenance.Run(ctx); err != nil {
+			r.log.Error().Err(err).Msg("archive maintenance failed")
+		}
+	})
+	scheduler.Start()
+	r.log.Info().
+		Str("expr", r.cfg.ResolvedMaintenanceSchedule()).
+		Str("backup_dir", r.cfg.Archive.BackupDir).
+		Int("retention_days", r.cfg.Archive.RetentionDays).
+		Msg("archive maintenance armed")
+}
+
+// startCalendar wires Google Calendar, the webhook status and the HTTP API.
+func (r *runtime) startCalendar() {
+	r.google = google.NewCalendarService(r.cfg)
+	r.bot.SetGoogleService(r.google)
+	r.calendarSyncEnabled = r.google.SyncEnabled()
+
+	r.webhook = newWebhookStatusSource(r.bot.WebhookStatus)
+	r.api.SetWebhookStatus(func(ctx context.Context) any { return r.webhook.Get(ctx) })
+	r.api.HandleGoogleOAuth(r.cfg.Google.URL, googleOAuthHandler(r.google, r.chats, r.bot, r.log, r.loc))
 
 	go func() {
-		log.Info().Int("port", cfg.HTTP.Port).Msg("API server starting")
-		if err := apiServer.Run(); err != nil {
-			log.Error().Err(err).Msg("API server error")
+		r.log.Info().Int("port", r.cfg.HTTP.Port).Msg("API server starting")
+		if err := r.api.Run(); err != nil {
+			r.log.Error().Err(err).Msg("API server error")
 		}
 	}()
 
-	adapter := telegrambot.NewEventChatFinder(chatRepo, cfg.Telegram.AdminIDs)
-
-	syncCalendars := func(ctx context.Context, tag string) (int, error) {
-		changes := googleDayChanges(raspCache.DrainDayChanges(ctx))
-		if !calendarSyncEnabled {
-			return 0, nil
-		}
-
-		synced := 0
-		var failures []error
-
-		days, err := bot.SyncGoogleCalendarChanges(ctx, changes)
-		if err != nil {
-			metrics.CalendarFailure(err)
-			log.Error().Err(err).Str("tag", tag).Msg("google calendar change sync failed")
-			failures = append(failures, err)
-		} else {
-			metrics.CalendarSuccess(days)
-		}
-		synced += days
-
-		days, err = bot.SyncGoogleCalendars(ctx)
-		if err != nil {
-			metrics.CalendarFailure(err)
-			log.Error().Err(err).Str("tag", tag).Msg("google calendar reconcile failed")
-			failures = append(failures, err)
-		} else {
-			metrics.CalendarSuccess(days)
-		}
-		synced += days
-
-		return synced, errors.Join(failures...)
-	}
-
-	bot.SetCalendarSyncFunc(func(ctx context.Context) (int, error) {
-		return syncCalendars(ctx, "manual")
+	r.bot.SetCalendarSyncFunc(func(ctx context.Context) (int, error) {
+		return r.syncCalendars(ctx, "manual")
 	})
+}
 
-	var eventNotifier *notification.EventNotifier
-	schedulerEntries := func() int { return 0 }
-	var trackedReminders func() int
-	if cfg.Telegram.Noticer {
-		eventNotifier = notification.NewEventNotifier(raspCache, cfg, log, bot, adapter)
-		eventNotifier.SetLocalizer(loc)
-		notifier := eventNotifier
-		bot.SetNoticeDayFunc(notifier.CronDayAll)
-		scheduler := notification.NewScheduler(cfg, raspCache, log, bot, adapter, metrics, chatRepo)
-		scheduler.SetIncidents(incidents)
-		scheduler.SetCounterSink(telegramCounters)
-		scheduler.Start()
-		defer scheduler.Stop()
-		schedulerEntries = scheduler.Entries
-		trackedReminders = scheduler.TrackedReminders
-		log.Info().Msg("notification scheduler started")
+// startNotifier arms the event notifier and the notification scheduler.
+func (r *runtime) startNotifier() {
+	r.schedulerEntries = func() int { return 0 }
+
+	if !r.cfg.Telegram.Noticer {
+		return
 	}
 
-	if cfg.Metrics.Enabled {
-		apiServer.SetMetricsConfig(api.MetricsConfig{Path: cfg.ResolvedMetricsPath(), Token: cfg.Metrics.Token})
-		apiServer.SetMetricsSources(api.MetricsSources{
-			Archive:   archiveRepo.Stats,
-			Bounds:    archiveRepo.DayIndexBounds,
-			Webhook:   func(ctx context.Context) api.WebhookMetrics { return webhookMetrics(webhookStatus.Get(ctx)) },
-			Scheduler: schedulerEntries,
-			Reminders: trackedReminders,
-			Telegram:  telegramCounters.TelegramStats,
-		})
-		log.Info().Str("path", cfg.ResolvedMetricsPath()).Msg("prometheus metrics enabled")
+	adapter := telegrambot.NewEventChatFinder(r.chats, r.cfg.Telegram.AdminIDs)
+	r.notifier = notification.NewEventNotifier(r.cache, r.cfg, r.log, r.bot, adapter)
+	r.notifier.SetLocalizer(r.loc)
+	r.bot.SetNoticeDayFunc(r.notifier.CronDayAll)
+
+	scheduler := notification.NewScheduler(r.cfg, r.cache, r.log, r.bot, adapter, r.metrics, r.chats)
+	scheduler.SetIncidents(r.incidents)
+	scheduler.SetCounterSink(r.counters)
+	scheduler.Start()
+	r.schedulerEntries = scheduler.Entries
+	r.trackedReminders = scheduler.TrackedReminders
+	r.log.Info().Msg("notification scheduler started")
+}
+
+// configureMetrics publishes the /metrics sources when Prometheus output is on.
+func (r *runtime) configureMetrics() {
+	if !r.cfg.Metrics.Enabled {
+		return
 	}
 
-	drainEvents := func(tag string) {
-		events := raspCache.DrainEvents(ctx)
-		if len(events) == 0 {
-			return
-		}
-		log.Info().Int("count", len(events)).Str("tag", tag).Msg("draining cache events")
-		if eventNotifier != nil {
-			eventNotifier.HandleEvents(events)
-		}
-	}
+	r.api.SetMetricsConfig(api.MetricsConfig{Path: r.cfg.ResolvedMetricsPath(), Token: r.cfg.Metrics.Token})
+	r.api.SetMetricsSources(api.MetricsSources{
+		Archive:   r.archive.Stats,
+		Bounds:    r.archive.DayIndexBounds,
+		Webhook:   func(ctx context.Context) api.WebhookMetrics { return webhookMetrics(r.webhook.Get(ctx)) },
+		Scheduler: r.schedulerEntries,
+		Reminders: r.trackedReminders,
+		Telegram:  r.counters.TelegramStats,
+	})
+	r.log.Info().Str("path", r.cfg.ResolvedMetricsPath()).Msg("prometheus metrics enabled")
+}
 
-	drainEvents("startup")
+// startParser wires the fetcher and starts the parse loop.
+func (r *runtime) startParser(ctx context.Context) {
+	r.drainEvents(ctx, "startup")
 
-	parserLoop := parserpkg.LoopConfigFrom(cfg)
+	parserLoop := parserpkg.LoopConfigFrom(r.cfg)
 	proxy := ""
-	if cfg.Parser.Proxy != nil {
-		proxy = *cfg.Parser.Proxy
-	}
-	onParserReport := func(report parserpkg.Report) {
-		metrics.ParserReport(report.Source, parserLayoutIssues(report), guardIssues(report))
-		bot.RecordParserReport(report)
+	if r.cfg.Parser.Proxy != nil {
+		proxy = *r.cfg.Parser.Proxy
 	}
 
-	fetcher := parserpkg.NewFetcher(log, raspCache, parserpkg.Options{
+	onParserReport := func(report parserpkg.Report) {
+		r.metrics.ParserReport(report.Source, parserLayoutIssues(report), guardIssues(report))
+		r.bot.RecordParserReport(report)
+	}
+
+	fetcher := parserpkg.NewFetcher(r.log, r.cache, parserpkg.Options{
 		Proxy:    proxy,
-		Guard:    parserGuard(cfg),
+		Guard:    parserGuard(r.cfg),
 		OnReport: onParserReport,
 	})
 
 	parseOnce := func(force bool) error {
 		started := time.Now()
 
-		parseErr := fetcher.Timetable(ctx, cfg.Parser.Endpoints.TimetableGroup, cfg.Parser.Endpoints.TimetableTeacher)
-		if parserLoop.CallsEnabled && (force || raspCache.CallsDue(started, parserLoop.CallsInterval)) {
-			parseErr = errors.Join(parseErr, fetcher.Calls(ctx, cfg.Parser.Endpoints.BellSchedule))
+		parseErr := fetcher.Timetable(ctx, r.cfg.Parser.Endpoints.TimetableGroup, r.cfg.Parser.Endpoints.TimetableTeacher)
+		if parserLoop.CallsEnabled && (force || r.cache.CallsDue(started, parserLoop.CallsInterval)) {
+			parseErr = errors.Join(parseErr, fetcher.Calls(ctx, r.cfg.Parser.Endpoints.BellSchedule))
 		}
-		if force || raspCache.TeamDue(started, parserLoop.TeamInterval) {
-			parseErr = errors.Join(parseErr, fetcher.Team(ctx, cfg.Parser.Endpoints.Team))
+		if force || r.cache.TeamDue(started, parserLoop.TeamInterval) {
+			parseErr = errors.Join(parseErr, fetcher.Team(ctx, r.cfg.Parser.Endpoints.Team))
 		}
 
-		raspCache.SetSuccessUpdate(ctx, parseErr == nil)
+		r.cache.SetSuccessUpdate(ctx, parseErr == nil)
 
 		if parseErr != nil {
-			metrics.ParserFailure(parseErr)
-			bot.AddParseLog(false, parseErr.Error())
-			if eventNotifier != nil {
-				go eventNotifier.ParserError(parseErr)
+			r.metrics.ParserFailure(parseErr)
+			r.bot.AddParseLog(false, parseErr.Error())
+			if r.notifier != nil {
+				go r.notifier.ParserError(parseErr)
 			}
 		} else {
-			metrics.ParserSuccess(time.Since(started))
-			bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(raspCache.GetGroups()), len(raspCache.GetTeachers())))
-			drainEvents("parse")
+			r.metrics.ParserSuccess(time.Since(started))
+			r.bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(r.cache.GetGroups()), len(r.cache.GetTeachers())))
+			r.drainEvents(ctx, "parse")
 		}
 
 		go func() {
-			syncArchive("parse")
-			syncCalendars(context.Background(), "parse")
-			saveMetrics("parse")
+			r.syncArchive(ctx, "parse")
+			r.syncCalendars(context.Background(), "parse")
+			r.saveMetrics("parse")
 		}()
 
 		return parseErr
 	}
 
-	bot.SetParseFunc(func() error { return parseOnce(true) })
+	r.bot.SetParseFunc(func() error { return parseOnce(true) })
 
-	if err := bot.SetMyCommands(); err != nil {
-		log.Error().Err(err).Msg("failed to set bot commands")
+	if err := r.bot.SetMyCommands(); err != nil {
+		r.log.Error().Err(err).Msg("failed to set bot commands")
 	}
 
-	if cfg.Parser.Enabled {
-		go parserpkg.RunLoop(ctx, parserLoop, log, func() error { return parseOnce(false) })
-		log.Info().
-			Dur("default", parserLoop.Default).
-			Dur("activity", parserLoop.ActivityInterval).
-			Dur("error", parserLoop.ErrorDelay).
-			Ints("activity_hours", parserLoop.Activity[:]).
-			Msg("parser loop started")
+	if !r.cfg.Parser.Enabled {
+		return
 	}
 
-	if cfg.Parser.Enabled {
-		go func() {
-			log.Info().Msg("initial parse starting")
-			if err := parseOnce(false); err != nil {
-				log.Error().Err(err).Msg("initial parse failed")
-				return
-			}
-			log.Info().Int("groups", len(raspCache.GetGroups())).Int("teachers", len(raspCache.GetTeachers())).Msg("initial parse done")
-		}()
+	go parserpkg.RunLoop(ctx, parserLoop, r.log, func() error { return parseOnce(false) })
+	r.log.Info().
+		Dur("default", parserLoop.Default).
+		Dur("activity", parserLoop.ActivityInterval).
+		Dur("error", parserLoop.ErrorDelay).
+		Ints("activity_hours", parserLoop.Activity[:]).
+		Msg("parser loop started")
+
+	go func() {
+		r.log.Info().Msg("initial parse starting")
+		if err := parseOnce(false); err != nil {
+			r.log.Error().Err(err).Msg("initial parse failed")
+			return
+		}
+		r.log.Info().Int("groups", len(r.cache.GetGroups())).Int("teachers", len(r.cache.GetTeachers())).Msg("initial parse done")
+	}()
+}
+
+// serve runs the bot until the signal context ends and saves the state.
+func (r *runtime) serve(ctx context.Context) int {
+	r.log.Info().Msg("bot starting, press Ctrl+C to stop")
+	if err := r.bot.Run(ctx); err != nil {
+		r.log.Error().Err(err).Msg("bot stopped")
 	}
 
-	log.Info().Msg("bot starting, press Ctrl+C to stop")
-	if err := bot.Run(ctx); err != nil {
-		log.Error().Err(err).Msg("bot stopped")
-	}
+	r.saveMetrics("shutdown")
 
-	saveMetrics("shutdown")
-
-	if err := raspCache.Save(ctx); err != nil {
-		log.Error().Err(err).Msg("failed to save cache")
+	if err := r.cache.Save(ctx); err != nil {
+		r.log.Error().Err(err).Msg("failed to save cache")
 	}
-	log.Info().Msg("shutdown complete")
-	_ = log.Close()
+	r.log.Info().Msg("shutdown complete")
+	_ = r.log.Close()
 	return 0
+}
+
+func (r *runtime) syncArchive(ctx context.Context, tag string) {
+	if err := r.archive.SyncFromCache(ctx, r.cache.GetGroups(), r.cache.GetTeachers()); err != nil {
+		r.log.Error().Err(err).Str("tag", tag).Msg("archive sync failed")
+	} else {
+		r.log.Info().Str("tag", tag).Msg("archive synced from cache")
+	}
+}
+
+func (r *runtime) saveMetrics(tag string) {
+	if err := r.metrics.Flush(r.chats); err != nil {
+		r.log.Warn().Err(err).Str("tag", tag).Msg("failed to persist health metrics")
+	}
+}
+
+func (r *runtime) drainEvents(ctx context.Context, tag string) {
+	events := r.cache.DrainEvents(ctx)
+	if len(events) == 0 {
+		return
+	}
+	r.log.Info().Int("count", len(events)).Str("tag", tag).Msg("draining cache events")
+	if r.notifier != nil {
+		r.notifier.HandleEvents(events)
+	}
+}
+
+func (r *runtime) syncCalendars(ctx context.Context, tag string) (int, error) {
+	changes := googleDayChanges(r.cache.DrainDayChanges(ctx))
+	if !r.calendarSyncEnabled {
+		return 0, nil
+	}
+
+	synced := 0
+	var failures []error
+
+	days, err := r.bot.SyncGoogleCalendarChanges(ctx, changes)
+	if err != nil {
+		r.metrics.CalendarFailure(err)
+		r.log.Error().Err(err).Str("tag", tag).Msg("google calendar change sync failed")
+		failures = append(failures, err)
+	} else {
+		r.metrics.CalendarSuccess(days)
+	}
+	synced += days
+
+	days, err = r.bot.SyncGoogleCalendars(ctx)
+	if err != nil {
+		r.metrics.CalendarFailure(err)
+		r.log.Error().Err(err).Str("tag", tag).Msg("google calendar reconcile failed")
+		failures = append(failures, err)
+	} else {
+		r.metrics.CalendarSuccess(days)
+	}
+	synced += days
+
+	return synced, errors.Join(failures...)
 }
 
 func absolutePath(path string) string {
