@@ -11,7 +11,7 @@ MGKCT Timetable Bot is a Telegram bot that shows the timetable of the Minsk Stat
 
 It is a complete port of the old TypeScript bot to Go: the same commands, menus, buttons and wording, without VK / Viber / Alice — Telegram and the HTTP API only. The surface (commands, callback prefixes, button labels) is guarded by an automated TypeScript parity check, see [Parity with the TypeScript bot](#parity-with-the-typescript-bot).
 
-Docs: [Google Calendar guide](docs/google-calendar.md), [monitoring set](deploy/monitoring/README.md), [config template](configs/config.example.yaml), [contributor rules](AGENTS.md), [releases](https://github.com/BlindMaster24/MgkeTimetableBot/releases) and the [GHCR image](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
+Docs: [Google Calendar guide](docs/google-calendar.en.md), [monitoring set](deploy/monitoring/README.md), [config template](configs/config.example.yaml), [contributor rules](AGENTS.md), [releases](https://github.com/BlindMaster24/MgkeTimetableBot/releases) and the [GHCR image](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
 Features:
 
@@ -453,7 +453,7 @@ Lesson reminders (enabled by `timetable.reminder_lead_minutes` > 0) are tuned pe
 
 ## Google Calendar and ICS
 
-- [docs/google-calendar.md](docs/google-calendar.md) — Google Cloud setup, OAuth, account linking, permissions.
+- [docs/google-calendar.en.md](docs/google-calendar.en.md) — Google Cloud setup, OAuth, account linking, permissions.
 - Google menu: `/google_calendar` or the “📅 Google Calendar” button in the main menu — list calendars, add one, grant or revoke write access.
 - Synchronization is event-driven: after every parse cycle the parser reports only the days that actually changed, and the bot refreshes exactly those days instead of re-reading the whole archive. A day is cleared of its old events before new ones are written, and lesson times come from the bell schedule.
 - A separate reconcile pass catches up calendars that fell behind (the bot was offline, a new week started). It only fetches the missing days and never rewrites days that are already synchronized.

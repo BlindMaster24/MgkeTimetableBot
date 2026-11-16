@@ -11,7 +11,7 @@
 
 Это полный порт старого TypeScript-бота на Go: тот же набор команд, меню, кнопок и текстов, без VK / Viber / Алисы — только Telegram и HTTP API. Паритет поверхности (команды, callback-префиксы, подписи кнопок) проверяется автоматически — см. [Паритет с TypeScript-ботом](#паритет-с-typescript-ботом).
 
-Документация: [инструкция по Google Calendar](docs/google-calendar.md), [набор мониторинга](deploy/monitoring/README.ru.md), [шаблон конфигурации](configs/config.example.yaml), [правила разработки](AGENTS.md), [релизы](https://github.com/BlindMaster24/MgkeTimetableBot/releases) и [образ в GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
+Документация: [инструкция по Google Calendar](docs/google-calendar.md), [набор мониторинга](deploy/monitoring/README.ru.md), [шаблон конфигурации](configs/config.example.yaml), [правила разработки](AGENTS.ru.md), [релизы](https://github.com/BlindMaster24/MgkeTimetableBot/releases) и [образ в GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
 Возможности:
 
