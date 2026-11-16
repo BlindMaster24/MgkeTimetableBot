@@ -2,11 +2,16 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/mymmrac/telego"
 )
+
+const MAX_ALIASES = 50
+
+var ErrAliasLimit = errors.New("alias limit reached")
 
 type Alias struct {
 	ID    int64
@@ -54,9 +59,32 @@ func (r *AliasRepository) List(userID int64) ([]Alias, error) {
 	return result, rows.Err()
 }
 
+func (r *AliasRepository) Count(userID int64) (int, error) {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+	var count int
+	err := r.db.db.QueryRow(`SELECT COUNT(*) FROM aliases WHERE telegram_user_id = ?`, userID).Scan(&count)
+	return count, err
+}
+
 func (r *AliasRepository) Add(userID int64, key, value string) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
+
+	existing := 0
+	if err := r.db.db.QueryRow(`SELECT COUNT(*) FROM aliases WHERE telegram_user_id = ? AND key = ?`, userID, key).Scan(&existing); err != nil {
+		return err
+	}
+	if existing == 0 {
+		total := 0
+		if err := r.db.db.QueryRow(`SELECT COUNT(*) FROM aliases WHERE telegram_user_id = ?`, userID).Scan(&total); err != nil {
+			return err
+		}
+		if total >= MAX_ALIASES {
+			return ErrAliasLimit
+		}
+	}
+
 	_, err := r.db.db.Exec(`INSERT OR REPLACE INTO aliases (chat_id, telegram_user_id, key, value) VALUES (?, ?, ?, ?)`,
 		userID, userID, key, value)
 	return err
@@ -181,6 +209,10 @@ func (b *Bot) handleAliasAdd(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	if err := b.aliasRepo.Add(u.UserID, key, value); err != nil {
+		if err == ErrAliasLimit {
+			b.SendText(u.ChatID, fmt.Sprintf(b.loc("alias_limit"), MAX_ALIASES))
+			return
+		}
 		b.SendText(u.ChatID, b.loc("aliastext_14"))
 		return
 	}

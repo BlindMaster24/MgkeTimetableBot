@@ -919,5 +919,6 @@
   "oauth_missing_state": "State not provided",
   "oauth_exchange_failed": "Не удалось получить доступ к Google аккаунту",
   "oauth_save_failed": "Не удалось сохранить Google аккаунт",
-  "oauth_linked_ok": "Аккаунт успешно привязан, можете вернуться обратно в чат"
+  "oauth_linked_ok": "Аккаунт успешно привязан, можете вернуться обратно в чат",
+  "alias_limit": "Достигнут лимит алиасов: %d."
 }
