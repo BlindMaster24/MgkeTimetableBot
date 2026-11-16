@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+[Русская версия](AGENTS.ru.md)
+
 ## Project Structure & Module Organization
 - Entrypoint: `cmd/bot/main.go` — wires config, logger, i18n, cache, archive, API, Telegram bot, notification scheduler, parser loop.
 - `cmd/migrate-pg/` — one-off migration of chats and subscriptions from PostgreSQL to SQLite.
