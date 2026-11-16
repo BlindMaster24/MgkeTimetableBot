@@ -927,5 +927,6 @@
   "gcal_event_teacher": "<b>Преподаватель:</b> %s",
   "gcal_event_cabinet": "<b>Кабинет:</b> %s",
   "gcal_event_comment": "<b>Примечание:</b> %s",
-  "gcal_event_group": "<b>Группа:</b> %s"
+  "gcal_event_group": "<b>Группа:</b> %s",
+  "subs_test_prompt": "Введите номер подписки для проверки:\n"
 }
