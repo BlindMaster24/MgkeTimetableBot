@@ -99,21 +99,7 @@ func (r *Repository) WeekIndexBounds(ctx context.Context) (Bounds, error) {
 }
 
 func (r *Repository) Groups(ctx context.Context) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT DISTINCT \"group\" FROM timetable_archive WHERE \"group\" IS NOT NULL")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result []string
-	for rows.Next() {
-		var g string
-		if err := rows.Scan(&g); err != nil {
-			return nil, err
-		}
-		result = append(result, g)
-	}
-	return result, rows.Err()
+	return r.distinctStrings(ctx, "\"group\"")
 }
 
 type Stats struct {
@@ -129,7 +115,12 @@ func (r *Repository) Stats(ctx context.Context) (Stats, error) {
 }
 
 func (r *Repository) Teachers(ctx context.Context) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT DISTINCT teacher FROM timetable_archive WHERE teacher IS NOT NULL")
+	return r.distinctStrings(ctx, "teacher")
+}
+
+// distinctStrings lists the non-null values of one key column.
+func (r *Repository) distinctStrings(ctx context.Context, column string) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT DISTINCT "+column+" FROM timetable_archive WHERE "+column+" IS NOT NULL")
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +128,11 @@ func (r *Repository) Teachers(ctx context.Context) ([]string, error) {
 
 	var result []string
 	for rows.Next() {
-		var t string
-		if err := rows.Scan(&t); err != nil {
+		var value string
+		if err := rows.Scan(&value); err != nil {
 			return nil, err
 		}
-		result = append(result, t)
+		result = append(result, value)
 	}
 	return result, rows.Err()
 }

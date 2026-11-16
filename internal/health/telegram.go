@@ -72,40 +72,35 @@ func (c *TelegramCounters) CountCommand(name string) {
 	if c == nil {
 		return
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.commands.add(sanitizeCounterKey(name))
+	c.count(&c.commands, name)
 }
 
 func (c *TelegramCounters) CountCallback(prefix string) {
 	if c == nil {
 		return
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.callbacks.add(sanitizeCounterKey(prefix))
+	c.count(&c.callbacks, prefix)
 }
 
 func (c *TelegramCounters) CountNotification(kind string) {
 	if c == nil {
 		return
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.notifications.add(sanitizeCounterKey(kind))
+	c.count(&c.notifications, kind)
 }
 
 func (c *TelegramCounters) CountSendError(transport string) {
 	if c == nil {
 		return
 	}
+	c.count(&c.transports, transport)
+}
 
+// count records one sanitized key in the given counter set.
+func (c *TelegramCounters) count(set *counterSet, key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.transports.add(sanitizeCounterKey(transport))
+	set.add(sanitizeCounterKey(key))
 }
 
 func (c *TelegramCounters) TelegramStats() TelegramStats {
