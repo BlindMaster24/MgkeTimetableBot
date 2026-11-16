@@ -105,7 +105,7 @@ type googleCalendarCmd struct{ bot *Bot }
 func (c *googleCalendarCmd) Hidden() bool { return true }
 
 func (c *googleCalendarCmd) Name() string        { return "/google_calendar" }
-func (c *googleCalendarCmd) Description() string { return "Настройка Google Calendar" }
+func (c *googleCalendarCmd) Description() string { return c.bot.loc("gcal_1") }
 
 func (c *googleCalendarCmd) MatchText(text string) bool {
 	trimmed := strings.TrimSpace(text)
@@ -118,7 +118,7 @@ func (c *googleCalendarCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	if !c.bot.googleReady() {
-		return u.Bot.SendText(u.ChatID, "Google Calendar не настроен на сервере.")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("gcal_2"))
 	}
 	return c.bot.showGoogleCalendarMenu(u, chat)
 }
@@ -168,16 +168,16 @@ func (b *Bot) showGoogleCalendarMenu(u *Update, chat *Chat) error {
 	if chat.GoogleEmail == "" {
 		return b.showGoogleAuth(u, chat)
 	}
-	text := fmt.Sprintf("Привязанный гугл аккаунт: %s.\nДействие с календарями:", chat.GoogleEmail)
-	return b.sendOrEdit(u, text, googleMenuKeyboard())
+	text := fmt.Sprintf(b.loc("gcal_3"), chat.GoogleEmail)
+	return b.sendOrEdit(u, text, googleMenuKeyboard(b))
 }
 
 func (b *Bot) showGoogleAuth(u *Update, chat *Chat) error {
 	if !b.googleReady() {
-		return u.Bot.SendText(u.ChatID, "Google Calendar не настроен на сервере.")
+		return u.Bot.SendText(u.ChatID, b.loc("gcal_4"))
 	}
 	state := EncodeGoogleState("telegram", chat.PeerID)
-	return b.sendOrEdit(u, "Гугл аккаунт не привязан, чтобы привязать, нажмите на кнопку ниже", googleAuthKeyboard(b.google.AuthURL(state)))
+	return b.sendOrEdit(u, b.loc("gcal_5"), googleAuthKeyboard(b, b.google.AuthURL(state)))
 }
 
 func googlePayload(action string, args ...string) string {
@@ -222,16 +222,16 @@ func (b *Bot) showGoogleCalendarList(ctx context.Context, u *Update, chat *Chat)
 
 	var lines []string
 	for i, calendar := range current {
-		lines = append(lines, fmt.Sprintf("%d. %s, %s (Синхронизация: %.2f%%)",
+		lines = append(lines, fmt.Sprintf(b.loc("gcal_6"),
 			i+1, calendar.Type, calendar.Value, googleProgress(calendar, bounds, hasBounds)))
 	}
 
-	text := "Нет добавленных календарей"
+	text := b.loc("gcal_7")
 	if len(lines) > 0 {
-		text = "Список календарей с расписанием:\n" + strings.Join(lines, "\n")
+		text = b.loc("gcal_8") + strings.Join(lines, "\n")
 	}
 
-	return b.sendOrEdit(u, text, googleListKeyboard(len(lines) > 0))
+	return b.sendOrEdit(u, text, googleListKeyboard(b, len(lines) > 0))
 }
 
 func (b *Bot) showGoogleCalendarDelete(u *Update, chat *Chat) error {
@@ -242,7 +242,7 @@ func (b *Bot) showGoogleCalendarDelete(u *Update, chat *Chat) error {
 
 	current := b.googleCalendars(api)
 	if len(current) == 0 {
-		return b.sendOrEdit(u, "Нет добавленных календарей", googleBackKeyboard())
+		return b.sendOrEdit(u, b.loc("gcal_9"), googleBackKeyboard(b))
 	}
 
 	rows := make([][]telego.InlineKeyboardButton, 0, len(current)+1)
@@ -252,22 +252,22 @@ func (b *Bot) showGoogleCalendarDelete(u *Update, chat *Chat) error {
 			CallbackData: googlePayload(googleActionDrop, googleLocalID(calendar.ID)),
 		}})
 	}
-	rows = append(rows, []telego.InlineKeyboardButton{{Text: "Назад", CallbackData: googlePayload(googleActionList)}})
+	rows = append(rows, []telego.InlineKeyboardButton{{Text: b.loc("gcal_10"), CallbackData: googlePayload(googleActionList)}})
 
-	return b.sendOrEdit(u, "Выберите календарь для удаления:", &telego.InlineKeyboardMarkup{InlineKeyboard: rows})
+	return b.sendOrEdit(u, b.loc("gcal_11"), &telego.InlineKeyboardMarkup{InlineKeyboard: rows})
 }
 
 func (b *Bot) dropGoogleCalendar(u *Update, chat *Chat, localID int64) error {
 	calendar, err := b.chatRepo.GoogleCalendarByLocalID(localID)
 	if err != nil || calendar == nil {
-		return b.sendOrEdit(u, "Календарь не найден", googleBackKeyboard())
+		return b.sendOrEdit(u, b.loc("gcal_12"), googleBackKeyboard(b))
 	}
 
 	if api, err := b.googleUserClient(context.Background(), chat); err == nil {
 		api.RemoveCalendarFromUser(context.Background(), calendar.CalendarID)
 	}
 	if err := b.chatRepo.DeleteGoogleCalendar(calendar.CalendarID); err != nil {
-		return u.Bot.SendText(u.ChatID, "Не удалось удалить календарь")
+		return u.Bot.SendText(u.ChatID, b.loc("gcal_13"))
 	}
 
 	return b.showGoogleCalendarDelete(u, chat)
@@ -285,46 +285,46 @@ func (b *Bot) googleCalendars(api googleUserAPI) []*GoogleCalendar {
 	return calendars
 }
 
-func googleMenuKeyboard() *telego.InlineKeyboardMarkup {
+func googleMenuKeyboard(b *Bot) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Список", CallbackData: googlePayload(googleActionList)}, {Text: "Добавить", CallbackData: googlePayload(googleActionAdd)}},
-			{{Text: "Права", CallbackData: googlePayload(googleActionPermMenu)}},
+			{{Text: b.loc("gcal_14"), CallbackData: googlePayload(googleActionList)}, {Text: b.loc("gcal_15"), CallbackData: googlePayload(googleActionAdd)}},
+			{{Text: b.loc("gcal_16"), CallbackData: googlePayload(googleActionPermMenu)}},
 		},
 	}
 }
 
-func googleListKeyboard(hasCalendars bool) *telego.InlineKeyboardMarkup {
+func googleListKeyboard(b *Bot, hasCalendars bool) *telego.InlineKeyboardMarkup {
 	rows := [][]telego.InlineKeyboardButton{
-		{{Text: "Обновить", CallbackData: googlePayload(googleActionList)}},
+		{{Text: b.loc("gcal_17"), CallbackData: googlePayload(googleActionList)}},
 	}
 	if hasCalendars {
-		rows = append(rows, []telego.InlineKeyboardButton{{Text: "Удалить", CallbackData: googlePayload(googleActionDelete)}})
+		rows = append(rows, []telego.InlineKeyboardButton{{Text: b.loc("gcal_18"), CallbackData: googlePayload(googleActionDelete)}})
 	}
-	rows = append(rows, []telego.InlineKeyboardButton{{Text: "Назад", CallbackData: googlePayload(googleActionMenu)}})
+	rows = append(rows, []telego.InlineKeyboardButton{{Text: b.loc("gcal_19"), CallbackData: googlePayload(googleActionMenu)}})
 	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
-func googleAuthKeyboard(url string) *telego.InlineKeyboardMarkup {
+func googleAuthKeyboard(b *Bot, url string) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Привязать Google аккаунт", URL: url}},
+			{{Text: b.loc("gcal_20"), URL: url}},
 		},
 	}
 }
 
-func googleControlCalendarKeyboard() *telego.InlineKeyboardMarkup {
+func googleControlCalendarKeyboard(b *Bot) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Настроить календарь", CallbackData: googlePayload(googleActionMenu)}},
+			{{Text: b.loc("gcal_21"), CallbackData: googlePayload(googleActionMenu)}},
 		},
 	}
 }
 
-func googleBackKeyboard() *telego.InlineKeyboardMarkup {
+func googleBackKeyboard(b *Bot) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Назад", CallbackData: googlePayload(googleActionMenu)}},
+			{{Text: b.loc("gcal_22"), CallbackData: googlePayload(googleActionMenu)}},
 		},
 	}
 }
@@ -337,7 +337,7 @@ func (b *Bot) showGooglePermissionsMenu(u *Update, chat *Chat) error {
 
 	calendars := b.googleCalendars(api)
 	if len(calendars) == 0 {
-		return b.sendOrEdit(u, "Нет добавленных календарей", googleBackKeyboard())
+		return b.sendOrEdit(u, b.loc("gcal_23"), googleBackKeyboard(b))
 	}
 
 	rows := make([][]telego.InlineKeyboardButton, 0, len(calendars)+1)
@@ -347,18 +347,18 @@ func (b *Bot) showGooglePermissionsMenu(u *Update, chat *Chat) error {
 			CallbackData: googlePayload(googleActionPermCal, googleLocalID(calendar.ID)),
 		}})
 	}
-	rows = append(rows, []telego.InlineKeyboardButton{{Text: "Назад", CallbackData: googlePayload(googleActionMenu)}})
+	rows = append(rows, []telego.InlineKeyboardButton{{Text: b.loc("gcal_24"), CallbackData: googlePayload(googleActionMenu)}})
 
-	return b.sendOrEdit(u, "Выберите календарь для управления правами:",
+	return b.sendOrEdit(u, b.loc("gcal_25"),
 		&telego.InlineKeyboardMarkup{InlineKeyboard: rows})
 }
 
-func googlePermissionsControl(localID int64) *telego.InlineKeyboardMarkup {
+func googlePermissionsControl(b *Bot, localID int64) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Дать права редактирования", CallbackData: googlePayload(googleActionPermApply, "writer", googleLocalID(localID))}},
-			{{Text: "Снять права редактирования", CallbackData: googlePayload(googleActionPermApply, "reader", googleLocalID(localID))}},
-			{{Text: "Назад", CallbackData: googlePayload(googleActionPermMenu)}},
+			{{Text: b.loc("gcal_26"), CallbackData: googlePayload(googleActionPermApply, "writer", googleLocalID(localID))}},
+			{{Text: b.loc("gcal_27"), CallbackData: googlePayload(googleActionPermApply, "reader", googleLocalID(localID))}},
+			{{Text: b.loc("gcal_28"), CallbackData: googlePayload(googleActionPermMenu)}},
 		},
 	}
 }
@@ -366,17 +366,17 @@ func googlePermissionsControl(localID int64) *telego.InlineKeyboardMarkup {
 func (b *Bot) showGooglePermissionsCalendar(u *Update, chat *Chat, localID int64) error {
 	calendar, err := b.chatRepo.GoogleCalendarByLocalID(localID)
 	if err != nil || calendar == nil {
-		return b.sendOrEdit(u, "Календарь не найден", googleBackKeyboard())
+		return b.sendOrEdit(u, b.loc("gcal_29"), googleBackKeyboard(b))
 	}
 
-	text := fmt.Sprintf("Календарь: %s, %s\nВыберите действие:", calendar.Type, calendar.Value)
-	return b.sendOrEdit(u, text, googlePermissionsControl(calendar.ID))
+	text := fmt.Sprintf(b.loc("gcal_30"), calendar.Type, calendar.Value)
+	return b.sendOrEdit(u, text, googlePermissionsControl(b, calendar.ID))
 }
 
 func (b *Bot) applyGooglePermissions(u *Update, chat *Chat, role string, localID int64) error {
 	calendar, err := b.chatRepo.GoogleCalendarByLocalID(localID)
 	if err != nil || calendar == nil {
-		return b.sendOrEdit(u, "Календарь не найден", googleBackKeyboard())
+		return b.sendOrEdit(u, b.loc("gcal_31"), googleBackKeyboard(b))
 	}
 
 	api, err := b.googleUserClient(context.Background(), chat)
@@ -386,29 +386,29 @@ func (b *Bot) applyGooglePermissions(u *Update, chat *Chat, role string, localID
 
 	email := chat.GoogleEmail
 	if err := api.SetUserRole(context.Background(), calendar.CalendarID, email, role); err != nil {
-		return u.Bot.SendText(u.ChatID, "Не удалось обновить права доступа")
+		return u.Bot.SendText(u.ChatID, b.loc("gcal_32"))
 	}
 
-	roleText := "чтения"
+	roleText := b.loc("gcal_33")
 	if role == "writer" {
-		roleText = "редактирования"
+		roleText = b.loc("gcal_34")
 	}
-	text := fmt.Sprintf("Права %s успешно обновлены для %s.", roleText, email)
-	return b.sendOrEdit(u, text, googlePermissionsControl(calendar.ID))
+	text := fmt.Sprintf(b.loc("gcal_35"), roleText, email)
+	return b.sendOrEdit(u, text, googlePermissionsControl(b, calendar.ID))
 }
 
 func (b *Bot) showGoogleCalendarAdd(u *Update, chat *Chat) error {
 	switch chat.Mode {
 	case ModeParent, ModeStudent:
 		if chat.Group == "" {
-			return u.Bot.AnswerCallback(u.Callback.ID, "Вы ещё не выбрали группу")
+			return u.Bot.AnswerCallback(u.Callback.ID, b.loc("gcal_36"))
 		}
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			return u.Bot.AnswerCallback(u.Callback.ID, "Вы ещё не выбрали преподавателя")
+			return u.Bot.AnswerCallback(u.Callback.ID, b.loc("gcal_37"))
 		}
 	default:
-		return u.Bot.AnswerCallback(u.Callback.ID, "Режим чата не позволяет добавить календарь")
+		return u.Bot.AnswerCallback(u.Callback.ID, b.loc("gcal_38"))
 	}
 
 	api, err := b.googleUserClient(context.Background(), chat)
@@ -425,25 +425,25 @@ func (b *Bot) showGoogleCalendarAdd(u *Update, chat *Chat) error {
 
 	calendar, err := b.chatRepo.GoogleCalendarByTypeValue(kind, value)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Не удалось получить календарь")
+		return u.Bot.SendText(u.ChatID, b.loc("gcal_39"))
 	}
 
 	created := false
 	if calendar == nil {
-		if err := b.sendOrEdit(u, "Ожидайте... Идёт создание календаря...", nil); err != nil {
+		if err := b.sendOrEdit(u, b.loc("gcal_40"), nil); err != nil {
 			return err
 		}
-		owner := "Группа"
+		owner := b.loc("gcal_41")
 		if kind == "teacher" {
-			owner = "Преподаватель"
+			owner = b.loc("gcal_42")
 		}
-		calendarID, err := api.CreateCalendar(context.Background(), fmt.Sprintf("Расписание занятий (%s - %s)", owner, value))
+		calendarID, err := api.CreateCalendar(context.Background(), fmt.Sprintf(b.loc("gcal_43"), owner, value))
 		if err != nil {
-			return u.Bot.SendText(u.ChatID, "Не удалось создать календарь. Сообщите разработчику!")
+			return u.Bot.SendText(u.ChatID, b.loc("gcal_44"))
 		}
 		calendar = &GoogleCalendar{Type: kind, Value: value, CalendarID: calendarID}
 		if err := b.chatRepo.SaveGoogleCalendar(calendar); err != nil {
-			return u.Bot.SendText(u.ChatID, "Не удалось сохранить календарь")
+			return u.Bot.SendText(u.ChatID, b.loc("gcal_45"))
 		}
 		created = true
 	}
@@ -451,20 +451,20 @@ func (b *Bot) showGoogleCalendarAdd(u *Update, chat *Chat) error {
 	if created {
 		go func() {
 			if _, err := b.resyncGoogleCalendar(context.Background(), calendar); err != nil {
-				b.SendText(u.ChatID, "Ошибка синхронизации календаря. Сообщите разработчику!")
+				b.SendText(u.ChatID, b.loc("gcal_46"))
 			}
 		}()
 	}
 
 	if err := api.AddCalendarToUser(context.Background(), calendar.CalendarID); err != nil {
-		return u.Bot.SendText(u.ChatID, "Не удалось добавить календарь в ваш гугл аккаунт")
+		return u.Bot.SendText(u.ChatID, b.loc("gcal_47"))
 	}
 
-	text := "Календарь успешно добавлен в ваш гугл аккаунт!"
+	text := b.loc("gcal_48")
 	if created {
-		text += "\n\nВажно! Так как календарь был создан только что, необходимо время для его полной синхронизации."
+		text += b.loc("gcal_49")
 	}
-	return b.sendOrEdit(u, text, googleBackKeyboard())
+	return b.sendOrEdit(u, text, googleBackKeyboard(b))
 }
 
 type GoogleDayChange struct {
@@ -835,9 +835,9 @@ func stringValue(value *string) string {
 func (b *Bot) SendGoogleLinked(peerID int64, email string) error {
 	_, err := b.client.SendMessage(context.Background(), &telego.SendMessageParams{
 		ChatID:      telego.ChatID{ID: peerID},
-		Text:        fmt.Sprintf("Гугл аккаунт '%s' успешно привязан!", email),
+		Text:        fmt.Sprintf(b.loc("gcal_50"), email),
 		ParseMode:   "HTML",
-		ReplyMarkup: googleControlCalendarKeyboard(),
+		ReplyMarkup: googleControlCalendarKeyboard(b),
 	})
 	return b.countSendError(transportSendMessage, err)
 }

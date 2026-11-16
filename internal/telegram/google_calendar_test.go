@@ -382,7 +382,7 @@ func TestGoogleCalendarMenuText(t *testing.T) {
 		t.Errorf("menu text = %q, want %q", caller.last(), want)
 	}
 
-	rows := flattenInlineKeyboard(googleMenuKeyboard())
+	rows := flattenInlineKeyboard(googleMenuKeyboard(b))
 	if rows != "Список Добавить Права " {
 		t.Errorf("menu keyboard = %q", rows)
 	}

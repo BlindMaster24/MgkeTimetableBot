@@ -173,13 +173,13 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		inline("weekControlKeyboard", func() *telego.InlineKeyboardMarkup {
 			return b.weekControlKeyboard(context.Background(), "group", "100", 0, false)
 		}),
-		inline("googleMenuKeyboard", googleMenuKeyboard),
-		inline("googleListKeyboard(empty)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(false) }),
-		inline("googleListKeyboard(full)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(true) }),
-		inline("googleAuthKeyboard", func() *telego.InlineKeyboardMarkup { return googleAuthKeyboard("https://example.com") }),
-		inline("googleBackKeyboard", googleBackKeyboard),
-		inline("googleControlCalendarKeyboard", googleControlCalendarKeyboard),
-		inline("googlePermissionsControl", func() *telego.InlineKeyboardMarkup { return googlePermissionsControl(1) }),
+		inline("googleMenuKeyboard", func() *telego.InlineKeyboardMarkup { return googleMenuKeyboard(b) }),
+		inline("googleListKeyboard(empty)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(b, false) }),
+		inline("googleListKeyboard(full)", func() *telego.InlineKeyboardMarkup { return googleListKeyboard(b, true) }),
+		inline("googleAuthKeyboard", func() *telego.InlineKeyboardMarkup { return googleAuthKeyboard(b, "https://example.com") }),
+		inline("googleBackKeyboard", func() *telego.InlineKeyboardMarkup { return googleBackKeyboard(b) }),
+		inline("googleControlCalendarKeyboard", func() *telego.InlineKeyboardMarkup { return googleControlCalendarKeyboard(b) }),
+		inline("googlePermissionsControl", func() *telego.InlineKeyboardMarkup { return googlePermissionsControl(b, 1) }),
 		inline("weekControlKeyboard(hidePast)", func() *telego.InlineKeyboardMarkup {
 			return b.weekControlKeyboardHeader(context.Background(), "group", "100", 0, true, true)
 		}),
