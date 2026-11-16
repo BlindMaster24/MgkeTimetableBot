@@ -124,7 +124,7 @@ func collectEntryDayEvents(kind, value string, oldEntry, newEntry map[string]any
 	oldDays := entryDays(oldEntry)
 	newDays := entryDays(newEntry)
 
-	added, _, changed := mergeDays(newDays, oldDays)
+	_, added, changed := mergeDays(newDays, oldDays)
 	if len(added) == 0 && len(changed) == 0 {
 		return nil, nil
 	}
