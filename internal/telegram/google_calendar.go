@@ -595,7 +595,7 @@ func (b *Bot) syncGoogleCalendarDays(ctx context.Context, repo archiveStore, cal
 			continue
 		}
 
-		lessons, err := archiveDayLessons(ctx, repo, calendar, dayIndex)
+		lessons, err := b.archiveDayLessons(ctx, repo, calendar, dayIndex)
 		if err != nil {
 			failures = append(failures, err)
 			continue
@@ -609,20 +609,20 @@ func (b *Bot) syncGoogleCalendarDays(ctx context.Context, repo archiveStore, cal
 	return synced, errors.Join(failures...)
 }
 
-func archiveDayLessons(ctx context.Context, repo archiveStore, calendar *GoogleCalendar, dayIndex int64) ([]google.DayLesson, error) {
+func (b *Bot) archiveDayLessons(ctx context.Context, repo archiveStore, calendar *GoogleCalendar, dayIndex int64) ([]google.DayLesson, error) {
 	switch calendar.Type {
 	case "group":
 		day, err := repo.GroupDay(ctx, dayIndex, calendar.Value)
 		if err != nil || day == nil {
 			return nil, err
 		}
-		return groupDayLessons(*day), nil
+		return b.groupDayLessons(*day), nil
 	case "teacher":
 		day, err := repo.TeacherDay(ctx, dayIndex, calendar.Value)
 		if err != nil || day == nil {
 			return nil, err
 		}
-		return teacherDayLessons(*day), nil
+		return b.teacherDayLessons(*day), nil
 	}
 	return nil, nil
 }
@@ -657,7 +657,7 @@ func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCale
 			return synced, err
 		}
 		for _, day := range days {
-			if err := b.google.SyncDay(ctx, calendar.CalendarID, day.Day, groupDayLessons(day), calls); err != nil {
+			if err := b.google.SyncDay(ctx, calendar.CalendarID, day.Day, b.groupDayLessons(day), calls); err != nil {
 				return synced, err
 			}
 			synced++
@@ -668,7 +668,7 @@ func (b *Bot) resyncGoogleCalendarFrom(ctx context.Context, calendar *GoogleCale
 			return synced, err
 		}
 		for _, day := range days {
-			if err := b.google.SyncDay(ctx, calendar.CalendarID, day.Day, teacherDayLessons(day), calls); err != nil {
+			if err := b.google.SyncDay(ctx, calendar.CalendarID, day.Day, b.teacherDayLessons(day), calls); err != nil {
 				return synced, err
 			}
 			synced++
@@ -714,14 +714,14 @@ func (b *Bot) defaultCampus() string {
 	return ""
 }
 
-func groupDayLessons(day model.GroupDay) []google.DayLesson {
+func (b *Bot) groupDayLessons(day model.GroupDay) []google.DayLesson {
 	var out []google.DayLesson
 	for index, raw := range day.Lessons {
 		lessons := groupLessonsAt(raw)
 		if len(lessons) == 0 {
 			continue
 		}
-		title, description, location := google.GroupLessonInfo(lessons)
+		title, description, location := google.GroupLessonInfo(b.googleTexts(), lessons)
 		out = append(out, google.DayLesson{Index: index, Title: title, Description: description, Location: location})
 	}
 	return out
@@ -806,13 +806,13 @@ func intValue(value any) *int {
 	return nil
 }
 
-func teacherDayLessons(day model.TeacherDay) []google.DayLesson {
+func (b *Bot) teacherDayLessons(day model.TeacherDay) []google.DayLesson {
 	var out []google.DayLesson
 	for index, lesson := range day.Lessons {
 		if lesson == nil || lesson.Lesson == "" {
 			continue
 		}
-		title, description, location := google.TeacherLessonInfo(google.TeacherLesson{
+		title, description, location := google.TeacherLessonInfo(b.googleTexts(), google.TeacherLesson{
 			Subgroup: lesson.Subgroup,
 			Group:    lesson.Group,
 			Name:     lesson.Lesson,
@@ -922,4 +922,16 @@ func parseGoogleLocalID(raw string) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func (b *Bot) googleTexts() google.Texts {
+	return google.Texts{
+		Subgroup: b.loc("gcal_event_subgroup"),
+		Subject:  b.loc("gcal_event_subject"),
+		Type:     b.loc("gcal_event_type"),
+		Teacher:  b.loc("gcal_event_teacher"),
+		Cabinet:  b.loc("gcal_event_cabinet"),
+		Comment:  b.loc("gcal_event_comment"),
+		Group:    b.loc("gcal_event_group"),
+	}
 }

@@ -920,5 +920,12 @@
   "oauth_exchange_failed": "Не удалось получить доступ к Google аккаунту",
   "oauth_save_failed": "Не удалось сохранить Google аккаунт",
   "oauth_linked_ok": "Аккаунт успешно привязан, можете вернуться обратно в чат",
-  "alias_limit": "Достигнут лимит алиасов: %d."
+  "alias_limit": "Достигнут лимит алиасов: %d.",
+  "gcal_event_subgroup": "<i>%d-я подгруппа:</i>",
+  "gcal_event_subject": "<b>Предмет:</b> %s",
+  "gcal_event_type": "<b>Вид:</b> %s",
+  "gcal_event_teacher": "<b>Преподаватель:</b> %s",
+  "gcal_event_cabinet": "<b>Кабинет:</b> %s",
+  "gcal_event_comment": "<b>Примечание:</b> %s",
+  "gcal_event_group": "<b>Группа:</b> %s"
 }

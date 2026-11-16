@@ -16,7 +16,16 @@ import (
 func intPtr(v int) *int { return &v }
 
 func TestGroupLessonInfoSingleLesson(t *testing.T) {
-	title, description, location := GroupLessonInfo([]GroupLesson{{
+	texts := Texts{
+		Subgroup: "<i>%d-я подгруппа:</i>",
+		Subject:  "<b>Предмет:</b> %s",
+		Type:     "<b>Вид:</b> %s",
+		Teacher:  "<b>Преподаватель:</b> %s",
+		Cabinet:  "<b>Кабинет:</b> %s",
+		Comment:  "<b>Примечание:</b> %s",
+		Group:    "<b>Группа:</b> %s",
+	}
+	title, description, location := GroupLessonInfo(texts, []GroupLesson{{
 		Name:    "Математика",
 		Type:    "Лек",
 		Teacher: "Иванов И.И.",
@@ -37,7 +46,16 @@ func TestGroupLessonInfoSingleLesson(t *testing.T) {
 }
 
 func TestGroupLessonInfoSubgroups(t *testing.T) {
-	title, description, _ := GroupLessonInfo([]GroupLesson{
+	texts := Texts{
+		Subgroup: "<i>%d-я подгруппа:</i>",
+		Subject:  "<b>Предмет:</b> %s",
+		Type:     "<b>Вид:</b> %s",
+		Teacher:  "<b>Преподаватель:</b> %s",
+		Cabinet:  "<b>Кабинет:</b> %s",
+		Comment:  "<b>Примечание:</b> %s",
+		Group:    "<b>Группа:</b> %s",
+	}
+	title, description, _ := GroupLessonInfo(texts, []GroupLesson{
 		{Subgroup: intPtr(1), Name: "Физика", Cabinet: "202"},
 		{Subgroup: intPtr(2), Name: "Физика", Cabinet: "203"},
 	})
@@ -51,7 +69,16 @@ func TestGroupLessonInfoSubgroups(t *testing.T) {
 }
 
 func TestGroupLessonInfoDifferentLessons(t *testing.T) {
-	title, _, _ := GroupLessonInfo([]GroupLesson{
+	texts := Texts{
+		Subgroup: "<i>%d-я подгруппа:</i>",
+		Subject:  "<b>Предмет:</b> %s",
+		Type:     "<b>Вид:</b> %s",
+		Teacher:  "<b>Преподаватель:</b> %s",
+		Cabinet:  "<b>Кабинет:</b> %s",
+		Comment:  "<b>Примечание:</b> %s",
+		Group:    "<b>Группа:</b> %s",
+	}
+	title, _, _ := GroupLessonInfo(texts, []GroupLesson{
 		{Subgroup: intPtr(1), Name: "Физика", Cabinet: "202"},
 		{Name: "Информатика", Cabinet: "303"},
 	})
@@ -62,7 +89,16 @@ func TestGroupLessonInfoDifferentLessons(t *testing.T) {
 }
 
 func TestGroupLessonInfoMissingCabinet(t *testing.T) {
-	_, description, location := GroupLessonInfo([]GroupLesson{{Name: "Математика"}})
+	texts := Texts{
+		Subgroup: "<i>%d-я подгруппа:</i>",
+		Subject:  "<b>Предмет:</b> %s",
+		Type:     "<b>Вид:</b> %s",
+		Teacher:  "<b>Преподаватель:</b> %s",
+		Cabinet:  "<b>Кабинет:</b> %s",
+		Comment:  "<b>Примечание:</b> %s",
+		Group:    "<b>Группа:</b> %s",
+	}
+	_, description, location := GroupLessonInfo(texts, []GroupLesson{{Name: "Математика"}})
 	if !strings.Contains(description, "<b>Кабинет:</b> -") {
 		t.Errorf("description = %q", description)
 	}
@@ -72,7 +108,16 @@ func TestGroupLessonInfoMissingCabinet(t *testing.T) {
 }
 
 func TestTeacherLessonInfo(t *testing.T) {
-	title, description, location := TeacherLessonInfo(TeacherLesson{
+	texts := Texts{
+		Subgroup: "<i>%d-я подгруппа:</i>",
+		Subject:  "<b>Предмет:</b> %s",
+		Type:     "<b>Вид:</b> %s",
+		Teacher:  "<b>Преподаватель:</b> %s",
+		Cabinet:  "<b>Кабинет:</b> %s",
+		Comment:  "<b>Примечание:</b> %s",
+		Group:    "<b>Группа:</b> %s",
+	}
+	title, description, location := TeacherLessonInfo(texts, TeacherLesson{
 		Subgroup: intPtr(2),
 		Group:    "100",
 		Name:     "Физика",

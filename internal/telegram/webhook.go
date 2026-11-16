@@ -517,7 +517,7 @@ func (cb *webhookResetCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.AnswerCallback(u.Callback.ID, "")
 	}
 	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("access_denied"))
 	}
 	if u.Data != webhookResetCallback {
 		return nil

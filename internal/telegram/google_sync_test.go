@@ -38,6 +38,7 @@ func stringPtr(value string) *string { return &value }
 func subPtr(value int) *int          { return &value }
 
 func TestGroupDayLessonsBuildsCalendarEntries(t *testing.T) {
+	b, _ := setupE2EBot(t)
 	day := model.GroupDay{
 		Day: "14.09.2026",
 		Lessons: []model.GroupLesson{
@@ -50,7 +51,7 @@ func TestGroupDayLessonsBuildsCalendarEntries(t *testing.T) {
 		},
 	}
 
-	lessons := groupDayLessons(day)
+	lessons := b.groupDayLessons(day)
 	if len(lessons) != 2 {
 		t.Fatalf("expected two calendar entries, got %d", len(lessons))
 	}
@@ -66,6 +67,7 @@ func TestGroupDayLessonsBuildsCalendarEntries(t *testing.T) {
 }
 
 func TestTeacherDayLessonsBuildsCalendarEntries(t *testing.T) {
+	b, _ := setupE2EBot(t)
 	day := model.TeacherDay{
 		Day: "14.09.2026",
 		Lessons: []model.TeacherLesson{
@@ -74,7 +76,7 @@ func TestTeacherDayLessonsBuildsCalendarEntries(t *testing.T) {
 		},
 	}
 
-	lessons := teacherDayLessons(day)
+	lessons := b.teacherDayLessons(day)
 	if len(lessons) != 1 {
 		t.Fatalf("expected one calendar entry, got %d", len(lessons))
 	}

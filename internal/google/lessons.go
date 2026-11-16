@@ -24,7 +24,17 @@ type TeacherLesson struct {
 	Comment  string
 }
 
-func GroupLessonInfo(lessons []GroupLesson) (string, string, string) {
+type Texts struct {
+	Subgroup string
+	Subject  string
+	Type     string
+	Teacher  string
+	Cabinet  string
+	Comment  string
+	Group    string
+}
+
+func GroupLessonInfo(texts Texts, lessons []GroupLesson) (string, string, string) {
 	if len(lessons) == 0 {
 		return "", "", ""
 	}
@@ -56,18 +66,18 @@ func GroupLessonInfo(lessons []GroupLesson) (string, string, string) {
 	for _, lesson := range lessons {
 		var lines []string
 		if lesson.Subgroup != nil && *lesson.Subgroup != 0 {
-			lines = append(lines, fmt.Sprintf("<i>%d-я подгруппа:</i>", *lesson.Subgroup))
+			lines = append(lines, fmt.Sprintf(texts.Subgroup, *lesson.Subgroup))
 		}
-		lines = append(lines, fmt.Sprintf("<b>Предмет:</b> %s", lesson.Name))
+		lines = append(lines, fmt.Sprintf(texts.Subject, lesson.Name))
 		if lesson.Type != "" {
-			lines = append(lines, fmt.Sprintf("<b>Вид:</b> %s", lesson.Type))
+			lines = append(lines, fmt.Sprintf(texts.Type, lesson.Type))
 		}
 		if lesson.Teacher != "" {
-			lines = append(lines, fmt.Sprintf("<b>Преподаватель:</b> %s", lesson.Teacher))
+			lines = append(lines, fmt.Sprintf(texts.Teacher, lesson.Teacher))
 		}
-		lines = append(lines, fmt.Sprintf("<b>Кабинет:</b> %s", cabinetValue(lesson.Cabinet)))
+		lines = append(lines, fmt.Sprintf(texts.Cabinet, cabinetValue(lesson.Cabinet)))
 		if lesson.Comment != "" {
-			lines = append(lines, fmt.Sprintf("<b>Примечание:</b> %s", lesson.Comment))
+			lines = append(lines, fmt.Sprintf(texts.Comment, lesson.Comment))
 		}
 		blocks = append(blocks, strings.Join(lines, "\n"))
 	}
@@ -84,18 +94,18 @@ func GroupLessonInfo(lessons []GroupLesson) (string, string, string) {
 	return title, strings.Join(blocks, "\n\n"), location
 }
 
-func TeacherLessonInfo(lesson TeacherLesson) (string, string, string) {
+func TeacherLessonInfo(texts Texts, lesson TeacherLesson) (string, string, string) {
 	var lines []string
-	lines = append(lines, fmt.Sprintf("<b>Предмет:</b> %s", lesson.Name))
+	lines = append(lines, fmt.Sprintf(texts.Subject, lesson.Name))
 	if lesson.Type != "" {
-		lines = append(lines, fmt.Sprintf("<b>Вид:</b> %s", lesson.Type))
+		lines = append(lines, fmt.Sprintf(texts.Type, lesson.Type))
 	}
 	if lesson.Group != "" {
-		lines = append(lines, fmt.Sprintf("<b>Группа:</b> %s", subgroupPrefix(lesson.Subgroup)+lesson.Group))
+		lines = append(lines, fmt.Sprintf(texts.Group, subgroupPrefix(lesson.Subgroup)+lesson.Group))
 	}
-	lines = append(lines, fmt.Sprintf("<b>Кабинет:</b> %s", cabinetValue(lesson.Cabinet)))
+	lines = append(lines, fmt.Sprintf(texts.Cabinet, cabinetValue(lesson.Cabinet)))
 	if lesson.Comment != "" {
-		lines = append(lines, fmt.Sprintf("<b>Примечание:</b> %s", lesson.Comment))
+		lines = append(lines, fmt.Sprintf(texts.Comment, lesson.Comment))
 	}
 
 	title := subgroupPrefix(lesson.Subgroup) + lesson.Group + "-" + lesson.Name
