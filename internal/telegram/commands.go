@@ -27,7 +27,7 @@ type startCmd struct{ bot *Bot }
 func (c *startCmd) Name() string        { return "/start" }
 func (c *startCmd) Description() string { return c.bot.loc("cmd_start") }
 func (c *startCmd) MatchText(text string) bool {
-	return text == "Начать" || text == "Start" || text == "Меню" || text == "Главное меню"
+	return text == c.bot.loc("cmdtext_1") || text == "Start" || text == c.bot.loc("cmdtext_2") || text == c.bot.loc("cmdtext_3")
 }
 func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
@@ -44,9 +44,9 @@ func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.showSchedule(u, chat)
 }
 
-func startButtonKeyboard() *telego.ReplyKeyboardMarkup {
+func startButtonKeyboard(b *Bot) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
-		Keyboard:       [][]telego.KeyboardButton{{{Text: "Начать"}}},
+		Keyboard:       [][]telego.KeyboardButton{{{Text: b.loc("cmdtext_4")}}},
 		ResizeKeyboard: true,
 	}
 }
@@ -130,7 +130,7 @@ type cancelCmd struct{ bot *Bot }
 func (c *cancelCmd) Name() string        { return "/cancel" }
 func (c *cancelCmd) Description() string { return c.bot.loc("cmd_cancel") }
 func (c *cancelCmd) MatchText(text string) bool {
-	return text == c.bot.loc("button_cancel") || text == "Отмена"
+	return text == c.bot.loc("button_cancel") || text == c.bot.loc("cmdtext_5")
 }
 func (c *cancelCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
@@ -170,7 +170,7 @@ func (c *dayCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	if chat.Mode == "" {
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard(c.bot))
 	}
 	return c.bot.showDaySchedule(u, chat)
 }
@@ -214,7 +214,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 			}
 		}
 	default:
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("setup_needed"), startButtonKeyboard())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("setup_needed"), startButtonKeyboard(b))
 	}
 
 	return b.sendOrEdit(u, text, nil)
@@ -233,7 +233,7 @@ func (c *weekCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	if chat.Mode == "" {
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_needed"), startButtonKeyboard(c.bot))
 	}
 	return c.bot.showWeekSchedule(ctx, u, chat)
 }
@@ -348,7 +348,7 @@ type buttonsReloadCmd struct{ bot *Bot }
 
 func (c *buttonsReloadCmd) Name() string { return "/buttons_reload" }
 func (c *buttonsReloadCmd) Description() string {
-	return "Обновить клавиатуру бота"
+	return c.bot.loc("cmdtext_6")
 }
 func (c *buttonsReloadCmd) MatchText(text string) bool {
 	return strings.EqualFold(text, "/buttons_reload") || strings.EqualFold(text, "/button_reload")
@@ -358,7 +358,7 @@ func (c *buttonsReloadCmd) Handler(ctx context.Context, u *Update) error {
 	if err != nil {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Клавиатура обновлена", replyMainMenu(c.bot, chat))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("cmdtext_7"), replyMainMenu(c.bot, chat))
 }
 
 type forceParseCmd struct{ bot *Bot }
@@ -402,7 +402,7 @@ func (c *resetCacheCmd) Handler(ctx context.Context, u *Update) error {
 type eulaCmd struct{ bot *Bot }
 
 func (c *eulaCmd) Name() string        { return "/eula" }
-func (c *eulaCmd) Description() string { return "Лицензионное соглашение" }
+func (c *eulaCmd) Description() string { return c.bot.loc("cmdtext_8") }
 func (c *eulaCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, c.bot.loc("eula_text"))
 }
@@ -503,28 +503,28 @@ func (c *flushCacheCmd) Hidden() bool { return true }
 
 func (c *flushCacheCmd) Name() string { return "/flushcache" }
 func (c *flushCacheCmd) Description() string {
-	return "Сбросить расписание из кэша парсера в БД"
+	return c.bot.loc("cmdtext_9")
 }
 func (c *flushCacheCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_10"))
 	}
 
-	if err := u.Bot.SendText(u.ChatID, "Сброс начат..."); err != nil {
+	if err := u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_11")); err != nil {
 		return err
 	}
 
 	if err := c.bot.cache.Save(ctx); err != nil {
-		return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_12")+err.Error())
 	}
 
 	if c.bot.archive != nil {
 		if _, err := c.bot.archive.FlushCache(ctx, c.bot.cache.GetGroups(), c.bot.cache.GetTeachers()); err != nil {
-			return u.Bot.SendText(u.ChatID, "❌ Ошибка: "+err.Error())
+			return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_13")+err.Error())
 		}
 	}
 
-	return u.Bot.SendText(u.ChatID, "Сброс закончен")
+	return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_14"))
 }
 
 func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
@@ -542,7 +542,7 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		chat.NeedUpdateButtons = false
 		chat.Scene = ""
 		b.chatRepo.Save(chat)
-		b.SendTextWithReplyKeyboard(u.ChatID, "Клавиатура была принудительно пересоздана (обновлена)", replyMainMenu(b, chat))
+		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_15"), replyMainMenu(b, chat))
 	}
 
 	b.sendEulaOnce(u, chat)
@@ -561,7 +561,7 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 
 	chat.Scene = ""
 	b.chatRepo.Save(chat)
-	b.SendTextWithReplyKeyboard(u.ChatID, "Команда не найдена", replyMainMenu(b, chat))
+	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_16"), replyMainMenu(b, chat))
 }
 
 func (b *Bot) allowsCommand(cmd Command, userID int64) bool {
@@ -694,9 +694,9 @@ type devCmd struct{ bot *Bot }
 func (c *devCmd) Hidden() bool { return true }
 
 func (c *devCmd) Name() string        { return "/dev" }
-func (c *devCmd) Description() string { return "Исходный код бота" }
+func (c *devCmd) Description() string { return c.bot.loc("cmdtext_17") }
 func (c *devCmd) Handler(ctx context.Context, u *Update) error {
-	return u.Bot.SendText(u.ChatID, "Привет! Хочешь помочь сделать бота лучше? Окей, бегом на гитхаб) Там всё расписано.\n\nhttps://github.com/BlindMaster24/MgkeTimetableBot")
+	return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_18"))
 }
 
 type mathCmd struct{ bot *Bot }
@@ -704,7 +704,7 @@ type mathCmd struct{ bot *Bot }
 func (c *mathCmd) Hidden() bool { return true }
 
 func (c *mathCmd) Name() string        { return "/math" }
-func (c *mathCmd) Description() string { return "Математический калькулятор" }
+func (c *mathCmd) Description() string { return c.bot.loc("cmdtext_19") }
 
 const mathAllowedCharacters = "0123456789+-*/():^×÷ekк,."
 
@@ -712,31 +712,31 @@ func (c *mathCmd) Handler(ctx context.Context, u *Update) error {
 	command := strings.Split(u.Text, " ")[0]
 	text := strings.Join(strings.Split(u.Text, " ")[1:], " ")
 	if text == "" {
-		return u.Bot.SendText(u.ChatID, command+" <some>\n<some> - математический пример")
+		return u.Bot.SendText(u.ChatID, command+c.bot.loc("cmdtext_21"))
 	}
 
 	expression := strings.ReplaceAll(text, " ", "")
 	for _, ch := range expression {
 		if !strings.ContainsRune(mathAllowedCharacters, ch) {
-			return u.Bot.SendText(u.ChatID, "В примере имеются лишние символы.\nСписок разрешённых: "+mathAllowedCharacters)
+			return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_22")+mathAllowedCharacters)
 		}
 	}
 
-	for from, to := range map[string]string{"^": "**", "×": "*", "÷": "/", ":": "/", "k": "000", "к": "000", ",": "."} {
+	for from, to := range map[string]string{"^": "**", "×": "*", "÷": "/", ":": "/", "k": "000", c.bot.loc("cmdtext_23"): "000", ",": "."} {
 		expression = strings.ReplaceAll(expression, from, to)
 	}
 
 	if !mathExpressionLooksValid(expression) {
-		return u.Bot.SendText(u.ChatID, "Пример записан неправильно")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_24"))
 	}
 
-	result, err := evalMath(expression)
+	result, err := evalMath(expression, c.bot.loc)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Произошла ошибка во время выполнения:\n"+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_25")+err.Error())
 	}
 
 	if math.IsInf(result, 0) {
-		return u.Bot.SendText(u.ChatID, "бесконечность")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("cmdtext_26"))
 	}
 
 	formatted := formatMathResult(result)
@@ -772,14 +772,14 @@ func formatMathResult(result float64) string {
 	return strconv.FormatFloat(result, 'g', -1, 64)
 }
 
-func evalMath(expr string) (float64, error) {
+func evalMath(expr string, loc func(string) string) (float64, error) {
 	expr = strings.ReplaceAll(expr, " ", "")
 	idx := 0
 
 	var parse func(int) (float64, error)
 	parse = func(minPrec int) (float64, error) {
 		if idx >= len(expr) {
-			return 0, fmt.Errorf("пустое выражение")
+			return 0, fmt.Errorf("%s", loc("cmdtext_27"))
 		}
 
 		var left float64
@@ -792,7 +792,7 @@ func evalMath(expr string) (float64, error) {
 			}
 			left = v
 			if idx >= len(expr) || expr[idx] != ')' {
-				return 0, fmt.Errorf("ожидалась закрывающая скобка")
+				return 0, fmt.Errorf("%s", loc("cmdtext_28"))
 			}
 			idx++
 		} else if (expr[idx] >= '0' && expr[idx] <= '9') || expr[idx] == '.' {
@@ -813,7 +813,7 @@ func evalMath(expr string) (float64, error) {
 			}
 			left = -v
 		} else {
-			return 0, fmt.Errorf("неожиданный символ '%c'", expr[idx])
+			return 0, fmt.Errorf(loc("cmdtext_29"), expr[idx])
 		}
 
 		for idx < len(expr) {
@@ -881,10 +881,10 @@ func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
 
 	added, _ := b.chatRepo.AddSubscription(u.UserID, "group", matched)
 	if added {
-		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Подписка на группу %s добавлена.", matched), b.replySubscriptionsMenu())
+		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf(b.loc("cmdtext_30"), matched), b.replySubscriptionsMenu())
 		return
 	}
-	b.SendTextWithReplyKeyboard(u.ChatID, "Такая подписка уже существует.", b.replySubscriptionsMenu())
+	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_31"), b.replySubscriptionsMenu())
 }
 
 func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
@@ -907,10 +907,10 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 
 	added, _ := b.chatRepo.AddSubscription(u.UserID, "teacher", matched)
 	if added {
-		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Подписка на преподавателя %s добавлена.", matched), b.replySubscriptionsMenu())
+		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf(b.loc("cmdtext_32"), matched), b.replySubscriptionsMenu())
 		return
 	}
-	b.SendTextWithReplyKeyboard(u.ChatID, "Такая подписка уже существует.", b.replySubscriptionsMenu())
+	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_33"), b.replySubscriptionsMenu())
 }
 
 func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
@@ -921,17 +921,17 @@ func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
 	b.chatRepo.Save(chat)
 
 	if len(list) == 0 {
-		b.SendText(u.ChatID, "Подписок нет.")
+		b.SendText(u.ChatID, b.loc("cmdtext_34"))
 		return
 	}
 
 	idx, err := strconv.Atoi(input)
 	if err != nil || idx < 1 || idx > len(list) {
-		b.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", b.replySubscriptionsMenu())
+		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_35"), b.replySubscriptionsMenu())
 		return
 	}
 
 	target := list[idx-1]
 	b.chatRepo.RemoveSubscription(u.UserID, target.ID)
-	b.SendTextWithReplyKeyboard(u.ChatID, "Подписка удалена.", b.replySubscriptionsMenu())
+	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_36"), b.replySubscriptionsMenu())
 }
