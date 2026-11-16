@@ -18,7 +18,7 @@ type archiveCmd struct{ bot *Bot }
 
 func (c *archiveCmd) Name() string { return "/archive" }
 func (c *archiveCmd) Description() string {
-	return "Архив расписания за прошедшие дни"
+	return c.bot.loc("archtext_2")
 }
 
 func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
@@ -29,11 +29,11 @@ func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
 
 	raw := strings.TrimSpace(strings.TrimPrefix(u.Text, "/archive"))
 	if raw == "" {
-		return u.Bot.SendText(u.ChatID, "День не указан")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_3"))
 	}
 
 	if c.bot.archive == nil {
-		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_4"))
 	}
 
 	if match := archiveWeekRe.FindStringSubmatch(raw); match != nil {
@@ -46,20 +46,18 @@ func (c *archiveCmd) Handler(ctx context.Context, u *Update) error {
 func (c *archiveCmd) showWeek(ctx context.Context, u *Update, chat *Chat, rawWeek string) error {
 	weekNum, _ := strconv.Atoi(rawWeek)
 	if weekNum < 1 {
-		return u.Bot.SendText(u.ChatID, "Неверный номер недели")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_5"))
 	}
 
 	week := utils.WeekIndexFromAcademicNumber(weekNum, c.bot.nowTime())
 	minIdx, maxIdx := week.WeekDayIndexRange()
-	return c.showRange(ctx, u, chat, minIdx, maxIdx, buildWeekLabelFromWeek(week), "Нет данных за указанную неделю", week.Value())
+	return c.showRange(ctx, u, chat, minIdx, maxIdx, buildWeekLabelFromWeek(week), c.bot.loc("archtext_6"), week.Value())
 }
-
-const archiveDateFormatHint = "Неверный формат даты. Пример: /archive 12.02 или /archive 12.02.2026 или /archive week 5"
 
 func (c *archiveCmd) showDay(ctx context.Context, u *Update, chat *Chat, raw string) error {
 	parts := strings.Split(raw, ".")
 	if len(parts) < 2 || len(parts) > 3 {
-		return u.Bot.SendText(u.ChatID, archiveDateFormatHint)
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_7"))
 	}
 
 	day, _ := strconv.Atoi(parts[0])
@@ -70,7 +68,7 @@ func (c *archiveCmd) showDay(ctx context.Context, u *Update, chat *Chat, raw str
 	}
 
 	if day < 1 || day > 31 || month < 1 || month > 12 {
-		return u.Bot.SendText(u.ChatID, archiveDateFormatHint)
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_7"))
 	}
 
 	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
@@ -78,17 +76,17 @@ func (c *archiveCmd) showDay(ctx context.Context, u *Update, chat *Chat, raw str
 
 	bounds, err := c.bot.archive.DayIndexBounds(ctx)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения архива")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_8"))
 	}
 
 	if index < bounds.Min || index > bounds.Max {
 		from := utils.DayIndexToDate(int(bounds.Min)).Format("02.01.2006")
 		to := utils.DayIndexToDate(int(bounds.Max)).Format("02.01.2006")
-		return u.Bot.SendText(u.ChatID, "Вы указали день, который находится вне периода сохранённых дней.\n"+
-			fmt.Sprintf("В базе хранятся дни, начиная с %s по %s", from, to))
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_9")+
+			fmt.Sprintf(c.bot.loc("archtext_10"), from, to))
 	}
 
-	return c.showRange(ctx, u, chat, int(index), int(index), "", "Ничего не найдено на данный день", utils.WeekIndexFromDate(date).Value())
+	return c.showRange(ctx, u, chat, int(index), int(index), "", c.bot.loc("archtext_11"), utils.WeekIndexFromDate(date).Value())
 }
 
 func (c *archiveCmd) showRange(ctx context.Context, u *Update, chat *Chat, minIdx, maxIdx int, weekLabel, emptyMessage string, weekIndex int) error {
@@ -115,19 +113,19 @@ func (c *archiveCmd) showRange(ctx context.Context, u *Update, chat *Chat, minId
 	opts.WeekLabel = weekLabel
 
 	text := c.bot.formatDays(chat, target.typeName, target.value, days, opts)
-	return u.Bot.SendTextWithKeyboard(u.ChatID, text, weekTimetableButton("На неделю", target.typeName, target.value, weekIndex, true))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, text, weekTimetableButton(c.bot.loc("archtext_12"), target.typeName, target.value, weekIndex, true))
 }
 
 type endingsCmd struct{ bot *Bot }
 
 func (c *endingsCmd) Name() string { return "/endings" }
 func (c *endingsCmd) Description() string {
-	return "Отображает сколько групп заканчивают к определённой паре"
+	return c.bot.loc("archtext_13")
 }
 func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 	groups := c.bot.cache.GetGroups()
 	if len(groups) == 0 {
-		return u.Bot.SendText(u.ChatID, "Данные ещё не загружены")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_14"))
 	}
 
 	type dayStat map[int]int
@@ -184,7 +182,7 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if len(stat) == 0 {
-		return u.Bot.SendText(u.ChatID, "Нет данных для отображения")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_15"))
 	}
 
 	days := make([]string, 0, len(stat))
@@ -210,7 +208,7 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 
 		part := []string{"__ " + day + " __"}
 		for _, lesson := range lessons {
-			part = append(part, fmt.Sprintf("%d групп заканчивают к %d паре", stat[day][lesson], lesson))
+			part = append(part, fmt.Sprintf(c.bot.loc("archtext_16"), stat[day][lesson], lesson))
 		}
 		msg = append(msg, strings.Join(part, "\n"))
 	}
