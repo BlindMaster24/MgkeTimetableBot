@@ -3,7 +3,7 @@ module github.com/blindmaster24/MgkeTimetableBot
 go 1.27.4
 
 require (
-	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/PuerkitoBio/goquery v1.14.0
 	// fogleman/gg stays the timetable PNG renderer: pure Go, no CGO, and the
 	// container font lookup in internal/image is built around it.
 	github.com/fogleman/gg v1.3.0
