@@ -130,7 +130,7 @@ func (n *EventNotifier) dayHeader(isUpdate bool, phrase, kind, value, ownValue s
 		}
 		return fmt.Sprintf(n.locData("notify_day_own", nil), phrase)
 	}
-	label := valueLabel(kind, value)
+	label := n.valueLabel(kind, value)
 	if isUpdate {
 		return fmt.Sprintf(n.locData("notify_changed_foreign", nil), label, phrase)
 	}
@@ -505,7 +505,7 @@ func dayIndex(dateStr string) int {
 func (n *EventNotifier) UpdateWeek(kind string, week int) {
 	firstWeekDay := utils.WeekIndexFromNumber(week).FirstDayDate()
 
-	message := "🆕 Доступно расписание на следующую неделю"
+	message := n.locData("notify_week_available", nil)
 
 	var timetable map[string]any
 	if kind == cache.KindTeachers {
@@ -572,7 +572,7 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 		}
 		if own != "" {
 			data := fmt.Sprintf(getWeekTimetableCallback, kindLetter(kind), own, week)
-			btn = &KeyboardButton{Text: "📃 Показать", Data: data}
+			btn = &KeyboardButton{Text: n.locData("notify_show_button", nil), Data: data}
 		}
 		if chat.PeerID != 0 {
 			chat.ID = chat.PeerID
@@ -595,9 +595,9 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 			continue
 		}
 
-		scoped := fmt.Sprintf("🆕 %s: доступно расписание на следующую неделю", valueLabel(kind, value))
+		scoped := fmt.Sprintf(n.locData("notify_week_available_foreign", nil), n.valueLabel(kind, value))
 		data := fmt.Sprintf(getWeekTimetableCallback, kindLetter(kind), value, week)
-		btn := KeyboardButton{Text: "📃 Показать", Data: data}
+		btn := KeyboardButton{Text: n.locData("notify_show_button", nil), Data: data}
 
 		for _, chat := range subs {
 			if !chat.NoticeNextWeek || baseIDs[chat.ID] {
@@ -611,11 +611,11 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 	}
 }
 
-func valueLabel(kind, value string) string {
+func (n *EventNotifier) valueLabel(kind, value string) string {
 	if kind == cache.KindTeachers {
-		return "Преподаватель " + value
+		return n.locData("notify_teacher_label", nil) + value
 	}
-	return "Группа " + value
+	return n.locData("notify_group_label", nil) + value
 }
 
 func kindLetter(kind string) string {
@@ -630,8 +630,8 @@ func (n *EventNotifier) WithdrawWeek(kind string, week int, entries []string) {
 		return
 	}
 
-	infoLine := "Расписание ещё не окончательно и может измениться."
-	baseMessage := fmt.Sprintf("❌ Расписание на следующую неделю отозвано.\n%s", infoLine)
+	infoLine := n.locData("notify_week_provisional", nil)
+	baseMessage := fmt.Sprintf(n.locData("notify_week_withdrawn", nil), infoLine)
 
 	var base []*EventChat
 	var err error
@@ -671,7 +671,7 @@ func (n *EventNotifier) WithdrawWeek(kind string, week int, entries []string) {
 			continue
 		}
 
-		scoped := fmt.Sprintf("❌ %s: расписание на следующую неделю отозвано.\n%s", valueLabel(kind, value), infoLine)
+		scoped := fmt.Sprintf(n.locData("notify_week_withdrawn_foreign", nil), n.valueLabel(kind, value), infoLine)
 		for _, chat := range subs {
 			if !chat.NoticeNextWeek || baseIDs[chat.ID] {
 				continue
@@ -698,27 +698,27 @@ func (n *EventNotifier) CallsChanged(ev *cache.CallsEvent) {
 		return
 	}
 
-	parts := []string{"🔔 Изменено расписание звонков"}
+	parts := []string{n.locData("notify_calls_changed", nil)}
 	if ev.Reason != "" {
-		parts = append(parts, fmt.Sprintf("Причина: %s", ev.Reason))
+		parts = append(parts, fmt.Sprintf(n.locData("notify_calls_reason", nil), ev.Reason))
 	}
 
 	if ev.WeekdaysChanged {
-		parts = append(parts, "\n__ Звонки (будни) __")
+		parts = append(parts, n.locData("notify_calls_weekdays", nil))
 		parts = append(parts, formatCallsLines(ev.Schedule.Weekdays))
 	}
 	if ev.SaturdayChanged {
-		parts = append(parts, "\n__ Звонки (суббота) __")
+		parts = append(parts, n.locData("notify_calls_saturday", nil))
 		parts = append(parts, formatCallsLines(ev.Schedule.Saturday))
 	}
-	parts = append(parts, "\nПолное расписание: нажмите Показать")
+	parts = append(parts, n.locData("notify_calls_full_hint", nil))
 
 	message := strings.Join(parts, "\n")
 	for _, chat := range chats {
 		if chat.PeerID != 0 {
 			chat.ID = chat.PeerID
 		}
-		if err := n.sendTextWithButtons(chat.ID, message, []KeyboardButton{{Text: "📊 Показать", Data: getCallsCallback}}, kindCalls); err != nil {
+		if err := n.sendTextWithButtons(chat.ID, message, []KeyboardButton{{Text: n.locData("notify_calls_button", nil), Data: getCallsCallback}}, kindCalls); err != nil {
 			n.log.Error().Err(err).Int64("chatID", chat.ID).Msg("calls notification failed")
 		}
 	}
