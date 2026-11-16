@@ -25,22 +25,22 @@ func (c *btnToggleTextCmd) Scene() string       { return sceneSettings }
 
 func (c *btnToggleTextCmd) MatchText(text string) bool {
 	pairs := map[string][2]string{
-		"daily":        {"📄", "На день"},
-		"weekly":       {"📑", "На неделю"},
-		"calls":        {"🕐", "Звонки"},
-		"about":        {"💡", "О боте"},
-		"fast_group":   {"👩‍🎓", "Группа"},
-		"fast_teacher": {"👩‍🏫", "Преподаватель"},
+		"daily":        {"📄", c.bot.loc("settext_1")},
+		"weekly":       {"📑", c.bot.loc("settext_2")},
+		"calls":        {"🕐", c.bot.loc("settext_3")},
+		"about":        {"💡", c.bot.loc("settext_4")},
+		"fast_group":   {"👩‍🎓", c.bot.loc("settext_5")},
+		"fast_teacher": {"👩‍🏫", c.bot.loc("settext_6")},
 	}
 	pair, ok := pairs[c.kind]
 	if !ok {
 		return false
 	}
 	variants := []string{
-		`✅ Кнопка "` + pair[0] + ` ` + pair[1] + `"`,
-		`🚫 Кнопка "` + pair[0] + ` ` + pair[1] + `"`,
-		`✅ Кнопка "` + pair[1] + `"`,
-		`🚫 Кнопка "` + pair[1] + `"`,
+		c.bot.loc("settext_80") + pair[0] + ` ` + pair[1] + `"`,
+		c.bot.loc("settext_81") + pair[0] + ` ` + pair[1] + `"`,
+		c.bot.loc("settext_82") + pair[1] + `"`,
+		c.bot.loc("settext_83") + pair[1] + `"`,
 	}
 	for _, variant := range variants {
 		if strings.EqualFold(text, variant) {
@@ -60,22 +60,22 @@ func (c *btnToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "daily":
 		chat.ShowDaily = !chat.ShowDaily
-		reply = fmt.Sprintf("Показывать кнопку \"📄 На день\"? Установлено: '%s'", yesNo(chat.ShowDaily))
+		reply = fmt.Sprintf(c.bot.loc("settext_7"), yesNo(chat.ShowDaily))
 	case "weekly":
 		chat.ShowWeekly = !chat.ShowWeekly
-		reply = fmt.Sprintf("Показывать кнопку \"📑 На неделю\"? Установлено: '%s'", yesNo(chat.ShowWeekly))
+		reply = fmt.Sprintf(c.bot.loc("settext_8"), yesNo(chat.ShowWeekly))
 	case "calls":
 		chat.ShowCalls = !chat.ShowCalls
-		reply = fmt.Sprintf("Показывать кнопку \"🕐 Звонки\"? Установлено: '%s'", yesNo(chat.ShowCalls))
+		reply = fmt.Sprintf(c.bot.loc("settext_9"), yesNo(chat.ShowCalls))
 	case "about":
 		chat.ShowAbout = !chat.ShowAbout
-		reply = fmt.Sprintf("Показывать кнопку \"💡 О боте\"? Установлено: '%s'", yesNo(chat.ShowAbout))
+		reply = fmt.Sprintf(c.bot.loc("settext_10"), yesNo(chat.ShowAbout))
 	case "fast_group":
 		chat.ShowFastGroup = !chat.ShowFastGroup
-		reply = fmt.Sprintf("Показывать кнопку \"👩‍🎓 Группа\"? Установлено: '%s'", yesNo(chat.ShowFastGroup))
+		reply = fmt.Sprintf(c.bot.loc("settext_11"), yesNo(chat.ShowFastGroup))
 	case "fast_teacher":
 		chat.ShowFastTeacher = !chat.ShowFastTeacher
-		reply = fmt.Sprintf("Показывать кнопку \"👩‍🏫 Преподаватель\"? Установлено: '%s'", yesNo(chat.ShowFastTeacher))
+		reply = fmt.Sprintf(c.bot.loc("settext_12"), yesNo(chat.ShowFastTeacher))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsButtons(chat))
@@ -93,11 +93,11 @@ func (c *noticeToggleTextCmd) Scene() string       { return sceneSettings }
 func (c *noticeToggleTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "changes":
-		return text == "🔈 Оповещение о новых днях: Да" || text == "🔇 Оповещение о новых днях: Нет"
+		return text == c.bot.loc("settext_13") || text == c.bot.loc("settext_14")
 	case "next_week":
-		return text == "🔈 Оповещение о новой неделе: Да" || text == "🔇 Оповещение о новой неделе: Нет"
+		return text == c.bot.loc("settext_15") || text == c.bot.loc("settext_16")
 	case "calls":
-		return text == "🔈 Оповещение о звонках: Да" || text == "🔇 Оповещение о звонках: Нет"
+		return text == c.bot.loc("settext_17") || text == c.bot.loc("settext_18")
 	}
 	return false
 }
@@ -112,13 +112,13 @@ func (c *noticeToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "changes":
 		chat.NoticeChanges = !chat.NoticeChanges
-		reply = fmt.Sprintf("Оповещение о добавлении нового дня: %s", onOff(chat.NoticeChanges))
+		reply = fmt.Sprintf(c.bot.loc("settext_19"), onOff(chat.NoticeChanges))
 	case "next_week":
 		chat.NoticeNextWeek = !chat.NoticeNextWeek
-		reply = fmt.Sprintf("Оповещение о добавлении новой недели: %s", onOff(chat.NoticeNextWeek))
+		reply = fmt.Sprintf(c.bot.loc("settext_20"), onOff(chat.NoticeNextWeek))
 	case "calls":
 		chat.NoticeCalls = !chat.NoticeCalls
-		reply = fmt.Sprintf("Оповещение об изменениях расписания звонков: %s", onOff(chat.NoticeCalls))
+		reply = fmt.Sprintf(c.bot.loc("settext_21"), onOff(chat.NoticeCalls))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsNotice(chat))
@@ -136,11 +136,11 @@ func (c *viewToggleTextCmd) Scene() string       { return sceneSettings }
 func (c *viewToggleTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "hide_past_days":
-		return text == "✅ Скрывать прошедшие дни" || text == "🚫 Скрывать прошедшие дни"
+		return text == c.bot.loc("settext_22") || text == c.bot.loc("settext_23")
 	case "show_parser_time":
-		return text == "✅ Время последней загрузки расписания" || text == "🚫 Время последней загрузки расписания"
+		return text == c.bot.loc("settext_24") || text == c.bot.loc("settext_25")
 	case "show_hints":
-		return text == "✅ Показывать подсказки: Да" || text == "🚫 Показывать подсказки: Нет"
+		return text == c.bot.loc("settext_26") || text == c.bot.loc("settext_27")
 	}
 	return false
 }
@@ -155,13 +155,13 @@ func (c *viewToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "hide_past_days":
 		chat.HidePastDays = !chat.HidePastDays
-		reply = fmt.Sprintf("Скрывать прошедшие дни? Установлено: '%s'", yesNo(chat.HidePastDays))
+		reply = fmt.Sprintf(c.bot.loc("settext_28"), yesNo(chat.HidePastDays))
 	case "show_parser_time":
 		chat.ShowParserTime = !chat.ShowParserTime
-		reply = fmt.Sprintf("Отображать в сообщении время последней загрузки расписания? Установлено: '%s'", yesNo(chat.ShowParserTime))
+		reply = fmt.Sprintf(c.bot.loc("settext_29"), yesNo(chat.ShowParserTime))
 	case "show_hints":
 		chat.ShowHints = !chat.ShowHints
-		reply = fmt.Sprintf("Показывать ли подсказки под расписанием? Установлено: '%s'", yesNo(chat.ShowHints))
+		reply = fmt.Sprintf(c.bot.loc("settext_30"), yesNo(chat.ShowHints))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsView(chat))
@@ -179,19 +179,19 @@ func (c *diffToggleTextCmd) Scene() string       { return sceneSettings }
 func (c *diffToggleTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "enabled":
-		return text == `✅ Включить раздел "Что изменилось"` || text == `🚫 Включить раздел "Что изменилось"`
+		return text == c.bot.loc("settext_84") || text == c.bot.loc("settext_85")
 	case "max_lines":
-		return strings.HasPrefix(text, "🧾 Лимит строк: ")
+		return strings.HasPrefix(text, c.bot.loc("settext_31"))
 	case "advanced":
-		return text == "⚙️ Расширенные"
+		return text == c.bot.loc("settext_32")
 	case "auto_week":
-		return text == "✅ Показывать diff после /week" || text == "🚫 Показывать diff после /week"
+		return text == c.bot.loc("settext_33") || text == c.bot.loc("settext_34")
 	case "auto_updates":
-		return text == "✅ Показывать diff в уведомлениях" || text == "🚫 Показывать diff в уведомлениях"
+		return text == c.bot.loc("settext_35") || text == c.bot.loc("settext_36")
 	case "before_after":
-		return text == `✅ Показывать "старое -> новое"` || text == `🚫 Показывать "старое -> новое"`
+		return text == c.bot.loc("settext_86") || text == c.bot.loc("settext_87")
 	case "back_basic":
-		return text == "⬅️ Базовые настройки"
+		return text == c.bot.loc("settext_37")
 	}
 	return false
 }
@@ -206,7 +206,7 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "enabled":
 		chat.DiffEnabled = !chat.DiffEnabled
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf("Включить раздел \"Что изменилось\"? Установлено: '%s'\nЕсли отключено, кнопки/блоки diff пользователю не показываются.", yesNo(chat.DiffEnabled))
+		reply := fmt.Sprintf(c.bot.loc("settext_38"), yesNo(chat.DiffEnabled))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiff(chat))
 	case "max_lines":
 		presets := []int{10, 20, 30, 50}
@@ -219,27 +219,27 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 		}
 		chat.DiffMaxLines = presets[(idx+1)%len(presets)]
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf("Лимит строк diff: %d\nКогда изменений больше лимита, бот покажет только первые строки и общий остаток.", chat.DiffMaxLines)
+		reply := fmt.Sprintf(c.bot.loc("settext_39"), chat.DiffMaxLines)
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiff(chat))
 	case "advanced":
-		return c.bot.SendTextWithReplyKeyboard(u.ChatID, "Расширенные настройки раздела \"Что изменилось\".", c.bot.replySettingsDiffAdvanced(chat))
+		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_40"), c.bot.replySettingsDiffAdvanced(chat))
 	case "auto_week":
 		chat.DiffAutoInWeek = !chat.DiffAutoInWeek
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf("Показывать diff после /week? Установлено: '%s'\nЕсли включено, после недельного расписания бот сразу добавляет блок изменений.", yesNo(chat.DiffAutoInWeek))
+		reply := fmt.Sprintf(c.bot.loc("settext_41"), yesNo(chat.DiffAutoInWeek))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "auto_updates":
 		chat.DiffAutoInUpdates = !chat.DiffAutoInUpdates
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf("Показывать diff в уведомлениях? Установлено: '%s'\nЕсли включено, в автоуведомлениях о сменах будет краткий список изменений.", yesNo(chat.DiffAutoInUpdates))
+		reply := fmt.Sprintf(c.bot.loc("settext_42"), yesNo(chat.DiffAutoInUpdates))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "before_after":
 		chat.DiffShowBeforeAfter = !chat.DiffShowBeforeAfter
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf("Показывать старое -> новое для изменённых пар? Установлено: '%s'\nЕсли включено, бот покажет обе версии пары в строках с типом \"~\".", yesNo(chat.DiffShowBeforeAfter))
+		reply := fmt.Sprintf(c.bot.loc("settext_43"), yesNo(chat.DiffShowBeforeAfter))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "back_basic":
-		return c.bot.SendTextWithReplyKeyboard(u.ChatID, "Базовые настройки раздела \"Что изменилось\".", c.bot.replySettingsDiff(chat))
+		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_44"), c.bot.replySettingsDiff(chat))
 	}
 	return nil
 }
@@ -255,7 +255,7 @@ func (c *formatterSelectTextCmd) Scene() string       { return sceneSettings }
 func (c *formatterSelectTextCmd) MatchText(text string) bool {
 	opts := formatter.FormatOptions{Labels: c.bot.formatterLabels()}
 	for _, f := range formatter.AllFormatters {
-		if strings.EqualFold(text, f.Label(opts)) || strings.EqualFold(text, f.Label(opts)+" (выбран)") {
+		if strings.EqualFold(text, f.Label(opts)) || strings.EqualFold(text, f.Label(opts)+c.bot.loc("settext_45")) {
 			return true
 		}
 	}
@@ -275,7 +275,7 @@ func (c *formatterSelectTextCmd) Handler(ctx context.Context, u *Update) error {
 			c.bot.chatRepo.Save(chat)
 			return c.bot.SendTextWithReplyKeyboard(
 				u.ChatID,
-				fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", f.Label(opts)),
+				fmt.Sprintf(c.bot.loc("settext_46"), f.Label(opts)),
 				c.bot.replySettingsFormatters(chat),
 			)
 		}
@@ -294,9 +294,9 @@ func (c *settingsNavTextCmd) Description() string { return "" }
 func (c *settingsNavTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "to_settings":
-		return text == "Меню настроек"
+		return text == c.bot.loc("settext_47")
 	case "to_main":
-		return text == "Главное меню"
+		return text == c.bot.loc("settext_48")
 	}
 	return false
 }
@@ -326,7 +326,7 @@ func (c *callsManageTextCmd) Description() string { return "" }
 func (c *callsManageTextCmd) Scene() string       { return sceneSettingsSchedules }
 
 func (c *callsManageTextCmd) MatchText(text string) bool {
-	return text == "🕐 Звонки: управление"
+	return text == c.bot.loc("settext_49")
 }
 
 func (c *callsManageTextCmd) Handler(ctx context.Context, u *Update) error {
@@ -350,7 +350,7 @@ func (c *showCurrentSettingsTextCmd) Description() string { return "" }
 func (c *showCurrentSettingsTextCmd) Scene() string       { return sceneSettings }
 
 func (c *showCurrentSettingsTextCmd) MatchText(text string) bool {
-	return text == "Показать текущие"
+	return text == c.bot.loc("settext_50")
 }
 
 func (c *showCurrentSettingsTextCmd) Handler(ctx context.Context, u *Update) error {
@@ -377,13 +377,13 @@ func (c *aliasActionTextCmd) Scene() string       { return sceneSettingsAlias }
 func (c *aliasActionTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "list":
-		return text == "Список"
+		return text == c.bot.loc("settext_51")
 	case "add":
-		return text == "Добавить"
+		return text == c.bot.loc("settext_52")
 	case "remove":
-		return text == "Удалить"
+		return text == c.bot.loc("settext_53")
 	case "clear":
-		return text == "Отчистить все"
+		return text == c.bot.loc("settext_54")
 	}
 	return false
 }
@@ -400,12 +400,12 @@ func (c *aliasActionTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "add":
 		chat.Scene = sceneAliasAdd
 		c.bot.chatRepo.Save(chat)
-		return u.Bot.SendText(u.ChatID, "Введите алиас в формате: оригинальное_название = замена")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("settext_55"))
 	case "remove":
 		return c.bot.showAliasRemoveList(u, u.UserID)
 	case "clear":
 		c.bot.aliasRepo.Clear(u.UserID)
-		return c.bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки алиасов.", c.bot.replySettingsAliases())
+		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_56"), c.bot.replySettingsAliases())
 	}
 	return nil
 }
@@ -421,15 +421,15 @@ func (c *subsActionTextCmd) Description() string { return "" }
 func (c *subsActionTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "add_group":
-		return text == "➕ Группа"
+		return text == c.bot.loc("settext_57")
 	case "add_teacher":
-		return text == "➕ Преподаватель"
+		return text == c.bot.loc("settext_58")
 	case "list":
-		return text == "📋 Мои подписки"
+		return text == c.bot.loc("settext_59")
 	case "remove":
-		return text == "❌ Удалить подписку"
+		return text == c.bot.loc("settext_60")
 	case "test":
-		return text == "🧪 Проверить"
+		return text == c.bot.loc("settext_61")
 	}
 	return false
 }
@@ -448,11 +448,11 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		}
 		count, _ := c.bot.chatRepo.CountSubscriptions(u.UserID)
 		if count >= MAX_SUBSCRIPTIONS {
-			return u.Bot.SendText(u.ChatID, fmt.Sprintf("Достигнут лимит подписок (%d).", MAX_SUBSCRIPTIONS))
+			return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("settext_62"), MAX_SUBSCRIPTIONS))
 		}
 		chat.Scene = sceneSubAddGroup
 		c.bot.chatRepo.Save(chat)
-		prompt := fmt.Sprintf("Введите номер группы, на которую хотите подписаться (например, %s)", randomKey(groups))
+		prompt := fmt.Sprintf(c.bot.loc("settext_63"), randomKey(groups))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
 	case "add_teacher":
 		teachers := c.bot.cache.GetTeachers()
@@ -461,26 +461,26 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		}
 		count, _ := c.bot.chatRepo.CountSubscriptions(u.UserID)
 		if count >= MAX_SUBSCRIPTIONS {
-			return u.Bot.SendText(u.ChatID, fmt.Sprintf("Достигнут лимит подписок (%d).", MAX_SUBSCRIPTIONS))
+			return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("settext_64"), MAX_SUBSCRIPTIONS))
 		}
 		chat.Scene = sceneSubAddTeacher
 		c.bot.chatRepo.Save(chat)
-		prompt := fmt.Sprintf("Введите фамилию преподавателя (например, %s)", randomKey(teachers))
+		prompt := fmt.Sprintf(c.bot.loc("settext_65"), randomKey(teachers))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
 	case "list":
 		list, _ := c.bot.chatRepo.GetSubscriptions(u.UserID)
 		if len(list) == 0 {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", c.bot.replySubscriptionsMenu())
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_66"), c.bot.replySubscriptionsMenu())
 		}
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.formatSubscriptionsList(list), c.bot.replySubscriptionsMenu())
 	case "remove":
 		list, _ := c.bot.chatRepo.GetSubscriptions(u.UserID)
 		if len(list) == 0 {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", c.bot.replySubscriptionsMenu())
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_67"), c.bot.replySubscriptionsMenu())
 		}
 		chat.Scene = sceneSubRemove
 		c.bot.chatRepo.Save(chat)
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите номер подписки для удаления:\n"+c.bot.formatSubscriptionsList(list), c.bot.replySubscriptionsMenu())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_68")+c.bot.formatSubscriptionsList(list), c.bot.replySubscriptionsMenu())
 	case "test":
 		return c.bot.subTestPrompt(u)
 	}
@@ -499,13 +499,13 @@ func (c *setupModeTextCmd) Scene() string       { return sceneSetup }
 func (c *setupModeTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "guest":
-		return text == "👀 Гость" || text == "Гость"
+		return text == c.bot.loc("settext_69") || text == c.bot.loc("settext_70")
 	case "student":
-		return text == "👩‍🎓 Учащийся" || text == "👩‍🎓 Ученик" || text == "Учащийся" || text == "Ученик"
+		return text == c.bot.loc("settext_71") || text == c.bot.loc("settext_72") || text == c.bot.loc("settext_73") || text == c.bot.loc("settext_74")
 	case "parent":
-		return text == "👨‍👩‍👦 Родитель" || text == "Родитель"
+		return text == c.bot.loc("settext_75") || text == c.bot.loc("settext_76")
 	case "skip":
-		return text == "🔙 Пропустить" || text == "Пропустить"
+		return text == c.bot.loc("settext_77") || text == c.bot.loc("settext_78")
 	}
 	return false
 }
@@ -534,7 +534,7 @@ func (c *setupModeTextCmd) Handler(ctx context.Context, u *Update) error {
 		}
 		chat.Scene = sceneSetGroup
 		c.bot.chatRepo.Save(chat)
-		prompt := fmt.Sprintf("%s (например, %s)", c.bot.loc("setup_enter_group"), randomKey(groups))
+		prompt := fmt.Sprintf(c.bot.loc("settext_79"), c.bot.loc("setup_enter_group"), randomKey(groups))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
 	case "skip":
 		chat.Scene = ""

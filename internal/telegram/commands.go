@@ -15,6 +15,9 @@ import (
 )
 
 func (b *Bot) loc(key string) string {
+	if b == nil || b.i18n == nil {
+		return ""
+	}
 	return b.i18n.T("ru", key, nil)
 }
 

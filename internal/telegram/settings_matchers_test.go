@@ -8,7 +8,8 @@ import (
 )
 
 func TestBtnToggleTextMatcherAcceptsOldVariants(t *testing.T) {
-	cmd := &btnToggleTextCmd{kind: "about"}
+	b, _, _ := setupTestBotWithData(t)
+	cmd := &btnToggleTextCmd{bot: b, kind: "about"}
 	for _, text := range []string{
 		`✅ Кнопка "💡 О боте"`,
 		`🚫 Кнопка "💡 О боте"`,
