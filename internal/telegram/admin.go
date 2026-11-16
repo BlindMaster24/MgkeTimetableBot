@@ -35,7 +35,7 @@ func (c *debugCmd) Description() string { return c.bot.loc("cmd_debug") }
 
 func (c *debugCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_1"))
 	}
 
 	return u.Bot.SendText(u.ChatID, "<pre>"+strings.Join(c.bot.debugLines(), "\n")+"</pre>")
@@ -51,17 +51,17 @@ func (b *Bot) debugLines() []string {
 	var lines []string
 
 	info := b.buildInfo
-	lines = append(lines, "-- Сборка --")
-	lines = append(lines, fmt.Sprintf("Версия: %s", info.Version))
-	lines = append(lines, fmt.Sprintf("Коммит: %s", info.ShortCommit()))
-	lines = append(lines, fmt.Sprintf("Собрано: %s", info.Date))
+	lines = append(lines, b.loc("admintext_2"))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_3"), info.Version))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_4"), info.ShortCommit()))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_5"), info.Date))
 	if info.Go != "" {
 		lines = append(lines, fmt.Sprintf("Toolchain: %s %s/%s", info.Go, info.OS, info.Arch))
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, "-- Система --")
-	lines = append(lines, fmt.Sprintf("ОС: %s (%s)", runtime.GOOS, runtime.GOARCH))
+	lines = append(lines, b.loc("admintext_6"))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_7"), runtime.GOOS, runtime.GOARCH))
 	lines = append(lines, fmt.Sprintf("Go: %s", runtime.Version()))
 	lines = append(lines, fmt.Sprintf("CPU: %d", runtime.NumCPU()))
 	lines = append(lines, fmt.Sprintf("GOMAXPROCS: %d", runtime.GOMAXPROCS(0)))
@@ -82,39 +82,39 @@ func (b *Bot) debugLines() []string {
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, "-- Бот --")
+	lines = append(lines, b.loc("admintext_8"))
 	lines = append(lines, fmt.Sprintf("PID: %d", os.Getpid()))
 	lines = append(lines, fmt.Sprintf("Uptime: %s", formatUptime(b.startTime)))
-	lines = append(lines, fmt.Sprintf("Команд: %d", len(b.commands)))
-	lines = append(lines, fmt.Sprintf("Callback'ов: %d", len(b.callbacks)))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_9"), len(b.commands)))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_10"), len(b.callbacks)))
 
 	lines = append(lines, "")
-	lines = append(lines, "-- Кеш --")
+	lines = append(lines, b.loc("admintext_11"))
 	stats := b.cache.Stats()
-	lines = append(lines, fmt.Sprintf("Групп: %d", stats.GroupsCount))
-	lines = append(lines, fmt.Sprintf("Преподавателей: %d", stats.TeachersCount))
-	lines = append(lines, fmt.Sprintf("Хиты/Промахи: %d/%d", stats.Hits, stats.Misses))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_12"), stats.GroupsCount))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_13"), stats.TeachersCount))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_14"), stats.Hits, stats.Misses))
 	lines = append(lines, fmt.Sprintf("SuccessUpdate: %v", stats.SuccessUpdate))
 	if stats.GroupsUpdate > 0 {
-		lines = append(lines, fmt.Sprintf("Группы обновлены: %s", time.UnixMilli(stats.GroupsUpdate).Format("02.01.2006 15:04")))
+		lines = append(lines, fmt.Sprintf(b.loc("admintext_15"), time.UnixMilli(stats.GroupsUpdate).Format("02.01.2006 15:04")))
 	}
 	if stats.TeachersUpdate > 0 {
-		lines = append(lines, fmt.Sprintf("Преподаватели обновлены: %s", time.UnixMilli(stats.TeachersUpdate).Format("02.01.2006 15:04")))
+		lines = append(lines, fmt.Sprintf(b.loc("admintext_16"), time.UnixMilli(stats.TeachersUpdate).Format("02.01.2006 15:04")))
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, "-- База данных --")
+	lines = append(lines, b.loc("admintext_17"))
 	total, err := b.chatRepo.CountAll()
 	if err == nil {
-		lines = append(lines, fmt.Sprintf("Всего чатов: %d", total))
+		lines = append(lines, fmt.Sprintf(b.loc("admintext_18"), total))
 	}
 	tgTotal, tgAllowed, err := b.chatRepo.CountTGChats()
 	if err == nil {
-		lines = append(lines, fmt.Sprintf("Чатов бота Telegram: %d (allow: %d)", tgTotal, tgAllowed))
+		lines = append(lines, fmt.Sprintf(b.loc("admintext_19"), tgTotal, tgAllowed))
 	}
 	if b.keys != nil {
 		if keys, active, err := b.keys.Counts(); err == nil {
-			lines = append(lines, fmt.Sprintf("API ключей: %d (active: %d)", keys, active))
+			lines = append(lines, fmt.Sprintf(b.loc("admintext_20"), keys, active))
 		}
 	}
 	notifyCount := 0
@@ -122,7 +122,7 @@ func (b *Bot) debugLines() []string {
 	if err == nil {
 		notifyCount = len(notifyChats)
 	}
-	lines = append(lines, fmt.Sprintf("С уведомлениями: %d", notifyCount))
+	lines = append(lines, fmt.Sprintf(b.loc("admintext_21"), notifyCount))
 	modes, err := b.chatRepo.CountByMode()
 	if err == nil {
 		modeOrder := []string{"student", "teacher", "parent", "guest", "none"}
@@ -134,7 +134,7 @@ func (b *Bot) debugLines() []string {
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, "-- Конфиг --")
+	lines = append(lines, b.loc("admintext_22"))
 	lines = append(lines, fmt.Sprintf("Telegram noticer: %v", b.cfg.Telegram.Noticer))
 
 	return lines
@@ -181,13 +181,13 @@ func (c *sendCmd) Description() string { return c.bot.loc("cmd_send") }
 
 func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_23"))
 	}
 
 	text := strings.TrimPrefix(u.Text, "/send")
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return u.Bot.SendText(u.ChatID, "Сообщение не введено")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_24"))
 	}
 
 	if !c.bot.broadcast.TryLock() {
@@ -197,15 +197,15 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 	chats, err := c.bot.chatRepo.FindAllTGChats()
 	if err != nil {
 		c.bot.broadcast.Unlock()
-		return u.Bot.SendText(u.ChatID, "Ошибка получения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_25")+err.Error())
 	}
 
 	if len(chats) == 0 {
 		c.bot.broadcast.Unlock()
-		return u.Bot.SendText(u.ChatID, "Нет активных чатов для рассылки")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_26"))
 	}
 
-	progressID, err := c.bot.sendMessageForID(u.ChatID, "Начинаю отправку сообщений.")
+	progressID, err := c.bot.sendMessageForID(u.ChatID, c.bot.loc("admintext_27"))
 	if err != nil {
 		c.bot.broadcast.Unlock()
 		return err
@@ -246,16 +246,16 @@ func (c *sendCmd) runBroadcast(chatID int64, progressID int, chats []*Chat, text
 			pct := float64(i+1) / float64(total) * 100
 			editText := fmt.Sprintf("tg: %d/%d (%.2f%%)", i+1, total, pct)
 			if failed > 0 {
-				editText += fmt.Sprintf("\n❌ Ошибок: %d", failed)
+				editText += fmt.Sprintf(c.bot.loc("admintext_28"), failed)
 			}
 			c.bot.EditMessageText(chatID, progressID, editText, nil)
 			lastEdit = time.Now()
 		}
 	}
 
-	result := "Успешно отправлено!"
+	result := c.bot.loc("admintext_29")
 	if failed > 0 {
-		result += fmt.Sprintf("\n❌ Ошибок: %d", failed)
+		result += fmt.Sprintf(c.bot.loc("admintext_30"), failed)
 	}
 
 	c.bot.EditMessageText(chatID, progressID, result, nil)
@@ -270,7 +270,7 @@ func (c *triggerCmd) Description() string { return c.bot.loc("cmd_trigger") }
 
 func (c *triggerCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_31"))
 	}
 
 	args := strings.Fields(strings.TrimSpace(strings.TrimPrefix(u.Text, "/trigger")))
@@ -303,22 +303,22 @@ type noticeDebugCmd struct{ bot *Bot }
 
 func (c *noticeDebugCmd) Name() string { return "/noticedebug" }
 func (c *noticeDebugCmd) Description() string {
-	return "Кому придут уведомления каждого типа"
+	return c.bot.loc("admintext_32")
 }
 func (c *noticeDebugCmd) AdminOnly() bool { return true }
 
 func (c *noticeDebugCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_33"))
 	}
 
-	lines := []string{"-- Оповещения: получатели --"}
+	lines := []string{c.bot.loc("admintext_34")}
 
 	addSection := func(title string, chats []*Chat, format func(*Chat) string) {
 		lines = append(lines, "")
 		lines = append(lines, title)
 		if len(chats) == 0 {
-			lines = append(lines, "  (нет получателей)")
+			lines = append(lines, c.bot.loc("admintext_35"))
 			return
 		}
 		for _, chat := range chats {
@@ -332,45 +332,45 @@ func (c *noticeDebugCmd) Handler(ctx context.Context, u *Update) error {
 			parts = append(parts, string(chat.Mode))
 		}
 		if chat.Group != "" {
-			parts = append(parts, "группа "+chat.Group)
+			parts = append(parts, c.bot.loc("admintext_36")+chat.Group)
 		}
 		if chat.Teacher != "" {
-			parts = append(parts, "преподаватель "+chat.Teacher)
+			parts = append(parts, c.bot.loc("admintext_37")+chat.Teacher)
 		}
 		return strings.Join(parts, ", ")
 	}
 
 	groups, err := c.bot.chatRepo.FindChatsByGroups("telegram", c.bot.cache.GroupKeys(), true)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_38")+err.Error())
 	}
-	addSection("Новое расписание (day add, notice_changes):", groups, describe)
+	addSection(c.bot.loc("admintext_39"), groups, describe)
 
 	teachers, err := c.bot.chatRepo.FindChatsByTeachers("telegram", c.bot.cache.TeacherKeys(), true)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_40")+err.Error())
 	}
-	addSection("Новое расписание преподавателей (notice_changes):", teachers, describe)
+	addSection(c.bot.loc("admintext_41"), teachers, describe)
 
 	subsG, err := c.bot.chatRepo.CountSubscriptionsByType("telegram", "group")
 	if err == nil {
 		lines = append(lines, "")
-		lines = append(lines, fmt.Sprintf("Подписки на группы: %d чат(ов)", subsG))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_42"), subsG))
 	}
 	subsT, err := c.bot.chatRepo.CountSubscriptionsByType("telegram", "teacher")
 	if err == nil {
-		lines = append(lines, fmt.Sprintf("Подписки на преподавателей: %d чат(ов)", subsT))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_43"), subsT))
 	}
 
 	nextWeek, err := c.bot.chatRepo.FindChatsWithNotice("telegram", "notice_next_week")
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_44")+err.Error())
 	}
-	addSection("Новая неделя (notice_next_week):", nextWeek, describe)
+	addSection(c.bot.loc("admintext_45"), nextWeek, describe)
 
 	calls, err := c.bot.chatRepo.FindChatsWithNotice("telegram", "notice_calls")
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_46")+err.Error())
 	}
 	configured := make([]*Chat, 0, len(calls))
 	for _, chat := range calls {
@@ -378,24 +378,24 @@ func (c *noticeDebugCmd) Handler(ctx context.Context, u *Update) error {
 			configured = append(configured, chat)
 		}
 	}
-	addSection("Изменение звонков (notice_calls, настроен режим):", configured, describe)
+	addSection(c.bot.loc("admintext_47"), configured, describe)
 
 	errs, err := c.bot.chatRepo.FindChatsWithNotice("telegram", "notice_parser_errors")
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_48")+err.Error())
 	}
-	addSection("Ошибки парсера (notice_parser_errors):", errs, describe)
+	addSection(c.bot.loc("admintext_49"), errs, describe)
 
 	admins, err := c.bot.chatRepo.FindAdminChats("telegram", c.bot.cfg.Telegram.AdminIDs)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения чатов: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_50")+err.Error())
 	}
-	addSection("Админы (всегда получают ошибки парсера):", admins, describe)
+	addSection(c.bot.loc("admintext_51"), admins, describe)
 
 	cronChats, err := c.bot.chatRepo.FindAllWithNotifications("telegram")
 	if err == nil {
 		lines = append(lines, "")
-		lines = append(lines, fmt.Sprintf("Всего чатов с notice_changes: %d", len(cronChats)))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_52"), len(cronChats)))
 	}
 
 	return u.Bot.SendText(u.ChatID, "<pre>"+strings.Join(lines, "\n")+"</pre>")
@@ -405,41 +405,41 @@ type archiveStatsCmd struct{ bot *Bot }
 
 func (c *archiveStatsCmd) Name() string { return "/archivestats" }
 func (c *archiveStatsCmd) Description() string {
-	return "Статистика архива расписания"
+	return c.bot.loc("admintext_53")
 }
 func (c *archiveStatsCmd) AdminOnly() bool { return true }
 
 func (c *archiveStatsCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_54"))
 	}
 
 	if c.bot.archive == nil {
-		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_55"))
 	}
 
 	stats, err := c.bot.archive.Stats(ctx)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения архива: "+err.Error())
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_56")+err.Error())
 	}
 
 	var lines []string
-	lines = append(lines, "-- Архив --")
+	lines = append(lines, c.bot.loc("admintext_57"))
 	if bounds, err := c.bot.archive.DayIndexBounds(ctx); err == nil && bounds.Max > 0 {
-		lines = append(lines, fmt.Sprintf("Дни: %s — %s", archive.DayIndexToDate(bounds.Min), archive.DayIndexToDate(bounds.Max)))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_58"), archive.DayIndexToDate(bounds.Min), archive.DayIndexToDate(bounds.Max)))
 		minWeek := int(bounds.Min) / 7
 		maxWeek := int(bounds.Max) / 7
-		lines = append(lines, fmt.Sprintf("Недели: %d — %d", minWeek, maxWeek))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_59"), minWeek, maxWeek))
 	} else {
-		lines = append(lines, "Дни: архив пуст")
+		lines = append(lines, c.bot.loc("admintext_60"))
 	}
-	lines = append(lines, fmt.Sprintf("Записей: %d (группы: %d, преподаватели: %d)", stats.Total, stats.WithGroup, stats.WithTeacher))
+	lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_61"), stats.Total, stats.WithGroup, stats.WithTeacher))
 
 	if groups, err := c.bot.archive.Groups(ctx); err == nil && len(groups) > 0 {
-		lines = append(lines, fmt.Sprintf("Групп в архиве: %d", len(groups)))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_62"), len(groups)))
 	}
 	if teachers, err := c.bot.archive.Teachers(ctx); err == nil && len(teachers) > 0 {
-		lines = append(lines, fmt.Sprintf("Преподавателей в архиве: %d", len(teachers)))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("admintext_63"), len(teachers)))
 	}
 
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
