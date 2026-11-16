@@ -58,6 +58,7 @@ type Chat struct {
 	DeactivateSecondaryCheck bool
 	CallsEditInput           string
 	CallsEditReason          string
+	TextFormat               string
 	CallsCampus              string
 	Ref                      string
 	HistoryGroup             []string
@@ -162,6 +163,7 @@ func (r *Repository) migrate() error {
 		ref TEXT,
 		history_group TEXT NOT NULL DEFAULT '[]',
 		history_teacher TEXT NOT NULL DEFAULT '[]',
+		text_format TEXT NOT NULL DEFAULT '',
 		UNIQUE(service, peer_id)
 	)`)
 	if err != nil {
@@ -180,6 +182,7 @@ func (r *Repository) migrate() error {
 		{"calls_edit_reason", "ALTER TABLE bot_chats ADD COLUMN calls_edit_reason TEXT"},
 		{"calls_campus", "ALTER TABLE bot_chats ADD COLUMN calls_campus TEXT"},
 		{"reminder_lead_minutes", "ALTER TABLE bot_chats ADD COLUMN reminder_lead_minutes INTEGER NOT NULL DEFAULT 0"},
+		{"text_format", "ALTER TABLE bot_chats ADD COLUMN text_format TEXT NOT NULL DEFAULT ''"},
 	} {
 		var count int
 		if err := r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count); err != nil {
@@ -214,6 +217,16 @@ func (r *Repository) migrate() error {
 	}
 
 	return r.migrateGoogle()
+}
+
+// SetTextFormat stores the outgoing message format of the chat: "md" for
+// MarkdownV2 (the default) or "html" for the HTML parser.
+func (r *Repository) SetTextFormat(service string, peerID int64, format string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	_, err := r.db.Exec(`UPDATE bot_chats SET text_format = ? WHERE service = ? AND peer_id = ?`, format, service, peerID)
+	return err
 }
 
 func (r *Repository) SetAllowSendMess(service string, peerID int64, allow bool) error {
@@ -295,7 +308,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		        diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref,
 		        history_group, history_teacher,
 		        last_msg_time, subscribe_distribution, need_update_buttons, deactivate_secondary_check,
-		        calls_edit_input, calls_edit_reason, calls_campus
+		        calls_edit_input, calls_edit_reason, calls_campus, text_format
 		 FROM bot_chats WHERE service = ? AND peer_id = ?`,
 		service, peerID,
 	)
@@ -309,6 +322,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	var nsScene, nsMode, nsGroup, nsTeacher, nsGoogleEmail, nsRef sql.NullString
 	var nsHistoryGroup, nsHistoryTeacher sql.NullString
 	var nsCallsEditInput, nsCallsEditReason, nsCallsCampus sql.NullString
+	var nsTextFormat sql.NullString
 	err := row.Scan(
 		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &eula, &nsScene, &nsMode,
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
@@ -318,7 +332,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
 		&chat.DiffMaxLines, &nsRef, &nsHistoryGroup, &nsHistoryTeacher,
 		&chat.LastMsgTime, &subscribeDistribution, &needUpdateButtons, &deactivateSecondaryCheck,
-		&nsCallsEditInput, &nsCallsEditReason, &nsCallsCampus,
+		&nsCallsEditInput, &nsCallsEditReason, &nsCallsCampus, &nsTextFormat,
 	)
 	if err != nil {
 		return nil, err
@@ -359,6 +373,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	chat.CallsEditInput = nsCallsEditInput.String
 	chat.CallsEditReason = nsCallsEditReason.String
 	chat.CallsCampus = nsCallsCampus.String
+	chat.TextFormat = nsTextFormat.String
 
 	return chat, nil
 }
@@ -450,7 +465,8 @@ func (r *Repository) Save(chat *Chat) error {
 			show_parser_time=?, show_hints=?, diff_enabled=?, diff_auto_in_week=?,
 			diff_auto_in_updates=?, diff_show_before_after=?, diff_max_lines=?, ref=?,
 			history_group=?, history_teacher=?, last_msg_time=?, subscribe_distribution=?,
-			need_update_buttons=?, deactivate_secondary_check=?, calls_edit_input=?, calls_edit_reason=?, calls_campus=?
+			need_update_buttons=?, deactivate_secondary_check=?, calls_edit_input=?, calls_edit_reason=?, calls_campus=?,
+			text_format=?
 		 WHERE id=?`,
 		toInt(chat.Accepted), toInt(chat.EULA), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
 		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
@@ -464,7 +480,8 @@ func (r *Repository) Save(chat *Chat) error {
 		chat.DiffMaxLines, chat.Ref,
 		marshalStringSlice(chat.HistoryGroup), marshalStringSlice(chat.HistoryTeacher),
 		chat.LastMsgTime, toInt(chat.SubscribeDistribution), toInt(chat.NeedUpdateButtons),
-		toInt(chat.DeactivateSecondaryCheck), chat.CallsEditInput, chat.CallsEditReason, chat.CallsCampus, chat.ID,
+		toInt(chat.DeactivateSecondaryCheck), chat.CallsEditInput, chat.CallsEditReason, chat.CallsCampus,
+		chat.TextFormat, chat.ID,
 	)
 	return err
 }

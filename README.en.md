@@ -268,6 +268,7 @@ Every field is also available as an environment variable: `MGKE_PARSER_GUARD_MIN
 | `/free` | Classrooms free at a lesson |
 | `/settings` | Settings entry point for the submenus below |
 | `/formatter` | Output format menu |
+| `/format` | Message format: Markdown by default, `/format html` switches the chat to HTML |
 | `/view` | View menu: hide past days, show the last parse time, hints |
 | `/notice` | Notification menu: changes, new week, bell schedule, parser errors |
 | `/diff` | Timetable change display menu |
@@ -720,8 +721,8 @@ CI runs the same checks — see “CI and releases” below.
 
 | Job | What it checks |
 | --- | --- |
-| `quality` | on `ubuntu-latest`, `windows-latest` and `macos-latest`: `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (any unformatted file fails the job) and the cross-compilation of the release targets (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) run on Linux |
-| `test` | the full suite with coverage on `ubuntu-latest` and `windows-latest`: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days (uploaded from Linux); macOS is out of this and the next two matrices because its runners regularly cancel queued jobs before the first step, turning the whole run red; the full suite still runs on macOS in the release `verify` job |
+| `quality` | on `ubuntu-latest` and `windows-latest`: `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (any unformatted file fails the job) and the cross-compilation of the release targets (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) run on Linux |
+| `test` | the full suite with coverage on `ubuntu-latest` and `windows-latest`: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days (uploaded from Linux) |
 | `newest-toolchain` | the same suite on `ubuntu-latest` and `windows-latest` with the newest stable Go (`go-version: stable`), so the minimum version from `go.mod` and the fresh toolchain are checked independently |
 | `race` | `go run ./scripts/racecheck` on `ubuntu-latest` and `windows-latest` — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
@@ -732,9 +733,9 @@ CI runs the same checks — see “CI and releases” below.
 
 `.github/workflows/security.yml` is a separate security lane: `govulncheck` scans the module and its dependencies on every push to `main`, on a schedule (Monday, 06:00 UTC) and on demand. It does not block pull requests and is not part of CI: its job is to report a known vulnerability, not to stop development.
 
-Runners are used in their `-latest` flavour (`ubuntu-latest`, `windows-latest`, `macos-latest` in `quality`), so the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the `newest-toolchain` job runs the suite on the newest stable Go release as well.
+Runners are used in their `-latest` flavour (`ubuntu-latest` and `windows-latest`: this repository gets no macOS runner, the jobs wait in the queue and get cancelled, so the darwin binaries are covered by the cross-compilation in `quality`), and the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the `newest-toolchain` job runs the suite on the newest stable Go release as well.
 
-`.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision on all three operating systems before anything is published, so a broken tag or `main` push never ships:
+`.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision on `ubuntu-latest` and `windows-latest` before anything is published, so a broken tag or `main` push never ships:
 
 - a push to `main` publishes a multi-arch image (`linux/amd64`, `linux/arm64`) to GHCR tagged `:edge` and `:main`;
 - a tag like `v<major>.<minor>.<patch>` builds binaries for `linux/amd64`, `linux/arm64`, `windows/amd64` and `darwin/arm64`, attaches them to a GitHub Release with generated release notes, and gives the image the persistent tags `:<major>.<minor>.<patch>`, `:<major>.<minor>` and `:latest`.

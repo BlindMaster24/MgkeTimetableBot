@@ -3,15 +3,24 @@ package telegram
 import (
 	"encoding/json"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mymmrac/telego/telegoapi"
 )
 
-// parseMode is the Bot API format of every outgoing text. The bot authors its
-// texts in HTML — the localizer files are HTML — and markdownV2 turns them
-// into MarkdownV2 right before the send call.
+// parseMode is the Bot API format of every outgoing text by default. The bot
+// authors its texts in HTML — the localizer files are HTML — and markdownV2
+// rewrites them into MarkdownV2 right before the send call. A chat that asked
+// for HTML keeps the text as it is.
 const parseMode = "MarkdownV2"
+
+// FormatMarkdown and FormatHTML are the values of the per-chat text_format
+// column; an empty value means MarkdownV2, the default.
+const (
+	FormatMarkdown = "md"
+	FormatHTML     = "html"
+)
 
 var markdownEscaper = strings.NewReplacer(
 	`\`, `\\`,
@@ -148,9 +157,12 @@ func escapeMarkdownURL(url string) string {
 }
 
 // markdownConstructor rewrites the formatted payloads on their way to the Bot
-// API: the bot authors HTML, and MarkdownV2 is what the clients get.
+// API: the bot authors HTML, and MarkdownV2 is what the clients get unless the
+// chat asked for HTML. The chat id travels inside the same payload, so the
+// choice costs no extra round trip.
 type markdownConstructor struct {
-	inner telegoapi.RequestConstructor
+	inner    telegoapi.RequestConstructor
+	formatOf func(chatID int64) string
 }
 
 func (c markdownConstructor) JSONRequest(parameters any) (*telegoapi.RequestData, error) {
@@ -158,14 +170,14 @@ func (c markdownConstructor) JSONRequest(parameters any) (*telegoapi.RequestData
 	if err != nil {
 		return nil, err
 	}
-	if rewritten, ok := markdownJSON(data.BodyRaw); ok {
+	if rewritten, ok := markdownJSON(data.BodyRaw, c.formatFor(data.BodyRaw)); ok {
 		data.BodyRaw = rewritten
 	}
 	return data, nil
 }
 
 func (c markdownConstructor) MultipartRequest(parameters map[string]string, files map[string]telegoapi.NamedReader) (*telegoapi.RequestData, error) {
-	if strings.EqualFold(parameters["parse_mode"], "HTML") {
+	if c.formatFromString(parameters["chat_id"]) != FormatHTML && strings.EqualFold(parameters["parse_mode"], "HTML") {
 		for _, key := range []string{"text", "caption"} {
 			if text, ok := parameters[key]; ok {
 				parameters[key] = markdownV2(text)
@@ -176,9 +188,51 @@ func (c markdownConstructor) MultipartRequest(parameters map[string]string, file
 	return c.inner.MultipartRequest(parameters, files)
 }
 
+// formatFor reads the chat id of a JSON payload and answers the format that
+// chat asked for.
+func (c markdownConstructor) formatFor(payload []byte) string {
+	var head struct {
+		ChatID json.RawMessage `json:"chat_id"`
+	}
+	if err := json.Unmarshal(payload, &head); err != nil || len(head.ChatID) == 0 {
+		return FormatMarkdown
+	}
+	var id int64
+	if err := json.Unmarshal(head.ChatID, &id); err == nil {
+		return c.chatFormat(id)
+	}
+	var text string
+	if err := json.Unmarshal(head.ChatID, &text); err == nil {
+		return c.formatFromString(text)
+	}
+	return FormatMarkdown
+}
+
+func (c markdownConstructor) formatFromString(raw string) string {
+	id, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil {
+		return FormatMarkdown
+	}
+	return c.chatFormat(id)
+}
+
+func (c markdownConstructor) chatFormat(chatID int64) string {
+	if c.formatOf == nil {
+		return FormatMarkdown
+	}
+	if c.formatOf(chatID) == FormatHTML {
+		return FormatHTML
+	}
+	return FormatMarkdown
+}
+
 // markdownJSON rewrites one JSON payload: only an HTML payload with a text or
 // a caption is touched, everything else goes to the API as it is.
-func markdownJSON(body []byte) ([]byte, bool) {
+func markdownJSON(body []byte, format string) ([]byte, bool) {
+	if format == FormatHTML {
+		return nil, false
+	}
+
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return nil, false

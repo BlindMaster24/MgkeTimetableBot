@@ -87,11 +87,43 @@ func TestMarkdownConstructorKeepsOtherPayloads(t *testing.T) {
 		t.Fatalf("plain text must stay as it is, got %q", payload.Text)
 	}
 
-	if _, ok := markdownJSON([]byte(`{"text":"x","parse_mode":"MarkdownV2"}`)); ok {
+	if _, ok := markdownJSON([]byte(`{"text":"x","parse_mode":"MarkdownV2"}`), FormatMarkdown); ok {
 		t.Fatal("a MarkdownV2 payload must not be rewritten twice")
 	}
-	if _, ok := markdownJSON([]byte(`not json`)); ok {
+	if _, ok := markdownJSON([]byte(`not json`), FormatMarkdown); ok {
 		t.Fatal("a broken payload must not be rewritten")
+	}
+}
+
+func TestMarkdownConstructorKeepsHTMLForAnHTMLChat(t *testing.T) {
+	constructor := markdownConstructor{
+		inner: telegoapi.DefaultConstructor{},
+		formatOf: func(chatID int64) string {
+			if chatID == 7 {
+				return FormatHTML
+			}
+			return FormatMarkdown
+		},
+	}
+
+	data, err := constructor.JSONRequest(&telego.SendMessageParams{
+		ChatID:    telego.ChatID{ID: 7},
+		Text:      "<b>Группа 100</b>",
+		ParseMode: "HTML",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var payload struct {
+		Text      string `json:"text"`
+		ParseMode string `json:"parse_mode"`
+	}
+	if err := json.Unmarshal(data.BodyRaw, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.ParseMode != "HTML" || payload.Text != "<b>Группа 100</b>" {
+		t.Fatalf("an HTML chat must keep its payload, got %q / %q", payload.ParseMode, payload.Text)
 	}
 }
 

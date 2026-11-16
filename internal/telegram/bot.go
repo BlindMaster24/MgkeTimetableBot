@@ -110,10 +110,19 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 		return nil, err
 	}
 
+	var self *Bot
 	options := []telego.BotOption{
 		telego.WithDefaultDebugLogger(),
 		telego.WithHTTPClient(&http.Client{Timeout: requestTimeout}),
-		telego.WithRequestConstructor(markdownConstructor{inner: telegoapi.DefaultConstructor{}}),
+		telego.WithRequestConstructor(markdownConstructor{
+			inner: telegoapi.DefaultConstructor{},
+			formatOf: func(chatID int64) string {
+				if self == nil {
+					return FormatMarkdown
+				}
+				return self.textFormat(chatID)
+			},
+		}),
 	}
 	if apiServer != "" {
 		options = append(options, telego.WithAPIServer(apiServer))
@@ -146,11 +155,28 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 		client:       client,
 	}
 
+	self = b
 	b.aliasRepo = NewAliasRepository(chatRepo)
 	b.aliasRepo.EnsureTable()
 	b.registerAll()
 	b.log.Info().Int("commands", len(b.commands)).Int("callbacks", len(b.callbacks)).Msg("bot handlers loaded")
 	return b, nil
+}
+
+// textFormat answers the format the chat asked for: MarkdownV2 unless the
+// user switched the chat to HTML.
+func (b *Bot) textFormat(chatID int64) string {
+	if b.chatRepo == nil {
+		return FormatMarkdown
+	}
+	chat, err := b.chatRepo.FindOrCreate("telegram", chatID)
+	if err != nil || chat == nil {
+		return FormatMarkdown
+	}
+	if chat.TextFormat == FormatHTML {
+		return FormatHTML
+	}
+	return FormatMarkdown
 }
 
 func (b *Bot) SetBuildInfo(info build.Info)    { b.buildInfo = info }
@@ -230,6 +256,7 @@ func (b *Bot) registerAll() {
 	b.RegisterCommand(&regexpCmd{bot: b})
 	b.RegisterCommand(&vanishCmd{bot: b})
 	b.RegisterCommand(&parserLogsCmd{bot: b})
+	b.RegisterCommand(&textFormatCmd{bot: b})
 	b.RegisterCommand(&requireNewButtonsCmd{bot: b})
 	b.RegisterCommand(&createApiKeyCmd{bot: b})
 	b.RegisterCommand(&getCabinetCmd{bot: b})

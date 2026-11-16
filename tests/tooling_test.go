@@ -58,13 +58,13 @@ func TestCIRunsTheRaceCheckScript(t *testing.T) {
 func TestCITestsEveryPlatform(t *testing.T) {
 	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
 
-	for _, runner := range []string{"ubuntu-latest", "windows-latest", "macos-latest"} {
+	for _, runner := range []string{"ubuntu-latest", "windows-latest"} {
 		if !strings.Contains(workflow, runner) {
 			t.Errorf("ci.yml must run on %s as well", runner)
 		}
 	}
-	if macos := strings.Count(workflow, "macos-latest"); macos != 1 {
-		t.Errorf("macOS runs in the quality matrix only, found %d entries", macos)
+	if strings.Contains(workflow, "runs-on: macos-latest") {
+		t.Error("no macOS runner is available for this repository, a macOS job only turns the run red")
 	}
 	if !strings.Contains(workflow, "matrix:") {
 		t.Error("the platform jobs must use a matrix, not a single runner")
@@ -155,10 +155,13 @@ func TestCIRunsTheNewestToolchain(t *testing.T) {
 func TestReleaseVerifiesEveryPlatform(t *testing.T) {
 	release := readRepoFile(t, filepath.Join(".github", "workflows", "release.yml"))
 
-	for _, runner := range []string{"ubuntu-latest", "windows-latest", "macos-latest"} {
+	for _, runner := range []string{"ubuntu-latest", "windows-latest"} {
 		if !strings.Contains(release, runner) {
 			t.Errorf("release.yml must verify the revision on %s too", runner)
 		}
+	}
+	if !strings.Contains(release, "goos: darwin") {
+		t.Error("the darwin binary must still be built by the release matrix")
 	}
 }
 

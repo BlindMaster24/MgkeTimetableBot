@@ -29,7 +29,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # No macOS runner is available for this repository: the jobs sat in
+        # the queue and were cancelled before the first step, turning the run
+        # red. macOS binaries are still cross-compiled in this job.
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
