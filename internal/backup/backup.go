@@ -1,4 +1,4 @@
-// Package backup writes rotated SQLite snapshots and restores from them.
+// Package backup takes vacuum copies of the archive database and prunes the old ones.
 package backup
 
 import (

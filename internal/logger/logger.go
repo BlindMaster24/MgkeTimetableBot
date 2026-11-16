@@ -1,4 +1,4 @@
-// Package logger wraps zerolog with console output, redaction and rotation.
+// Package logger wraps zerolog with console output and rotation.
 package logger
 
 import (
