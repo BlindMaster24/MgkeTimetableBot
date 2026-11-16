@@ -354,10 +354,6 @@ func containsString(values []string, needle string) bool {
 	return false
 }
 
-func (b *Bot) getFormatter(chat *Chat) formatter.Formatter {
-	return formatter.GetByIndex(chat.Formatter)
-}
-
 func (b *Bot) relevantWeekDays(data any) (utils.WeekIndex, []map[string]any) {
 	week := b.relevantWeekIndex()
 	minIdx, maxIdx := week.WeekDayIndexRange()

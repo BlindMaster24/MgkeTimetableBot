@@ -1336,7 +1336,7 @@ func TestE2E_HistoryTeacherScene_MultiMatch(t *testing.T) {
 	if loaded.Teacher != "Иванов И.И." {
 		t.Errorf("teacher: %q", loaded.Teacher)
 	}
-	if loaded.HistoryTeacher == nil || len(loaded.HistoryTeacher) == 0 {
+	if len(loaded.HistoryTeacher) == 0 {
 		t.Error("teacher not appended to history")
 	}
 }

@@ -27,13 +27,6 @@ type labelMatch struct {
 	OK    bool
 }
 
-type tableRow struct {
-	Cells  map[int]*goquery.Selection
-	Count  int
-	HasDay bool
-	HasTD  bool
-}
-
 const headingLimit = 8
 
 func headingIndex(doc *goquery.Document) map[*html.Node][]string {

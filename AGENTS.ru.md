@@ -86,7 +86,7 @@
 - Go 1.27.4+; версия живёт только в `go.mod`.
 - `go build -o bot ./cmd/bot/`, `go run ./cmd/bot/ -config configs/config.yaml`.
 - `go test -count=1 -p 1 ./internal/... ./tests/...` — весь набор.
-- `go vet ./...`, `gofmt -l .` (любой вывод — провал).
+- `go vet ./...`, `gofmt -l .`, `go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...` (любой вывод — провал).
 - `go run ./scripts/racecheck` — тот же набор под `-race` (нужны cgo и компилятор).
 - `go run ./scripts/tgstub -listen 127.0.0.1:18090` — заглушка Bot API.
 - `go run ./scripts/devbot` — офлайн-профиль: заглушка плюс бот, состояние в `./.dev/`.
@@ -108,8 +108,8 @@
 
 ## Чек-лист перед коммитом
 
-- `go vet ./...`; `go test -count=1 -p 1 ./internal/... ./tests/...`;
-  `go build -o bot ./cmd/bot/`.
+- `go vet ./...`; `go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...`;
+  `go test -count=1 -p 1 ./internal/... ./tests/...`; `go build -o bot ./cmd/bot/`.
 - `go run ./scripts/paritycheck` при изменении поверхности.
 - `go test ./internal/image/` после правок рендера; `-update` — только осознанно.
 - `go test ./internal/app/ -run EndToEnd` после правок диагностики парсера.

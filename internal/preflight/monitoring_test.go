@@ -313,9 +313,7 @@ func TestMonitoringSurfaceCheckCatchesUnknownAndUnrenderedFamilies(t *testing.T)
 				inner.ServeHTTP(recorder, r)
 				w.WriteHeader(recorder.Code)
 				body := recorder.Body.String()
-				if strings.Contains(body, "# HELP mgke_uptime_seconds ") {
-					body = strings.Replace(body, "# HELP mgke_uptime_seconds ", "# HELP mgke_ghost_total ghost\n# TYPE mgke_ghost_total gauge\nmgke_ghost_total 1\n# HELP mgke_uptime_seconds ", 1)
-				}
+				body = strings.Replace(body, "# HELP mgke_uptime_seconds ", "# HELP mgke_ghost_total ghost\n# TYPE mgke_ghost_total gauge\nmgke_ghost_total 1\n# HELP mgke_uptime_seconds ", 1)
 				io.WriteString(w, body)
 			}), nil
 		},

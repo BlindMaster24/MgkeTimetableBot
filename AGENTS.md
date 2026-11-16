@@ -81,6 +81,7 @@
 - `go test -count=1 -p 1 ./internal/... ./tests/...` — run all tests (`-p 1` keeps peak memory down).
 - `go test -count=1 ./internal/... ./tests/... -cover` — run with coverage.
 - `go vet ./...` — static analysis.
+- `go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...` — dead code, wrong conversions and ineffective assignments; the Linux `quality` CI job fails on any output.
 - `go clean -cache` — clean build cache.
 - `gofmt -l .` — formatting check (CI fails on any output).
 - `go run ./scripts/racecheck` — the race detector run CI performs; it verifies the cgo/C-compiler prerequisites first and prints the install steps (or `go run ./scripts/racecheck -check` to only report availability).
@@ -270,7 +271,7 @@ These are settled; do not reopen them without the user asking.
 - Parity surface: `go run ./scripts/paritycheck`; keyboard layouts: `go test ./internal/telegram -run Golden`; message texts: `go test ./internal/telegram ./internal/notification`; timetable PNG: `go test ./internal/image` (`-update` rewrites the goldens)
 - Race detector: `go run ./scripts/racecheck` (needs `CGO_ENABLED=1` and a C compiler — gcc on Linux, clang on macOS, mingw-w64 on Windows; `-check` only reports)
 - Fuzz targets: `go test -run Fuzz -fuzz <Target> -fuzztime 30s ./internal/<pkg>/` for `schedulediff`, `search`, `reminder`, `rooms`, `parser` and the webhook target in `telegram`
-- Static analysis: `go vet ./...`
+- Static analysis: `go vet ./...` and `go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...`
 
 ## Documentation Is Part of the Change
 Documentation is not a follow-up task; it is part of the same commit and the same pull request.

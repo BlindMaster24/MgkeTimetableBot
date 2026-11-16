@@ -14,8 +14,6 @@ import (
 var teacherNameRe = regexp.MustCompile(`(?i)^Преподаватель\s*[-–—:]?\s*(.+)$`)
 var teacherLooseRe = regexp.MustCompile(`(?i)Преподаватель\s*[-–—:]?\s*(.+)$`)
 var typeRe = regexp.MustCompile(`\(([^)]+)\)`)
-var typeOnlyRe = regexp.MustCompile(`^\s*\([^()]*\)\s*$`)
-var subgroupRe = regexp.MustCompile(`^(\d+)\.\s*(.+)`)
 
 type TeacherParser struct {
 	doc         *goquery.Document

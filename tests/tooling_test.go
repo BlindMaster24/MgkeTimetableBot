@@ -124,6 +124,20 @@ func TestCIRunsTheOfflinePreflight(t *testing.T) {
 	}
 }
 
+func TestCIRunsStaticcheck(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	job := workflowJob(t, workflow, "quality")
+	for _, want := range []string{
+		"name: Staticcheck",
+		"honnef.co/go/tools/cmd/staticcheck@v",
+	} {
+		if !strings.Contains(job, want) {
+			t.Errorf("the quality job must keep %q, otherwise dead code and wrong conversions slip back", want)
+		}
+	}
+}
+
 func TestCIRunsTheNewestToolchain(t *testing.T) {
 	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
 

@@ -13,10 +13,6 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 )
 
-type adminChecker interface {
-	isAdmin(userID int64) bool
-}
-
 func (b *Bot) isAdmin(userID int64) bool {
 	for _, id := range b.cfg.Telegram.AdminIDs {
 		if id == userID {

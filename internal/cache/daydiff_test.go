@@ -12,9 +12,7 @@ func diffLesson(subject, room, teacher, time string) map[string]any {
 
 func diffDay(date string, lessons ...any) map[string]any {
 	list := make([]any, 0, len(lessons))
-	for _, l := range lessons {
-		list = append(list, l)
-	}
+	list = append(list, lessons...)
 	return map[string]any{"day": date, "lessons": list}
 }
 

@@ -143,7 +143,9 @@ func TestLimiterAllowsUpToTheLimit(t *testing.T) {
 	now := timeAt(0)
 	limiter := NewLimiter(func() time.Time { return now })
 
-	if !limiter.Allow(1, 2) || !limiter.Allow(1, 2) {
+	first := limiter.Allow(1, 2)
+	second := limiter.Allow(1, 2)
+	if !first || !second {
 		t.Fatal("the first two requests must pass")
 	}
 	if limiter.Allow(1, 2) {

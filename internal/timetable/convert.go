@@ -34,20 +34,6 @@ func text(value *string) string {
 	return *value
 }
 
-func textPtr(value string) *string {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-	return &value
-}
-
-func subgroupPtr(value int) *int {
-	if value == 0 {
-		return nil
-	}
-	return &value
-}
-
 func splitExtras(raw map[string]any, known []string) map[string]any {
 	keep := make(map[string]bool, len(known))
 	for _, key := range known {

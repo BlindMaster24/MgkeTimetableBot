@@ -243,7 +243,7 @@ func (f *Fetcher) Calls(ctx context.Context, bellScheduleURL string) error {
 	}
 
 	schedule := variants[0].Schedule
-	f.cache.SetCallsNotify(ctx, cache.Schedule{Weekdays: schedule.Weekdays, Saturday: schedule.Saturday}, cache.Schedule{}, "site", "")
+	f.cache.SetCallsNotify(ctx, cache.Schedule(schedule), cache.Schedule{}, "site", "")
 	f.cache.SetCallsSiteVariants(ctx, variants)
 
 	updated := ParseCallsUpdatedAt(doc)

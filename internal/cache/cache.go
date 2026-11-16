@@ -372,13 +372,13 @@ func (c *RaspCache) setCallsInternal(ctx context.Context, site Schedule, manual 
 	}
 
 	c.Calls.Site = CallsSource{
-		Schedule:  CallsSchedule{Weekdays: site.Weekdays, Saturday: site.Saturday},
+		Schedule:  CallsSchedule(site),
 		UpdatedAt: now,
 		Hash:      scheduleDigest(site),
 	}
 	if len(manual.Weekdays) > 0 || len(manual.Saturday) > 0 {
 		c.Calls.Manual = CallsSource{
-			Schedule:  CallsSchedule{Weekdays: manual.Weekdays, Saturday: manual.Saturday},
+			Schedule:  CallsSchedule(manual),
 			UpdatedAt: now,
 			Hash:      scheduleDigest(manual),
 		}
@@ -477,7 +477,7 @@ func (c *RaspCache) selectActiveCallsLocked(skipNotify bool, reason string) {
 		}
 	}
 
-	activeHash := scheduleDigest(Schedule{Weekdays: activeSchedule.Weekdays, Saturday: activeSchedule.Saturday})
+	activeHash := scheduleDigest(Schedule(activeSchedule))
 	sourceChanged := c.Calls.Active.Source != activeSource
 	updatedChanged := c.Calls.Active.UpdatedAt != activeUpdatedAt
 	if c.Calls.Active.Hash != "" && c.Calls.Active.Hash == activeHash && !sourceChanged && !updatedChanged {

@@ -83,12 +83,4 @@ func TestBroadcastUnlocksEvenWhenEverySendFails(t *testing.T) {
 		t.Fatal("the broadcast mutex must be released after the run")
 	}
 	b.broadcast.Unlock()
-
-	timeout := make(chan struct{})
-	go func() {
-		b.broadcast.Lock()
-		b.broadcast.Unlock()
-		close(timeout)
-	}()
-	<-timeout
 }
