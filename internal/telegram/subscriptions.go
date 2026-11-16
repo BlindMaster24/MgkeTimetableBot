@@ -32,6 +32,6 @@ func (b *Bot) subTestPrompt(u *Update) error {
 	chat.Scene = "sub_test_pick"
 	b.chatRepo.Save(chat)
 
-	prompt := "Введите номер подписки для проверки:\n" + b.formatSubscriptionsList(list)
+	prompt := b.loc("subs_test_prompt") + b.formatSubscriptionsList(list)
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, b.replySubscriptionsMenu())
 }

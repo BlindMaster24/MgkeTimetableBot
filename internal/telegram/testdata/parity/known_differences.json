@@ -509,6 +509,12 @@
       "kind": "extra_in_go",
       "value": "авто",
       "reason": "campus auto label now lives in ru.json, the parser splits the label on the colon"
+    },
+    {
+      "section": "texts",
+      "kind": "missing_in_go",
+      "value": "Введите номер подписки для проверки:",
+      "reason": "the prompt now lives in ru.json joined with the subscription list, so the source scan sees it only inside the locale value"
     }
   ]
 }
