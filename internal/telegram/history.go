@@ -33,7 +33,7 @@ func (c *historyCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf(c.bot.loc("histtext_2"), randomKey(teachers))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, c.bot.withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
 type historyTeacherScene struct{ bot *Bot }
@@ -55,7 +55,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	}
 	if len(matched) > 1 {
 		msg := s.bot.loc("histtext_6") + strings.Join(matched, "\n")
-		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, s.bot.withCancelButton(verticalValuesKeyboard(matched)))
 	}
 
 	teacher := matched[0]
@@ -66,7 +66,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	s.bot.chatRepo.Save(chat)
 
 	prompt := s.bot.loc("histtext_7")
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, s.bot.withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
 type historyWeekScene struct{ bot *Bot }

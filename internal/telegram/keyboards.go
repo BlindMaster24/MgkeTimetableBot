@@ -6,12 +6,26 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-func withCancelButton(kb *telego.InlineKeyboardMarkup) *telego.InlineKeyboardMarkup {
+func (b *Bot) cancelLabel() string {
+	if b == nil {
+		return ""
+	}
+	return b.loc("button_cancel")
+}
+
+func (b *Bot) weekButtonLabel() string {
+	if b == nil {
+		return ""
+	}
+	return b.loc("week_button_label")
+}
+
+func (b *Bot) withCancelButton(kb *telego.InlineKeyboardMarkup) *telego.InlineKeyboardMarkup {
 	if kb == nil {
 		kb = &telego.InlineKeyboardMarkup{}
 	}
 	kb.InlineKeyboard = append(kb.InlineKeyboard, []telego.InlineKeyboardButton{
-		{Text: "Отмена", CallbackData: "cancel"},
+		{Text: b.cancelLabel(), CallbackData: "cancel"},
 	})
 	return kb
 }
@@ -46,8 +60,8 @@ func verticalValuesKeyboard(values []string) *telego.InlineKeyboardMarkup {
 	return kb
 }
 
-func getWeekTimetableKeyboard(typeName, value string) *telego.InlineKeyboardMarkup {
-	return weekTimetableButton("На неделю", typeName, value, 0, true)
+func (b *Bot) getWeekTimetableKeyboard(typeName, value string) *telego.InlineKeyboardMarkup {
+	return weekTimetableButton(b.weekButtonLabel(), typeName, value, 0, true)
 }
 
 func weekTimetableButton(label, typeName, value string, weekIndex int, showHeader bool) *telego.InlineKeyboardMarkup {

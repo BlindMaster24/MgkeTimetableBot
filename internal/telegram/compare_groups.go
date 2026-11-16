@@ -23,7 +23,7 @@ func (s *compareGroupsStepA) Handle(ctx context.Context, u *Update, chat *Chat) 
 	s.bot.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf(s.bot.loc("cmpgrp_1"), randomKey(s.bot.cache.GetGroups()))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, s.bot.withCancelButton(groupHistoryKeyboard(chat)))
 }
 
 type compareGroupsInputScene struct{ bot *Bot }
@@ -95,7 +95,7 @@ func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keybo
 	}
 	if len(matched) > 1 {
 		msg := b.loc("cmpgrp_10") + strings.Join(matched, "\n")
-		u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
+		u.Bot.SendTextWithKeyboard(u.ChatID, msg, b.withCancelButton(verticalValuesKeyboard(matched)))
 		return "", false, true
 	}
 

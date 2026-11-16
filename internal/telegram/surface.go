@@ -154,14 +154,14 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		reply("replySelectMode", b.replySelectMode),
 		reply("replyCancel", b.replyCancel),
 		reply("replyStartButton", b.replyStartButton),
-		inline("withCancelButton", func() *telego.InlineKeyboardMarkup { return withCancelButton(nil) }),
+		inline("withCancelButton", func() *telego.InlineKeyboardMarkup { return b.withCancelButton(nil) }),
 		inline("groupHistoryKeyboard", func() *telego.InlineKeyboardMarkup { return groupHistoryKeyboard(chat) }),
 		inline("teacherHistoryKeyboard", func() *telego.InlineKeyboardMarkup { return teacherHistoryKeyboard(chat) }),
 		inline("verticalValuesKeyboard", func() *telego.InlineKeyboardMarkup {
 			return verticalValuesKeyboard([]string{"100", "101"})
 		}),
 		inline("getWeekTimetableKeyboard", func() *telego.InlineKeyboardMarkup {
-			return getWeekTimetableKeyboard("group", "100")
+			return b.getWeekTimetableKeyboard("group", "100")
 		}),
 		inline("weekTimetableButton", func() *telego.InlineKeyboardMarkup {
 			return weekTimetableButton("На неделю", "group", "100", 0, true)

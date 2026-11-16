@@ -289,5 +289,5 @@ func (c *compareGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf(c.bot.loc("rasptext_27"), randomKey(groups))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, c.bot.withCancelButton(groupHistoryKeyboard(chat)))
 }

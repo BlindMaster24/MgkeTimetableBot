@@ -21,7 +21,7 @@ func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	chat.Scene = sceneCallsEditReason
 	s.bot.chatRepo.Save(chat)
 
-	reasonKb := withCancelButton(&telego.InlineKeyboardMarkup{
+	reasonKb := s.bot.withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{{Text: s.bot.loc("calls_edit_skip"), CallbackData: "answer:Пропустить"}},
 		},
@@ -38,7 +38,7 @@ func (s *callsEditReasonScene) Handle(ctx context.Context, u *Update, chat *Chat
 	chat.Scene = sceneCallsEditConfirm
 	s.bot.chatRepo.Save(chat)
 
-	confirmKb := withCancelButton(&telego.InlineKeyboardMarkup{
+	confirmKb := s.bot.withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{
 				{Text: s.bot.loc("calls_edit_send"), CallbackData: "answer:Отправить"},

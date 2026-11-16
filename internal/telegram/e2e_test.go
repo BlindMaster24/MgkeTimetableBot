@@ -1084,7 +1084,7 @@ func TestE2E_GoogleCalendarAddNoMode(t *testing.T) {
 }
 
 func TestE2E_GroupHistoryAppendAndKeyboard(t *testing.T) {
-	_, repo := setupE2EBot(t)
+	b, repo := setupE2EBot(t)
 	userID := int64(4242)
 
 	chat, _ := repo.FindOrCreate("telegram", userID)
@@ -1116,7 +1116,7 @@ func TestE2E_GroupHistoryAppendAndKeyboard(t *testing.T) {
 		t.Errorf("first row: %q", kb.InlineKeyboard[0][0].Text)
 	}
 
-	withCancel := withCancelButton(groupHistoryKeyboard(again))
+	withCancel := b.withCancelButton(groupHistoryKeyboard(again))
 	if len(withCancel.InlineKeyboard) != 3 {
 		t.Errorf("cancel row missing")
 	}
@@ -1199,7 +1199,8 @@ func TestE2E_VerticalValuesKeyboard(t *testing.T) {
 }
 
 func TestE2E_GetWeekTimetableKeyboard(t *testing.T) {
-	kb := getWeekTimetableKeyboard("group", "100")
+	b, _ := setupE2EBot(t)
+	kb := b.getWeekTimetableKeyboard("group", "100")
 	if kb.InlineKeyboard[0][0].Text != "На неделю" {
 		t.Errorf("label: %q", kb.InlineKeyboard[0][0].Text)
 	}

@@ -91,7 +91,7 @@ func (b *Bot) startGetGroup(ctx context.Context, u *Update, kind string) error {
 	b.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf("%s (например, %s)", b.loc("enter_group_number"), randomKey(groups))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, b.withCancelButton(groupHistoryKeyboard(chat)))
 }
 
 func (b *Bot) startGetTeacher(ctx context.Context, u *Update, kind string) error {
@@ -112,7 +112,7 @@ func (b *Bot) startGetTeacher(ctx context.Context, u *Update, kind string) error
 	b.chatRepo.Save(chat)
 
 	prompt := fmt.Sprintf("Введите фамилию преподавателя или выберите из списка ниже (например, %s)", randomKey(teachers))
-	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, b.withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
 func extractCommandArg(text string) string {
@@ -205,7 +205,7 @@ func (b *Bot) sendGroupResult(ctx context.Context, u *Update, chat *Chat, group,
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, getWeekTimetableKeyboard("group", group))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, text, b.getWeekTimetableKeyboard("group", group))
 	}
 }
 
@@ -231,7 +231,7 @@ func (b *Bot) resolveTeacherInput(ctx context.Context, u *Update, chat *Chat, in
 		chat.Scene = sceneGetTeacher + ":" + kind
 		b.chatRepo.Save(chat)
 		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
-		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, b.withCancelButton(verticalValuesKeyboard(matched)))
 	}
 
 	teacher := matched[0]
@@ -265,7 +265,7 @@ func (b *Bot) sendTeacherResult(ctx context.Context, u *Update, chat *Chat, teac
 	case "week":
 		chat.Scene = sceneGetTeacherWeek + ":" + teacher
 		b.chatRepo.Save(chat)
-		return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("history_enter_week"), withCancelButton(teacherHistoryKeyboard(chat)))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("history_enter_week"), b.withCancelButton(teacherHistoryKeyboard(chat)))
 	case "image":
 		_, days := b.relevantWeekDays(data)
 		path, err := imagepkg.RenderTeacherDays(teacher, days, "./cache/images", b.imageTexts(), b.cfg.ResolvedStampFormat())
@@ -278,7 +278,7 @@ func (b *Bot) sendTeacherResult(ctx context.Context, u *Update, chat *Chat, teac
 		if text == "" {
 			return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
 		}
-		return u.Bot.SendTextWithKeyboard(u.ChatID, text, getWeekTimetableKeyboard("teacher", teacher))
+		return u.Bot.SendTextWithKeyboard(u.ChatID, text, b.getWeekTimetableKeyboard("teacher", teacher))
 	}
 }
 

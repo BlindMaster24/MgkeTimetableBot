@@ -937,6 +937,7 @@
   "subs_teacher_label": "Преподаватель",
   "subs_empty": "Подписок нет.",
   "subs_test_prompt": "Введите номер подписки для проверки:\n",
+  "week_button_label": "На неделю",
   "access_denied": "⛔ Доступ запрещён",
   "api_duration_ms": "%d мс",
   "api_duration_seconds": "%.2f с",
