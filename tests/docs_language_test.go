@@ -11,6 +11,7 @@ func TestEveryDocLinksToItsOtherLanguage(t *testing.T) {
 	pairs := [][2]string{
 		{"README.md", "README.en.md"},
 		{"docs/google-calendar.md", "docs/google-calendar.en.md"},
+		{"deploy/monitoring/README.md", "deploy/monitoring/README.ru.md"},
 	}
 
 	for _, pair := range pairs {

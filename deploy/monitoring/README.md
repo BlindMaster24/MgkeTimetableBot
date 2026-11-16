@@ -1,5 +1,7 @@
 # Monitoring the MGKE timetable bot
 
+[Русская версия](README.ru.md)
+
 A ready-to-use monitoring set for the bot's Prometheus route (`metrics.enabled`,
 `metrics.path`, `metrics.token` — see the [main README](../../README.md#prometheus-metrics)).
 Nothing here needs editing before it runs: the compose stack writes the scrape

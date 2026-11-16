@@ -11,7 +11,7 @@
 
 Это полный порт старого TypeScript-бота на Go: тот же набор команд, меню, кнопок и текстов, без VK / Viber / Алисы — только Telegram и HTTP API. Паритет поверхности (команды, callback-префиксы, подписи кнопок) проверяется автоматически — см. [Паритет с TypeScript-ботом](#паритет-с-typescript-ботом).
 
-Документация: [инструкция по Google Calendar](docs/google-calendar.md), [набор мониторинга](deploy/monitoring/README.md), [шаблон конфигурации](configs/config.example.yaml), [правила разработки](AGENTS.md), [релизы](https://github.com/BlindMaster24/MgkeTimetableBot/releases) и [образ в GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
+Документация: [инструкция по Google Calendar](docs/google-calendar.md), [набор мониторинга](deploy/monitoring/README.ru.md), [шаблон конфигурации](configs/config.example.yaml), [правила разработки](AGENTS.md), [релизы](https://github.com/BlindMaster24/MgkeTimetableBot/releases) и [образ в GHCR](https://github.com/BlindMaster24/MgkeTimetableBot/pkgs/container/mgketimetablebot).
 
 Возможности:
 
@@ -407,7 +407,7 @@ curl -s localhost:8081/metrics
 
 ### Мониторинг (`deploy/monitoring`)
 
-Набор мониторинга лежит в `deploy/monitoring` — его можно взять целиком, ничего не редактируя: стек compose сам записывает адрес и токен ручки в тома, дашборд импортируется как есть, а правила грузятся и обычным Prometheus, и Prometheus Operator, и Grafana Cloud. Полное описание набора — [deploy/monitoring/README.md](deploy/monitoring/README.md).
+Набор мониторинга лежит в `deploy/monitoring` — его можно взять целиком, ничего не редактируя: стек compose сам записывает адрес и токен ручки в тома, дашборд импортируется как есть, а правила грузятся и обычным Prometheus, и Prometheus Operator, и Grafana Cloud. Полное описание набора — [deploy/monitoring/README.ru.md](deploy/monitoring/README.ru.md) ([English version](deploy/monitoring/README.md)).
 
 ```bash
 export MGKE_METRICS_TARGET=host.docker.internal:8081   # api.port бота
