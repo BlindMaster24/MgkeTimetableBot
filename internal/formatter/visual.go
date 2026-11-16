@@ -25,45 +25,15 @@ func (f *VisualFormatter) FormatTeacherFull(teacher string, days []map[string]an
 }
 
 func (f *VisualFormatter) formatFull(name string, teacher string, days []DayInfo, isGroup bool, opts FormatOptions) string {
-	var text []string
+	return formatFull(f, name, teacher, days, isGroup, opts)
+}
 
-	if opts.ShowHeader {
-		if isGroup {
-			if header := opts.formatLabel("formatter_group_visual", name); header != "" {
-				text = append(text, header)
-			}
-		} else {
-			if header := opts.formatLabel("formatter_teacher_visual", opts.getFullTeacherName(teacher)); header != "" {
-				text = append(text, header)
-			}
-		}
-	}
+func (f *VisualFormatter) groupHeader(group string, opts FormatOptions) string {
+	return opts.formatLabel("formatter_group_visual", group)
+}
 
-	if opts.WeekLabel != "" {
-		text = append(text, opts.WeekLabel)
-	}
-
-	if len(days) > 0 {
-		for _, day := range days {
-			dayText := f.formatDayHeader(day, opts)
-			lessonsText := f.formatTeacherLessons(day.Lessons, opts)
-			if isGroup {
-				lessonsText = f.formatGroupLessons(day.Lessons, opts)
-			}
-			text = append(text, dayText+"\n"+lessonsText)
-		}
-	} else {
-		if empty := f.NoTimetable(opts); empty != "" {
-			text = append(text, empty)
-		}
-	}
-
-	footer := formatFooter(opts)
-	if strings.TrimSpace(footer) != "" {
-		text = append(text, footer)
-	}
-
-	return strings.Join(text, "\n\n")
+func (f *VisualFormatter) teacherHeader(teacher string, opts FormatOptions) string {
+	return opts.formatLabel("formatter_teacher_visual", teacher)
 }
 
 func (f *VisualFormatter) formatDayHeader(day DayInfo, opts FormatOptions) string {

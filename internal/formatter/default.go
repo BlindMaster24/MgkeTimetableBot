@@ -25,45 +25,15 @@ func (f *DefaultFormatter) FormatTeacherFull(teacher string, days []map[string]a
 }
 
 func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInfo, isGroup bool, opts FormatOptions) string {
-	var text []string
+	return formatFull(f, name, teacher, days, isGroup, opts)
+}
 
-	if opts.ShowHeader {
-		if isGroup {
-			if header := opts.formatLabel("formatter_group_default", name); header != "" {
-				text = append(text, header)
-			}
-		} else {
-			if header := opts.formatLabel("formatter_teacher_default", opts.getFullTeacherName(teacher)); header != "" {
-				text = append(text, header)
-			}
-		}
-	}
+func (f *DefaultFormatter) groupHeader(group string, opts FormatOptions) string {
+	return opts.formatLabel("formatter_group_default", group)
+}
 
-	if opts.WeekLabel != "" {
-		text = append(text, opts.WeekLabel)
-	}
-
-	if len(days) > 0 {
-		for _, day := range days {
-			dayText := f.formatDayHeader(day, opts)
-			lessonsText := f.formatTeacherLessons(day.Lessons, opts)
-			if isGroup {
-				lessonsText = f.formatGroupLessons(day.Lessons, opts)
-			}
-			text = append(text, dayText+"\n"+lessonsText)
-		}
-	} else {
-		if empty := f.NoTimetable(opts); empty != "" {
-			text = append(text, empty)
-		}
-	}
-
-	footer := formatFooter(opts)
-	if strings.TrimSpace(footer) != "" {
-		text = append(text, footer)
-	}
-
-	return strings.Join(text, "\n\n")
+func (f *DefaultFormatter) teacherHeader(teacher string, opts FormatOptions) string {
+	return opts.formatLabel("formatter_teacher_default", teacher)
 }
 
 func (f *DefaultFormatter) formatDayHeader(day DayInfo, opts FormatOptions) string {
@@ -117,25 +87,7 @@ func (f *DefaultFormatter) formatGroupLessons(lessons []any, opts FormatOptions)
 }
 
 func (f *DefaultFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
-	if len(lessons) == 0 {
-		return opts.italicLabel("no_lessons")
-	}
-
-	var text []string
-	for i, lesson := range lessons {
-		if lesson == nil {
-			continue
-		}
-
-		subs := getSubgroups(lesson)
-		if len(subs) == 0 {
-			continue
-		}
-
-		text = append(text, fmt.Sprintf("%d. ", i+1)+f.formatTeacherLesson(subs[0]))
-	}
-
-	return strings.TrimSpace(strings.Join(text, "\n"))
+	return formatTeacherLessonList(lessons, opts.italicLabel("no_lessons"), f.formatTeacherLesson)
 }
 
 func (f *DefaultFormatter) formatTeacherLesson(p LessonPart) string {

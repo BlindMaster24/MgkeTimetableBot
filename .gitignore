@@ -67,3 +67,5 @@ Thumbs.db
 
 # Local conversation dumps
 /.cloud-attachments/
+.metrics/
+coverage.out
