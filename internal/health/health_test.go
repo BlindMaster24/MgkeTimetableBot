@@ -516,3 +516,22 @@ func TestAPIMessageIsCompact(t *testing.T) {
 		t.Errorf("long message should be clipped, got %d chars", len(long))
 	}
 }
+
+func TestThresholdsWithDefaultsFillEveryZero(t *testing.T) {
+	fallback := DefaultThresholds()
+	zero := Thresholds{}
+
+	got := zero.WithDefaults()
+	if got != fallback {
+		t.Fatalf("zero thresholds = %+v, want the defaults %+v", got, fallback)
+	}
+
+	custom := Thresholds{ParserStale: time.Minute, APIErrors: 3}
+	got = custom.WithDefaults()
+	if got.ParserStale != time.Minute || got.APIErrors != 3 {
+		t.Fatalf("explicit values must survive: %+v", got)
+	}
+	if got.CalendarStale != fallback.CalendarStale {
+		t.Fatalf("missing values must fall back: %+v", got)
+	}
+}

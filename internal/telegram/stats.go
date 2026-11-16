@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/model"
 )
 
 type statsCmd struct{ bot *Bot }
@@ -40,42 +42,13 @@ func (c *statsCmd) getGroupStats(ctx context.Context, repo archiveStore, group s
 		return c.bot.loc("no_timetable")
 	}
 
-	type statEntry struct {
-		key   string
-		count int
-	}
-	total := make(map[string]int)
-
+	lessons := make([]any, 0, len(days))
 	for _, day := range days {
 		for _, lesson := range day.Lessons {
-			if lesson == nil {
-				continue
-			}
-			entries := formatGroupLessonExplain(lesson)
-			for _, entry := range entries {
-				total[entry]++
-			}
+			lessons = append(lessons, lesson)
 		}
 	}
-
-	var sorted []statEntry
-	for k, v := range total {
-		sorted = append(sorted, statEntry{key: k, count: v})
-	}
-	sort.SliceStable(sorted, func(i, j int) bool {
-		return sorted[i].count > sorted[j].count
-	})
-
-	var lines []string
-	lines = append(lines, c.bot.loc("stats_header"))
-	totalCount := 0
-	for _, e := range sorted {
-		lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_2"), e.key, e.count))
-		totalCount += e.count
-	}
-
-	lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_3"), len(sorted), totalCount))
-	return strings.Join(lines, "\n")
+	return c.formatStats(lessons, formatGroupLessonExplain, "sgstats_2", "sgstats_3")
 }
 
 func (c *statsCmd) getTeacherStats(ctx context.Context, repo archiveStore, teacher string) string {
@@ -84,22 +57,31 @@ func (c *statsCmd) getTeacherStats(ctx context.Context, repo archiveStore, teach
 		return c.bot.loc("no_timetable")
 	}
 
+	lessons := make([]any, 0, len(days))
+	for _, day := range days {
+		for _, lesson := range day.Lessons {
+			lessons = append(lessons, lesson)
+		}
+	}
+	return c.formatStats(lessons, formatTeacherLessonExplain, "sgstats_4", "sgstats_5")
+}
+
+// formatStats counts how often every subject line appears in the given lessons
+// and prints the most frequent first.
+func (c *statsCmd) formatStats(lessons []any, explain func(any) []string, lineKey, totalKey string) string {
+	total := make(map[string]int)
+	for _, lesson := range lessons {
+		if lesson == nil {
+			continue
+		}
+		for _, entry := range explain(lesson) {
+			total[entry]++
+		}
+	}
+
 	type statEntry struct {
 		key   string
 		count int
-	}
-	total := make(map[string]int)
-
-	for _, day := range days {
-		for _, lesson := range day.Lessons {
-			if lesson == nil {
-				continue
-			}
-			entries := formatTeacherLessonExplain(lesson)
-			for _, entry := range entries {
-				total[entry]++
-			}
-		}
 	}
 
 	var sorted []statEntry
@@ -114,11 +96,11 @@ func (c *statsCmd) getTeacherStats(ctx context.Context, repo archiveStore, teach
 	lines = append(lines, c.bot.loc("stats_header"))
 	totalCount := 0
 	for _, e := range sorted {
-		lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_4"), e.key, e.count))
+		lines = append(lines, fmt.Sprintf(c.bot.loc(lineKey), e.key, e.count))
 		totalCount += e.count
 	}
 
-	lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_5"), len(sorted), totalCount))
+	lines = append(lines, fmt.Sprintf(c.bot.loc(totalKey), len(sorted), totalCount))
 	return strings.Join(lines, "\n")
 }
 
@@ -140,6 +122,11 @@ func formatTeacherLessonExplain(lesson any) []string {
 	switch l := lesson.(type) {
 	case map[string]any:
 		return []string{formatExplainMap(l, "group")}
+	case *model.TeacherLessonExplain:
+		if l == nil {
+			return nil
+		}
+		return []string{formatTeacherLessonPart(l)}
 	case []any:
 		var result []string
 		for _, item := range l {
@@ -148,6 +135,28 @@ func formatTeacherLessonExplain(lesson any) []string {
 		return result
 	}
 	return nil
+}
+
+func formatTeacherLessonPart(l *model.TeacherLessonExplain) string {
+	var parts []string
+
+	if l.Group != "" {
+		if l.Subgroup != nil && *l.Subgroup > 0 {
+			parts = append(parts, fmt.Sprintf("%d-%s.", *l.Subgroup, l.Group))
+		} else {
+			parts = append(parts, l.Group+".")
+		}
+	}
+	if l.Lesson != "" {
+		parts = append(parts, l.Lesson)
+	}
+	if l.Type != nil && *l.Type != "" {
+		parts = append(parts, "("+*l.Type+")")
+	}
+	if l.Comment != nil && *l.Comment != "" {
+		parts = append(parts, "// "+*l.Comment)
+	}
+	return strings.Join(parts, " ")
 }
 
 func formatExplainMap(m map[string]any, groupKey string) string {
