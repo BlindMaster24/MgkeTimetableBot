@@ -159,7 +159,7 @@ func TestBrovkaExportsAWindows1251Csv(t *testing.T) {
 }
 
 func TestBrovkaCsvQuotesAFieldWithAComma(t *testing.T) {
-	lines := brovkaCSV([]model.TeacherDay{{
+	lines := brovkaCSV([]string{"День", "Подгруппа", "Группа", "Тип", "Предмет"}, []model.TeacherDay{{
 		Day: "01.09.2026",
 		Lessons: []model.TeacherLesson{
 			{Lesson: "Матем, физика", Group: "100"},
@@ -184,7 +184,7 @@ func TestBrovkaCsvQuotesAFieldWithAComma(t *testing.T) {
 func TestBrovkaCsvUsesTheTeacherFields(t *testing.T) {
 	typeValue := "лек"
 	subgroup := 2
-	lines := brovkaCSV([]model.TeacherDay{{
+	lines := brovkaCSV([]string{"День", "Подгруппа", "Группа", "Тип", "Предмет"}, []model.TeacherDay{{
 		Day: "01.09.2026",
 		Lessons: []model.TeacherLesson{
 			{Lesson: "Матем", Type: &typeValue, Group: "100", Subgroup: &subgroup},
