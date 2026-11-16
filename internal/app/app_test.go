@@ -16,6 +16,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	parserpkg "github.com/blindmaster24/MgkeTimetableBot/internal/parser"
@@ -524,7 +525,7 @@ func TestUndatedDayColumnReachesTheAdminsEndToEnd(t *testing.T) {
 		t.Fatalf("expected one admin alert for the skipped column, got %+v", delivered)
 	}
 	for _, want := range []string{
-		notification.HealthAlertTitle(health.AlertParserLayout),
+		notification.HealthAlertTitle(health.AlertParserLayout, func(k string) string { return i18n.New("ru").T("ru", k, nil) }),
 		"th: day header without dd.MM.yyyy",
 		"skipped 1",
 	} {

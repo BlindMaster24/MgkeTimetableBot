@@ -184,13 +184,13 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 			return b.weekControlKeyboardHeader(context.Background(), "group", "100", 0, true, true)
 		}),
 		inline("parserAlertKeyboard", func() *telego.InlineKeyboardMarkup {
-			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserLayout))
+			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserLayout, func(k string) string { return b.loc(k) }))
 		}),
 		inline("calendarAlertKeyboard", func() *telego.InlineKeyboardMarkup {
-			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertCalendarFailures))
+			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertCalendarFailures, func(k string) string { return b.loc(k) }))
 		}),
 		inline("apiAlertKeyboard", func() *telego.InlineKeyboardMarkup {
-			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertAPIErrors))
+			return buttonsKeyboard(notification.HealthAlertButtons(health.AlertAPIErrors, func(k string) string { return b.loc(k) }))
 		}),
 		inline("webhookStatusKeyboard", func() *telego.InlineKeyboardMarkup {
 			return b.webhookStatusKeyboard()

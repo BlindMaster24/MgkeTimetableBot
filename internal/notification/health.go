@@ -1,6 +1,7 @@
 package notification
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,9 +16,6 @@ const (
 	ParserReparseCallback = "parser_reparse"
 	CalendarSyncCallback  = "calendar_sync"
 	APIProbeCallback      = "api_probe"
-	parserReparseButton   = "🔄 Переразобрать сейчас"
-	calendarSyncButton    = "🔄 Синхронизировать сейчас"
-	apiProbeButton        = "🔌 Проверить API"
 )
 
 type alertState struct {
@@ -85,10 +83,10 @@ func (n *HealthNotifier) Check() {
 	}
 
 	for _, alert := range pending {
-		n.broadcast(chats, healthAlertMessage(alert), HealthAlertButtons(alert.Key))
+		n.broadcast(chats, n.alertMessage(alert), n.alertButtons(alert.Key))
 	}
 	for _, key := range recovered {
-		n.broadcast(chats, healthRecoveryMessage(key), nil)
+		n.broadcast(chats, n.recoveryMessage(key), nil)
 	}
 }
 
@@ -195,44 +193,55 @@ func IsAPIAlert(key string) bool {
 	return health.AlertScope(key) == health.ScopeAPI
 }
 
-func HealthAlertButtons(key string) []KeyboardButton {
+func (n *HealthNotifier) alertButtons(key string) []KeyboardButton {
+	return HealthAlertButtons(key, n.localize)
+}
+
+func HealthAlertButtons(key string, localize func(string) string) []KeyboardButton {
 	switch {
 	case IsParserAlert(key):
-		return []KeyboardButton{{Text: parserReparseButton, Data: ParserReparseCallback}}
+		return []KeyboardButton{{Text: localize("notify_parser_reparse_button"), Data: ParserReparseCallback}}
 	case IsCalendarAlert(key):
-		return []KeyboardButton{{Text: calendarSyncButton, Data: CalendarSyncCallback}}
+		return []KeyboardButton{{Text: localize("notify_calendar_sync_button"), Data: CalendarSyncCallback}}
 	case IsAPIAlert(key):
-		return []KeyboardButton{{Text: apiProbeButton, Data: APIProbeCallback}}
+		return []KeyboardButton{{Text: localize("notify_api_probe_button"), Data: APIProbeCallback}}
 	}
 	return nil
 }
 
-func healthAlertMessage(alert health.Alert) string {
-	return "⚠️ " + HealthAlertTitle(alert.Key) + "\n" + alert.Detail
+func (n *HealthNotifier) alertMessage(alert health.Alert) string {
+	return fmt.Sprintf(n.locData("health_alert_message", nil), HealthAlertTitle(alert.Key, n.localize), alert.Detail)
 }
 
-func healthRecoveryMessage(key string) string {
-	return "✅ " + HealthAlertTitle(key) + " — восстановлено"
+func (n *HealthNotifier) recoveryMessage(key string) string {
+	return fmt.Sprintf(n.locData("health_recovery_message", nil), HealthAlertTitle(key, n.localize))
 }
 
-func HealthAlertTitle(key string) string {
+func (n *HealthNotifier) locData(key string, data map[string]any) string {
+	return defaultLocalizer.T("ru", key, data)
+}
+
+func (n *HealthNotifier) localize(key string) string {
+	return n.locData(key, nil)
+}
+func HealthAlertTitle(key string, localize func(string) string) string {
 	switch key {
 	case health.AlertParserFailures:
-		return "Парсер расписания падает"
+		return localize("health_title_parser_failures")
 	case health.AlertParserStale:
-		return "Расписание давно не обновлялось"
+		return localize("health_title_parser_stale")
 	case health.AlertParserLayout:
-		return "Парсер перестал находить данные на сайте"
+		return localize("health_title_parser_layout")
 	case health.AlertParserGuard:
-		return "Парсер резко потерял данные, кэш оставлен прежним"
+		return localize("health_title_parser_guard")
 	case health.AlertCalendarFailures:
-		return "Ошибки синхронизации Google Calendar"
+		return localize("health_title_calendar_failures")
 	case health.AlertCalendarStale:
-		return "Google Calendar давно не синхронизировался"
+		return localize("health_title_calendar_stale")
 	case health.AlertAPIErrors:
-		return "Ошибки HTTP API"
+		return localize("health_title_api_errors")
 	case health.AlertBackupFailed:
-		return "Не удалось забрать резервную копию архива"
+		return localize("health_title_backup_failed")
 	}
 	return key
 }

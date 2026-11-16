@@ -81,7 +81,7 @@ func TestHealthNotifierParserAlertsCarryTheReparseButton(t *testing.T) {
 	if buttoned[0].buttons[0].Data != ParserReparseCallback {
 		t.Errorf("button data = %q, want %q", buttoned[0].buttons[0].Data, ParserReparseCallback)
 	}
-	if buttoned[0].buttons[0].Text != parserReparseButton {
+	if buttoned[0].buttons[0].Text != defaultLocalizer.T("ru", "notify_parser_reparse_button", nil) {
 		t.Errorf("button text = %q", buttoned[0].buttons[0].Text)
 	}
 }
@@ -105,7 +105,7 @@ func TestHealthNotifierCalendarAlertsCarryTheSyncButton(t *testing.T) {
 	if buttoned[0].buttons[0].Data != CalendarSyncCallback {
 		t.Errorf("button data = %q, want %q", buttoned[0].buttons[0].Data, CalendarSyncCallback)
 	}
-	if buttoned[0].buttons[0].Text != calendarSyncButton {
+	if buttoned[0].buttons[0].Text != defaultLocalizer.T("ru", "notify_calendar_sync_button", nil) {
 		t.Errorf("button text = %q", buttoned[0].buttons[0].Text)
 	}
 }
@@ -129,7 +129,7 @@ func TestHealthNotifierAPIAlertsCarryTheProbeButton(t *testing.T) {
 	if buttoned[0].buttons[0].Data != APIProbeCallback {
 		t.Errorf("button data = %q, want %q", buttoned[0].buttons[0].Data, APIProbeCallback)
 	}
-	if buttoned[0].buttons[0].Text != apiProbeButton {
+	if buttoned[0].buttons[0].Text != defaultLocalizer.T("ru", "notify_api_probe_button", nil) {
 		t.Errorf("button text = %q", buttoned[0].buttons[0].Text)
 	}
 	for _, want := range []string{"Ошибки HTTP API", "paths: GET /api/health x1 (500)", "last: 500 GET /api/health: database is locked"} {
@@ -146,7 +146,7 @@ func TestHealthAlertButtonsMatchTheAlertScope(t *testing.T) {
 		health.AlertParserLayout,
 		health.AlertParserGuard,
 	} {
-		buttons := HealthAlertButtons(key)
+		buttons := HealthAlertButtons(key, func(k string) string { return defaultLocalizer.T("ru", k, nil) })
 		if len(buttons) != 1 {
 			t.Errorf("%s: expected one button, got %+v", key, buttons)
 			continue
@@ -160,7 +160,7 @@ func TestHealthAlertButtonsMatchTheAlertScope(t *testing.T) {
 	}
 
 	for _, key := range []string{health.AlertCalendarFailures, health.AlertCalendarStale} {
-		buttons := HealthAlertButtons(key)
+		buttons := HealthAlertButtons(key, func(k string) string { return defaultLocalizer.T("ru", k, nil) })
 		if len(buttons) != 1 {
 			t.Errorf("%s: expected the sync button, got %+v", key, buttons)
 			continue
@@ -173,7 +173,7 @@ func TestHealthAlertButtonsMatchTheAlertScope(t *testing.T) {
 		}
 	}
 
-	buttons := HealthAlertButtons(health.AlertAPIErrors)
+	buttons := HealthAlertButtons(health.AlertAPIErrors, func(k string) string { return defaultLocalizer.T("ru", k, nil) })
 	if len(buttons) != 1 || buttons[0].Data != APIProbeCallback {
 		t.Errorf("API alerts must carry the probe button, got %+v", buttons)
 	}

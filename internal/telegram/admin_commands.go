@@ -108,7 +108,7 @@ func (c *parserHealthCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
 		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
 	}
-	kb := buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserGuard))
+	kb := buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserGuard, func(k string) string { return c.bot.loc(k) }))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.parserHealthText(), kb)
 }
 
@@ -310,7 +310,7 @@ func (b *Bot) incidentLine(record health.Incident, now time.Time) string {
 		window = healthClock(record.StartedAt) + "–" + healthClock(record.EndedAt)
 	}
 
-	return fmt.Sprintf("%s %s (%s)\n   %s — %s", icon, window, record.Duration(now).Truncate(time.Second), notification.HealthAlertTitle(record.Key), record.Key)
+	return fmt.Sprintf("%s %s (%s)\n   %s — %s", icon, window, record.Duration(now).Truncate(time.Second), notification.HealthAlertTitle(record.Key, func(k string) string { return b.loc(k) }), record.Key)
 }
 
 func (b *Bot) incidentOutcome(record health.Incident) string {
@@ -328,7 +328,7 @@ func (b *Bot) incidentButtons() *telego.InlineKeyboardMarkup {
 	var buttons []notification.KeyboardButton
 	seen := map[string]bool{}
 	for _, record := range open {
-		for _, button := range notification.HealthAlertButtons(record.Key) {
+		for _, button := range notification.HealthAlertButtons(record.Key, func(k string) string { return b.loc(k) }) {
 			if seen[button.Data] {
 				continue
 			}
