@@ -8,22 +8,22 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 )
 
-var hints = []string{
-	"Настроить оповещения можно в настройках (/notice)",
-	"Не нравится вид расписания? Попробуй новый в настройках! (/formatter)",
-	"Мешают лишние кнопки? Убери их в настройках! (/buttons)",
-	"Установил не ту группу или учителя? Измени в настройках! (/setup)",
-	"Ты разработчик? Имеешь навыки в программировании на Go? Сделай бота лучше! (/dev)",
-	"Проблема с ботом? Не бойся писать разработчику (/about)",
-	"Вопрос по боту? Не бойся спросить у разработчика (/about)",
-	"Мешают подсказки? Убери в настройках! (/view)",
-	"Хочешь интегрировать расписание в свой проект? У бота есть API! (/api)",
+func (b *Bot) hints() []string {
+	return []string{
+		b.loc("fmttext_1"),
+		b.loc("fmttext_2"),
+		b.loc("fmttext_3"),
+		b.loc("fmttext_4"),
+		b.loc("fmttext_5"),
+		b.loc("fmttext_6"),
+		b.loc("fmttext_7"),
+		b.loc("fmttext_8"),
+		b.loc("fmttext_9"),
+	}
 }
 
 func (b *Bot) getRandHint() string {
-	if len(hints) == 0 {
-		return ""
-	}
+	hints := b.hints()
 	return hints[time.Now().UnixNano()%int64(len(hints))]
 }
 
@@ -48,11 +48,11 @@ func (b *Bot) getFormatterOpts(chat *Chat) formatter.FormatOptions {
 		opts.RandHint = b.getRandHint()
 
 		if (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group == "" {
-			opts.RandHint = "Выберите группу в настройках (/setup)"
+			opts.RandHint = b.loc("fmttext_10")
 		} else if chat.Mode == "teacher" && chat.Teacher == "" {
-			opts.RandHint = "Выберите преподавателя в настройках (/setup)"
+			opts.RandHint = b.loc("fmttext_11")
 		} else if !chat.ShowDaily && !chat.ShowWeekly {
-			opts.RandHint = "Верни кнопки расписания в настройках (/buttons)"
+			opts.RandHint = b.loc("fmttext_12")
 		}
 	}
 
