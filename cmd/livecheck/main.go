@@ -69,8 +69,11 @@ func main() {
 	}
 	fmt.Printf("fetched in %s\n", time.Since(started))
 
-	issues += auditEntries("group", rasp.GetGroups())
-	issues += auditEntries("teacher", rasp.GetTeachers())
+	for kind, entries := range map[string]map[string]any{"group": rasp.GetGroups(), "teacher": rasp.GetTeachers()} {
+		result := auditEntries(kind, entries)
+		result.report(kind)
+		issues += result.Issues()
+	}
 	fmt.Printf("groups=%d teachers=%d teamNames=%d\n", len(rasp.GetGroups()), len(rasp.GetTeachers()), len(rasp.GetTeamNames()))
 
 	calls := rasp.GetCalls()
@@ -93,48 +96,67 @@ func main() {
 	fmt.Println("all invariants hold")
 }
 
-func auditEntries(kind string, entries map[string]any) int {
+type auditResult struct {
+	Entries        int
+	EmptyDays      int
+	BadDates       int
+	LessonlessDays int
+	BadLessons     int
+	DayCounts      map[int]int
+	EmptyWeekdays  map[string]int
+	Notes          []string
+}
+
+// Issues counts the findings that make the dump unhealthy.
+func (r auditResult) Issues() int {
+	return r.EmptyDays + r.BadDates + r.BadLessons
+}
+
+func auditEntries(kind string, entries map[string]any) auditResult {
 	names := make([]string, 0, len(entries))
 	for name := range entries {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	emptyDays := 0
-	badDates := 0
-	lessonless := 0
-	badLessons := 0
-	weekdayEmpty := map[string]int{}
-	dayCounts := map[int]int{}
+
+	result := auditResult{
+		Entries:       len(entries),
+		DayCounts:     map[int]int{},
+		EmptyWeekdays: map[string]int{},
+	}
+	note := func(format string, args ...any) {
+		result.Notes = append(result.Notes, fmt.Sprintf(format, args...))
+	}
+
 	for _, name := range names {
 		entry, _ := entries[name].(map[string]any)
 		days, _ := entry["days"].([]any)
 		if len(days) == 0 {
-			emptyDays++
-			if emptyDays <= 5 {
-				fmt.Printf("  %s %q: no days\n", kind, name)
+			result.EmptyDays++
+			if result.EmptyDays <= 5 {
+				note("  %s %q: no days", kind, name)
 			}
 			continue
 		}
-		dayCounts[len(days)]++
+		result.DayCounts[len(days)]++
 		for _, raw := range days {
 			day, _ := raw.(map[string]any)
 			if day == nil {
 				continue
 			}
 			dateStr, _ := day["day"].(string)
-			if _, err := time.Parse("02.01.2006", dateStr); err != nil {
-				badDates++
-				if badDates <= 5 {
-					fmt.Printf("  %s %q: unparsable day %q\n", kind, name, dateStr)
+			parsed, err := time.Parse("02.01.2006", dateStr)
+			if err != nil {
+				result.BadDates++
+				if result.BadDates <= 5 {
+					note("  %s %q: unparsable day %q", kind, name, dateStr)
 				}
 				continue
 			}
 			lessons, _ := day["lessons"].([]any)
 			if len(lessons) == 0 {
-				if parsed, err := time.Parse("02.01.2006", dateStr); err == nil {
-					weekdayEmpty[parsed.Weekday().String()]++
-				}
-				lessonless++
+				result.EmptyWeekdays[parsed.Weekday().String()]++
+				result.LessonlessDays++
 				continue
 			}
 			for _, rawLesson := range lessons {
@@ -150,29 +172,35 @@ func auditEntries(kind string, entries map[string]any) int {
 						bad = true
 					}
 					if bad {
-						badLessons++
-						if badLessons <= 5 {
-							fmt.Printf("  %s %q %s: bad lesson map: %v\n", kind, name, dateStr, entry)
+						result.BadLessons++
+						if result.BadLessons <= 5 {
+							note("  %s %q %s: bad lesson map: %v", kind, name, dateStr, entry)
 						}
 					}
 				case []any:
 					for _, sub := range entry {
 						m, _ := sub.(map[string]any)
 						if m == nil || m["lesson"] == nil || m["lesson"] == "" || m["subgroup"] == nil {
-							badLessons++
-							if badLessons <= 5 {
-								fmt.Printf("  %s %q %s: bad subgroup: %v\n", kind, name, dateStr, sub)
+							result.BadLessons++
+							if result.BadLessons <= 5 {
+								note("  %s %q %s: bad subgroup: %v", kind, name, dateStr, sub)
 							}
 						}
 					}
 				default:
-					badLessons++
-					fmt.Printf("  %s %q %s: unexpected lesson shape %T\n", kind, name, dateStr, rawLesson)
+					result.BadLessons++
+					note("  %s %q %s: unexpected lesson shape %T", kind, name, dateStr, rawLesson)
 				}
 			}
 		}
 	}
+	return result
+}
+
+func (r auditResult) report(kind string) {
+	for _, note := range r.Notes {
+		fmt.Println(note)
+	}
 	fmt.Printf("%s audit: entries=%d emptyDays=%d badDates=%d lessonlessDays=%d badLessons=%d dayCounts=%v emptyWeekdays=%v\n",
-		kind, len(entries), emptyDays, badDates, lessonless, badLessons, dayCounts, weekdayEmpty)
-	return badDates + badLessons + emptyDays
+		kind, r.Entries, r.EmptyDays, r.BadDates, r.LessonlessDays, r.BadLessons, r.DayCounts, r.EmptyWeekdays)
 }
