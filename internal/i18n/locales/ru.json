@@ -130,7 +130,7 @@
   "settings_subscription": "Подписка на рассылку: %s",
   "settings_buttons_update": "Требуется ли принудительное обновление кнопок: %s",
   "image_sent": "Изображение было отправлено",
-  "callback_selected": "Выбрано: \\\"%s\\\"",
+  "callback_selected": "Выбрано: \"%s\"",
   "calls_show_full": "Показать полностью",
   "calls_reason_line": "Причина: %s\n",
   "calls_weekdays_header": "__ <b>Звонки (будни)</b> __",
