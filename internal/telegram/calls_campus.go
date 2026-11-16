@@ -7,9 +7,6 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 )
 
-const campusButtonPrefix = "🏫 Корпус: "
-const campusAutoLabel = "авто"
-
 func (b *Bot) campusNames() []string {
 	var names []string
 	for _, variant := range b.cache.GetCalls().SiteVariants {
@@ -44,20 +41,20 @@ func (b *Bot) callsScheduleFor(chat *Chat) cache.CallsSchedule {
 	return b.cache.ActiveCallsForCampus(b.selectedCampus(chat), fallback)
 }
 
-func campusButtonText(name string, selected bool) string {
+func (b *Bot) campusButtonText(name string, selected bool) string {
 	if selected {
-		return "✅ " + campusButtonPrefix + name
+		return b.loc("campus_selected") + b.loc("campus_prefix") + name
 	}
-	return campusButtonPrefix + name
+	return b.loc("campus_prefix") + name
 }
 
-func campusButtonLabel(text string) string {
+func (b *Bot) campusButtonLabel(text string) string {
 	text = strings.TrimSpace(text)
 	text = strings.TrimPrefix(text, "✅ ")
-	if !strings.HasPrefix(text, campusButtonPrefix) {
+	if !strings.HasPrefix(text, b.loc("campus_prefix")) {
 		return ""
 	}
-	return strings.TrimSpace(strings.TrimPrefix(text, campusButtonPrefix))
+	return strings.TrimSpace(strings.TrimPrefix(text, b.loc("campus_prefix")))
 }
 
 type callsCampusTextCmd struct {
@@ -69,7 +66,7 @@ func (c *callsCampusTextCmd) Description() string { return "" }
 func (c *callsCampusTextCmd) Scene() string       { return sceneSettingsCalls }
 
 func (c *callsCampusTextCmd) MatchText(text string) bool {
-	return campusButtonLabel(text) != ""
+	return c.bot.campusButtonLabel(text) != ""
 }
 
 func (c *callsCampusTextCmd) Handler(ctx context.Context, u *Update) error {
@@ -78,8 +75,8 @@ func (c *callsCampusTextCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 
-	name := campusButtonLabel(u.Text)
-	if name != campusAutoLabel {
+	name := c.bot.campusButtonLabel(u.Text)
+	if name != c.bot.loc("campus_auto") {
 		known := false
 		for _, candidate := range c.bot.campusNames() {
 			if candidate == name {
@@ -93,7 +90,7 @@ func (c *callsCampusTextCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chat.CallsCampus = name
-	if name == campusAutoLabel {
+	if name == c.bot.loc("campus_auto") {
 		chat.CallsCampus = ""
 	}
 	if err := c.bot.chatRepo.Save(chat); err != nil {

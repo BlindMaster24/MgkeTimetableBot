@@ -91,20 +91,20 @@ func TestCallsCampusKeyboardOffersEveryCampus(t *testing.T) {
 	b, _, _ := setupTestBotWithData(t)
 
 	plain := replyRows(b.replyCallsSettings(&Chat{}, false))
-	if containsText(plain, campusButtonPrefix+"Казинца") {
+	if containsText(plain, b.loc("campus_prefix")+"Казинца") {
 		t.Error("no campus buttons before the site reports several schedules")
 	}
 
 	withCampusVariants(t, b)
 	rows := replyRows(b.replyCallsSettings(&Chat{CallsCampus: "Кнорина"}, false))
 
-	if !containsText(rows, "✅ "+campusButtonPrefix+"Кнорина") {
+	if !containsText(rows, "✅ "+b.loc("campus_prefix")+"Кнорина") {
 		t.Errorf("the selected campus must be checked: %v", rows)
 	}
-	if !containsText(rows, campusButtonPrefix+"Казинца") {
+	if !containsText(rows, b.loc("campus_prefix")+"Казинца") {
 		t.Errorf("the other campus must be offered: %v", rows)
 	}
-	if !containsText(rows, campusButtonPrefix+campusAutoLabel) {
+	if !containsText(rows, b.loc("campus_prefix")+b.loc("campus_auto")) {
 		t.Errorf("an explicit choice must be resettable: %v", rows)
 	}
 }
@@ -114,10 +114,10 @@ func TestCallsCampusTextCommandStoresTheChoice(t *testing.T) {
 	withCampusVariants(t, b)
 
 	handler := &callsCampusTextCmd{bot: b}
-	if !handler.MatchText(campusButtonText("Кнорина", false)) {
+	if !handler.MatchText(b.campusButtonText("Кнорина", false)) {
 		t.Fatal("the campus button must be matched")
 	}
-	if !handler.MatchText(campusButtonText("Кнорина", true)) {
+	if !handler.MatchText(b.campusButtonText("Кнорина", true)) {
 		t.Fatal("the checked campus button must be matched")
 	}
 	if handler.MatchText("Источник: сайт") {
@@ -129,7 +129,7 @@ func TestCallsCampusTextCommandStoresTheChoice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if label := campusButtonLabel(campusButtonText("Кнорина", true)); label != "Кнорина" {
+	if label := b.campusButtonLabel(b.campusButtonText("Кнорина", true)); label != "Кнорина" {
 		t.Errorf("label = %q", label)
 	}
 
@@ -161,7 +161,7 @@ func TestE2E_CampusButtonStoresTheChoice(t *testing.T) {
 		t.Fatalf("scene = %q", saved.Scene)
 	}
 
-	u := makeUpdate(userID, campusButtonText("Кнорина", false))
+	u := makeUpdate(userID, b.campusButtonText("Кнорина", false))
 	u.Bot = b
 	b.handleMessageText(context.Background(), u)
 
@@ -170,7 +170,7 @@ func TestE2E_CampusButtonStoresTheChoice(t *testing.T) {
 		t.Errorf("campus was not saved: %q", saved.CallsCampus)
 	}
 
-	auto := makeUpdate(userID, campusButtonPrefix+campusAutoLabel)
+	auto := makeUpdate(userID, b.loc("campus_prefix")+b.loc("campus_auto"))
 	auto.Bot = b
 	b.handleMessageText(context.Background(), auto)
 

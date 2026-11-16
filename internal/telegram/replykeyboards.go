@@ -165,7 +165,7 @@ func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMa
 		selected := b.selectedCampus(chat)
 		var row []telego.KeyboardButton
 		for _, name := range names {
-			row = append(row, telego.KeyboardButton{Text: campusButtonText(name, selected == name)})
+			row = append(row, telego.KeyboardButton{Text: b.campusButtonText(name, selected == name)})
 			if len(row) == 2 {
 				rows = append(rows, row)
 				row = nil
@@ -175,7 +175,7 @@ func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMa
 			rows = append(rows, row)
 		}
 		if selected != "" {
-			rows = append(rows, []telego.KeyboardButton{{Text: campusButtonPrefix + campusAutoLabel}})
+			rows = append(rows, []telego.KeyboardButton{{Text: b.loc("campus_prefix") + b.loc("campus_auto")}})
 		}
 	}
 
