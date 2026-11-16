@@ -22,7 +22,7 @@ func (s *compareGroupsStepA) Handle(ctx context.Context, u *Update, chat *Chat) 
 	chat.Scene = sceneCompareInput + ":" + group
 	s.bot.chatRepo.Save(chat)
 
-	prompt := fmt.Sprintf("Введите номер второй группы (например, %s)", randomKey(s.bot.cache.GetGroups()))
+	prompt := fmt.Sprintf(s.bot.loc("cmpgrp_1"), randomKey(s.bot.cache.GetGroups()))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
 }
 
@@ -40,7 +40,7 @@ func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *C
 	}
 
 	if groupA == groupB {
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Выберите две разные группы", replyMainMenu(s.bot, chat))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("cmpgrp_2"), replyMainMenu(s.bot, chat))
 	}
 
 	chat.AppendGroupHistory(groupA)
@@ -58,7 +58,7 @@ func (b *Bot) findGroupWithKeyboard(u *Update, chat *Chat, input string, keyboar
 	normalized := strings.TrimRight(strings.TrimSpace(input), "*")
 
 	if normalized == "" {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", keyboard)
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_3"), keyboard)
 		return "", false
 	}
 	if group, ok := b.lookupGroup(normalized, u.UserID); ok {
@@ -66,35 +66,35 @@ func (b *Bot) findGroupWithKeyboard(u *Update, chat *Chat, input string, keyboar
 	}
 	for _, ch := range normalized {
 		if ch < '0' || ch > '9' {
-			u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Это не число", keyboard)
+			u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_4"), keyboard)
 			return "", false
 		}
 	}
 	if len(normalized) > 3 {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Номер группы введён неверно", keyboard)
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_5"), keyboard)
 		return "", false
 	}
-	u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данной учебной группы не существует", keyboard)
+	u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_6"), keyboard)
 	return "", false
 }
 
 func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keyboard *telego.ReplyKeyboardMarkup) (string, bool, bool) {
 	if len(input) < 3 {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Фамилия введена некорректно", keyboard)
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_7"), keyboard)
 		return "", false, false
 	}
 
 	matched, tooMany := matchTeacherList(input, b.cache.GetTeachers(), b.cache.GetTeamNames(), b.searchAliases(u.UserID))
 	if len(matched) == 0 {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Данный преподаватель не найден", keyboard)
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_8"), keyboard)
 		return "", false, false
 	}
 	if tooMany {
-		u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Слишком много результатов для выборки.", keyboard)
+		u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_9"), keyboard)
 		return "", false, false
 	}
 	if len(matched) > 1 {
-		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
+		msg := b.loc("cmpgrp_10") + strings.Join(matched, "\n")
 		u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
 		return "", false, true
 	}
@@ -110,7 +110,7 @@ func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) s
 	daysB := b.weekDayLessons(ctx, minIdx, maxIdx, groupB)
 
 	lines := []string{
-		fmt.Sprintf("Сравнение групп %s и %s", groupA, groupB),
+		fmt.Sprintf(b.loc("cmpgrp_11"), groupA, groupB),
 		buildWeekLabelFromWeek(week),
 	}
 
@@ -165,7 +165,7 @@ func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) s
 
 				detail := fmt.Sprintf("%d) %s | %s", i+1, aText, bText)
 				if len(same) > 0 {
-					detail += " — совпадает"
+					detail += b.loc("cmpgrp_12")
 				}
 				overlapDetails = append(overlapDetails, detail)
 			}
@@ -176,18 +176,18 @@ func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) s
 		}
 
 		lines = append(lines, fmt.Sprintf("\n__ %s, %s __", b.weekdayFromDate(dayStr), dayStr))
-		lines = append(lines, "Совпадающие пары: "+orNone(strings.Join(overlap, ", ")))
+		lines = append(lines, b.loc("cmpgrp_13")+orNone(strings.Join(overlap, ", ")))
 		if len(overlapDetails) > 0 {
-			lines = append(lines, "Пары:")
+			lines = append(lines, b.loc("cmpgrp_14"))
 			lines = append(lines, strings.Join(overlapDetails, "\n"))
 		}
-		lines = append(lines, "Общие предметы: "+orNone(strings.Join(sameSubjects, ", ")))
+		lines = append(lines, b.loc("cmpgrp_15")+orNone(strings.Join(sameSubjects, ", ")))
 
 		formattedFree := make([]string, 0, len(free))
 		for _, pair := range free {
 			formattedFree = append(formattedFree, formatPair(pair, calls))
 		}
-		lines = append(lines, "Общие окна: "+orNone(strings.Join(formattedFree, ", ")))
+		lines = append(lines, b.loc("cmpgrp_16")+orNone(strings.Join(formattedFree, ", ")))
 	}
 
 	return strings.Join(lines, "\n")
