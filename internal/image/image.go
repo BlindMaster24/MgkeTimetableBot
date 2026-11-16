@@ -7,13 +7,15 @@ import (
 
 const renderRetention = 24 * time.Hour
 
-func RenderGroupDays(group string, dayMaps []map[string]any, outputDir string) (string, error) {
-	days := daysFromMaps(dayMaps, true)
+func RenderGroupDays(group string, dayMaps []map[string]any, outputDir string, texts Texts, stampFormat string) (string, error) {
+	days := daysFromMaps(dayMaps, true, texts)
 	if len(days) == 0 {
 		return "", fmt.Errorf("no days to render")
 	}
 
 	r := NewRenderer(outputDir)
+	r.SetTexts(texts)
+	r.SetStampFormat(stampFormat)
 	path, err := r.RenderGroupImage(group, days)
 	if err != nil {
 		return "", err
@@ -22,13 +24,15 @@ func RenderGroupDays(group string, dayMaps []map[string]any, outputDir string) (
 	return path, nil
 }
 
-func RenderTeacherDays(teacher string, dayMaps []map[string]any, outputDir string) (string, error) {
-	days := daysFromMaps(dayMaps, false)
+func RenderTeacherDays(teacher string, dayMaps []map[string]any, outputDir string, texts Texts, stampFormat string) (string, error) {
+	days := daysFromMaps(dayMaps, false, texts)
 	if len(days) == 0 {
 		return "", fmt.Errorf("no days to render")
 	}
 
 	r := NewRenderer(outputDir)
+	r.SetTexts(texts)
+	r.SetStampFormat(stampFormat)
 	path, err := r.RenderTeacherImage(teacher, days)
 	if err != nil {
 		return "", err
@@ -37,7 +41,7 @@ func RenderTeacherDays(teacher string, dayMaps []map[string]any, outputDir strin
 	return path, nil
 }
 
-func daysFromMaps(dayMaps []map[string]any, isGroup bool) []DayData {
+func daysFromMaps(dayMaps []map[string]any, isGroup bool, texts Texts) []DayData {
 	now := time.Now()
 	today := now.Format("02.01.2006")
 	tomorrow := now.AddDate(0, 0, 1).Format("02.01.2006")
@@ -51,10 +55,10 @@ func daysFromMaps(dayMaps []map[string]any, isGroup bool) []DayData {
 
 		hint := ""
 		if isGroup {
-			if dateStr == today {
-				hint = "(сегодня)"
-			} else if dateStr == tomorrow {
-				hint = "(завтра)"
+			if dateStr == today && texts.Today != "" {
+				hint = "(" + texts.Today + ")"
+			} else if dateStr == tomorrow && texts.Tomorrow != "" {
+				hint = "(" + texts.Tomorrow + ")"
 			}
 		}
 

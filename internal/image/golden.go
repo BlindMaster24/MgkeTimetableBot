@@ -109,6 +109,16 @@ func RenderGoldenSamples() (map[string][]byte, error) {
 	renderer := NewRenderer(dir)
 	renderer.SetFontPath(fontFile.Name())
 	renderer.SetNow(func() time.Time { return at })
+	renderer.SetStampFormat("02.01.2006 15:04:05,000")
+	renderer.SetTexts(Texts{
+		GroupTitle:     "Group - %s",
+		TeacherTitle:   "Teacher - %s",
+		Stamp:          "Generated at: %s",
+		Today:          "today",
+		Tomorrow:       "tomorrow",
+		GroupColumns:   [5]string{"#", "Subject", "Type", "Room", "Teacher"},
+		TeacherColumns: [5]string{"#", "Subject", "Type", "Room", "Group"},
+	})
 
 	groupPath, err := renderer.RenderGroupImage("63ТП", GoldenGroupDays())
 	if err != nil {

@@ -127,6 +127,10 @@ type Config struct {
 		} `yaml:"ics"`
 	} `yaml:"calendar"`
 
+	Image struct {
+		StampFormat string `yaml:"stamp_format"`
+	} `yaml:"image"`
+
 	Health  *HealthConfig `yaml:"health"`
 	Archive ArchiveConfig `yaml:"archive"`
 	Metrics MetricsConfig `yaml:"metrics"`
@@ -184,6 +188,7 @@ const (
 	MinimumMetricsToken        = 8
 	DefaultSQLiteBusyTimeoutMS = 5000
 	DefaultSQLiteBusyRetries   = 1
+	DefaultImageStampFormat    = "02.01.2006"
 )
 
 func (c *Config) ResolvedSQLiteBusyTimeout() time.Duration {
@@ -258,6 +263,10 @@ func (c *Config) RetentionEnabled() bool {
 
 func (c *Config) MaintenanceEnabled() bool {
 	return c.BackupEnabled() || c.RetentionEnabled()
+}
+
+func (c *Config) ResolvedStampFormat() string {
+	return pathOr(strings.TrimSpace(c.Image.StampFormat), DefaultImageStampFormat)
 }
 
 func (c *Config) ResolvedMetricsPath() string {

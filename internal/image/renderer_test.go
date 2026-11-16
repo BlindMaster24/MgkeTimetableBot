@@ -136,7 +136,7 @@ func TestRenderDaysPrunesOldRenders(t *testing.T) {
 		"day":     "07.09.2026",
 		"lessons": []any{map[string]any{"lesson": "Математика", "cabinet": "101"}},
 	}}
-	path, err := RenderGroupDays("63", days, dir)
+	path, err := RenderGroupDays("63", days, dir, Texts{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}

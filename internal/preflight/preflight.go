@@ -955,7 +955,7 @@ func renderCheck(name string, days []map[string]any, opts Options) Check {
 		defer os.RemoveAll(dir)
 	}
 
-	path, err := imagepkg.RenderGroupDays(name, days, dir)
+	path, err := imagepkg.RenderGroupDays(name, days, dir, imagepkg.Texts{}, "")
 	if err != nil {
 		return Check{Name: "image", Level: LevelFail, Detail: "render: " + err.Error()}
 	}

@@ -195,7 +195,7 @@ func (b *Bot) sendGroupResult(ctx context.Context, u *Update, chat *Chat, group,
 		return b.showWeekDays(ctx, u, chat, "group", group, &week)
 	case "image":
 		_, days := b.relevantWeekDays(data)
-		path, err := imagepkg.RenderGroupDays(group, days, "./cache/images")
+		path, err := imagepkg.RenderGroupDays(group, days, "./cache/images", b.imageTexts(), b.cfg.ResolvedStampFormat())
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
 		}
@@ -268,7 +268,7 @@ func (b *Bot) sendTeacherResult(ctx context.Context, u *Update, chat *Chat, teac
 		return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("history_enter_week"), withCancelButton(teacherHistoryKeyboard(chat)))
 	case "image":
 		_, days := b.relevantWeekDays(data)
-		path, err := imagepkg.RenderTeacherDays(teacher, days, "./cache/images")
+		path, err := imagepkg.RenderTeacherDays(teacher, days, "./cache/images", b.imageTexts(), b.cfg.ResolvedStampFormat())
 		if err != nil {
 			return u.Bot.SendText(u.ChatID, b.loc("image_failed"))
 		}

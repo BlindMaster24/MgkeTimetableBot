@@ -80,9 +80,9 @@ func (b *Bot) handleImagePayload(ctx context.Context, u *Update, typePart, value
 	var path string
 	var err error
 	if typeName == "teacher" {
-		path, err = imagepkg.RenderTeacherDays(value, days, "./cache/images")
+		path, err = imagepkg.RenderTeacherDays(value, days, "./cache/images", b.imageTexts(), b.cfg.ResolvedStampFormat())
 	} else {
-		path, err = imagepkg.RenderGroupDays(value, days, "./cache/images")
+		path, err = imagepkg.RenderGroupDays(value, days, "./cache/images", b.imageTexts(), b.cfg.ResolvedStampFormat())
 	}
 	if err != nil {
 		b.log.Error().Err(err).Msg("image render failed")

@@ -18,11 +18,24 @@ import (
 //go:embed mgke.png
 var logoPNG []byte
 
+type Texts struct {
+	GroupTitle     string
+	TeacherTitle   string
+	Stamp          string
+	Credit         string
+	Today          string
+	Tomorrow       string
+	GroupColumns   [5]string
+	TeacherColumns [5]string
+}
+
 type Renderer struct {
-	outputDir string
-	cacheDir  string
-	fontPath  string
-	now       func() time.Time
+	outputDir   string
+	cacheDir    string
+	fontPath    string
+	now         func() time.Time
+	texts       Texts
+	stampFormat string
 }
 
 func NewRenderer(outputDir string) *Renderer {
@@ -36,6 +49,14 @@ func (r *Renderer) SetFontPath(path string) {
 
 func (r *Renderer) SetNow(now func() time.Time) {
 	r.now = now
+}
+
+func (r *Renderer) SetTexts(texts Texts) {
+	r.texts = texts
+}
+
+func (r *Renderer) SetStampFormat(layout string) {
+	r.stampFormat = layout
 }
 
 func (r *Renderer) clock() time.Time {
@@ -103,9 +124,16 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		return "", fmt.Errorf("no days to render")
 	}
 
-	cols := groupColumns
+	cols := append([]Column(nil), groupColumns...)
+	titles := r.texts.GroupColumns
 	if !isGroup {
-		cols = teacherColumns
+		cols = append([]Column(nil), teacherColumns...)
+		titles = r.texts.TeacherColumns
+	}
+	for i := range cols {
+		if titles[i] != "" {
+			cols[i].Title = titles[i]
+		}
 	}
 
 	const (
@@ -204,9 +232,9 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 
 	dc.SetColor(color.Black)
 	dc.LoadFontFace(fontPath, titleFont)
-	title := fmt.Sprintf("Группа - %s", ti.Group)
+	title := fmt.Sprintf(titleFormat(r.texts.GroupTitle), ti.Group)
 	if !isGroup {
-		title = fmt.Sprintf("Преподаватель - %s", ti.Teacher)
+		title = fmt.Sprintf(titleFormat(r.texts.TeacherTitle), ti.Teacher)
 	}
 	dc.DrawStringAnchored(title, float64(totalW)/2, 45, 0.5, 0.5)
 
@@ -308,8 +336,16 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	dc.DrawStringAnchored("Viber: https://mgke.keller.by/viber", padding, baseY-18, 0, 0.5)
 	dc.DrawStringAnchored("TG: https://t.me/mgke_slave_bot", padding, baseY-9, 0, 0.5)
 	dc.DrawStringAnchored("VK: https://vk.com/mgke_slave", padding, baseY, 0, 0.5)
-	dc.DrawStringAnchored(fmt.Sprintf("Сгенерированно в: %s", r.clock().Format("02.01.2006 15:04:05,000")), float64(totalW-padding), baseY-9, 1, 0.5)
-	dc.DrawStringAnchored("Таблица с расписанием была сгенерированна в ботах Алексея Костюка из 63 группы", float64(totalW-padding), baseY, 1, 0.5)
+	layout := r.stampFormat
+	if layout == "" {
+		layout = defaultStampFormat
+	}
+	if r.texts.Stamp != "" {
+		dc.DrawStringAnchored(fmt.Sprintf(r.texts.Stamp, r.clock().Format(layout)), float64(totalW-padding), baseY-9, 1, 0.5)
+	}
+	if r.texts.Credit != "" {
+		dc.DrawStringAnchored(r.texts.Credit, float64(totalW-padding), baseY, 1, 0.5)
+	}
 
 	fname := fmt.Sprintf("timetable_%d.png", time.Now().UnixNano())
 	outPath := filepath.Join(r.outputDir, fname)
@@ -323,6 +359,15 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		return "", err
 	}
 	return outPath, nil
+}
+
+const defaultStampFormat = "02.01.2006"
+
+func titleFormat(format string) string {
+	if format == "" {
+		return "%s"
+	}
+	return format
 }
 
 func (r *Renderer) Cleanup(maxAge time.Duration) {

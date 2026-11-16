@@ -110,6 +110,9 @@ archive:
   retention_days: 0
   maintenance_schedule: "0 30 4 * * *"
 
+image:
+  stamp_format: "02.01.2006"
+
 metrics:
   enabled: false
   path: "/metrics"
