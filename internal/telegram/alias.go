@@ -79,9 +79,9 @@ func (r *AliasRepository) Clear(userID int64) error {
 type aliasCmd struct{ bot *Bot }
 
 func (c *aliasCmd) Name() string        { return "/alias" }
-func (c *aliasCmd) Description() string { return "Настройки алиасов" }
+func (c *aliasCmd) Description() string { return c.bot.loc("aliastext_1") }
 func (c *aliasCmd) MatchText(text string) bool {
-	return text == "Алиасы" || text == "Настройка алиасов"
+	return text == c.bot.loc("aliastext_2") || text == c.bot.loc("aliastext_3")
 }
 func (c *aliasCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
@@ -94,19 +94,19 @@ func (c *aliasCmd) Handler(ctx context.Context, u *Update) error {
 }
 
 func (b *Bot) showAliasMenu(u *Update) error {
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Меню настройки алиасов.", b.replySettingsAliases())
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("aliastext_4"), b.replySettingsAliases())
 }
 
 func (b *Bot) showAliasList(u *Update, userID int64) error {
 	aliases, err := b.aliasRepo.List(userID)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения алиасов")
+		return u.Bot.SendText(u.ChatID, b.loc("aliastext_5"))
 	}
 	if len(aliases) == 0 {
-		return u.Bot.SendText(u.ChatID, "У вас нет алиасов")
+		return u.Bot.SendText(u.ChatID, b.loc("aliastext_6"))
 	}
 	var lines []string
-	lines = append(lines, "Ваши алиасы:")
+	lines = append(lines, b.loc("aliastext_7"))
 	for i, a := range aliases {
 		lines = append(lines, fmt.Sprintf("%d. %s → %s", i+1, a.Key, a.Value))
 	}
@@ -116,15 +116,22 @@ func (b *Bot) showAliasList(u *Update, userID int64) error {
 func (b *Bot) showAliasRemoveList(u *Update, userID int64) error {
 	aliases, err := b.aliasRepo.List(userID)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, "Ошибка чтения алиасов")
+		return u.Bot.SendText(u.ChatID, b.loc("aliastext_8"))
 	}
 	if len(aliases) == 0 {
-		return u.Bot.SendText(u.ChatID, "У вас нет алиасов для удаления")
+		return u.Bot.SendText(u.ChatID, b.loc("aliastext_9"))
 	}
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Выберите алиас для удаления:", aliasRemoveKeyboard(aliases))
+	return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("aliastext_10"), aliasRemoveKeyboard(b, aliases))
 }
 
-func aliasRemoveKeyboard(aliases []Alias) *telego.InlineKeyboardMarkup {
+func aliasMenuLabel(b *Bot) string {
+	if b == nil {
+		return ""
+	}
+	return b.loc("aliastext_11")
+}
+
+func aliasRemoveKeyboard(b *Bot, aliases []Alias) *telego.InlineKeyboardMarkup {
 	var rows [][]telego.InlineKeyboardButton
 	for _, a := range aliases {
 		rows = append(rows, []telego.InlineKeyboardButton{
@@ -132,7 +139,7 @@ func aliasRemoveKeyboard(aliases []Alias) *telego.InlineKeyboardMarkup {
 		})
 	}
 	rows = append(rows, []telego.InlineKeyboardButton{
-		{Text: "Назад", CallbackData: "alias:menu"},
+		{Text: aliasMenuLabel(b), CallbackData: "alias:menu"},
 	})
 	return &telego.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
@@ -162,21 +169,21 @@ func (b *Bot) handleAliasAdd(ctx context.Context, u *Update, chat *Chat) {
 
 	parts := strings.SplitN(input, "=", 2)
 	if len(parts) != 2 {
-		b.SendText(u.ChatID, "Неверный формат. Используйте: оригинальное_название = замена")
+		b.SendText(u.ChatID, b.loc("aliastext_12"))
 		return
 	}
 
 	key := strings.TrimSpace(parts[0])
 	value := strings.TrimSpace(parts[1])
 	if key == "" || value == "" {
-		b.SendText(u.ChatID, "Неверный формат. Используйте: оригинальное_название = замена")
+		b.SendText(u.ChatID, b.loc("aliastext_13"))
 		return
 	}
 
 	if err := b.aliasRepo.Add(u.UserID, key, value); err != nil {
-		b.SendText(u.ChatID, "Ошибка сохранения алиаса")
+		b.SendText(u.ChatID, b.loc("aliastext_14"))
 		return
 	}
 
-	b.SendText(u.ChatID, fmt.Sprintf("Алиас добавлен: %s → %s", key, value))
+	b.SendText(u.ChatID, fmt.Sprintf(b.loc("aliastext_15"), key, value))
 }

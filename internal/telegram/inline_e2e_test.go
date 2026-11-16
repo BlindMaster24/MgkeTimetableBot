@@ -29,7 +29,7 @@ func inlineScenarios(t *testing.T, b *Bot, repo *Repository) []CallbackLayout {
 	aliases := []Alias{{Key: "Математика", Value: "Матем"}}
 	layouts = append(layouts, CallbackLayout{
 		Builder: "aliasRemoveKeyboard",
-		Rows:    callbackRows(aliasRemoveKeyboard(aliases)),
+		Rows:    callbackRows(aliasRemoveKeyboard(nil, aliases)),
 	})
 	return layouts
 }
