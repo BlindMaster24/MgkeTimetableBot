@@ -14,7 +14,7 @@ type callsEditInputScene struct{ bot *Bot }
 func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
 	parsed := parseCallsInput(u.Text)
 	if parsed == nil {
-		return u.Bot.SendText(u.ChatID, "Не удалось распознать расписание. Проверьте формат.")
+		return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_unrecognized"))
 	}
 
 	chat.CallsEditInput = u.Text
@@ -23,11 +23,11 @@ func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat)
 
 	reasonKb := withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Пропустить", CallbackData: "answer:Пропустить"}},
+			{{Text: s.bot.loc("calls_edit_skip"), CallbackData: "answer:Пропустить"}},
 		},
 	})
 
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Укажите причину изменения или нажмите Пропустить", reasonKb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, s.bot.loc("calls_edit_reason_prompt"), reasonKb)
 }
 
 type callsEditReasonScene struct{ bot *Bot }
@@ -41,13 +41,13 @@ func (s *callsEditReasonScene) Handle(ctx context.Context, u *Update, chat *Chat
 	confirmKb := withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{
-				{Text: "Отправить", CallbackData: "answer:Отправить"},
-				{Text: "Не отправлять", CallbackData: "answer:Не отправлять"},
+				{Text: s.bot.loc("calls_edit_send"), CallbackData: "answer:Отправить"},
+				{Text: s.bot.loc("calls_edit_dont_send"), CallbackData: "answer:Не отправлять"},
 			},
 		},
 	})
 
-	return u.Bot.SendTextWithKeyboard(u.ChatID, "Отправить уведомление всем?", confirmKb)
+	return u.Bot.SendTextWithKeyboard(u.ChatID, s.bot.loc("calls_edit_confirm"), confirmKb)
 }
 
 type callsEditConfirmScene struct{ bot *Bot }
@@ -57,7 +57,7 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 	notifyNow := strings.Contains(confirmText, "отправить")
 
 	reason := strings.TrimSpace(chat.CallsEditReason)
-	if reason == "" || strings.EqualFold(reason, "пропустить") || strings.EqualFold(reason, "скип") {
+	if reason == "" || strings.EqualFold(reason, s.bot.loc("calls_edit_reason_skip")) || strings.EqualFold(reason, s.bot.loc("calls_edit_reason_skip_short")) {
 		reason = ""
 	}
 
@@ -67,7 +67,7 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 		chat.CallsEditInput = ""
 		chat.CallsEditReason = ""
 		s.bot.chatRepo.Save(chat)
-		return u.Bot.SendText(u.ChatID, "Не удалось распознать расписание. Проверьте формат.")
+		return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_unrecognized"))
 	}
 
 	s.bot.cache.SetCallsManualNotify(parsed.Weekdays, parsed.Saturday, reason, notifyNow)
@@ -78,9 +78,9 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 	s.bot.chatRepo.Save(chat)
 
 	if notifyNow {
-		return u.Bot.SendText(u.ChatID, "Расписание звонков обновлено и уведомление отправлено.")
+		return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_done_notified"))
 	}
-	return u.Bot.SendText(u.ChatID, "Расписание звонков обновлено вручную.")
+	return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_done_manual"))
 }
 
 var callsRowRe = regexp.MustCompile(`\b(\d{1,2})[:.](\d{2})\b`)
