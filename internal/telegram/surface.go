@@ -169,7 +169,7 @@ func (b *Bot) surfaceKeyboards(chat *Chat) []builtKeyboard {
 		inline("weekTimetableButton(teacher)", func() *telego.InlineKeyboardMarkup {
 			return weekTimetableButton("На неделю", "teacher", "Иванов И.И.", 0, true)
 		}),
-		inline("callsFullKeyboard", callsFullKeyboard),
+		inline("callsFullKeyboard", func() *telego.InlineKeyboardMarkup { return callsFullKeyboard(b) }),
 		inline("weekControlKeyboard", func() *telego.InlineKeyboardMarkup {
 			return b.weekControlKeyboard(context.Background(), "group", "100", 0, false)
 		}),

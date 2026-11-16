@@ -92,7 +92,7 @@ func (b *Bot) handleImagePayload(ctx context.Context, u *Update, typePart, value
 	if err := b.sendPhotoReply(u.ChatID, path, u.MessageID); err != nil {
 		return "", err
 	}
-	return "Изображение было отправлено", nil
+	return b.loc("image_sent"), nil
 }
 
 type cancelCb struct{ bot *Bot }
@@ -117,7 +117,7 @@ type answerCb struct{ bot *Bot }
 func (cb *answerCb) Prefix() string { return "answer:" }
 func (cb *answerCb) Handler(ctx context.Context, u *Update) error {
 	answer := strings.TrimPrefix(u.Data, "answer:")
-	cb.bot.AnswerCallback(u.Callback.ID, fmt.Sprintf("Выбрано: \"%s\"", answer))
+	cb.bot.AnswerCallback(u.Callback.ID, fmt.Sprintf(cb.bot.loc("callback_selected"), answer))
 	if _, err := cb.bot.chatRepo.FindOrCreate("telegram", u.UserID); err != nil {
 		return nil
 	}
@@ -126,10 +126,10 @@ func (cb *answerCb) Handler(ctx context.Context, u *Update) error {
 	return nil
 }
 
-func callsFullKeyboard() *telego.InlineKeyboardMarkup {
+func callsFullKeyboard(b *Bot) *telego.InlineKeyboardMarkup {
 	return &telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: "Показать полностью", CallbackData: "calls_full"}},
+			{{Text: b.loc("calls_show_full"), CallbackData: "calls_full"}},
 		},
 	}
 }
@@ -164,14 +164,14 @@ func (b *Bot) showCalls(u *Update, chat *Chat, full bool) {
 	var msg []string
 	calls := b.cache.GetCalls()
 	if calls.Active.Source == "manual" && calls.ManualReason != "" {
-		msg = append(msg, fmt.Sprintf("Причина: %s\n", calls.ManualReason))
+		msg = append(msg, fmt.Sprintf(b.loc("calls_reason_line"), calls.ManualReason))
 	}
 	if line := b.callsCampusLine(chat); line != "" {
 		msg = append(msg, line)
 	}
-	msg = append(msg, "__ <b>Звонки (будни)</b> __")
+	msg = append(msg, b.loc("calls_weekdays_header"))
 	msg = append(msg, b.callsLines(activeWeekdays, userMax, full, []int{1, 2, 3, 4, 5}))
-	msg = append(msg, "\n__ <b>Звонки (суббота)</b> __")
+	msg = append(msg, b.loc("calls_saturday_header"))
 	msg = append(msg, b.callsLines(activeSaturday, userMax, full, []int{6}))
 	if line := b.callsFreshnessLine(); line != "" {
 		msg = append(msg, "\n"+line)
@@ -179,7 +179,7 @@ func (b *Bot) showCalls(u *Update, chat *Chat, full bool) {
 
 	text := strings.Join(msg, "\n")
 	if !full {
-		b.sendOrEdit(u, text, callsFullKeyboard())
+		b.sendOrEdit(u, text, callsFullKeyboard(b))
 		return
 	}
 
@@ -260,7 +260,7 @@ func (cb *reparseCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.AnswerCallback(u.Callback.ID, "")
 	}
 	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("access_denied"))
 	}
 	if cb.bot.parseFunc == nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("parse_not_available"))
@@ -293,7 +293,7 @@ func (cb *calendarSyncCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.AnswerCallback(u.Callback.ID, "")
 	}
 	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("access_denied"))
 	}
 	if cb.bot.calendarSync == nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("calendar_sync_unavailable"))
@@ -327,7 +327,7 @@ func (cb *apiProbeCb) Handler(ctx context.Context, u *Update) error {
 		cb.bot.AnswerCallback(u.Callback.ID, "")
 	}
 	if !cb.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("access_denied"))
 	}
 	if cb.bot.apiProbe == nil {
 		return u.Bot.SendText(u.ChatID, cb.bot.loc("api_probe_unavailable"))
@@ -371,7 +371,7 @@ func (b *Bot) apiProbeText(results []apiprobe.Result) string {
 		if result.Err == "" {
 			status = strconv.Itoa(result.Status)
 		}
-		row := fmt.Sprintf("%-*s %3s %8s", width, result.Label(), status, apiDuration(result.Duration))
+		row := fmt.Sprintf("%-*s %3s %8s", width, result.Label(), status, b.apiDuration(result.Duration))
 		rows = append(rows, row+" "+apiProbeMark(result, slow))
 	}
 
@@ -379,7 +379,7 @@ func (b *Bot) apiProbeText(results []apiprobe.Result) string {
 	lines = append(lines, b.locData("api_probe_summary", map[string]interface{}{
 		"Healthy": apiprobe.HealthyCount(results),
 		"Total":   len(results),
-		"Slowest": apiProbeSlowest(results),
+		"Slowest": b.apiProbeSlowest(results),
 	}))
 
 	if failed := apiprobe.Failed(results); len(failed) > 0 {
@@ -391,7 +391,7 @@ func (b *Bot) apiProbeText(results []apiprobe.Result) string {
 	}
 
 	if slow > 0 {
-		lines = append(lines, b.locData("api_probe_slow_note", map[string]interface{}{"Threshold": apiDuration(slow)}))
+		lines = append(lines, b.locData("api_probe_slow_note", map[string]interface{}{"Threshold": b.apiDuration(slow)}))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -406,19 +406,19 @@ func apiProbeMark(result apiprobe.Result, slow time.Duration) string {
 	return "✅"
 }
 
-func apiProbeSlowest(results []apiprobe.Result) string {
+func (b *Bot) apiProbeSlowest(results []apiprobe.Result) string {
 	slowest, ok := apiprobe.Slowest(results)
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("%s — %s", slowest.Label(), apiDuration(slowest.Duration))
+	return fmt.Sprintf("%s — %s", slowest.Label(), b.apiDuration(slowest.Duration))
 }
 
-func apiDuration(value time.Duration) string {
+func (b *Bot) apiDuration(value time.Duration) string {
 	if value < time.Second {
-		return fmt.Sprintf("%d мс", value.Milliseconds())
+		return fmt.Sprintf(b.loc("api_duration_ms"), value.Milliseconds())
 	}
-	return fmt.Sprintf("%.2f с", value.Seconds())
+	return fmt.Sprintf(b.loc("api_duration_seconds"), value.Seconds())
 }
 
 func (b *Bot) slowThreshold() time.Duration {

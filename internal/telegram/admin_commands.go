@@ -244,8 +244,8 @@ func (b *Bot) apiDiagnostics() string {
 			"Label":    apiEndpointLabel(endpoint.Method, endpoint.Path),
 			"Requests": endpoint.Requests,
 			"Errors":   endpoint.Errors,
-			"Avg":      apiDuration(time.Duration(endpoint.AvgMillis) * time.Millisecond),
-			"Max":      apiDuration(time.Duration(endpoint.MaxMillis) * time.Millisecond),
+			"Avg":      b.apiDuration(time.Duration(endpoint.AvgMillis) * time.Millisecond),
+			"Max":      b.apiDuration(time.Duration(endpoint.MaxMillis) * time.Millisecond),
 		})
 		if endpoint.Slow {
 			line = "🐌 " + line
