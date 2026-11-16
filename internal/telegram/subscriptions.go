@@ -10,9 +10,9 @@ const MAX_SUBSCRIPTIONS = 5
 func (b *Bot) formatSubscriptionsList(list []Subscription) string {
 	var lines []string
 	for i, s := range list {
-		label := "Группа"
+		label := b.loc("subs_group_label")
 		if s.Type == "teacher" {
-			label = "Преподаватель"
+			label = b.loc("subs_teacher_label")
 		}
 		lines = append(lines, fmt.Sprintf("%d. %s %s", i+1, label, s.Value))
 	}
@@ -22,7 +22,7 @@ func (b *Bot) formatSubscriptionsList(list []Subscription) string {
 func (b *Bot) subTestPrompt(u *Update) error {
 	list, _ := b.chatRepo.GetSubscriptions(u.UserID)
 	if len(list) == 0 {
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", b.replySubscriptionsMenu())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("subs_empty"), b.replySubscriptionsMenu())
 	}
 
 	chat, err := b.chatRepo.FindOrCreate("telegram", u.UserID)
