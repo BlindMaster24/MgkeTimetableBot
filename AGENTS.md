@@ -245,7 +245,7 @@ These are settled; do not reopen them without the user asking.
 - Naming: `camelCase` vars/functions, `PascalCase` exported types/methods, `SCREAMING_SNAKE_CASE` constants.
 - Do not add code comments.
 - Keep package boundaries: cross-package access goes through exported APIs.
-- New user-facing text goes to `internal/i18n/locales/ru.json`. Literals that reproduce the old TypeScript wording (formatters, weekday names, menu prompts pinned by the parity and golden tests) stay inline: they are the contract, not a translation key.
+- New user-facing text goes to `internal/i18n/locales/ru.json`. Input alphabets and sample data stay in Go: the Cyrillic letter in `mathAllowedCharacters`, the input regexes in `inputcmds.go`, the surface fixtures in `surface.go` and the golden samples in `image/golden.go` are data the code matches or renders, not labels. Literals that reproduce the old TypeScript wording (formatters, weekday names, menu prompts pinned by the parity and golden tests) stay inline: they are the contract, not a translation key.
 
 ## Testing Guidelines
 - Test runner: `go test`.

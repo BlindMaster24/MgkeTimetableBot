@@ -77,8 +77,7 @@
   README.
 - Новый источник парсинга: файл в `internal/parser/` с `Report`: обязательные
   пробы называют селектор, пропуски считаются через `probeSkipped`.
-- Новый текст: ключ в `ru.json`, в коде только `b.loc`/`locData`; паритетные
-  литералы паритета и голденов остаются как есть.
+- Новый текст: ключ в `ru.json`, в коде только `b.loc`/`locData`. Данные остаются в Go: кириллическая буква в `mathAllowedCharacters`, входные регулярки в `inputcmds.go`, фикстуры поверхности в `surface.go` и эталонные примеры в `image/golden.go` — это то, что код сопоставляет или рисует, а не подписи.
 - Новый алерт: `internal/health` + текст в `internal/notification/health.go`.
 - Новый сценарий e2e: `tests/e2e_test.go` или `internal/telegram/*_e2e_test.go`.
 
