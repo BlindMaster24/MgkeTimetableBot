@@ -111,7 +111,7 @@ func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) s
 
 	lines := []string{
 		fmt.Sprintf(b.loc("cmpgrp_11"), groupA, groupB),
-		buildWeekLabelFromWeek(week),
+		b.buildWeekLabelFromWeek(week),
 	}
 
 	for dayIndex := minIdx; dayIndex <= maxIdx; dayIndex++ {

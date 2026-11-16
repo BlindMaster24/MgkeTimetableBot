@@ -825,6 +825,8 @@
   "accept_not_number": "это не число",
   "accept_error_prefix": "Ошибка выдачи доступа: ",
   "accept_not_found": "Чат %d не найден",
+  "week_image_button": "📷 Сгенерировать изображение",
+  "week_label": "Учебная неделя №%d (%s-%s)",
   "access_denied": "⛔ Доступ запрещён",
   "api_duration_ms": "%d мс",
   "api_duration_seconds": "%.2f с",

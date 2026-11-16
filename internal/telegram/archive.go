@@ -51,7 +51,7 @@ func (c *archiveCmd) showWeek(ctx context.Context, u *Update, chat *Chat, rawWee
 
 	week := utils.WeekIndexFromAcademicNumber(weekNum, c.bot.nowTime())
 	minIdx, maxIdx := week.WeekDayIndexRange()
-	return c.showRange(ctx, u, chat, minIdx, maxIdx, buildWeekLabelFromWeek(week), c.bot.loc("archtext_6"), week.Value())
+	return c.showRange(ctx, u, chat, minIdx, maxIdx, c.bot.buildWeekLabelFromWeek(week), c.bot.loc("archtext_6"), week.Value())
 }
 
 func (c *archiveCmd) showDay(ctx context.Context, u *Update, chat *Chat, raw string) error {

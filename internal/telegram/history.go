@@ -100,7 +100,7 @@ func (b *Bot) showWeekDays(ctx context.Context, u *Update, chat *Chat, kind, val
 
 	opts := b.getFormatterOpts(chat)
 	opts.ShowHeader = true
-	opts.WeekLabel = buildWeekLabelFromWeek(*weekIndex)
+	opts.WeekLabel = b.buildWeekLabelFromWeek(*weekIndex)
 
 	minIdx, maxIdx := weekIndex.WeekDayIndexRange()
 	days, result := b.archiveDaysForRange(ctx, kind, value, minIdx, maxIdx)

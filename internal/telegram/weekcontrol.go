@@ -54,7 +54,7 @@ func (b *Bot) weekControlKeyboardHeader(ctx context.Context, typeName, value str
 
 	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, []telego.InlineKeyboardButton{
 		{
-			Text:         "📷 Сгенерировать изображение",
+			Text:         b.loc("week_image_button"),
 			CallbackData: fmt.Sprintf("image_%s:%s:%d", typeLetter, value, weekIndex),
 		},
 	})
@@ -162,7 +162,7 @@ func (b *Bot) handleTimetableCb(ctx context.Context, u *Update, chat *Chat, type
 	}
 
 	opts := b.fmtOpts(chat, p.ShowHeader)
-	opts.WeekLabel = buildWeekLabelFromWeek(week)
+	opts.WeekLabel = b.buildWeekLabelFromWeek(week)
 
 	text := b.formatDays(chat, typeName, p.Value, days, opts)
 	if text == "" {
@@ -200,7 +200,7 @@ func (b *Bot) showWeekSchedule(ctx context.Context, u *Update, chat *Chat) error
 	}
 
 	opts := b.fmtOpts(chat, false)
-	opts.WeekLabel = buildWeekLabelFromWeek(week)
+	opts.WeekLabel = b.buildWeekLabelFromWeek(week)
 	text := b.formatDays(chat, target.typeName, target.value, days, opts)
 	if text == "" {
 		return u.Bot.SendText(u.ChatID, b.loc("no_timetable"))
@@ -210,14 +210,14 @@ func (b *Bot) showWeekSchedule(ctx context.Context, u *Update, chat *Chat) error
 	return b.sendOrEdit(u, text, kb)
 }
 
-func buildWeekLabelFromWeek(week utils.WeekIndex) string {
+func (b *Bot) buildWeekLabelFromWeek(week utils.WeekIndex) string {
 	d1, d2 := week.WeekRange()
 	weekNum := week.AcademicWeekNumber()
-	return fmt.Sprintf("Учебная неделя №%d (%s-%s)", weekNum,
+	return fmt.Sprintf(b.loc("week_label"), weekNum,
 		d1.Format("02.01.2006"), d2.Format("02.01.2006"))
 }
 
-func buildWeekLabel(days []map[string]any) string {
+func (b *Bot) buildWeekLabel(days []map[string]any) string {
 	if len(days) == 0 {
 		return ""
 	}
@@ -234,7 +234,7 @@ func buildWeekLabel(days []map[string]any) string {
 	week := utils.WeekIndexFromDate(t1)
 	weekNum := week.AcademicWeekNumber()
 
-	return fmt.Sprintf("Учебная неделя №%d (%s-%s)", weekNum,
+	return fmt.Sprintf(b.loc("week_label"), weekNum,
 		t1.Format("02.01.2006"), t2.Format("02.01.2006"))
 }
 
