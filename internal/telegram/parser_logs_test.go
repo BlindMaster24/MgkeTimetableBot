@@ -1,131 +1,79 @@
 package telegram
 
 import (
+	"context"
 	"strings"
 	"testing"
-
-	"github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 )
 
-func TestParserDiagnosticsRenderFailingSelectors(t *testing.T) {
-	b := setupTestBot(t)
+func TestParserLogsRefusesAStranger(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 424242)
 
-	report := parser.Report{Source: parser.SourceGroups, URL: "https://example.by/groups", Items: 3}
-	report.Warn("group 84: day columns found, but every day is empty")
-	report.Fallbacks = append(report.Fallbacks, "group label without the 'Группа -' prefix: 84")
-	report.Probes = append(report.Probes, parser.Probe{
-		Source:   parser.SourceGroups,
-		Selector: "td lesson cells",
-		Expected: "groups with at least one lesson",
-		Found:    0,
-		Required: true,
-	})
-
-	b.RecordParserReport(report)
-
-	lines := strings.Join(b.parserDiagnostics(), "\n")
-	for _, want := range []string{
-		"groups",
-		"items=3",
-		"td lesson cells",
-		"https://example.by/groups",
-	} {
-		if !strings.Contains(lines, want) {
-			t.Errorf("diagnostics omit %q:\n%s", want, lines)
-		}
+	u := makeUpdate(1000, "/parserlogs")
+	u.Bot = b
+	if err := (&parserLogsCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if got := caller.last(); got != b.loc("admcmd_6") {
+		t.Fatalf("a stranger must be refused, got %q", got)
 	}
 }
 
-func TestParserDiagnosticsRenderSkippedItems(t *testing.T) {
-	b := setupTestBot(t)
+func TestParserLogsSaysWhenThereIsNothingToShow(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 424242)
 
-	report := parser.Report{Source: parser.SourceGroups, Items: 3}
-	report.Probes = append(report.Probes, parser.Probe{
-		Source:   parser.SourceGroups,
-		Selector: "th: day header without dd.MM.yyyy",
-		Expected: "every day column carries a date",
-		Missing:  1,
-		Required: true,
-		Inverted: true,
-	})
-
-	b.RecordParserReport(report)
-
-	lines := strings.Join(b.parserDiagnostics(), "\n")
-	for _, want := range []string{
-		"th: day header without dd.MM.yyyy",
-		"пропущено: 1",
-	} {
-		if !strings.Contains(lines, want) {
-			t.Errorf("diagnostics omit %q:\n%s", want, lines)
-		}
+	u := makeUpdate(424242, "/parserlogs")
+	u.Bot = b
+	if err := (&parserLogsCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	if got := caller.last(); got != b.loc("parser_logs_no_logs") {
+		t.Fatalf("an empty log must say so, got %q", got)
 	}
 }
 
-func TestParserDiagnosticsRenderAdvisorySelectors(t *testing.T) {
-	b := setupTestBot(t)
+func TestParserLogsListsSuccessesAndFailures(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 424242)
 
-	report := parser.Report{Source: parser.SourceCalls, Items: 2}
-	report.Probes = append(report.Probes, parser.Probe{
-		Source:   parser.SourceCalls,
-		Selector: "[date-updated] with dd.MM.yyyy",
-		Expected: "bell schedule page date",
-		Found:    0,
-		Advisory: true,
-	})
+	b.AddParseLog(true, "группы обновлены")
+	b.AddParseLog(false, "преподаватели упали")
 
-	b.RecordParserReport(report)
+	u := makeUpdate(424242, "/getUpdaterLogs")
+	u.Bot = b
+	if err := (&parserLogsCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
 
-	lines := strings.Join(b.parserDiagnostics(), "\n")
-	for _, want := range []string{
-		"[date-updated] with dd.MM.yyyy",
-		b.loc("parser_logs_advisory_prefix"),
-	} {
-		if !strings.Contains(lines, want) {
-			t.Errorf("diagnostics omit %q:\n%s", want, lines)
-		}
+	text := caller.last()
+	if !strings.Contains(text, "✅") || !strings.Contains(text, "группы обновлены") {
+		t.Fatalf("a success line is missing: %q", text)
+	}
+	if !strings.Contains(text, "❌") || !strings.Contains(text, "преподаватели упали") {
+		t.Fatalf("a failure line is missing: %q", text)
 	}
 }
 
-func TestParserDiagnosticsReportCleanState(t *testing.T) {
-	b := setupTestBot(t)
+func TestParserLogsKeepsTheNewestTailOfALongAnswer(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 424242)
 
-	b.RecordParserReport(parser.Report{Source: parser.SourceCalls, Items: 7})
+	b.AddParseLog(true, strings.Repeat("старое ", 700))
+	b.AddParseLog(true, "последняя строка")
 
-	lines := strings.Join(b.parserDiagnostics(), "\n")
-	if !strings.Contains(lines, b.loc("parser_logs_clean")) {
-		t.Errorf("expected the clean marker, got:\n%s", lines)
-	}
-}
-
-func TestParserDiagnosticsEmptyWithoutReports(t *testing.T) {
-	b := setupTestBot(t)
-
-	if lines := b.parserDiagnostics(); len(lines) != 0 {
-		t.Errorf("expected no diagnostics before the first parse, got %v", lines)
-	}
-}
-
-func TestParserLogsCommandShowsDiagnostics(t *testing.T) {
-	b := setupTestBot(t)
-	b.cfg.Telegram.AdminIDs = []int64{42}
-
-	report := parser.Report{Source: parser.SourceTeachers, Items: 0}
-	report.Probes = append(report.Probes, parser.Probe{
-		Source:   parser.SourceTeachers,
-		Selector: "heading: Преподаватель - <ФИО>",
-		Found:    0,
-		Required: true,
-	})
-	b.RecordParserReport(report)
-
-	handler := &parserLogsCmd{bot: b}
-	if !handler.MatchText("/parserlogs") {
-		t.Fatal("the command should match /parserlogs")
+	u := makeUpdate(424242, "/parserlogs")
+	u.Bot = b
+	if err := (&parserLogsCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
 	}
 
-	text := strings.Join(b.parserDiagnostics(), "\n")
-	if !strings.Contains(text, "heading: Преподаватель - <ФИО>") {
-		t.Errorf("teacher selector is missing from diagnostics:\n%s", text)
+	text := caller.last()
+	if len(text) > 4096 {
+		t.Fatalf("the answer must fit one message, got %d characters", len(text))
+	}
+	if !strings.Contains(text, "последняя строка") {
+		t.Fatal("the tail must keep the newest line")
 	}
 }
