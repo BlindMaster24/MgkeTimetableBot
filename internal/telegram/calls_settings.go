@@ -21,19 +21,19 @@ func (c *callsSettingsTextCmd) Scene() string       { return sceneSettingsCalls 
 func (c *callsSettingsTextCmd) MatchText(text string) bool {
 	switch c.kind {
 	case "show":
-		return text == "📊 Показать"
+		return text == c.bot.loc("callset_1")
 	case "refresh":
-		return text == "✅ Обновить с сайта"
+		return text == c.bot.loc("callset_2")
 	case "edit":
-		return text == "✏️ Изменить вручную"
+		return text == c.bot.loc("callset_3")
 	case "source_site":
-		return text == "Источник: сайт" || text == "✅ Источник: сайт"
+		return text == c.bot.loc("callset_4") || text == c.bot.loc("callset_5")
 	case "source_manual":
-		return text == "Источник: вручную" || text == "✅ Источник: вручную"
+		return text == c.bot.loc("callset_6") || text == c.bot.loc("callset_7")
 	case "source_config":
-		return text == "Источник: конфиг" || text == "✅ Источник: конфиг"
+		return text == c.bot.loc("callset_8") || text == c.bot.loc("callset_9")
 	case "source_auto":
-		return text == "Источник: авто" || text == "✅ Источник: авто"
+		return text == c.bot.loc("callset_10") || text == c.bot.loc("callset_11")
 	}
 	return false
 }
@@ -49,7 +49,7 @@ func (c *callsSettingsTextCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("callset_12"))
 	}
 
 	switch c.kind {
@@ -58,14 +58,14 @@ func (c *callsSettingsTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "edit":
 		chat.Scene = sceneCallsEditInput
 		c.bot.chatRepo.Save(chat)
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите расписание звонков. Пример\nБудни\n1 08:30 09:15 09:25 10:10\n2 10:20 11:05 11:15 12:00\nСуббота\n1 09:00 09:45 09:55 10:40", c.bot.replyCancel())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("callset_13"), c.bot.replyCancel())
 	case "source_site", "source_manual", "source_config":
 		source := strings.TrimPrefix(c.kind, "source_")
 		c.bot.applyCallsSource(source)
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Источник звонков переключен на %s.\n\n%s", callsSourceLabel(source), c.bot.callsMenuText(chat, true)), c.bot.replyCallsSettings(chat, true))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf(c.bot.loc("callset_14"), c.bot.callsSourceLabel(source), c.bot.callsMenuText(chat, true)), c.bot.replyCallsSettings(chat, true))
 	case "source_auto":
 		c.bot.cache.ResetCallsOverride()
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Источник звонков переключен на авто.\n\n%s", c.bot.callsMenuText(chat, true)), c.bot.replyCallsSettings(chat, true))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf(c.bot.loc("callset_15"), c.bot.callsMenuText(chat, true)), c.bot.replyCallsSettings(chat, true))
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func (b *Bot) applyCallsSource(source string) {
 }
 
 func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
-	lines := []string{"🔄 Обновление звонков"}
+	lines := []string{b.loc("callset_16")}
 
 	var err error
 	if b.parseFunc != nil {
@@ -96,22 +96,22 @@ func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
 
 	switch {
 	case err != nil:
-		lines = append(lines, "⚠️ Ошибка парсера")
+		lines = append(lines, b.loc("callset_17"))
 	case !siteParsed:
-		lines = append(lines, "⚠️ Сайт отдал пусто")
+		lines = append(lines, b.loc("callset_18"))
 	default:
-		lines = append(lines, "✅ Сайт успешно спарсен")
+		lines = append(lines, b.loc("callset_19"))
 	}
 
 	if siteParsed {
-		lines = append(lines, "🧪 Результат парсинга: OK")
+		lines = append(lines, b.loc("callset_20"))
 	} else {
-		lines = append(lines, "🧪 Результат парсинга: EMPTY")
+		lines = append(lines, b.loc("callset_21"))
 	}
 
 	switch {
 	case calls.Site.UpdatedAtRaw != "":
-		lines = append(lines, fmt.Sprintf("📅 Дата на сайте: %s", calls.Site.UpdatedAtRaw))
+		lines = append(lines, fmt.Sprintf(b.loc("callset_22"), calls.Site.UpdatedAtRaw))
 	case siteParsed:
 		lines = append(lines, "📅 "+b.loc("call_site_date_missing"))
 		if at := b.siteCallsParsedAt(); at != "" {
@@ -123,10 +123,10 @@ func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
 	if calls.OverrideSource != "" {
 		active = calls.OverrideSource
 	}
-	lines = append(lines, fmt.Sprintf("📌 Активный источник: %s", callsSourceLabel(active)))
+	lines = append(lines, fmt.Sprintf(b.loc("callset_23"), b.callsSourceLabel(active)))
 
 	if calls.ManualReason != "" && calls.Active.Source == "manual" {
-		lines = append(lines, fmt.Sprintf("✍️ Причина: %s", calls.ManualReason))
+		lines = append(lines, fmt.Sprintf(b.loc("callset_24"), calls.ManualReason))
 	}
 
 	if err != nil {
@@ -135,9 +135,9 @@ func (b *Bot) refreshCallsNow(u *Update, chat *Chat) error {
 
 	schedule := b.callsScheduleFor(chat)
 	if len(schedule.Weekdays) > 0 {
-		lines = append(lines, "\n__ Звонки (будни) __")
+		lines = append(lines, b.loc("callset_25"))
 		lines = append(lines, formatCallsPlain(schedule.Weekdays))
-		lines = append(lines, "\n__ Звонки (суббота) __")
+		lines = append(lines, b.loc("callset_26"))
 		lines = append(lines, formatCallsPlain(schedule.Saturday))
 	}
 
@@ -152,14 +152,14 @@ func formatCallsPlain(slots [][2][2]string) string {
 	return strings.Join(lines, "\n")
 }
 
-func callsSourceLabel(source string) string {
+func (b *Bot) callsSourceLabel(source string) string {
 	switch source {
 	case "site":
-		return "сайт"
+		return b.loc("callset_27")
 	case "manual":
-		return "вручную"
+		return b.loc("callset_28")
 	default:
-		return "конфиг"
+		return b.loc("callset_29")
 	}
 }
 
@@ -209,32 +209,32 @@ func (b *Bot) siteCallsParsedAt() string {
 func (b *Bot) callsMenuText(chat *Chat, admin bool) string {
 	calls := b.cache.GetCalls()
 
-	lines := []string{"Управление расписанием звонков."}
+	lines := []string{b.loc("callset_30")}
 	lines = append(lines, b.callsCampusMenuLines(chat)...)
 	if admin {
 		if calls.OverrideSource != "" {
-			lines = append(lines, fmt.Sprintf("Переопределение источника: %s", callsSourceLabel(calls.OverrideSource)))
+			lines = append(lines, fmt.Sprintf(b.loc("callset_31"), b.callsSourceLabel(calls.OverrideSource)))
 		} else {
-			lines = append(lines, fmt.Sprintf("Источник: авто (сейчас: %s)", callsSourceLabel(calls.Active.Source)))
+			lines = append(lines, fmt.Sprintf(b.loc("callset_32"), b.callsSourceLabel(calls.Active.Source)))
 		}
 	}
 
 	if calls.OverrideSource == "" && calls.Active.Source != "site" && calls.SiteEmptyNotifiedAt > 0 {
-		lines = append(lines, "Сайт отдал пусто.")
+		lines = append(lines, b.loc("callset_33"))
 	}
 
 	switch {
 	case calls.Active.Source == "site" && calls.Site.UpdatedAtRaw != "":
-		lines = append(lines, fmt.Sprintf("Обновлено на сайте: %s", calls.Site.UpdatedAtRaw))
+		lines = append(lines, fmt.Sprintf(b.loc("callset_34"), calls.Site.UpdatedAtRaw))
 	case calls.Active.Source == "site":
 		lines = append(lines, b.loc("call_site_date_missing"))
 		if at := b.siteCallsParsedAt(); at != "" {
 			lines = append(lines, b.locData("call_site_parsed_at", map[string]interface{}{"At": at}))
 		}
 	case calls.Active.Source == "manual" && calls.ManualReason != "":
-		lines = append(lines, fmt.Sprintf("Причина: %s", calls.ManualReason))
+		lines = append(lines, fmt.Sprintf(b.loc("callset_35"), calls.ManualReason))
 	case calls.Active.Source == "config" && len(b.cfg.Timetable.Weekdays) > 0:
-		lines = append(lines, "Используются данные из конфига")
+		lines = append(lines, b.loc("callset_36"))
 	}
 
 	return strings.Join(lines, "\n")
