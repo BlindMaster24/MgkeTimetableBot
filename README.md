@@ -724,9 +724,9 @@ go run ./scripts/racecheck -pkgs ./internal/telegram/...
 | Job | Что проверяет |
 | --- | --- |
 | `quality` | на `ubuntu-latest`, `windows-latest` и `macos-latest`: `go build ./...`, `go vet ./...` и сборка всех трёх бинарников (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (любой неотформатированный файл валит job) и кросс-компиляция релизных целей (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) выполняются на Linux |
-| `test` | полный набор тестов на всех трёх ОС с покрытием: итог уходит в summary запуска, `coverage.out` — в артефакты на 14 дней (загружается с Linux) |
-| `newest-toolchain` | тот же набор на всех трёх ОС под последней стабильной версией Go (`go-version: stable`), чтобы минимальная версия из `go.mod` и свежий тулчейн проверялись независимо |
-| `race` | `go run ./scripts/racecheck` на всех трёх ОС — тот же набор под `-race`, чтобы гонки в кэше, планировщике и боте не доезжали до пользователей |
+| `test` | полный набор тестов на `ubuntu-latest` и `windows-latest` с покрытием: итог уходит в summary запуска, `coverage.out` — в артефакты на 14 дней (загружается с Linux); macOS исключён из матриц этого и двух следующих job: раннеры macOS регулярно отменяют уже стоящие в очереди job без единого шага, и весь прогон становится красным; полный набор на macOS прогоняет `verify` при релизе |
+| `newest-toolchain` | тот же набор на `ubuntu-latest` и `windows-latest` под последней стабильной версией Go (`go-version: stable`), чтобы минимальная версия из `go.mod` и свежий тулчейн проверялись независимо |
+| `race` | `go run ./scripts/racecheck` на `ubuntu-latest` и `windows-latest` — тот же набор под `-race`, чтобы гонки в кэше, планировщике и боте не доезжали до пользователей |
 | `parity` | сравнение поверхности с веткой `old`, golden-раскладки клавиатур и docs-guard |
 | `monitoring` | `go run ./scripts/monitoringcheck -strict` и `promtool test rules` с promtool 3.15.0, скачанным по закреплённому SHA-256: правила, дашборд, конфиг Alertmanager, копии для Kubernetes и имена метрик проверяются так же, как локально |
 | `container` | сборка образа, запуск контейнера, `GET /api/health` со статусом 200, данные сборки и часовой пояс внутри контейнера (`date +%z` → `+0300`), а также корректное завершение по `SIGTERM` (`docker stop` ждёт `shutdown complete`) |
@@ -735,7 +735,7 @@ go run ./scripts/racecheck -pkgs ./internal/telegram/...
 
 `.github/workflows/security.yml` — отдельный контур безопасности: `govulncheck` по модулю и зависимостям запускается на push в `main`, по расписанию (понедельник, 06:00 UTC) и вручную. Он не блокирует pull request'ы и не входит в CI: его задача — сообщить об известной уязвимости, а не остановить разработку.
 
-Раннеры берутся в варианте `-latest` (`ubuntu-latest`, `windows-latest`, `macos-latest`), поэтому проверки идут на самых свежих образах GitHub; точная версия тулчейна задаётся `go.mod` (`GOTOOLCHAIN: local` не даёт Go молча подменить его), а job `newest-toolchain` дополнительно прогоняет набор на последнем стабильном релизе Go.
+Раннеры берутся в варианте `-latest` (`ubuntu-latest`, `windows-latest`, `macos-latest` в `quality`), поэтому проверки идут на самых свежих образах GitHub; точная версия тулчейна задаётся `go.mod` (`GOTOOLCHAIN: local` не даёт Go молча подменить его), а job `newest-toolchain` дополнительно прогоняет набор на последнем стабильном релизе Go.
 
 `.github/workflows/release.yml` — доставка. Перед публикацией job `verify` прогоняет сборку, vet и тесты на том же коммите на всех трёх ОС, поэтому сломанный тег или push в `main` не публикуется:
 

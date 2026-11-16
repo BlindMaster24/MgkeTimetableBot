@@ -63,6 +63,9 @@ func TestCITestsEveryPlatform(t *testing.T) {
 			t.Errorf("ci.yml must run on %s as well", runner)
 		}
 	}
+	if macos := strings.Count(workflow, "macos-latest"); macos != 1 {
+		t.Errorf("macOS runs in the quality matrix only, found %d entries", macos)
+	}
 	if !strings.Contains(workflow, "matrix:") {
 		t.Error("the platform jobs must use a matrix, not a single runner")
 	}

@@ -100,7 +100,7 @@
 
 - `ci.yml`: `quality`, `test`, `newest-toolchain`, `race`, `fuzz`, `parity`,
   `monitoring`, `preflight`, `container`, `devbot`, `workflow-lint`.
-- Платформы — Ubuntu, Windows, macOS; `GOTOOLCHAIN: local`; экшены закреплены SHA.
+- Платформы: `quality` — Ubuntu, Windows, macOS; `test`, `newest-toolchain`, `race` — Ubuntu и Windows (раннеры macOS отменяют job-ы из очереди), полный набор на macOS идёт в `verify` при релизе; `GOTOOLCHAIN: local`; экшены закреплены SHA.
 - `release.yml` сначала проверяет ревизию, затем публикует образ в GHCR и
   бинарники для linux/amd64, linux/arm64, windows/amd64, darwin/arm64.
 - Версия, коммит и дата приходят через `-X main.*` и видны в `/api/health`.

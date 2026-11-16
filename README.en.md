@@ -721,9 +721,9 @@ CI runs the same checks — see “CI and releases” below.
 | Job | What it checks |
 | --- | --- |
 | `quality` | on `ubuntu-latest`, `windows-latest` and `macos-latest`: `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (any unformatted file fails the job) and the cross-compilation of the release targets (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) run on Linux |
-| `test` | the full suite with coverage on all three operating systems: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days (uploaded from Linux) |
-| `newest-toolchain` | the same suite on all three operating systems with the newest stable Go (`go-version: stable`), so the minimum version from `go.mod` and the fresh toolchain are checked independently |
-| `race` | `go run ./scripts/racecheck` on all three operating systems — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
+| `test` | the full suite with coverage on `ubuntu-latest` and `windows-latest`: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days (uploaded from Linux); macOS is out of this and the next two matrices because its runners regularly cancel queued jobs before the first step, turning the whole run red; the full suite still runs on macOS in the release `verify` job |
+| `newest-toolchain` | the same suite on `ubuntu-latest` and `windows-latest` with the newest stable Go (`go-version: stable`), so the minimum version from `go.mod` and the fresh toolchain are checked independently |
+| `race` | `go run ./scripts/racecheck` on `ubuntu-latest` and `windows-latest` — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
 | `monitoring` | `go run ./scripts/monitoringcheck -strict` plus `promtool test rules`, with promtool 3.15.0 downloaded against a pinned SHA-256: the rules, the dashboard, the Alertmanager config, the Kubernetes copies and the metric names are checked the same way as locally |
 | `container` | the image build, starting the container, `GET /api/health` answering 200, the build metadata, the container timezone (`date +%z` → `+0300`) and a graceful `SIGTERM` shutdown (`docker stop` waits for `shutdown complete`) |
@@ -732,7 +732,7 @@ CI runs the same checks — see “CI and releases” below.
 
 `.github/workflows/security.yml` is a separate security lane: `govulncheck` scans the module and its dependencies on every push to `main`, on a schedule (Monday, 06:00 UTC) and on demand. It does not block pull requests and is not part of CI: its job is to report a known vulnerability, not to stop development.
 
-Runners are used in their `-latest` flavour (`ubuntu-latest`, `windows-latest`, `macos-latest`), so the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the `newest-toolchain` job runs the suite on the newest stable Go release as well.
+Runners are used in their `-latest` flavour (`ubuntu-latest`, `windows-latest`, `macos-latest` in `quality`), so the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the `newest-toolchain` job runs the suite on the newest stable Go release as well.
 
 `.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision on all three operating systems before anything is published, so a broken tag or `main` push never ships:
 
