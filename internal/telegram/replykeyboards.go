@@ -37,16 +37,16 @@ func (b *Bot) replySettingsButtons(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
 			{
-				{Text: noYesSmile(chat.ShowDaily, b.loc("kbtext_13"))},
-				{Text: noYesSmile(chat.ShowWeekly, b.loc("kbtext_14"))},
+				{Text: b.noYesSmile(chat.ShowDaily, b.loc("kbtext_13"))},
+				{Text: b.noYesSmile(chat.ShowWeekly, b.loc("kbtext_14"))},
 			},
 			{
-				{Text: noYesSmile(chat.ShowCalls, b.loc("kbtext_15"))},
-				{Text: noYesSmile(chat.ShowAbout, b.loc("kbtext_16"))},
+				{Text: b.noYesSmile(chat.ShowCalls, b.loc("kbtext_15"))},
+				{Text: b.noYesSmile(chat.ShowAbout, b.loc("kbtext_16"))},
 			},
 			{
-				{Text: noYesSmile(chat.ShowFastGroup, b.loc("kbtext_17"))},
-				{Text: noYesSmile(chat.ShowFastTeacher, b.loc("kbtext_18"))},
+				{Text: b.noYesSmile(chat.ShowFastGroup, b.loc("kbtext_17"))},
+				{Text: b.noYesSmile(chat.ShowFastTeacher, b.loc("kbtext_18"))},
 			},
 			settingsBotNavRow(b),
 		},
@@ -58,9 +58,9 @@ func (b *Bot) replySettingsButtons(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsNotice(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmileVolume(chat.NoticeChanges, b.loc("kbtext_19"))}},
-			{{Text: noYesSmileVolume(chat.NoticeNextWeek, b.loc("kbtext_20"))}},
-			{{Text: noYesSmileVolume(chat.NoticeCalls, b.loc("kbtext_21"))}},
+			{{Text: b.noYesSmileVolume(chat.NoticeChanges, b.loc("kbtext_19"))}},
+			{{Text: b.noYesSmileVolume(chat.NoticeNextWeek, b.loc("kbtext_20"))}},
+			{{Text: b.noYesSmileVolume(chat.NoticeCalls, b.loc("kbtext_21"))}},
 			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
@@ -84,9 +84,9 @@ func (b *Bot) replySettingsReminders(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsView(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmile(chat.HidePastDays, b.loc("kbtext_22"))}},
-			{{Text: noYesSmile(chat.ShowParserTime, b.loc("kbtext_23"))}},
-			{{Text: noYesSmile(chat.ShowHints, b.loc("kbtext_24")) + yesNoCapital(chat.ShowHints)}},
+			{{Text: b.noYesSmile(chat.HidePastDays, b.loc("kbtext_22"))}},
+			{{Text: b.noYesSmile(chat.ShowParserTime, b.loc("kbtext_23"))}},
+			{{Text: b.noYesSmile(chat.ShowHints, b.loc("kbtext_24")) + b.yesNoCapital(chat.ShowHints)}},
 			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
@@ -97,7 +97,7 @@ func (b *Bot) replySettingsView(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsDiff(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmile(chat.DiffEnabled, b.loc("kbtext_25"))}},
+			{{Text: b.noYesSmile(chat.DiffEnabled, b.loc("kbtext_25"))}},
 			{{Text: fmt.Sprintf(b.loc("kbtext_26"), chat.DiffMaxLines)}},
 			{{Text: b.loc("kbtext_27")}},
 			settingsBotNavRow(b),
@@ -110,9 +110,9 @@ func (b *Bot) replySettingsDiff(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsDiffAdvanced(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmile(chat.DiffAutoInWeek, b.loc("kbtext_28"))}},
-			{{Text: noYesSmile(chat.DiffAutoInUpdates, b.loc("kbtext_29"))}},
-			{{Text: noYesSmile(chat.DiffShowBeforeAfter, b.loc("kbtext_30"))}},
+			{{Text: b.noYesSmile(chat.DiffAutoInWeek, b.loc("kbtext_28"))}},
+			{{Text: b.noYesSmile(chat.DiffAutoInUpdates, b.loc("kbtext_29"))}},
+			{{Text: b.noYesSmile(chat.DiffShowBeforeAfter, b.loc("kbtext_30"))}},
 			{{Text: b.loc("kbtext_31")}},
 			settingsBotNavRow(b),
 		},

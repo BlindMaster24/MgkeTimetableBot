@@ -176,18 +176,18 @@ func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) s
 		}
 
 		lines = append(lines, fmt.Sprintf("\n__ %s, %s __", b.weekdayFromDate(dayStr), dayStr))
-		lines = append(lines, b.loc("cmpgrp_13")+orNone(strings.Join(overlap, ", ")))
+		lines = append(lines, b.loc("cmpgrp_13")+b.orNone(strings.Join(overlap, ", ")))
 		if len(overlapDetails) > 0 {
 			lines = append(lines, b.loc("cmpgrp_14"))
 			lines = append(lines, strings.Join(overlapDetails, "\n"))
 		}
-		lines = append(lines, b.loc("cmpgrp_15")+orNone(strings.Join(sameSubjects, ", ")))
+		lines = append(lines, b.loc("cmpgrp_15")+b.orNone(strings.Join(sameSubjects, ", ")))
 
 		formattedFree := make([]string, 0, len(free))
 		for _, pair := range free {
 			formattedFree = append(formattedFree, formatPair(pair, calls))
 		}
-		lines = append(lines, b.loc("cmpgrp_16")+orNone(strings.Join(formattedFree, ", ")))
+		lines = append(lines, b.loc("cmpgrp_16")+b.orNone(strings.Join(formattedFree, ", ")))
 	}
 
 	return strings.Join(lines, "\n")

@@ -385,10 +385,11 @@ func TestRandomKey(t *testing.T) {
 }
 
 func TestSourceCheck(t *testing.T) {
-	if got := sourceCheck("S", true); got != "✅ S" {
+	b, _, _ := setupTestBotWithData(t)
+	if got := b.sourceCheck("S", true); got != "✅ S" {
 		t.Errorf("expected ✅ S, got %s", got)
 	}
-	if got := sourceCheck("S", false); got != "S" {
+	if got := b.sourceCheck("S", false); got != "S" {
 		t.Errorf("expected S, got %s", got)
 	}
 }

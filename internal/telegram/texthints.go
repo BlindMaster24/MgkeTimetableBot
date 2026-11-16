@@ -7,49 +7,49 @@ func payloadFlag(v bool) string {
 	return "0"
 }
 
-func yesNo(v bool) string {
+func (b *Bot) yesNo(v bool) string {
 	if v {
-		return "да"
+		return b.loc("hint_yes")
 	}
-	return "нет"
+	return b.loc("hint_no")
 }
 
-func yesNoCapital(v bool) string {
+func (b *Bot) yesNoCapital(v bool) string {
 	if v {
-		return "Да"
+		return b.loc("hint_yes_capital")
 	}
-	return "Нет"
+	return b.loc("hint_no_capital")
 }
 
-func onOff(v bool) string {
+func (b *Bot) onOff(v bool) string {
 	if v {
-		return "включено"
+		return b.loc("hint_on")
 	}
-	return "выключено"
+	return b.loc("hint_off")
 }
 
-func orNone(value string) string {
+func (b *Bot) orNone(value string) string {
 	if value == "" {
-		return "нет"
+		return b.loc("hint_no")
 	}
 	return value
 }
 
-func noYesSmile(v bool, text string) string {
+func (b *Bot) noYesSmile(v bool, text string) string {
 	if v {
 		return "✅ " + text
 	}
 	return "🚫 " + text
 }
 
-func noYesSmileVolume(v bool, text string) string {
+func (b *Bot) noYesSmileVolume(v bool, text string) string {
 	if v {
-		return "🔈 " + text + ": " + yesNoCapital(true)
+		return "🔈 " + text + ": " + b.yesNoCapital(true)
 	}
-	return "🔇 " + text + ": " + yesNoCapital(false)
+	return "🔇 " + text + ": " + b.yesNoCapital(false)
 }
 
-func sourceCheck(label string, active bool) string {
+func (b *Bot) sourceCheck(label string, active bool) string {
 	if active {
 		return "✅ " + label
 	}

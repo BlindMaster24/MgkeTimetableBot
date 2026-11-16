@@ -60,22 +60,22 @@ func (c *btnToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "daily":
 		chat.ShowDaily = !chat.ShowDaily
-		reply = fmt.Sprintf(c.bot.loc("settext_7"), yesNo(chat.ShowDaily))
+		reply = fmt.Sprintf(c.bot.loc("settext_7"), c.bot.yesNo(chat.ShowDaily))
 	case "weekly":
 		chat.ShowWeekly = !chat.ShowWeekly
-		reply = fmt.Sprintf(c.bot.loc("settext_8"), yesNo(chat.ShowWeekly))
+		reply = fmt.Sprintf(c.bot.loc("settext_8"), c.bot.yesNo(chat.ShowWeekly))
 	case "calls":
 		chat.ShowCalls = !chat.ShowCalls
-		reply = fmt.Sprintf(c.bot.loc("settext_9"), yesNo(chat.ShowCalls))
+		reply = fmt.Sprintf(c.bot.loc("settext_9"), c.bot.yesNo(chat.ShowCalls))
 	case "about":
 		chat.ShowAbout = !chat.ShowAbout
-		reply = fmt.Sprintf(c.bot.loc("settext_10"), yesNo(chat.ShowAbout))
+		reply = fmt.Sprintf(c.bot.loc("settext_10"), c.bot.yesNo(chat.ShowAbout))
 	case "fast_group":
 		chat.ShowFastGroup = !chat.ShowFastGroup
-		reply = fmt.Sprintf(c.bot.loc("settext_11"), yesNo(chat.ShowFastGroup))
+		reply = fmt.Sprintf(c.bot.loc("settext_11"), c.bot.yesNo(chat.ShowFastGroup))
 	case "fast_teacher":
 		chat.ShowFastTeacher = !chat.ShowFastTeacher
-		reply = fmt.Sprintf(c.bot.loc("settext_12"), yesNo(chat.ShowFastTeacher))
+		reply = fmt.Sprintf(c.bot.loc("settext_12"), c.bot.yesNo(chat.ShowFastTeacher))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsButtons(chat))
@@ -112,13 +112,13 @@ func (c *noticeToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "changes":
 		chat.NoticeChanges = !chat.NoticeChanges
-		reply = fmt.Sprintf(c.bot.loc("settext_19"), onOff(chat.NoticeChanges))
+		reply = fmt.Sprintf(c.bot.loc("settext_19"), c.bot.onOff(chat.NoticeChanges))
 	case "next_week":
 		chat.NoticeNextWeek = !chat.NoticeNextWeek
-		reply = fmt.Sprintf(c.bot.loc("settext_20"), onOff(chat.NoticeNextWeek))
+		reply = fmt.Sprintf(c.bot.loc("settext_20"), c.bot.onOff(chat.NoticeNextWeek))
 	case "calls":
 		chat.NoticeCalls = !chat.NoticeCalls
-		reply = fmt.Sprintf(c.bot.loc("settext_21"), onOff(chat.NoticeCalls))
+		reply = fmt.Sprintf(c.bot.loc("settext_21"), c.bot.onOff(chat.NoticeCalls))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsNotice(chat))
@@ -155,13 +155,13 @@ func (c *viewToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "hide_past_days":
 		chat.HidePastDays = !chat.HidePastDays
-		reply = fmt.Sprintf(c.bot.loc("settext_28"), yesNo(chat.HidePastDays))
+		reply = fmt.Sprintf(c.bot.loc("settext_28"), c.bot.yesNo(chat.HidePastDays))
 	case "show_parser_time":
 		chat.ShowParserTime = !chat.ShowParserTime
-		reply = fmt.Sprintf(c.bot.loc("settext_29"), yesNo(chat.ShowParserTime))
+		reply = fmt.Sprintf(c.bot.loc("settext_29"), c.bot.yesNo(chat.ShowParserTime))
 	case "show_hints":
 		chat.ShowHints = !chat.ShowHints
-		reply = fmt.Sprintf(c.bot.loc("settext_30"), yesNo(chat.ShowHints))
+		reply = fmt.Sprintf(c.bot.loc("settext_30"), c.bot.yesNo(chat.ShowHints))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsView(chat))
@@ -206,7 +206,7 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "enabled":
 		chat.DiffEnabled = !chat.DiffEnabled
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf(c.bot.loc("settext_38"), yesNo(chat.DiffEnabled))
+		reply := fmt.Sprintf(c.bot.loc("settext_38"), c.bot.yesNo(chat.DiffEnabled))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiff(chat))
 	case "max_lines":
 		presets := []int{10, 20, 30, 50}
@@ -226,17 +226,17 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "auto_week":
 		chat.DiffAutoInWeek = !chat.DiffAutoInWeek
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf(c.bot.loc("settext_41"), yesNo(chat.DiffAutoInWeek))
+		reply := fmt.Sprintf(c.bot.loc("settext_41"), c.bot.yesNo(chat.DiffAutoInWeek))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "auto_updates":
 		chat.DiffAutoInUpdates = !chat.DiffAutoInUpdates
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf(c.bot.loc("settext_42"), yesNo(chat.DiffAutoInUpdates))
+		reply := fmt.Sprintf(c.bot.loc("settext_42"), c.bot.yesNo(chat.DiffAutoInUpdates))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "before_after":
 		chat.DiffShowBeforeAfter = !chat.DiffShowBeforeAfter
 		c.bot.chatRepo.Save(chat)
-		reply := fmt.Sprintf(c.bot.loc("settext_43"), yesNo(chat.DiffShowBeforeAfter))
+		reply := fmt.Sprintf(c.bot.loc("settext_43"), c.bot.yesNo(chat.DiffShowBeforeAfter))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "back_basic":
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_44"), c.bot.replySettingsDiff(chat))
