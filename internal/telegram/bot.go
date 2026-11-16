@@ -113,6 +113,7 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	options := []telego.BotOption{
 		telego.WithDefaultDebugLogger(),
 		telego.WithHTTPClient(&http.Client{Timeout: requestTimeout}),
+		telego.WithRequestConstructor(markdownConstructor{inner: telegoapi.DefaultConstructor{}}),
 	}
 	if apiServer != "" {
 		options = append(options, telego.WithAPIServer(apiServer))

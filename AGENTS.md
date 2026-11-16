@@ -244,6 +244,7 @@ These are settled; do not reopen them without the user asking.
 - Naming: `camelCase` vars/functions, `PascalCase` exported types/methods, `SCREAMING_SNAKE_CASE` constants.
 - Do not add code comments.
 - Keep package boundaries: cross-package access goes through exported APIs.
+- User-facing texts are authored in the small HTML subset (`b`, `i`, `code`, `pre`, `a href`) and go out as MarkdownV2: `internal/telegram/markdown.go` rewrites text, captions and multipart forms through a `telegoapi.RequestConstructor` installed in `NewBot`. The store stays HTML; the wire is MarkdownV2, so a new tag needs a case there and a test in `markdown_test.go`.
 - New user-facing text goes to `internal/i18n/locales/ru.json`. Input alphabets and sample data stay in Go: the Cyrillic letter in `mathAllowedCharacters`, the input regexes in `inputcmds.go`, the surface fixtures in `surface.go` and the golden samples in `image/golden.go` are data the code matches or renders, not labels. Literals that reproduce the old TypeScript wording (formatters, weekday names, menu prompts pinned by the parity and golden tests) stay inline: they are the contract, not a translation key.
 
 ## Testing Guidelines
