@@ -25,6 +25,7 @@ type capturingCaller struct {
 	mu        sync.Mutex
 	messages  []capturedMessage
 	documents []string
+	answers   []string
 }
 
 func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.RequestData) (*telegoapi.Response, error) {
@@ -38,6 +39,15 @@ func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.
 			c.messages = append(c.messages, capturedMessage{chatID: payload.ChatID, text: payload.Text})
 			c.mu.Unlock()
 		}
+	}
+	if strings.HasSuffix(url, "/answerCallbackQuery") {
+		var payload struct {
+			Text string `json:"text"`
+		}
+		_ = json.Unmarshal(data.BodyRaw, &payload)
+		c.mu.Lock()
+		c.answers = append(c.answers, payload.Text)
+		c.mu.Unlock()
 	}
 	if strings.HasSuffix(url, "/sendDocument") {
 		body := data.BodyRaw
@@ -61,6 +71,22 @@ func (c *capturingCaller) documentPayload() string {
 		return ""
 	}
 	return c.documents[len(c.documents)-1]
+}
+
+// lastAnswer returns the text of the latest callback answer.
+func (c *capturingCaller) lastAnswer() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.answers) == 0 {
+		return "<no answer>"
+	}
+	return c.answers[len(c.answers)-1]
+}
+
+func (c *capturingCaller) answerCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.answers)
 }
 
 func (c *capturingCaller) last() string {

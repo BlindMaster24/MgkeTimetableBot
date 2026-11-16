@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
@@ -541,6 +542,14 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 		return
 	}
 
+	// The old bot remembered when the chat last spoke to it; /settings shows
+	// that moment, so keep it fresh for every accepted message.
+	defer func() {
+		if err := b.chatRepo.TouchLastMessage("telegram", u.UserID, time.Now()); err != nil {
+			b.log.Error().Err(err).Int64("chatID", u.ChatID).Msg("failed to save the last message time")
+		}
+	}()
+
 	if chat.NeedUpdateButtons {
 		chat.NeedUpdateButtons = false
 		chat.Scene = ""
@@ -567,6 +576,13 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_16"), replyMainMenu(b, chat))
 }
 
+// reportHandlerError keeps the details in the log and tells the user that the
+// command failed, the way the TypeScript bot did — without the raw error text.
+func (b *Bot) reportHandlerError(u *Update, name string, err error) {
+	b.log.Error().Err(err).Str("cmd", name).Int64("userID", u.UserID).Int64("chatID", u.ChatID).Msg("command error")
+	_ = u.Bot.SendText(u.ChatID, b.loc("handler_error"))
+}
+
 func (b *Bot) allowsCommand(cmd Command, userID int64) bool {
 	ac, ok := cmd.(AdminCommand)
 	if !ok || !ac.AdminOnly() {
@@ -585,7 +601,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		}
 		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
-			b.log.Error().Err(err).Str("cmd", u.Text).Int64("userID", u.UserID).Int64("chatID", u.ChatID).Msg("command error")
+			b.reportHandlerError(u, u.Text, err)
 		}
 		return true
 	}
@@ -602,7 +618,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if cmd != nil && b.allowsCommand(cmd, u.UserID) {
 			b.countCommand(cmd)
 			if err := cmd.Handler(ctx, u); err != nil {
-				b.log.Error().Err(err).Str("cmd", cmdName).Int64("userID", u.UserID).Int64("chatID", u.ChatID).Msg("command error")
+				b.reportHandlerError(u, cmdName, err)
 			}
 			return true
 		}
@@ -617,7 +633,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		}
 		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
-			b.log.Error().Err(err).Msg("text match error")
+			b.reportHandlerError(u, cmd.Name(), err)
 		}
 		return true
 	}
@@ -631,7 +647,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		}
 		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
-			b.log.Error().Err(err).Msg("text match error")
+			b.reportHandlerError(u, cmd.Name(), err)
 		}
 		return true
 	}

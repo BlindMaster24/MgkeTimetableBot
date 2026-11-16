@@ -219,6 +219,17 @@ func (r *Repository) migrate() error {
 	return r.migrateGoogle()
 }
 
+// TouchLastMessage records the moment the chat last spoke to the bot without
+// rewriting the rest of the row, which handlers keep editing meanwhile.
+func (r *Repository) TouchLastMessage(service string, peerID int64, moment time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	_, err := r.db.Exec(`UPDATE bot_chats SET last_msg_time = ? WHERE service = ? AND peer_id = ?`,
+		moment.UnixMilli(), service, peerID)
+	return err
+}
+
 // SetTextFormat stores the outgoing message format of the chat: "md" for
 // MarkdownV2 (the default) or "html" for the HTML parser.
 func (r *Repository) SetTextFormat(service string, peerID int64, format string) error {

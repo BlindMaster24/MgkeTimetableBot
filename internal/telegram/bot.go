@@ -59,6 +59,7 @@ type Bot struct {
 	client       *telego.Bot
 	googleSyncMu sync.Mutex
 	broadcast    sync.Mutex
+	answered     sync.Map
 }
 
 type Update struct {
@@ -406,6 +407,19 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 
 	b.sendEulaOnce(u, chat)
 
+	if err := b.chatRepo.TouchLastMessage("telegram", cb.From.ID, time.Now()); err != nil {
+		b.log.Error().Err(err).Int64("chatID", u.ChatID).Msg("failed to save the last message time")
+	}
+
+	if !chat.AllowSendMess {
+		chat.AllowSendMess = true
+		if err := b.chatRepo.Save(chat); err != nil {
+			b.log.Error().Err(err).Int64("chatID", u.ChatID).Msg("failed to resume the notifications of the chat")
+		} else {
+			b.log.Info().Int64("chatID", u.ChatID).Msg("the chat pressed a button, notifications resumed")
+		}
+	}
+
 	bestPrefix, bestHandler := b.findCallback(cb.Data)
 	if bestHandler != nil {
 		b.countCallback(bestPrefix)
@@ -415,8 +429,18 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 				chatID = cb.Message.GetChat().ID
 			}
 			b.log.Error().Err(err).Str("prefix", bestPrefix).Int64("userID", cb.From.ID).Int64("chatID", chatID).Msg("callback error")
+			_ = b.AnswerCallback(cb.ID, b.loc("callback_error"))
 		}
+	} else {
+		_ = b.AnswerCallback(cb.ID, b.loc("callback_not_found"))
 	}
+
+	// The old bot always stopped the client spinner, even when the handler
+	// returned early without answering.
+	if cb.ID != "" && !b.callbackAnswered(cb.ID) {
+		_ = b.AnswerCallback(cb.ID, "")
+	}
+	b.forgetCallback(cb.ID)
 }
 
 var telegramCommandName = regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
@@ -575,10 +599,32 @@ func (b *Bot) sendPhoto(chatID int64, filePath string, caption string, replyTo i
 }
 
 func (b *Bot) AnswerCallback(callbackID string, text string) error {
-	return b.client.AnswerCallbackQuery(context.Background(), &telego.AnswerCallbackQueryParams{
+	err := b.client.AnswerCallbackQuery(context.Background(), &telego.AnswerCallbackQueryParams{
 		CallbackQueryID: callbackID,
 		Text:            text,
 	})
+	b.markCallbackAnswered(callbackID)
+	return err
+}
+
+// markCallbackAnswered remembers that the spinner of this callback is gone, so
+// the dispatcher does not answer it a second time.
+func (b *Bot) markCallbackAnswered(callbackID string) {
+	if callbackID == "" {
+		return
+	}
+	b.answered.Store(callbackID, struct{}{})
+}
+
+func (b *Bot) callbackAnswered(callbackID string) bool {
+	_, ok := b.answered.Load(callbackID)
+	return ok
+}
+
+func (b *Bot) forgetCallback(callbackID string) {
+	if callbackID != "" {
+		b.answered.Delete(callbackID)
+	}
 }
 
 func withChat(b *Bot, u *Update, fn func(*Chat) error) error {
