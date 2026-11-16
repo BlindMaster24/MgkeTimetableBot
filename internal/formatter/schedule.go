@@ -75,5 +75,5 @@ func formatTeacherLessonList(lessons []any, empty string, line func(LessonPart) 
 		text = append(text, fmt.Sprintf("%d. ", i+1)+line(subs[0]))
 	}
 
-	return strings.TrimSpace(strings.Join(text, "'+bs+'n"))
+	return strings.TrimSpace(strings.Join(text, "\n"))
 }
