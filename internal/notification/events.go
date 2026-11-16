@@ -100,7 +100,7 @@ func (n *EventNotifier) nowTime() time.Time {
 	return time.Now()
 }
 
-func getDayPhrase(now time.Time, day string, nextDayPhrase string) string {
+func (n *EventNotifier) getDayPhrase(now time.Time, day string, nextDayPhrase string) string {
 	t, err := time.Parse("02.01.2006", day)
 	if err != nil {
 		return nextDayPhrase
@@ -110,14 +110,14 @@ func getDayPhrase(now time.Time, day string, nextDayPhrase string) string {
 	todayIdx := utils.DayIndexFromDate(now)
 
 	if dayIdx == todayIdx {
-		return "сегодня"
+		return n.locData("notify_today", nil)
 	}
 	if dayIdx == todayIdx+1 {
-		return "завтра"
+		return n.locData("notify_tomorrow", nil)
 	}
 
 	if utils.WeekIndexFromDate(t).IsFutureWeek() {
-		return "следующую неделю"
+		return n.locData("notify_next_week", nil)
 	}
 
 	return nextDayPhrase
@@ -126,15 +126,15 @@ func getDayPhrase(now time.Time, day string, nextDayPhrase string) string {
 func (n *EventNotifier) dayHeader(isUpdate bool, phrase, kind, value, ownValue string) string {
 	if ownValue != "" && ownValue == value {
 		if isUpdate {
-			return fmt.Sprintf("🆕 Изменено расписание %s\n", phrase)
+			return fmt.Sprintf(n.locData("notify_changed_own", nil), phrase)
 		}
-		return fmt.Sprintf("📢 Расписание на %s\n", phrase)
+		return fmt.Sprintf(n.locData("notify_day_own", nil), phrase)
 	}
 	label := valueLabel(kind, value)
 	if isUpdate {
-		return fmt.Sprintf("🆕 %s: изменено расписание %s\n", label, phrase)
+		return fmt.Sprintf(n.locData("notify_changed_foreign", nil), label, phrase)
 	}
-	return fmt.Sprintf("📢 %s: расписание на %s\n", label, phrase)
+	return fmt.Sprintf(n.locData("notify_day_foreign", nil), label, phrase)
 }
 
 func (n *EventNotifier) formatDay(kind, value string, day map[string]any, chat *EventChat) string {
@@ -265,7 +265,7 @@ func (n *EventNotifier) AddDay(ev *cache.DayEvent) {
 		return
 	}
 
-	phrase := getDayPhrase(n.nowTime(), dayString(ev.Day), "следующий день")
+	phrase := n.getDayPhrase(n.nowTime(), dayString(ev.Day), n.locData("notify_next_day", nil))
 	n.sendDay(ev.Kind, ev.Value, false, phrase, ev.Day, chats)
 }
 
@@ -302,7 +302,7 @@ func (n *EventNotifier) UpdateDay(ev *cache.DayEvent) {
 		return
 	}
 
-	phrase := getDayPhrase(n.nowTime(), dayString(ev.Day), "день")
+	phrase := n.getDayPhrase(n.nowTime(), dayString(ev.Day), n.locData("notify_day", nil))
 	n.sendDayUpdate(ev, phrase, chats)
 }
 
@@ -431,7 +431,7 @@ func (n *EventNotifier) CronDay(kind string, index int, latest bool) {
 
 		n.cache.SetLastNoticedDay(kind, value, int64(dayIdx))
 
-		phrase := getDayPhrase(n.nowTime(), dayString(day), "следующий день")
+		phrase := n.getDayPhrase(n.nowTime(), dayString(day), n.locData("notify_next_day", nil))
 
 		for _, chat := range groupChats {
 			if chat.PeerID != 0 {

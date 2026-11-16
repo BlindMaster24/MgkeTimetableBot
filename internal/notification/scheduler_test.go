@@ -103,32 +103,37 @@ func futureWeekStr() string {
 }
 
 func TestGetDayPhrase_Today(t *testing.T) {
-	if got := getDayPhrase(time.Now(), todayStr(), "день"); got != "сегодня" {
+	n, _, _, _ := newTestNotifier(t)
+	if got := n.getDayPhrase(time.Now(), todayStr(), "день"); got != "сегодня" {
 		t.Errorf("expected 'сегодня', got %q", got)
 	}
 }
 
 func TestGetDayPhrase_Tomorrow(t *testing.T) {
-	if got := getDayPhrase(time.Now(), tomorrowStr(), "день"); got != "завтра" {
+	n, _, _, _ := newTestNotifier(t)
+	if got := n.getDayPhrase(time.Now(), tomorrowStr(), "день"); got != "завтра" {
 		t.Errorf("expected 'завтра', got %q", got)
 	}
 }
 
 func TestGetDayPhrase_FutureWeek(t *testing.T) {
-	if got := getDayPhrase(time.Now(), futureWeekStr(), "день"); got != "следующую неделю" {
+	n, _, _, _ := newTestNotifier(t)
+	if got := n.getDayPhrase(time.Now(), futureWeekStr(), "день"); got != "следующую неделю" {
 		t.Errorf("expected 'следующую неделю', got %q", got)
 	}
 }
 
 func TestGetDayPhrase_Other(t *testing.T) {
+	n, _, _, _ := newTestNotifier(t)
 	past := time.Now().AddDate(0, 0, -3).Format("02.01.2006")
-	if got := getDayPhrase(time.Now(), past, "день"); got != "день" {
+	if got := n.getDayPhrase(time.Now(), past, "день"); got != "день" {
 		t.Errorf("expected fallback phrase, got %q", got)
 	}
 }
 
 func TestGetDayPhrase_Invalid(t *testing.T) {
-	if got := getDayPhrase(time.Now(), "not-a-date", "день"); got != "день" {
+	n, _, _, _ := newTestNotifier(t)
+	if got := n.getDayPhrase(time.Now(), "not-a-date", "день"); got != "день" {
 		t.Errorf("expected fallback phrase, got %q", got)
 	}
 }
