@@ -118,6 +118,7 @@ func RenderGoldenSamples() (map[string][]byte, error) {
 		Tomorrow:       "tomorrow",
 		GroupColumns:   [5]string{"#", "Subject", "Type", "Room", "Teacher"},
 		TeacherColumns: [5]string{"#", "Subject", "Type", "Room", "Group"},
+		Weekdays:       [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
 	})
 
 	groupPath, err := renderer.RenderGroupImage("63ТП", GoldenGroupDays())

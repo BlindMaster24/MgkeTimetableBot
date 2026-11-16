@@ -51,7 +51,7 @@ func daysFromMaps(dayMaps []map[string]any, isGroup bool, texts Texts) []DayData
 		dateStr, _ := dayMap["day"].(string)
 		lessons, _ := dayMap["lessons"].([]any)
 
-		wd := weekdayName(dateStr)
+		wd := weekdayName(dateStr, texts)
 
 		hint := ""
 		if isGroup {

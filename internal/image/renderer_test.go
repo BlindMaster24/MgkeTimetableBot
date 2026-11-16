@@ -258,9 +258,10 @@ func TestWeekdayName(t *testing.T) {
 		{"07.09.2025", "Воскресенье"},
 	}
 
+	texts := Texts{Weekdays: [7]string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}}
 	for _, tt := range tests {
 		t.Run(tt.date, func(t *testing.T) {
-			result := weekdayName(tt.date)
+			result := weekdayName(tt.date, texts)
 			if result != tt.expected {
 				t.Errorf("weekdayName(%s) = %q, want %q", tt.date, result, tt.expected)
 			}

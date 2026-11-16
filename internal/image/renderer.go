@@ -27,6 +27,7 @@ type Texts struct {
 	Tomorrow       string
 	GroupColumns   [5]string
 	TeacherColumns [5]string
+	Weekdays       [7]string
 }
 
 type Renderer struct {
@@ -96,19 +97,19 @@ type LessonRow struct {
 }
 
 var groupColumns = []Column{
-	{Title: "№", Width: 30, Align: "center"},
-	{Title: "Предмет", Width: 250, Align: "left"},
-	{Title: "Вид", Width: 60, Align: "center"},
-	{Title: "Аудитория", Width: 100, Align: "center"},
-	{Title: "Преподаватель", Width: 190, Align: "left"},
+	{Title: "", Width: 30, Align: "center"},
+	{Title: "", Width: 250, Align: "left"},
+	{Title: "", Width: 60, Align: "center"},
+	{Title: "", Width: 100, Align: "center"},
+	{Title: "", Width: 190, Align: "left"},
 }
 
 var teacherColumns = []Column{
-	{Title: "№", Width: 30, Align: "center"},
-	{Title: "Предмет", Width: 250, Align: "left"},
-	{Title: "Вид", Width: 60, Align: "center"},
-	{Title: "Аудитория", Width: 100, Align: "center"},
-	{Title: "Группа", Width: 68, Align: "center"},
+	{Title: "", Width: 30, Align: "center"},
+	{Title: "", Width: 250, Align: "left"},
+	{Title: "", Width: 60, Align: "center"},
+	{Title: "", Width: 100, Align: "center"},
+	{Title: "", Width: 68, Align: "center"},
 }
 
 func (r *Renderer) RenderGroupImage(group string, days []DayData) (string, error) {
@@ -563,11 +564,10 @@ func getSubgroupPrefix(m map[string]any) string {
 	return ""
 }
 
-func weekdayName(date string) string {
+func weekdayName(date string, texts Texts) string {
 	t, err := time.Parse("02.01.2006", date)
 	if err != nil {
 		return ""
 	}
-	names := []string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}
-	return names[t.Weekday()]
+	return texts.Weekdays[t.Weekday()]
 }

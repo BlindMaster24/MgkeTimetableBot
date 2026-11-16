@@ -24,5 +24,14 @@ func (b *Bot) imageTexts() imagepkg.Texts {
 			b.loc("image_col_room"),
 			b.loc("image_col_group"),
 		},
+		Weekdays: [7]string{
+			b.loc("weekday_0"),
+			b.loc("weekday_1"),
+			b.loc("weekday_2"),
+			b.loc("weekday_3"),
+			b.loc("weekday_4"),
+			b.loc("weekday_5"),
+			b.loc("weekday_6"),
+		},
 	}
 }
