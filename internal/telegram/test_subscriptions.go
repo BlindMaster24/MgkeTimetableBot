@@ -17,7 +17,7 @@ func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	if len(list) == 0 {
 		chat.Scene = ""
 		s.bot.chatRepo.Save(chat)
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Подписок нет.", s.bot.replySubscriptionsMenu())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("subtest_1"), s.bot.replySubscriptionsMenu())
 	}
 
 	input := strings.TrimSpace(u.Text)
@@ -42,14 +42,14 @@ func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 			}
 		}
 		if !found {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", s.bot.replySubscriptionsMenu())
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("subtest_2"), s.bot.replySubscriptionsMenu())
 		}
 	}
 
 	chat.Scene = "sub_test_mode:" + target.Type + ":" + target.Value
 	s.bot.chatRepo.Save(chat)
 
-	prompt := "Что проверить?\n1. Оповещение об изменении дня\n2. Оповещение о новой неделе\n3. Оба варианта"
+	prompt := s.bot.loc("subtest_3")
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, s.bot.replySubscriptionsMenu())
 }
 
@@ -65,7 +65,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	if len(parts) != 2 {
 		chat.Scene = ""
 		s.bot.chatRepo.Save(chat)
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Неверный номер подписки.", s.bot.replySubscriptionsMenu())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("subtest_4"), s.bot.replySubscriptionsMenu())
 	}
 	subType, subValue := parts[0], parts[1]
 
@@ -78,7 +78,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	case "3":
 		mode = "both"
 	default:
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Введите 1, 2 или 3", s.bot.replySubscriptionsMenu())
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("subtest_5"), s.bot.replySubscriptionsMenu())
 	}
 
 	chat.Scene = ""
@@ -87,17 +87,17 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	week := s.bot.relevantWeekIndex()
 	days := s.bot.weekDays(ctx, daysFromArchive, subType, subValue, week)
 
-	label := "Группа"
+	label := s.bot.loc("subtest_6")
 	if subType == "teacher" {
-		label = "Преподаватель"
+		label = s.bot.loc("subtest_7")
 	}
 
 	if mode == "day" || mode == "both" {
 		day := pickFutureDay(days)
-		phrase := "день"
+		phrase := s.bot.loc("subtest_8")
 		var one []map[string]any
 		if day != nil {
-			phrase = subscriptionDayPhrase(day["day"].(string))
+			phrase = s.bot.subscriptionDayPhrase(day["day"].(string))
 			one = []map[string]any{day}
 		}
 
@@ -109,7 +109,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 			text = formatter.GetByIndex(chat.Formatter).FormatGroupFull(subValue, one, opts)
 		}
 
-		message := fmt.Sprintf("📢 %s %s: расписание на %s\n%s", label, subValue, phrase, text)
+		message := fmt.Sprintf(s.bot.loc("subtest_9"), label, subValue, phrase, text)
 		if err := u.Bot.SendTextWithReplyKeyboard(u.ChatID, message, s.bot.replySubscriptionsMenu()); err != nil {
 			return err
 		}
@@ -119,8 +119,8 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	}
 
 	return u.Bot.SendTextWithKeyboard(u.ChatID,
-		fmt.Sprintf("🆕 %s %s: доступно расписание на следующую неделю", label, subValue),
-		weekTimetableButton("📃 Показать", subType, subValue, week.Value(), false))
+		fmt.Sprintf(s.bot.loc("subtest_10"), label, subValue),
+		weekTimetableButton(s.bot.loc("subtest_11"), subType, subValue, week.Value(), false))
 }
 
 func pickFutureDay(days []map[string]any) map[string]any {
@@ -141,34 +141,34 @@ func pickFutureDay(days []map[string]any) map[string]any {
 	return nil
 }
 
-func subscriptionDayPhrase(day string) string {
+func (b *Bot) subscriptionDayPhrase(day string) string {
 	t, err := time.Parse("02.01.2006", day)
 	if err != nil {
-		return "день"
+		return b.loc("subtest_12")
 	}
 
 	dayIdx := utils.DayIndexFromDate(t)
 	todayIdx := utils.DayIndexFromDate(time.Now())
 	if dayIdx == todayIdx {
-		return "сегодня"
+		return b.loc("subtest_13")
 	}
 	if dayIdx == todayIdx+1 {
-		return "завтра"
+		return b.loc("subtest_14")
 	}
 	if utils.WeekIndexFromDate(t).IsFutureWeek() {
-		return "следующую неделю"
+		return b.loc("subtest_15")
 	}
-	return "день"
+	return b.loc("subtest_16")
 }
 
 type subscriptionsTestCmd struct{ bot *Bot }
 
 func (c *subscriptionsTestCmd) Name() string { return "/subscriptions_test" }
 func (c *subscriptionsTestCmd) Description() string {
-	return "Тестовое уведомление по подпискам"
+	return c.bot.loc("subtest_17")
 }
 func (c *subscriptionsTestCmd) MatchText(text string) bool {
-	return text == "🧪 Проверить" || text == "/subscriptions_test"
+	return text == c.bot.loc("subtest_18") || text == "/subscriptions_test"
 }
 func (c *subscriptionsTestCmd) Handler(ctx context.Context, u *Update) error {
 	return c.bot.subTestPrompt(u)
