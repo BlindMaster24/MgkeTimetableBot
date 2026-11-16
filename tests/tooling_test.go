@@ -107,6 +107,23 @@ func TestCIRunsTheMonitoringCheck(t *testing.T) {
 	}
 }
 
+func TestCIRunsTheOfflinePreflight(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+
+	job := workflowJob(t, workflow, "preflight")
+	for _, want := range []string{
+		"name: Run the offline preflight",
+		"scripts/preflight",
+		"configs/config.example.yaml",
+		"MGKE_TELEGRAM_TOKEN:",
+		"MGKE_ENCRYPT_KEY:",
+	} {
+		if !strings.Contains(job, want) {
+			t.Errorf("the preflight job must keep %q", want)
+		}
+	}
+}
+
 func TestCIRunsTheNewestToolchain(t *testing.T) {
 	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
 
