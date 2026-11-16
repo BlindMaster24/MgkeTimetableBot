@@ -7,19 +7,21 @@ import (
 
 type LitolaxFormatter struct{}
 
-func (f *LitolaxFormatter) Name() string  { return "litolax" }
-func (f *LitolaxFormatter) Label() string { return "💩 LitolaxStyle" }
-func (f *LitolaxFormatter) NoTimetable() string {
-	return "Нет расписания для отображения"
+func (f *LitolaxFormatter) Name() string { return "litolax" }
+func (f *LitolaxFormatter) Label(opts FormatOptions) string {
+	return opts.formatLabel("formatter_label_litolax")
+}
+func (f *LitolaxFormatter) NoTimetable(opts FormatOptions) string {
+	return opts.formatLabel("no_timetable")
 }
 
 func (f *LitolaxFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
-	daysInfo := parseDaysFromSlice(days, opts.now())
+	daysInfo := parseDaysFromSlice(days, opts)
 	return f.formatFull(group, "", daysInfo, true, opts)
 }
 
 func (f *LitolaxFormatter) FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string {
-	daysInfo := parseDaysFromSlice(days, opts.now())
+	daysInfo := parseDaysFromSlice(days, opts)
 	return f.formatFull("", teacher, daysInfo, false, opts)
 }
 
@@ -28,9 +30,13 @@ func (f *LitolaxFormatter) formatFull(name string, teacher string, days []DayInf
 
 	if opts.ShowHeader {
 		if isGroup {
-			text = append(text, "Группа: "+opts.b(name))
+			if header := opts.formatLabel("formatter_group_litolax", name); header != "" {
+				text = append(text, opts.b(header))
+			}
 		} else {
-			text = append(text, "Преподаватель: "+opts.b(opts.getFullTeacherName(teacher)))
+			if header := opts.formatLabel("formatter_teacher_litolax", opts.getFullTeacherName(teacher)); header != "" {
+				text = append(text, opts.b(header))
+			}
 		}
 	}
 
@@ -48,7 +54,9 @@ func (f *LitolaxFormatter) formatFull(name string, teacher string, days []DayInf
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, f.NoTimetable())
+		if empty := f.NoTimetable(opts); empty != "" {
+			text = append(text, empty)
+		}
 	}
 
 	footer := formatFooter(opts)
@@ -64,12 +72,12 @@ func (f *LitolaxFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 	if day.Hint != "" {
 		w += " " + opts.i(day.Hint)
 	}
-	return "\nДень - " + w + ", " + day.Date + "\n"
+	return "\n" + opts.formatLabel("formatter_day_header_litolax", w, day.Date) + "\n"
 }
 
 func (f *LitolaxFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return opts.i("Пар нет")
+		return opts.italicLabel("no_lessons")
 	}
 
 	var text []string
@@ -83,7 +91,7 @@ func (f *LitolaxFormatter) formatGroupLessons(lessons []any, opts FormatOptions)
 			continue
 		}
 
-		header := "\n" + opts.b(fmt.Sprintf("Пара: №%d", i+1))
+		header := "\n" + opts.b(opts.formatLabel("formatter_pair_litolax", i+1))
 
 		if !isSubgroupList(lesson) {
 			text = append(text, header+"\n"+f.formatGroupLessonLine(subs[0]))
@@ -94,7 +102,9 @@ func (f *LitolaxFormatter) formatGroupLessons(lessons []any, opts FormatOptions)
 			}
 		}
 
-		text = append(text, "Каб: "+strings.Join(cabinetsOf(subs), " "))
+		if cabinet := opts.formatLabel("formatter_cabinet_litolax", strings.Join(cabinetsOf(subs), " ")); cabinet != "" {
+			text = append(text, cabinet)
+		}
 	}
 
 	return strings.TrimSpace(strings.Join(text, "\n"))
@@ -102,7 +112,7 @@ func (f *LitolaxFormatter) formatGroupLessons(lessons []any, opts FormatOptions)
 
 func (f *LitolaxFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return opts.i("Пар нет")
+		return opts.italicLabel("no_lessons")
 	}
 
 	var text []string
@@ -116,9 +126,11 @@ func (f *LitolaxFormatter) formatTeacherLessons(lessons []any, opts FormatOption
 			continue
 		}
 
-		header := "\n" + opts.b(fmt.Sprintf("Пара: №%d", i+1))
+		header := "\n" + opts.b(opts.formatLabel("formatter_pair_litolax", i+1))
 		text = append(text, header+"\n"+f.formatTeacherLesson(subs[0]))
-		text = append(text, "Каб: "+oldDash(subs[0].Cabinet))
+		if cabinet := opts.formatLabel("formatter_cabinet_litolax", oldDash(subs[0].Cabinet)); cabinet != "" {
+			text = append(text, cabinet)
+		}
 	}
 
 	return strings.TrimSpace(strings.Join(text, "\n"))

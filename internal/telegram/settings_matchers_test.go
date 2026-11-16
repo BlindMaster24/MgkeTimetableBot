@@ -33,8 +33,9 @@ func TestBtnToggleTextMatcherAcceptsOldVariants(t *testing.T) {
 }
 
 func TestFormatterSelectMatcherIgnoresCase(t *testing.T) {
-	cmd := &formatterSelectTextCmd{}
-	label := formatter.AllFormatters[0].Label()
+	b, _, _ := setupTestBotWithData(t)
+	cmd := &formatterSelectTextCmd{bot: b}
+	label := formatter.AllFormatters[0].Label(b.fmtOpts(&Chat{}, true))
 	upper := strings.ToUpper(label)
 	if !cmd.MatchText(upper) {
 		t.Errorf("MatchText(%q) = false", upper)

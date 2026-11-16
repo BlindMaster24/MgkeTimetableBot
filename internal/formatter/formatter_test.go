@@ -1,6 +1,9 @@
 package formatter
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +70,21 @@ func makeSubgroupData() map[string]any {
 	}
 }
 
+func testLabels(t *testing.T) map[string]string {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join("..", "i18n", "locales", "ru.json"))
+	if err != nil {
+		t.Fatalf("read the locale file: %v", err)
+	}
+
+	labels := make(map[string]string)
+	if err := json.Unmarshal(data, &labels); err != nil {
+		t.Fatalf("decode the locale file: %v", err)
+	}
+	return labels
+}
+
 func TestGetByIndex(t *testing.T) {
 	if GetByIndex(0) == nil {
 		t.Fatal("GetByIndex(0) returned nil")
@@ -114,7 +132,7 @@ func TestDefaultFormatter_GroupDay(t *testing.T) {
 	data := makeDataWithDays(makeTestDaysData())
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true, ShowHeader: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true, ShowHeader: true}
 	result := f.FormatGroupFull("63ТП", days, opts)
 
 	if result == "" {
@@ -146,7 +164,7 @@ func TestTeacherLessonsCarryTheGroupPrefix(t *testing.T) {
 	days := extractDaysFromData(makeTeacherDaysData())
 
 	for _, f := range AllFormatters {
-		opts := FormatOptions{IsTelegram: true}
+		opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 		result := f.FormatTeacherFull("Иванов И.И.", days, opts)
 
 		if result == "" {
@@ -166,7 +184,7 @@ func TestVisualFormatter_GroupDay(t *testing.T) {
 	data := makeDataWithDays(makeTestDaysData())
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true, ShowHeader: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true, ShowHeader: true}
 	result := f.FormatGroupFull("63ТП", days, opts)
 
 	if result == "" {
@@ -185,7 +203,7 @@ func TestCompactFormatter_GroupDay(t *testing.T) {
 	data := makeDataWithDays(makeTestDaysData())
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 	result := f.FormatGroupFull("63ТП", days, opts)
 
 	if result == "" {
@@ -201,7 +219,7 @@ func TestLitolaxFormatter_GroupDay(t *testing.T) {
 	data := makeDataWithDays(makeTestDaysData())
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 	result := f.FormatGroupFull("63ТП", days, opts)
 
 	if result == "" {
@@ -221,7 +239,7 @@ func TestDayHintsToday(t *testing.T) {
 			},
 		}
 		days := extractDaysFromData(data)
-		opts := FormatOptions{IsTelegram: true}
+		opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 		result := f.FormatGroupFull("Г1", days, opts)
 
 		if !strings.Contains(result, "сегодня") {
@@ -239,7 +257,7 @@ func TestDayHintsTomorrow(t *testing.T) {
 			},
 		}
 		days := extractDaysFromData(data)
-		opts := FormatOptions{IsTelegram: true}
+		opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 		result := f.FormatGroupFull("Г1", days, opts)
 
 		if !strings.Contains(result, "завтра") {
@@ -253,7 +271,7 @@ func TestHTMLFormatting(t *testing.T) {
 	data := makeDataWithDays(makeTestDaysData())
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if !strings.Contains(result, "<b>") {
@@ -266,7 +284,7 @@ func TestNoHTMLFormatting(t *testing.T) {
 	data := makeDataWithDays(makeTestDaysData())
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: false}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: false}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if strings.Contains(result, "<b>") {
@@ -295,11 +313,27 @@ func TestNoLessons(t *testing.T) {
 			t.Fatalf("no expectation for formatter %q", f.Name())
 		}
 
-		if got := f.FormatGroupFull("Г1", days, FormatOptions{IsTelegram: true}); !strings.Contains(got, expected[0]) {
+		if got := f.FormatGroupFull("Г1", days, FormatOptions{Labels: testLabels(t), IsTelegram: true}); !strings.Contains(got, expected[0]) {
 			t.Fatalf("%s: telegram output %q must carry %q", f.Name(), got, expected[0])
 		}
-		if got := f.FormatGroupFull("Г1", days, FormatOptions{}); strings.Contains(got, "<i>") || !strings.Contains(got, expected[1]) {
+		if got := f.FormatGroupFull("Г1", days, FormatOptions{Labels: testLabels(t)}); strings.Contains(got, "<i>") || !strings.Contains(got, expected[1]) {
 			t.Fatalf("%s: plain output %q must carry %q without tags", f.Name(), got, expected[1])
+		}
+	}
+}
+
+func TestNoLabelsMeansNoText(t *testing.T) {
+	days := extractDaysFromData(makeDataWithDays(makeTestDaysData()))
+
+	for _, f := range AllFormatters {
+		if got := f.Label(FormatOptions{}); got != "" {
+			t.Errorf("%s: a missing label must render as an empty string, got %q", f.Name(), got)
+		}
+		if got := f.NoTimetable(FormatOptions{}); got != "" {
+			t.Errorf("%s: a missing timetable text must render as an empty string, got %q", f.Name(), got)
+		}
+		if got := f.FormatGroupFull("63ТП", days, FormatOptions{ShowHeader: true}); strings.Contains(got, "63ТП") {
+			t.Errorf("%s: the header must not be drawn without its label, got %q", f.Name(), got)
 		}
 	}
 }
@@ -318,10 +352,10 @@ func TestEmptyDays(t *testing.T) {
 			t.Fatalf("no expectation for formatter %q", f.Name())
 		}
 
-		if got := f.FormatGroupFull("Г1", nil, FormatOptions{IsTelegram: true}); !strings.Contains(got, expected) {
+		if got := f.FormatGroupFull("Г1", nil, FormatOptions{Labels: testLabels(t), IsTelegram: true}); !strings.Contains(got, expected) {
 			t.Fatalf("%s: expected %q, got: %s", f.Name(), expected, got)
 		}
-		if got := f.FormatTeacherFull("Иванов И.И.", nil, FormatOptions{IsTelegram: true}); !strings.Contains(got, expected) {
+		if got := f.FormatTeacherFull("Иванов И.И.", nil, FormatOptions{Labels: testLabels(t), IsTelegram: true}); !strings.Contains(got, expected) {
 			t.Fatalf("%s: expected %q for a teacher too, got: %s", f.Name(), expected, got)
 		}
 	}
@@ -332,7 +366,7 @@ func TestFooterParserError(t *testing.T) {
 	data := makeSingleLessonData()
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true, HasParserError: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true, HasParserError: true}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if !strings.Contains(result, "⚠️") {
@@ -345,7 +379,7 @@ func TestFooterHint(t *testing.T) {
 	data := makeSingleLessonData()
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true, ShowHints: true, RandHint: "Тестовая подсказка"}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true, ShowHints: true, RandHint: "Тестовая подсказка"}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if !strings.Contains(result, "Тестовая подсказка") {
@@ -358,7 +392,7 @@ func TestSubgroups(t *testing.T) {
 	data := makeSubgroupData()
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if !strings.Contains(result, "1.") {
@@ -374,7 +408,7 @@ func TestWeekLabel(t *testing.T) {
 	data := makeSingleLessonData()
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true, WeekLabel: "Неделя №5"}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true, WeekLabel: "Неделя №5"}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if !strings.Contains(result, "Неделя №5") {
@@ -387,7 +421,7 @@ func TestParserTimeFooter(t *testing.T) {
 	data := makeSingleLessonData()
 	days := extractDaysFromData(data)
 
-	opts := FormatOptions{IsTelegram: true, ShowParserTime: true, ParserUpdateTime: time.Now().Add(-5 * time.Minute).UnixMilli()}
+	opts := FormatOptions{Labels: testLabels(t), IsTelegram: true, ShowParserTime: true, ParserUpdateTime: time.Now().Add(-5 * time.Minute).UnixMilli()}
 	result := f.FormatGroupFull("Г1", days, opts)
 
 	if !strings.Contains(result, "загружена") {
@@ -428,7 +462,7 @@ func TestDayHeadersUseFullWeekdayNames(t *testing.T) {
 	}
 
 	for _, formatter := range AllFormatters {
-		plain := formatter.FormatGroupFull("777", days, FormatOptions{})
+		plain := formatter.FormatGroupFull("777", days, FormatOptions{Labels: testLabels(t)})
 		if !strings.Contains(plain, "Понедельник, 07.09.2026") {
 			t.Errorf("%s: monday header is not spelled out: %q", formatter.Name(), plain)
 		}
@@ -436,7 +470,7 @@ func TestDayHeadersUseFullWeekdayNames(t *testing.T) {
 			t.Errorf("%s: tuesday header is not spelled out: %q", formatter.Name(), plain)
 		}
 
-		html := formatter.FormatGroupFull("777", days, FormatOptions{IsTelegram: true})
+		html := formatter.FormatGroupFull("777", days, FormatOptions{Labels: testLabels(t), IsTelegram: true})
 		if !strings.Contains(html, "Понедельник") || !strings.Contains(html, "07.09.2026") {
 			t.Errorf("%s: monday header is missing from the telegram output: %q", formatter.Name(), html)
 		}
@@ -468,10 +502,12 @@ func TestFormatSeconds(t *testing.T) {
 		{90000, "1 д. 1 ч. 0 мин. 0 сек."},
 		{31536000, "1 г. 0 д. 0 ч. 0 мин. 0 сек."},
 	}
+	opts := FormatOptions{Labels: testLabels(t)}
+
 	for _, tt := range tests {
-		got := FormatSeconds(tt.secs)
+		got := formatSeconds(tt.secs, opts.secondsSuffixes())
 		if got != tt.want {
-			t.Errorf("FormatSeconds(%d) = %q, want %q", tt.secs, got, tt.want)
+			t.Errorf("formatSeconds(%d) = %q, want %q", tt.secs, got, tt.want)
 		}
 	}
 }
@@ -520,7 +556,7 @@ func TestSubgroupLayoutMatchesTheOldBot(t *testing.T) {
 				if !ok {
 					t.Fatalf("no expectation for formatter %q", f.Name())
 				}
-				got := f.FormatGroupFull("100", day(tc.lessons), FormatOptions{})
+				got := f.FormatGroupFull("100", day(tc.lessons), FormatOptions{Labels: testLabels(t)})
 				if !strings.Contains(got, expected) {
 					t.Fatalf("%s: subgroup layout drifted\nwant fragment:\n%s\ngot:\n%s", f.Name(), expected, got)
 				}

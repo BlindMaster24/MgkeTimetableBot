@@ -8,18 +8,20 @@ import (
 
 type DefaultFormatter struct{}
 
-func (f *DefaultFormatter) Name() string  { return "default" }
-func (f *DefaultFormatter) Label() string { return "📝 Стуктурированный" }
-func (f *DefaultFormatter) NoTimetable() string {
-	return "Нет расписания для отображения"
+func (f *DefaultFormatter) Name() string { return "default" }
+func (f *DefaultFormatter) Label(opts FormatOptions) string {
+	return opts.formatLabel("formatter_label_default")
+}
+func (f *DefaultFormatter) NoTimetable(opts FormatOptions) string {
+	return opts.formatLabel("no_timetable")
 }
 
 func (f *DefaultFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
-	return f.formatFull(group, "", parseDaysFromSlice(days, opts.now()), true, opts)
+	return f.formatFull(group, "", parseDaysFromSlice(days, opts), true, opts)
 }
 
 func (f *DefaultFormatter) FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string {
-	return f.formatFull("", teacher, parseDaysFromSlice(days, opts.now()), false, opts)
+	return f.formatFull("", teacher, parseDaysFromSlice(days, opts), false, opts)
 }
 
 func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInfo, isGroup bool, opts FormatOptions) string {
@@ -27,9 +29,13 @@ func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInf
 
 	if opts.ShowHeader {
 		if isGroup {
-			text = append(text, fmt.Sprintf("- Группа '%s' -", name))
+			if header := opts.formatLabel("formatter_group_default", name); header != "" {
+				text = append(text, header)
+			}
 		} else {
-			text = append(text, fmt.Sprintf("- Преподаватель '%s' -", opts.getFullTeacherName(teacher)))
+			if header := opts.formatLabel("formatter_teacher_default", opts.getFullTeacherName(teacher)); header != "" {
+				text = append(text, header)
+			}
 		}
 	}
 
@@ -47,7 +53,9 @@ func (f *DefaultFormatter) formatFull(name string, teacher string, days []DayInf
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, f.NoTimetable())
+		if empty := f.NoTimetable(opts); empty != "" {
+			text = append(text, empty)
+		}
 	}
 
 	footer := formatFooter(opts)
@@ -68,7 +76,7 @@ func (f *DefaultFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 
 func (f *DefaultFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return opts.i("Пар нет")
+		return opts.italicLabel("no_lessons")
 	}
 
 	var text []string
@@ -110,7 +118,7 @@ func (f *DefaultFormatter) formatGroupLessons(lessons []any, opts FormatOptions)
 
 func (f *DefaultFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return opts.i("Пар нет")
+		return opts.italicLabel("no_lessons")
 	}
 
 	var text []string
@@ -179,11 +187,12 @@ func (f *DefaultFormatter) formatLessonLine(p LessonPart, show map[string]bool, 
 	return strings.Join(parts, " ")
 }
 
-func parseDaysFromSlice(days []map[string]any, now time.Time) []DayInfo {
+func parseDaysFromSlice(days []map[string]any, opts FormatOptions) []DayInfo {
 	if len(days) == 0 {
 		return nil
 	}
 
+	now := opts.now()
 	today := now.Format("02.01.2006")
 	tomorrow := now.AddDate(0, 0, 1).Format("02.01.2006")
 
@@ -194,14 +203,14 @@ func parseDaysFromSlice(days []map[string]any, now time.Time) []DayInfo {
 
 		wd := ""
 		if t, err := time.Parse("02.01.2006", dateStr); err == nil {
-			wd = weekdayNames[t.Weekday()]
+			wd = opts.weekdayName(t.Weekday())
 		}
 
 		hint := ""
 		if dateStr == today {
-			hint = "(сегодня)"
+			hint = opts.formatLabel("day_hint_today")
 		} else if dateStr == tomorrow {
-			hint = "(завтра)"
+			hint = opts.formatLabel("day_hint_tomorrow")
 		}
 
 		result = append(result, DayInfo{

@@ -125,7 +125,7 @@ func (b *Bot) replySettingsFormatters(chat *Chat) *telego.ReplyKeyboardMarkup {
 	var rows [][]telego.KeyboardButton
 	var currentRow []telego.KeyboardButton
 	for i, f := range formatter.AllFormatters {
-		label := f.Label()
+		label := f.Label(formatter.FormatOptions{Labels: b.formatterLabels()})
 		if chat.Formatter == i {
 			label += " (выбран)"
 		}

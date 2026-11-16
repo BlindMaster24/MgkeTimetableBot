@@ -41,6 +41,7 @@ func (b *Bot) getFormatterOpts(chat *Chat) formatter.FormatOptions {
 		HasParserError:   !b.cache.SuccessUpdate,
 		TeacherNames:     b.cache.GetTeamNames(),
 		Now:              b.nowTime(),
+		Labels:           b.formatterLabels(),
 	}
 
 	if opts.ShowHints && !opts.HasParserError {

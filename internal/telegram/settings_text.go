@@ -253,8 +253,9 @@ func (c *formatterSelectTextCmd) Description() string { return "" }
 func (c *formatterSelectTextCmd) Scene() string       { return sceneSettings }
 
 func (c *formatterSelectTextCmd) MatchText(text string) bool {
+	opts := formatter.FormatOptions{Labels: c.bot.formatterLabels()}
 	for _, f := range formatter.AllFormatters {
-		if strings.EqualFold(text, f.Label()) || strings.EqualFold(text, f.Label()+" (выбран)") {
+		if strings.EqualFold(text, f.Label(opts)) || strings.EqualFold(text, f.Label(opts)+" (выбран)") {
 			return true
 		}
 	}
@@ -267,13 +268,14 @@ func (c *formatterSelectTextCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 
+	opts := formatter.FormatOptions{Labels: c.bot.formatterLabels()}
 	for i, f := range formatter.AllFormatters {
-		if strings.HasPrefix(u.Text, f.Label()) {
+		if strings.HasPrefix(u.Text, f.Label(opts)) {
 			chat.Formatter = i
 			c.bot.chatRepo.Save(chat)
 			return c.bot.SendTextWithReplyKeyboard(
 				u.ChatID,
-				fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", f.Label()),
+				fmt.Sprintf("Был успешно выбран \"%s\" форматировщик.", f.Label(opts)),
 				c.bot.replySettingsFormatters(chat),
 			)
 		}

@@ -187,9 +187,9 @@ func TestIntegrationParseToCacheToDisplay(t *testing.T) {
 				IsTelegram: true,
 			})
 			if text == "" {
-				t.Errorf("formatter %s produced empty output for group %s", f.Label(), groupName)
+				t.Errorf("formatter %s produced empty output for group %s", f.Name(), groupName)
 			} else {
-				t.Logf("formatter %s, group %s:\n%s", f.Label(), groupName, text)
+				t.Logf("formatter %s, group %s:\n%s", f.Name(), groupName, text)
 			}
 		}
 	}
@@ -200,7 +200,7 @@ func TestIntegrationParseToCacheToDisplay(t *testing.T) {
 				IsTelegram: true,
 			})
 			if text == "" {
-				t.Errorf("formatter %s produced empty output for teacher %s", f.Label(), teacherName)
+				t.Errorf("formatter %s produced empty output for teacher %s", f.Name(), teacherName)
 			}
 		}
 	}
@@ -345,7 +345,7 @@ func TestIntegrationFormatAllGroupsAllFormatters(t *testing.T) {
 				WeekLabel:  buildWeekLabelFromDays(days),
 			})
 			if text == "" {
-				t.Errorf("formatter %d (%s) empty for group %s", i, f.Label(), name)
+				t.Errorf("formatter %d (%s) empty for group %s", i, f.Name(), name)
 			}
 		}
 	}

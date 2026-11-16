@@ -143,11 +143,22 @@ func (n *EventNotifier) formatDay(kind, value string, day map[string]any, chat *
 		ShowHeader:   false,
 		IsTelegram:   true,
 		TeacherNames: n.cache.GetTeamNames(),
+		Labels:       n.formatterLabels(),
 	}
 	if kind == cache.KindTeachers {
 		return formatter.GetByIndex(chat.Formatter).FormatTeacherFull(value, days, opts)
 	}
 	return formatter.GetByIndex(chat.Formatter).FormatGroupFull(value, days, opts)
+}
+
+func (n *EventNotifier) formatterLabels() map[string]string {
+	keys := formatter.LabelKeys()
+
+	labels := make(map[string]string, len(keys))
+	for _, key := range keys {
+		labels[key] = n.locData(key, nil)
+	}
+	return labels
 }
 
 func hasAlertableLessons(day map[string]any, filters []config.LessonFilter) bool {

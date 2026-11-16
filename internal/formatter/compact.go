@@ -7,19 +7,21 @@ import (
 
 type CompactFormatter struct{}
 
-func (f *CompactFormatter) Name() string  { return "compact" }
-func (f *CompactFormatter) Label() string { return "Компактный" }
-func (f *CompactFormatter) NoTimetable() string {
-	return "Нет расписания для отображения"
+func (f *CompactFormatter) Name() string { return "compact" }
+func (f *CompactFormatter) Label(opts FormatOptions) string {
+	return opts.formatLabel("formatter_label_compact")
+}
+func (f *CompactFormatter) NoTimetable(opts FormatOptions) string {
+	return opts.formatLabel("no_timetable")
 }
 
 func (f *CompactFormatter) FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string {
-	daysInfo := parseDaysFromSlice(days, opts.now())
+	daysInfo := parseDaysFromSlice(days, opts)
 	return f.formatFull(group, "", daysInfo, true, opts)
 }
 
 func (f *CompactFormatter) FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string {
-	daysInfo := parseDaysFromSlice(days, opts.now())
+	daysInfo := parseDaysFromSlice(days, opts)
 	return f.formatFull("", teacher, daysInfo, false, opts)
 }
 
@@ -28,9 +30,13 @@ func (f *CompactFormatter) formatFull(name string, teacher string, days []DayInf
 
 	if opts.ShowHeader {
 		if isGroup {
-			text = append(text, "Группа '"+name+"'")
+			if header := opts.formatLabel("formatter_group_compact", name); header != "" {
+				text = append(text, header)
+			}
 		} else {
-			text = append(text, "Преподаватель '"+opts.getFullTeacherName(teacher)+"'")
+			if header := opts.formatLabel("formatter_teacher_compact", opts.getFullTeacherName(teacher)); header != "" {
+				text = append(text, header)
+			}
 		}
 	}
 
@@ -48,7 +54,9 @@ func (f *CompactFormatter) formatFull(name string, teacher string, days []DayInf
 			text = append(text, dayText+"\n"+lessonsText)
 		}
 	} else {
-		text = append(text, f.NoTimetable())
+		if empty := f.NoTimetable(opts); empty != "" {
+			text = append(text, empty)
+		}
 	}
 
 	footer := formatFooter(opts)
@@ -69,7 +77,7 @@ func (f *CompactFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 
 func (f *CompactFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return opts.i("Пар нет")
+		return opts.italicLabel("no_lessons")
 	}
 
 	var text []string
@@ -104,7 +112,7 @@ func (f *CompactFormatter) formatGroupLessons(lessons []any, opts FormatOptions)
 
 func (f *CompactFormatter) formatTeacherLessons(lessons []any, opts FormatOptions) string {
 	if len(lessons) == 0 {
-		return opts.i("Пар нет")
+		return opts.italicLabel("no_lessons")
 	}
 
 	var text []string

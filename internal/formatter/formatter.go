@@ -7,14 +7,12 @@ import (
 	"time"
 )
 
-var weekdayNames = []string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}
-
 type Formatter interface {
 	Name() string
-	Label() string
+	Label(opts FormatOptions) string
 	FormatGroupFull(group string, days []map[string]any, opts FormatOptions) string
 	FormatTeacherFull(teacher string, days []map[string]any, opts FormatOptions) string
-	NoTimetable() string
+	NoTimetable(opts FormatOptions) string
 }
 
 type FormatOptions struct {
@@ -28,6 +26,7 @@ type FormatOptions struct {
 	RandHint         string
 	TeacherNames     map[string]string
 	Now              time.Time
+	Labels           map[string]string
 }
 
 func (o FormatOptions) b(text string) string {
@@ -49,6 +48,83 @@ func (o FormatOptions) now() time.Time {
 		return o.Now
 	}
 	return time.Now()
+}
+
+var labelKeys = []string{
+	"formatter_label_default",
+	"formatter_label_visual",
+	"formatter_label_compact",
+	"formatter_label_litolax",
+	"no_timetable",
+	"no_lessons",
+	"formatter_no_timetable_visual",
+	"formatter_no_lessons_visual",
+	"formatter_group_default",
+	"formatter_teacher_default",
+	"formatter_group_compact",
+	"formatter_teacher_compact",
+	"formatter_group_visual",
+	"formatter_teacher_visual",
+	"formatter_group_litolax",
+	"formatter_teacher_litolax",
+	"formatter_day_header_visual",
+	"formatter_day_header_litolax",
+	"formatter_pair_visual",
+	"formatter_pair_litolax",
+	"formatter_subgroup_visual",
+	"formatter_cabinet_litolax",
+	"formatter_loaded_ago",
+	"formatter_hint_prefix",
+	"formatter_seconds_second",
+	"formatter_seconds_minute",
+	"formatter_seconds_hour",
+	"formatter_seconds_day",
+	"formatter_seconds_year",
+	"day_hint_today",
+	"day_hint_tomorrow",
+	"parser_error_warning",
+	"weekday_0",
+	"weekday_1",
+	"weekday_2",
+	"weekday_3",
+	"weekday_4",
+	"weekday_5",
+	"weekday_6",
+}
+
+func LabelKeys() []string {
+	return append([]string(nil), labelKeys...)
+}
+
+func (o FormatOptions) formatLabel(key string, args ...any) string {
+	label := o.Labels[key]
+	if label == "" {
+		return ""
+	}
+	if len(args) == 0 {
+		return label
+	}
+	return fmt.Sprintf(label, args...)
+}
+
+func (o FormatOptions) italicLabel(key string) string {
+	if label := o.Labels[key]; label != "" {
+		return o.i(label)
+	}
+	return ""
+}
+
+func (o FormatOptions) weekdayName(day time.Weekday) string {
+	return o.Labels[fmt.Sprintf("weekday_%d", int(day))]
+}
+
+func (o FormatOptions) secondsSuffixes() []string {
+	keys := []string{"formatter_seconds_second", "formatter_seconds_minute", "formatter_seconds_hour", "formatter_seconds_day", "formatter_seconds_year"}
+	suffixes := make([]string, len(keys))
+	for i, key := range keys {
+		suffixes[i] = o.Labels[key]
+	}
+	return suffixes
 }
 
 func (o FormatOptions) getFullTeacherName(shortName string) string {
@@ -181,29 +257,37 @@ func formatFooter(opts FormatOptions) string {
 		if secs < 0 {
 			secs = 0
 		}
-		text = append(text, fmt.Sprintf("Информация была загружена %s назад", FormatSeconds(secs)))
+		if loaded := opts.formatLabel("formatter_loaded_ago", formatSeconds(secs, opts.secondsSuffixes())); loaded != "" {
+			text = append(text, loaded)
+		}
 	}
 
 	if opts.HasParserError {
-		text = append(text, "⚠️ В последний раз при получении расписания с сайта произошла ошибка. Есть вероятность, что расписание не актуальное. Если проблема не исчезнет - сообщите разработчику.")
+		if warning := opts.formatLabel("parser_error_warning"); warning != "" {
+			text = append(text, warning)
+		}
 	} else if opts.ShowHints && opts.RandHint != "" {
-		text = append(text, "💬 Подсказка: "+opts.RandHint)
+		text = append(text, opts.formatLabel("formatter_hint_prefix")+opts.RandHint)
 	}
 
 	return strings.Join(text, "\n\n")
 }
 
 var secondsPeriods = []int64{60, 3600, 86400, 31536000}
-var secondsSuffixes = []string{"сек.", "мин.", "ч.", "д.", "г."}
 
 func FormatSeconds(secs int64) string {
+	return formatSeconds(secs, nil)
+}
+
+func formatSeconds(secs int64, suffixes []string) string {
 	if secs < 0 {
 		secs = 0
 	}
 
+	parts := len(secondsPeriods) + 1
 	values := 3
-	times := make([]int64, len(secondsSuffixes))
-	filled := make([]bool, len(secondsSuffixes))
+	times := make([]int64, parts)
+	filled := make([]bool, parts)
 	rest := secs
 	countZero := false
 
@@ -219,12 +303,16 @@ func FormatSeconds(secs int64) string {
 	times[0] = rest
 	filled[0] = true
 
-	var parts []string
-	for i := len(times) - 1; i >= 0; i-- {
+	var text []string
+	for i := parts - 1; i >= 0; i-- {
 		if !filled[i] {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%d %s", times[i], secondsSuffixes[i]))
+		suffix := ""
+		if i < len(suffixes) {
+			suffix = suffixes[i]
+		}
+		text = append(text, strings.TrimSpace(fmt.Sprintf("%d %s", times[i], suffix)))
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(text, " ")
 }

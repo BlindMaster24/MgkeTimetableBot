@@ -564,7 +564,7 @@ func TestAllFormattersWithGroupData(t *testing.T) {
 		if text == "" {
 			t.Errorf("formatter %d produced empty output", i)
 		}
-		t.Logf("formatter %d (%s):\n%s", i, f.Label(), text)
+		t.Logf("formatter %d (%s):\n%s", i, f.Name(), text)
 	}
 }
 
