@@ -386,7 +386,7 @@ func (r *runtime) startParser(ctx context.Context) {
 
 		go func() {
 			r.syncArchive(ctx, "parse")
-			r.syncCalendars(context.Background(), "parse")
+			r.syncCalendars(ctx, "parse")
 			r.saveMetrics("parse")
 		}()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
 
@@ -136,7 +137,7 @@ func (b *Bot) showAliasList(u *Update, userID int64) error {
 	var lines []string
 	lines = append(lines, b.loc("aliastext_7"))
 	for i, a := range aliases {
-		lines = append(lines, fmt.Sprintf("%d. %s → %s", i+1, a.Key, a.Value))
+		lines = append(lines, fmt.Sprintf("%d. %s → %s", i+1, utils.EscapeHTML(a.Key), utils.EscapeHTML(a.Value)))
 	}
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
@@ -217,5 +218,5 @@ func (b *Bot) handleAliasAdd(ctx context.Context, u *Update, chat *Chat) {
 		return
 	}
 
-	b.SendText(u.ChatID, fmt.Sprintf(b.loc("aliastext_15"), key, value))
+	b.SendText(u.ChatID, fmt.Sprintf(b.loc("aliastext_15"), utils.EscapeHTML(key), utils.EscapeHTML(value)))
 }

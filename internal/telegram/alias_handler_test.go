@@ -56,6 +56,51 @@ func TestAliasAddStoresThePairAndLeavesTheScene(t *testing.T) {
 	}
 }
 
+func TestAliasAddEscapesTheAnglesInTheAnswer(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	chat, err := b.chatRepo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat.Scene = sceneSettingsAlias
+
+	b.handleAliasAdd(context.Background(), makeUpdate(userID, "мат = <b>Математика</b> & физика"), chat)
+
+	answer := caller.last()
+	if strings.Contains(answer, "<b>") || strings.Contains(answer, "& физика") {
+		t.Fatalf("the answer must carry escaped text, got %q", answer)
+	}
+	if !strings.Contains(answer, "&lt;b&gt;") || !strings.Contains(answer, "&amp;") {
+		t.Fatalf("the answer must escape the markup, got %q", answer)
+	}
+}
+
+func TestAliasListEscapesTheStoredPairs(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	chat, err := b.chatRepo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := b.aliasRepo.Add(userID, "мат<", "Математика&Физика"); err != nil {
+		t.Fatal(err)
+	}
+	listUpdate := makeUpdate(userID, "/alias")
+	listUpdate.Bot = b
+	if err := b.showAliasList(listUpdate, userID); err != nil {
+		t.Fatal(err)
+	}
+	_ = chat
+
+	list := caller.last()
+	if strings.Contains(list, "мат<") || strings.Contains(list, "&Физика") {
+		t.Fatalf("the list must escape the pairs, got %q", list)
+	}
+	if !strings.Contains(list, "мат&lt;") || !strings.Contains(list, "Математика&amp;Физика") {
+		t.Fatalf("the list must keep the escaped pairs, got %q", list)
+	}
+}
+
 func TestSendGroupResultFallsBackToTheTextSchedule(t *testing.T) {
 	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
 	chat, err := b.chatRepo.FindOrCreate("telegram", userID)

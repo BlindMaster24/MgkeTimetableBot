@@ -700,7 +700,7 @@ func (n *EventNotifier) CallsChanged(ev *cache.CallsEvent) {
 
 	parts := []string{n.locData("notify_calls_changed", nil)}
 	if ev.Reason != "" {
-		parts = append(parts, fmt.Sprintf(n.locData("notify_calls_reason", nil), ev.Reason))
+		parts = append(parts, fmt.Sprintf(n.locData("notify_calls_reason", nil), utils.EscapeHTML(ev.Reason)))
 	}
 
 	if ev.WeekdaysChanged {

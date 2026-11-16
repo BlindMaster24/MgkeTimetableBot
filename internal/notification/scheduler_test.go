@@ -781,3 +781,27 @@ func TestEventChatFinder_InterfaceCompliance(t *testing.T) {
 	var _ EventChatFinder = (*mockEventChatFinder)(nil)
 	var _ EventSender = (*mockEventSender)(nil)
 }
+
+func TestEventNotifier_CallsChangedEscapesTheReason(t *testing.T) {
+	n, sender, finder, _ := newTestNotifier(t)
+	finder.withNotice = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", NoticeCalls: true}}
+
+	n.CallsChanged(&cache.CallsEvent{
+		WeekdaysChanged: true,
+		Reason:          "<b>срочно</b> & важно",
+		Schedule: cache.CallsSchedule{
+			Weekdays: [][2][2]string{{{"08:00", "08:45"}, {"08:50", "09:35"}}},
+		},
+	})
+
+	if len(sender.buttoned()) != 1 {
+		t.Fatalf("expected one message, got %d", len(sender.buttoned()))
+	}
+	text := sender.buttoned()[0].text
+	if strings.Contains(text, "<b>срочно</b>") || strings.Contains(text, "& важно") {
+		t.Fatalf("the reason must be escaped, got %q", text)
+	}
+	if !strings.Contains(text, "&lt;b&gt;срочно&lt;/b&gt; &amp; важно") {
+		t.Fatalf("the escaped reason is missing, got %q", text)
+	}
+}

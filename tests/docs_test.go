@@ -500,7 +500,7 @@ func hasPackageDoc(t *testing.T, files []string) bool {
 		lines := strings.Split(string(data), "\n")
 		for _, line := range lines {
 			if strings.HasPrefix(line, "package ") {
-				return false
+				break
 			}
 			if strings.HasPrefix(line, "// Package ") || strings.HasPrefix(line, "// Command ") {
 				return true
