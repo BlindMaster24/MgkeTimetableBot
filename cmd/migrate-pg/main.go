@@ -123,7 +123,27 @@ func main() {
 	}
 	defer sqliteDB.Close()
 
-	_, err = sqliteDB.Exec(`CREATE TABLE IF NOT EXISTS bot_chats (
+	if err := createChatsSchema(sqliteDB); err != nil {
+		log.Fatalf("create the chats schema: %v", err)
+	}
+
+	migrated := 0
+	for _, c := range chats {
+		if err := insertChat(sqliteDB, c); err != nil {
+			log.Printf("insert error for peer_id=%d: %v", c.ID, err)
+			continue
+		}
+		migrated++
+	}
+
+	log.Printf("Migrated %d/%d chats to %s", migrated, len(chats), *sqlitePath)
+
+	var count int
+	sqliteDB.QueryRow(`SELECT COUNT(*) FROM bot_chats`).Scan(&count)
+	log.Printf("Verification: %d rows in SQLite", count)
+}
+
+const createChatsTable = `CREATE TABLE IF NOT EXISTS bot_chats (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		service TEXT NOT NULL DEFAULT 'telegram',
 		peer_id INTEGER NOT NULL,
@@ -159,79 +179,68 @@ func main() {
 		diff_max_lines INTEGER NOT NULL DEFAULT 20,
 		ref TEXT,
 		UNIQUE(service, peer_id)
-	)`)
-	if err != nil {
-		log.Fatalf("create sqlite table: %v", err)
-	}
+	)`
 
-	_, err = sqliteDB.Exec(`CREATE INDEX IF NOT EXISTS idx_chats_peer ON bot_chats(service, peer_id)`)
-	if err != nil {
-		log.Fatalf("create index: %v", err)
-	}
+const createChatsIndex = `CREATE INDEX IF NOT EXISTS idx_chats_peer ON bot_chats(service, peer_id)`
 
+func createChatsSchema(db *sql.DB) error {
+	if _, err := db.Exec(createChatsTable); err != nil {
+		return err
+	}
+	_, err := db.Exec(createChatsIndex)
+	return err
+}
+
+const insertChatSQL = `INSERT OR REPLACE INTO bot_chats (
+	service, peer_id, accepted, scene, mode, "group", teacher,
+	google_email, formatter, show_about, show_daily, show_weekly,
+	show_calls, show_fast_group, show_fast_teacher, hide_past_days,
+	delete_last_msg, last_msg_id, allow_send_mess, notice_changes,
+	notice_next_week, notice_calls, notice_parser_errors,
+	show_parser_time, show_hints, diff_enabled, diff_auto_in_week,
+	diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+// insertChat writes one PostgreSQL row as a bot_chats row.
+func insertChat(db *sql.DB, c OldChat) error {
 	toInt := func(b bool) int {
 		if b {
 			return 1
 		}
 		return 0
 	}
-
-	migrated := 0
-	for _, c := range chats {
-		peerID := c.ID
-
-		_, err := sqliteDB.Exec(
-			`INSERT OR REPLACE INTO bot_chats (
-				service, peer_id, accepted, scene, mode, "group", teacher,
-				google_email, formatter, show_about, show_daily, show_weekly,
-				show_calls, show_fast_group, show_fast_teacher, hide_past_days,
-				delete_last_msg, last_msg_id, allow_send_mess, notice_changes,
-				notice_next_week, notice_calls, notice_parser_errors,
-				show_parser_time, show_hints, diff_enabled, diff_auto_in_week,
-				diff_auto_in_updates, diff_show_before_after, diff_max_lines, ref
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			"telegram",
-			peerID,
-			toInt(c.Accepted),
-			c.Scene,
-			c.Mode,
-			c.Group,
-			c.Teacher,
-			c.GoogleEmail,
-			c.ScheduleFormatter,
-			toInt(c.ShowAbout),
-			toInt(c.ShowDaily),
-			toInt(c.ShowWeekly),
-			toInt(c.ShowCalls),
-			toInt(c.ShowFastGroup),
-			toInt(c.ShowFastTeacher),
-			toInt(c.HidePastDays),
-			toInt(c.DeleteLastMsg),
-			c.LastMsgID,
-			toInt(c.AllowSendMess),
-			toInt(c.NoticeChanges),
-			toInt(c.NoticeNextWeek),
-			toInt(c.NoticeCalls),
-			toInt(c.NoticeParserErrors),
-			toInt(c.ShowParserTime),
-			toInt(c.ShowHints),
-			toInt(c.DiffEnabled),
-			toInt(c.DiffAutoInWeek),
-			toInt(c.DiffAutoInUpdates),
-			toInt(c.DiffShowBeforeAfter),
-			c.DiffMaxLines,
-			c.Ref,
-		)
-		if err != nil {
-			log.Printf("insert error for peer_id=%d: %v", peerID, err)
-			continue
-		}
-		migrated++
-	}
-
-	log.Printf("Migrated %d/%d chats to %s", migrated, len(chats), *sqlitePath)
-
-	var count int
-	sqliteDB.QueryRow(`SELECT COUNT(*) FROM bot_chats`).Scan(&count)
-	log.Printf("Verification: %d rows in SQLite", count)
+	_, err := db.Exec(insertChatSQL,
+		"telegram",
+		c.ID,
+		toInt(c.Accepted),
+		c.Scene,
+		c.Mode,
+		c.Group,
+		c.Teacher,
+		c.GoogleEmail,
+		c.ScheduleFormatter,
+		toInt(c.ShowAbout),
+		toInt(c.ShowDaily),
+		toInt(c.ShowWeekly),
+		toInt(c.ShowCalls),
+		toInt(c.ShowFastGroup),
+		toInt(c.ShowFastTeacher),
+		toInt(c.HidePastDays),
+		toInt(c.DeleteLastMsg),
+		c.LastMsgID,
+		toInt(c.AllowSendMess),
+		toInt(c.NoticeChanges),
+		toInt(c.NoticeNextWeek),
+		toInt(c.NoticeCalls),
+		toInt(c.NoticeParserErrors),
+		toInt(c.ShowParserTime),
+		toInt(c.ShowHints),
+		toInt(c.DiffEnabled),
+		toInt(c.DiffAutoInWeek),
+		toInt(c.DiffAutoInUpdates),
+		toInt(c.DiffShowBeforeAfter),
+		c.DiffMaxLines,
+		c.Ref,
+	)
+	return err
 }
