@@ -12,19 +12,19 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 )
 
-func weekdayFromDate(date string) string {
+func (b *Bot) weekdayFromDate(date string) string {
 	t, err := time.Parse("02.01.2006", date)
 	if err != nil {
 		return ""
 	}
-	return []string{"Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"}[t.Weekday()]
+	return []string{b.loc("rasptext_1"), b.loc("rasptext_2"), b.loc("rasptext_3"), b.loc("rasptext_4"), b.loc("rasptext_5"), b.loc("rasptext_6"), b.loc("rasptext_7")}[t.Weekday()]
 }
 
 type getCabinetCmd struct{ bot *Bot }
 
 func (c *getCabinetCmd) Name() string { return "/cabinet" }
 func (c *getCabinetCmd) Description() string {
-	return "Получить информацию по кабинету"
+	return c.bot.loc("rasptext_8")
 }
 func (c *getCabinetCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
@@ -46,12 +46,12 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
 	teachers := rasp.GetTeachers()
 	if len(teachers) == 0 {
-		return u.Bot.SendText(u.ChatID, "Данные с сервера ещё не загружены, ожидайте...")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("rasptext_9"))
 	}
 
 	input := strings.TrimSpace(cabinetRegexp.ReplaceAllString(strings.ToLower(u.Text), ""))
 	if input == "" {
-		return u.Bot.SendText(u.ChatID, "Номер кабинета не указан")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("rasptext_10"))
 	}
 
 	type lessonInfo struct {
@@ -105,7 +105,7 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 					info[cab] = make(map[string]*dayInfo)
 				}
 				if info[cab][dayDate] == nil {
-					info[cab][dayDate] = &dayInfo{Date: dayDate, Weekday: weekdayFromDate(dayDate)}
+					info[cab][dayDate] = &dayInfo{Date: dayDate, Weekday: c.bot.weekdayFromDate(dayDate)}
 				}
 				info[cab][dayDate].Lessons = append(info[cab][dayDate].Lessons, lessonInfo{
 					Index:    lessonIdx,
@@ -119,7 +119,7 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if len(info) == 0 {
-		return u.Bot.SendText(u.ChatID, "Кабинет не найден.")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("rasptext_11"))
 	}
 
 	cabinets := make([]string, 0, len(info))
@@ -136,7 +136,7 @@ func (c *getCabinetCmd) Handler(ctx context.Context, u *Update) error {
 		}
 		sort.Strings(dates)
 
-		lines := []string{fmt.Sprintf("Кабинет: %s", cab)}
+		lines := []string{fmt.Sprintf(c.bot.loc("rasptext_12"), cab)}
 		for _, date := range dates {
 			d := info[cab][date]
 			sort.SliceStable(d.Lessons, func(i, j int) bool { return d.Lessons[i].Index < d.Lessons[j].Index })
@@ -160,7 +160,7 @@ type getGroupsCmd struct{ bot *Bot }
 
 func (c *getGroupsCmd) Name() string { return "/groups" }
 func (c *getGroupsCmd) Description() string {
-	return "Получить полный список групп в кэше бота"
+	return c.bot.loc("rasptext_13")
 }
 func (c *getGroupsCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
@@ -179,10 +179,10 @@ func (c *getGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if len(groupNames) == 0 {
-		return u.Bot.SendText(u.ChatID, "Группы ещё не загружены")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("rasptext_14"))
 	}
 
-	msg := fmt.Sprintf("__ Группы в кэше __\n\n%s\n\nЗагружено: %s назад\nИзменено: %s назад",
+	msg := fmt.Sprintf(c.bot.loc("rasptext_15"),
 		strings.Join(groupNames, ", "),
 		formatAgo(c.bot.nowTime(), rasp.GetGroupsUpdateTime()),
 		formatAgo(c.bot.nowTime(), rasp.GetGroupsChangedTime()))
@@ -223,7 +223,7 @@ type getTeachersCmd struct{ bot *Bot }
 
 func (c *getTeachersCmd) Name() string { return "/teachers" }
 func (c *getTeachersCmd) Description() string {
-	return "Получить полный список преподавателей в кэше бота"
+	return c.bot.loc("rasptext_16")
 }
 func (c *getTeachersCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
@@ -241,11 +241,11 @@ func (c *getTeachersCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if len(teacherNames) == 0 {
-		return u.Bot.SendText(u.ChatID, "Преподаватели ещё не загружены")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("rasptext_17"))
 	}
 
 	fullNames := rasp.GetTeamNames()
-	lines := []string{"__ Преподаватели в кэше __"}
+	lines := []string{c.bot.loc("rasptext_18")}
 	for i, name := range teacherNames {
 		label := name
 		if full, ok := fullNames[name]; ok && full != "" {
@@ -255,11 +255,11 @@ func (c *getTeachersCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	lines = append(lines,
-		fmt.Sprintf("\nЗагружено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeachersUpdateTime())),
-		fmt.Sprintf("Изменено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeachersChangedTime())),
-		"\n__ Страницы с учителями/администрацией __",
-		fmt.Sprintf("Загружено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeamUpdateTime())),
-		fmt.Sprintf("Изменено: %s назад", formatAgo(c.bot.nowTime(), rasp.GetTeamChangedTime())))
+		fmt.Sprintf(c.bot.loc("rasptext_19"), formatAgo(c.bot.nowTime(), rasp.GetTeachersUpdateTime())),
+		fmt.Sprintf(c.bot.loc("rasptext_20"), formatAgo(c.bot.nowTime(), rasp.GetTeachersChangedTime())),
+		c.bot.loc("rasptext_21"),
+		fmt.Sprintf(c.bot.loc("rasptext_22"), formatAgo(c.bot.nowTime(), rasp.GetTeamUpdateTime())),
+		fmt.Sprintf(c.bot.loc("rasptext_23"), formatAgo(c.bot.nowTime(), rasp.GetTeamChangedTime())))
 
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
@@ -268,17 +268,17 @@ type compareGroupsCmd struct{ bot *Bot }
 
 func (c *compareGroupsCmd) Name() string { return "/comparegroups" }
 func (c *compareGroupsCmd) Description() string {
-	return "Сравнить расписания двух групп"
+	return c.bot.loc("rasptext_24")
 }
 func (c *compareGroupsCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
-	return lower == "/comparegroups" || lower == "/comparegroup" || lower == "/groupscompare" || strings.HasPrefix(lower, "сравнить группы")
+	return lower == "/comparegroups" || lower == "/comparegroup" || lower == "/groupscompare" || strings.HasPrefix(lower, c.bot.loc("rasptext_25"))
 }
 func (c *compareGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	rasp := c.bot.GetRaspCache()
 	groups := rasp.GetGroups()
 	if len(groups) == 0 {
-		return u.Bot.SendText(u.ChatID, "Данные с сервера ещё не загружены, ожидайте...")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("rasptext_26"))
 	}
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err != nil {
@@ -288,6 +288,6 @@ func (c *compareGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	chat.Scene = sceneCompareStepA
 	c.bot.chatRepo.Save(chat)
 
-	prompt := fmt.Sprintf("Введите номер первой группы (например, %s)", randomKey(groups))
+	prompt := fmt.Sprintf(c.bot.loc("rasptext_27"), randomKey(groups))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(groupHistoryKeyboard(chat)))
 }

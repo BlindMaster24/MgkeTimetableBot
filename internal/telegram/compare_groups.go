@@ -175,7 +175,7 @@ func (b *Bot) compareGroupsMessage(ctx context.Context, groupA, groupB string) s
 			}
 		}
 
-		lines = append(lines, fmt.Sprintf("\n__ %s, %s __", weekdayFromDate(dayStr), dayStr))
+		lines = append(lines, fmt.Sprintf("\n__ %s, %s __", b.weekdayFromDate(dayStr), dayStr))
 		lines = append(lines, "Совпадающие пары: "+orNone(strings.Join(overlap, ", ")))
 		if len(overlapDetails) > 0 {
 			lines = append(lines, "Пары:")
