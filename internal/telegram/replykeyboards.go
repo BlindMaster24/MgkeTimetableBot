@@ -11,22 +11,22 @@ type SceneMatcher interface {
 	Scene() string
 }
 
-func settingsBotNavRow() []telego.KeyboardButton {
+func settingsBotNavRow(b *Bot) []telego.KeyboardButton {
 	return []telego.KeyboardButton{
-		{Text: "Меню настроек"},
-		{Text: "Главное меню"},
+		{Text: b.loc("kbtext_1")},
+		{Text: b.loc("kbtext_2")},
 	}
 }
 
 func (b *Bot) replySettingsMain() *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: "📚 Первоначальная настройка"}},
-			{{Text: "🗓️ Управление расписаниями"}},
-			{{Text: "⌨️ Кнопки"}, {Text: "📃 Форматировщик"}},
-			{{Text: "🔊 Оповещения"}, {Text: "🔔 Подписки"}, {Text: "🖼️ Отображение"}, {Text: "📊 Сравнение"}},
+			{{Text: b.loc("kbtext_3")}},
+			{{Text: b.loc("kbtext_4")}},
+			{{Text: b.loc("kbtext_5")}, {Text: b.loc("kbtext_6")}},
+			{{Text: b.loc("kbtext_7")}, {Text: b.loc("kbtext_8")}, {Text: b.loc("kbtext_9")}, {Text: b.loc("kbtext_10")}},
 			{{Text: b.loc("button_settings_reminders")}},
-			{{Text: "Показать текущие"}, {Text: "Главное меню"}},
+			{{Text: b.loc("kbtext_11")}, {Text: b.loc("kbtext_12")}},
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -37,18 +37,18 @@ func (b *Bot) replySettingsButtons(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
 			{
-				{Text: noYesSmile(chat.ShowDaily, `Кнопка "📄 На день"`)},
-				{Text: noYesSmile(chat.ShowWeekly, `Кнопка "📑 На неделю"`)},
+				{Text: noYesSmile(chat.ShowDaily, b.loc("kbtext_13"))},
+				{Text: noYesSmile(chat.ShowWeekly, b.loc("kbtext_14"))},
 			},
 			{
-				{Text: noYesSmile(chat.ShowCalls, `Кнопка "🕐 Звонки"`)},
-				{Text: noYesSmile(chat.ShowAbout, `Кнопка "💡 О боте"`)},
+				{Text: noYesSmile(chat.ShowCalls, b.loc("kbtext_15"))},
+				{Text: noYesSmile(chat.ShowAbout, b.loc("kbtext_16"))},
 			},
 			{
-				{Text: noYesSmile(chat.ShowFastGroup, `Кнопка "👩‍🎓 Группа"`)},
-				{Text: noYesSmile(chat.ShowFastTeacher, `Кнопка "👩‍🏫 Преподаватель"`)},
+				{Text: noYesSmile(chat.ShowFastGroup, b.loc("kbtext_17"))},
+				{Text: noYesSmile(chat.ShowFastTeacher, b.loc("kbtext_18"))},
 			},
-			settingsBotNavRow(),
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -58,10 +58,10 @@ func (b *Bot) replySettingsButtons(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsNotice(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmileVolume(chat.NoticeChanges, "Оповещение о новых днях")}},
-			{{Text: noYesSmileVolume(chat.NoticeNextWeek, "Оповещение о новой неделе")}},
-			{{Text: noYesSmileVolume(chat.NoticeCalls, "Оповещение о звонках")}},
-			settingsBotNavRow(),
+			{{Text: noYesSmileVolume(chat.NoticeChanges, b.loc("kbtext_19"))}},
+			{{Text: noYesSmileVolume(chat.NoticeNextWeek, b.loc("kbtext_20"))}},
+			{{Text: noYesSmileVolume(chat.NoticeCalls, b.loc("kbtext_21"))}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -74,7 +74,7 @@ func (b *Bot) replySettingsReminders(chat *Chat) *telego.ReplyKeyboardMarkup {
 			{{Text: b.loc("reminder_lead_default")}},
 			{{Text: b.loc("reminder_lead_5")}, {Text: b.loc("reminder_lead_10")}, {Text: b.loc("reminder_lead_15")}},
 			{{Text: b.loc("reminder_lead_30")}, {Text: b.loc("reminder_lead_60")}},
-			settingsBotNavRow(),
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -84,10 +84,10 @@ func (b *Bot) replySettingsReminders(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsView(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmile(chat.HidePastDays, "Скрывать прошедшие дни")}},
-			{{Text: noYesSmile(chat.ShowParserTime, "Время последней загрузки расписания")}},
-			{{Text: noYesSmile(chat.ShowHints, "Показывать подсказки: ") + yesNoCapital(chat.ShowHints)}},
-			settingsBotNavRow(),
+			{{Text: noYesSmile(chat.HidePastDays, b.loc("kbtext_22"))}},
+			{{Text: noYesSmile(chat.ShowParserTime, b.loc("kbtext_23"))}},
+			{{Text: noYesSmile(chat.ShowHints, b.loc("kbtext_24")) + yesNoCapital(chat.ShowHints)}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -97,10 +97,10 @@ func (b *Bot) replySettingsView(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsDiff(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmile(chat.DiffEnabled, `Включить раздел "Что изменилось"`)}},
-			{{Text: fmt.Sprintf("🧾 Лимит строк: %d", chat.DiffMaxLines)}},
-			{{Text: "⚙️ Расширенные"}},
-			settingsBotNavRow(),
+			{{Text: noYesSmile(chat.DiffEnabled, b.loc("kbtext_25"))}},
+			{{Text: fmt.Sprintf(b.loc("kbtext_26"), chat.DiffMaxLines)}},
+			{{Text: b.loc("kbtext_27")}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -110,11 +110,11 @@ func (b *Bot) replySettingsDiff(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsDiffAdvanced(chat *Chat) *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: noYesSmile(chat.DiffAutoInWeek, "Показывать diff после /week")}},
-			{{Text: noYesSmile(chat.DiffAutoInUpdates, "Показывать diff в уведомлениях")}},
-			{{Text: noYesSmile(chat.DiffShowBeforeAfter, `Показывать "старое -> новое"`)}},
-			{{Text: "⬅️ Базовые настройки"}},
-			settingsBotNavRow(),
+			{{Text: noYesSmile(chat.DiffAutoInWeek, b.loc("kbtext_28"))}},
+			{{Text: noYesSmile(chat.DiffAutoInUpdates, b.loc("kbtext_29"))}},
+			{{Text: noYesSmile(chat.DiffShowBeforeAfter, b.loc("kbtext_30"))}},
+			{{Text: b.loc("kbtext_31")}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -127,7 +127,7 @@ func (b *Bot) replySettingsFormatters(chat *Chat) *telego.ReplyKeyboardMarkup {
 	for i, f := range formatter.AllFormatters {
 		label := f.Label(formatter.FormatOptions{Labels: b.formatterLabels()})
 		if chat.Formatter == i {
-			label += " (выбран)"
+			label += b.loc("kbtext_32")
 		}
 		currentRow = append(currentRow, telego.KeyboardButton{Text: label})
 		if (i+1)%2 == 0 {
@@ -138,7 +138,7 @@ func (b *Bot) replySettingsFormatters(chat *Chat) *telego.ReplyKeyboardMarkup {
 	if len(currentRow) > 0 {
 		rows = append(rows, currentRow)
 	}
-	rows = append(rows, settingsBotNavRow())
+	rows = append(rows, settingsBotNavRow(b))
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard:       rows,
 		IsPersistent:   true,
@@ -149,8 +149,8 @@ func (b *Bot) replySettingsFormatters(chat *Chat) *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySettingsSchedules() *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: "🕐 Звонки: управление"}},
-			settingsBotNavRow(),
+			{{Text: b.loc("kbtext_33")}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -159,7 +159,7 @@ func (b *Bot) replySettingsSchedules() *telego.ReplyKeyboardMarkup {
 
 func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMarkup {
 	var rows [][]telego.KeyboardButton
-	rows = append(rows, []telego.KeyboardButton{{Text: "📊 Показать"}})
+	rows = append(rows, []telego.KeyboardButton{{Text: b.loc("kbtext_34")}})
 
 	if names := b.campusNames(); len(names) > 1 {
 		selected := b.selectedCampus(chat)
@@ -193,19 +193,19 @@ func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMa
 		}
 		autoActive := calls.OverrideSource == ""
 
-		rows = append(rows, []telego.KeyboardButton{{Text: "✅ Обновить с сайта"}})
-		rows = append(rows, []telego.KeyboardButton{{Text: "✏️ Изменить вручную"}})
+		rows = append(rows, []telego.KeyboardButton{{Text: b.loc("kbtext_35")}})
+		rows = append(rows, []telego.KeyboardButton{{Text: b.loc("kbtext_36")}})
 		rows = append(rows, []telego.KeyboardButton{
-			{Text: check(activeSource == "site") + "Источник: сайт"},
-			{Text: check(activeSource == "manual") + "Источник: вручную"},
+			{Text: check(activeSource == "site") + b.loc("kbtext_37")},
+			{Text: check(activeSource == "manual") + b.loc("kbtext_38")},
 		})
 		rows = append(rows, []telego.KeyboardButton{
-			{Text: check(activeSource == "config") + "Источник: конфиг"},
-			{Text: check(autoActive) + "Источник: авто"},
+			{Text: check(activeSource == "config") + b.loc("kbtext_39")},
+			{Text: check(autoActive) + b.loc("kbtext_40")},
 		})
 	}
 
-	rows = append(rows, settingsBotNavRow())
+	rows = append(rows, settingsBotNavRow(b))
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard:       rows,
 		IsPersistent:   true,
@@ -216,10 +216,10 @@ func (b *Bot) replyCallsSettings(chat *Chat, admin bool) *telego.ReplyKeyboardMa
 func (b *Bot) replySettingsAliases() *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: "Список"}, {Text: "Добавить"}},
-			{{Text: "Удалить"}},
-			{{Text: "Отчистить все"}},
-			settingsBotNavRow(),
+			{{Text: b.loc("kbtext_41")}, {Text: b.loc("kbtext_42")}},
+			{{Text: b.loc("kbtext_43")}},
+			{{Text: b.loc("kbtext_44")}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -229,9 +229,9 @@ func (b *Bot) replySettingsAliases() *telego.ReplyKeyboardMarkup {
 func (b *Bot) replySubscriptionsMenu() *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: "➕ Группа"}, {Text: "➕ Преподаватель"}},
-			{{Text: "📋 Мои подписки"}, {Text: "❌ Удалить подписку"}, {Text: "🧪 Проверить"}},
-			settingsBotNavRow(),
+			{{Text: b.loc("kbtext_45")}, {Text: b.loc("kbtext_46")}},
+			{{Text: b.loc("kbtext_47")}, {Text: b.loc("kbtext_48")}, {Text: b.loc("kbtext_49")}},
+			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -244,7 +244,7 @@ func (b *Bot) replySelectMode() *telego.ReplyKeyboardMarkup {
 		Keyboard: [][]telego.KeyboardButton{
 			{{Text: t("mode_guest")}},
 			{{Text: t("mode_student")}, {Text: t("mode_teacher")}},
-			{{Text: t("mode_parent")}, {Text: "🔙 Пропустить"}},
+			{{Text: t("mode_parent")}, {Text: b.loc("kbtext_50")}},
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -254,7 +254,7 @@ func (b *Bot) replySelectMode() *telego.ReplyKeyboardMarkup {
 func (b *Bot) replyCancel() *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: "Отмена"}},
+			{{Text: b.loc("kbtext_51")}},
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
@@ -264,7 +264,7 @@ func (b *Bot) replyCancel() *telego.ReplyKeyboardMarkup {
 func (b *Bot) replyStartButton() *telego.ReplyKeyboardMarkup {
 	return &telego.ReplyKeyboardMarkup{
 		Keyboard: [][]telego.KeyboardButton{
-			{{Text: "Начать"}},
+			{{Text: b.loc("kbtext_52")}},
 		},
 		IsPersistent:   true,
 		ResizeKeyboard: true,
