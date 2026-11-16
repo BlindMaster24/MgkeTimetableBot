@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -99,13 +100,20 @@ type healthSource interface {
 	SlowThreshold() time.Duration
 }
 
+// requestTimeout bounds every call to the Bot API, so one stalled
+// connection cannot hang a command, a broadcast or a shutdown.
+var requestTimeout = 60 * time.Second
+
 func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRepo *Repository, cache *cache.RaspCache, archiveRepo archiveStore) (*Bot, error) {
 	apiServer, err := cfg.TelegramAPIServer()
 	if err != nil {
 		return nil, err
 	}
 
-	options := []telego.BotOption{telego.WithDefaultDebugLogger()}
+	options := []telego.BotOption{
+		telego.WithDefaultDebugLogger(),
+		telego.WithHTTPClient(&http.Client{Timeout: requestTimeout}),
+	}
 	if apiServer != "" {
 		options = append(options, telego.WithAPIServer(apiServer))
 	}
