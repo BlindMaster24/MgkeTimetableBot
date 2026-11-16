@@ -18,7 +18,7 @@ func (c *statsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if c.bot.archive == nil {
-		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("sgstats_1"))
 	}
 
 	if (chat.Mode == ModeStudent || chat.Mode == ModeParent) && chat.Group != "" {
@@ -70,11 +70,11 @@ func (c *statsCmd) getGroupStats(ctx context.Context, repo archiveStore, group s
 	lines = append(lines, c.bot.loc("stats_header"))
 	totalCount := 0
 	for _, e := range sorted {
-		lines = append(lines, fmt.Sprintf("%s - %d пар", e.key, e.count))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_2"), e.key, e.count))
 		totalCount += e.count
 	}
 
-	lines = append(lines, fmt.Sprintf("\nИтого всего пар (%d предметов): %d", len(sorted), totalCount))
+	lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_3"), len(sorted), totalCount))
 	return strings.Join(lines, "\n")
 }
 
@@ -114,11 +114,11 @@ func (c *statsCmd) getTeacherStats(ctx context.Context, repo archiveStore, teach
 	lines = append(lines, c.bot.loc("stats_header"))
 	totalCount := 0
 	for _, e := range sorted {
-		lines = append(lines, fmt.Sprintf("%s - %d пар", e.key, e.count))
+		lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_4"), e.key, e.count))
 		totalCount += e.count
 	}
 
-	lines = append(lines, fmt.Sprintf("\nИтого всего пар (%d предметов): %d", len(sorted), totalCount))
+	lines = append(lines, fmt.Sprintf(c.bot.loc("sgstats_5"), len(sorted), totalCount))
 	return strings.Join(lines, "\n")
 }
 
