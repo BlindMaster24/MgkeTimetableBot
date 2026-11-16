@@ -96,7 +96,7 @@ func TestWeekViewRollsOverForGroupsButNotForTeachers(t *testing.T) {
 	if strings.Contains(text, "ПрошлыйПонедельник") {
 		t.Fatalf("the past days must not be shown after the roll over, got %q", text)
 	}
-	if !strings.Contains(text, buildWeekLabelFromWeek(next)) {
+	if !strings.Contains(text, b.buildWeekLabelFromWeek(next)) {
 		t.Fatalf("the rolled over week label is missing, got %q", text)
 	}
 

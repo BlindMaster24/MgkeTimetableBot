@@ -213,8 +213,11 @@ func (b *Bot) showWeekSchedule(ctx context.Context, u *Update, chat *Chat) error
 func (b *Bot) buildWeekLabelFromWeek(week utils.WeekIndex) string {
 	d1, d2 := week.WeekRange()
 	weekNum := week.AcademicWeekNumber()
-	return fmt.Sprintf(b.loc("week_label"), weekNum,
-		d1.Format("02.01.2006"), d2.Format("02.01.2006"))
+	return b.locData("week_label", map[string]interface{}{
+		"Week":  weekNum,
+		"Start": d1.Format("02.01.2006"),
+		"End":   d2.Format("02.01.2006"),
+	})
 }
 
 func (b *Bot) buildWeekLabel(days []map[string]any) string {
@@ -234,8 +237,11 @@ func (b *Bot) buildWeekLabel(days []map[string]any) string {
 	week := utils.WeekIndexFromDate(t1)
 	weekNum := week.AcademicWeekNumber()
 
-	return fmt.Sprintf(b.loc("week_label"), weekNum,
-		t1.Format("02.01.2006"), t2.Format("02.01.2006"))
+	return b.locData("week_label", map[string]interface{}{
+		"Week":  weekNum,
+		"Start": t1.Format("02.01.2006"),
+		"End":   t2.Format("02.01.2006"),
+	})
 }
 
 func extractWeekTypeAndValue(data string) (string, string) {

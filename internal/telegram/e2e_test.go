@@ -680,8 +680,9 @@ func TestE2E_WeekControlKeyboard(t *testing.T) {
 }
 
 func TestE2E_AcademicWeekLabel(t *testing.T) {
+	b, _ := setupE2EBot(t)
 	week := utils.WeekIndexFromDate(time.Now())
-	label := buildWeekLabelFromWeek(week)
+	label := b.buildWeekLabelFromWeek(week)
 	if !strings.Contains(label, "Учебная неделя №") {
 		t.Errorf("week label missing academic number: %q", label)
 	}

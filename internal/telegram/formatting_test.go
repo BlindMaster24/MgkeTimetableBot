@@ -247,7 +247,8 @@ func TestGetDayRasp(t *testing.T) {
 }
 
 func TestBuildWeekLabel(t *testing.T) {
-	label := buildWeekLabel(nil)
+	b, _, _ := setupTestBotWithData(t)
+	label := b.buildWeekLabel(nil)
 	if label != "" {
 		t.Error("expected empty for nil days")
 	}
@@ -256,7 +257,7 @@ func TestBuildWeekLabel(t *testing.T) {
 		{"day": "01.09.2026"},
 		{"day": "05.09.2026"},
 	}
-	label = buildWeekLabel(days)
+	label = b.buildWeekLabel(days)
 	if !strings.Contains(label, "Учебная неделя") {
 		t.Errorf("expected week label, got %q", label)
 	}
@@ -583,11 +584,12 @@ func TestAllFormattersWithTeacherData(t *testing.T) {
 }
 
 func TestBuildWeekLabelVariousDates(t *testing.T) {
+	b, _, _ := setupTestBotWithData(t)
 	days := []map[string]any{
 		{"day": "01.09.2026"},
 		{"day": "07.09.2026"},
 	}
-	label := buildWeekLabel(days)
+	label := b.buildWeekLabel(days)
 	if !strings.Contains(label, "Учебная неделя") {
 		t.Errorf("expected week label, got %q", label)
 	}
@@ -596,7 +598,7 @@ func TestBuildWeekLabelVariousDates(t *testing.T) {
 		{"day": "01.12.2026"},
 		{"day": "05.12.2026"},
 	}
-	label = buildWeekLabel(days)
+	label = b.buildWeekLabel(days)
 	if !strings.Contains(label, "Учебная неделя") {
 		t.Errorf("expected week label, got %q", label)
 	}
@@ -1203,7 +1205,7 @@ func TestShowWeekLabelInFullWeek(t *testing.T) {
 	text := formatter.GetByIndex(chat.Formatter).FormatGroupFull("", days, formatter.FormatOptions{
 		IsTelegram: true,
 		ShowHeader: false,
-		WeekLabel:  buildWeekLabel(days),
+		WeekLabel:  b.buildWeekLabel(days),
 	})
 	if !strings.Contains(text, "Учебная неделя") {
 		t.Errorf("expected week label in output, got %q", text)
