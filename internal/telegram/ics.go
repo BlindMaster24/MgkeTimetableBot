@@ -23,7 +23,7 @@ type pingCmd struct{ bot *Bot }
 
 func (c *pingCmd) Name() string { return "/ping" }
 func (c *pingCmd) Description() string {
-	return "Проверка работоспособности бота"
+	return c.bot.loc("icstext_1")
 }
 func (c *pingCmd) Handler(ctx context.Context, u *Update) error {
 	return u.Bot.SendText(u.ChatID, "pong")
@@ -32,7 +32,7 @@ func (c *pingCmd) Handler(ctx context.Context, u *Update) error {
 type icsCmd struct{ bot *Bot }
 
 func (c *icsCmd) Name() string        { return "/ics" }
-func (c *icsCmd) Description() string { return "Экспорт расписания в .ics" }
+func (c *icsCmd) Description() string { return c.bot.loc("icstext_2") }
 func (c *icsCmd) MatchText(text string) bool {
 	return text == "📅 ICS" || text == "/ics"
 }
@@ -43,7 +43,7 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	if !c.bot.cfg.Calendar.ICS.Enabled {
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "ICS отключен в конфиге.", replyMainMenu(c.bot, chat))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("icstext_3"), replyMainMenu(c.bot, chat))
 	}
 
 	week := c.bot.relevantWeekIndex()
@@ -52,22 +52,22 @@ func (c *icsCmd) Handler(ctx context.Context, u *Update) error {
 	switch chat.Mode {
 	case ModeStudent, ModeParent:
 		if chat.Group == "" {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Группа не выбрана. Используйте /setup.", replyMainMenu(c.bot, chat))
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("icstext_4"), replyMainMenu(c.bot, chat))
 		}
 		return c.bot.buildAndSendICS(ctx, u, chat, "group", chat.Group, minIdx, maxIdx, week)
 	case ModeTeacher:
 		if chat.Teacher == "" {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Преподаватель не выбран. Используйте /setup.", replyMainMenu(c.bot, chat))
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("icstext_5"), replyMainMenu(c.bot, chat))
 		}
 		return c.bot.buildAndSendICS(ctx, u, chat, "teacher", chat.Teacher, minIdx, maxIdx, week)
 	}
 
-	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Режим чата не поддерживает экспорт расписания.", replyMainMenu(c.bot, chat))
+	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("icstext_6"), replyMainMenu(c.bot, chat))
 }
 
 func (bot *Bot) buildAndSendICS(ctx context.Context, u *Update, chat *Chat, typeName, value string, minIdx, maxIdx int, week utils.WeekIndex) error {
 	if bot.archive == nil {
-		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Архив недоступен", replyMainMenu(bot, chat))
+		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, bot.loc("icstext_7"), replyMainMenu(bot, chat))
 	}
 
 	weekNum := week.AcademicWeekNumber()
@@ -83,7 +83,7 @@ func (bot *Bot) buildAndSendICS(ctx context.Context, u *Update, chat *Chat, type
 	case "group":
 		days, err := bot.archive.GroupDaysByRange(ctx, int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, bot.loc("icstext_8"), replyMainMenu(bot, chat))
 		}
 		for _, d := range days {
 			builder.AddGroupDay(d, value)
@@ -91,7 +91,7 @@ func (bot *Bot) buildAndSendICS(ctx context.Context, u *Update, chat *Chat, type
 	case "teacher":
 		days, err := bot.archive.TeacherDaysByRange(ctx, int64(minIdx), int64(maxIdx), value)
 		if err != nil || len(days) == 0 {
-			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, "Нет расписания за текущую неделю.", replyMainMenu(bot, chat))
+			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, bot.loc("icstext_9"), replyMainMenu(bot, chat))
 		}
 		for _, d := range days {
 			builder.AddTeacherDay(d, value)
