@@ -1,3 +1,4 @@
+// Package app wires one bot process: configuration, stores, API, bot, scheduler and parser.
 package app
 
 import (

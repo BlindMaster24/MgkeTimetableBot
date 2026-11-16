@@ -1,3 +1,4 @@
+// Package telegram is the bot: commands, callbacks, menus, keyboards and scenes.
 package telegram
 
 import (

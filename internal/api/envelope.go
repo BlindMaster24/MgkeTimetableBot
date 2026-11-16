@@ -1,3 +1,4 @@
+// Package api serves the read-only REST API, its metrics and its health routes.
 package api
 
 import (

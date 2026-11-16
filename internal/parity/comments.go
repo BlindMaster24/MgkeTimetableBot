@@ -1,3 +1,4 @@
+// Package parity compares the old TypeScript surface with the Go one.
 package parity
 
 func StripComments(src string) string {

@@ -1,3 +1,4 @@
+// Package model holds the timetable types shared by the parser, the cache and the archive.
 package model
 
 type CallsSchedule struct {

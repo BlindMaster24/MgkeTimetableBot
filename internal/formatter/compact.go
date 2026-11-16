@@ -1,3 +1,4 @@
+// Package formatter renders days, groups and teachers in every output format.
 package formatter
 
 import (

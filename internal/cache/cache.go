@@ -1,3 +1,4 @@
+// Package cache keeps the timetable in JSON files and turns changes into events.
 package cache
 
 import (

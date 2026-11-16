@@ -1,3 +1,4 @@
+// Package apiprobe calls the local API and metrics routes and grades their answers.
 package apiprobe
 
 import (

@@ -1,3 +1,4 @@
+// Package tgstub implements a stand-in Telegram Bot API for tests.
 package tgstub
 
 import (

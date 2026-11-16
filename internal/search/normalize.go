@@ -1,3 +1,4 @@
+// Package search matches groups, teachers and subjects with fuzzy queries.
 package search
 
 import "strings"

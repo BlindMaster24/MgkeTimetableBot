@@ -1,3 +1,4 @@
+// Package notification schedules reminders and day-change notices.
 package notification
 
 import "time"

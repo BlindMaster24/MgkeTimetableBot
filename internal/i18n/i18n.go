@@ -1,3 +1,4 @@
+// Package i18n loads the locale bundles and renders localized texts.
 package i18n
 
 import (

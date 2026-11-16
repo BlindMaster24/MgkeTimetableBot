@@ -1,3 +1,4 @@
+// Package parser reads the timetable, the bell schedule and the teachers page.
 package parser
 
 import (

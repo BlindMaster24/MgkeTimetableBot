@@ -1,3 +1,4 @@
+// Package image renders group and teacher timetable tables to PNG.
 package image
 
 import (

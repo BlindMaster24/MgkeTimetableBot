@@ -1,3 +1,4 @@
+// Command livecheck audits a live cache dump for empty days, bad dates and empty lessons.
 package main
 
 import (

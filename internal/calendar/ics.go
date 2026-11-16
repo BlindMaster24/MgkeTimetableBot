@@ -1,3 +1,4 @@
+// Package calendar renders ICS feeds for groups, teachers and the bell schedule.
 package calendar
 
 import (

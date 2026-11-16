@@ -1,3 +1,4 @@
+// Package rooms searches free rooms and normalizes room names.
 package rooms
 
 import (

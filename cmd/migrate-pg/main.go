@@ -1,3 +1,4 @@
+// Command migrate-pg copies chats, aliases and state from PostgreSQL into SQLite.
 package main
 
 import (

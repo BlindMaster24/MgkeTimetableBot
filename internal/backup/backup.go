@@ -1,3 +1,4 @@
+// Package backup writes rotated SQLite snapshots and restores from them.
 package backup
 
 import (

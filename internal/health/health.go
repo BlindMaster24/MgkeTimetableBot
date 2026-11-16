@@ -1,3 +1,4 @@
+// Package health evaluates the metrics, raises alerts and keeps the incident log.
 package health
 
 import (

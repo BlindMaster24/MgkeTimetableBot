@@ -1,3 +1,4 @@
+// Package testgolden normalizes golden texts for comparison.
 package testgolden
 
 import (

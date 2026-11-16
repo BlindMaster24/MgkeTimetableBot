@@ -1,3 +1,4 @@
+// Package build carries the version stamp the linker injects into the binary.
 package build
 
 import (

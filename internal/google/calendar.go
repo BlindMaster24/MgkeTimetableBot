@@ -1,3 +1,4 @@
+// Package google signs in to Google and syncs timetable days into calendars.
 package google
 
 import (

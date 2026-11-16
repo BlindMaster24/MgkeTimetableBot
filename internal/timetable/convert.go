@@ -1,3 +1,4 @@
+// Package timetable is the typed timetable model with week and day helpers.
 package timetable
 
 import (

@@ -1,3 +1,4 @@
+// Command bot starts the timetable bot: configuration, polling or webhook, and the HTTP API.
 package main
 
 import (

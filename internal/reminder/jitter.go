@@ -1,3 +1,4 @@
+// Package reminder decides when an upcoming lesson deserves a reminder.
 package reminder
 
 import (

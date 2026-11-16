@@ -1,3 +1,4 @@
+// Package utils holds academic week, subject and formatting helpers.
 package utils
 
 import (

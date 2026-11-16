@@ -750,15 +750,22 @@ go run ./scripts/racecheck -pkgs ./internal/telegram/...
 
 ```
 cmd/bot/                 — entrypoint бота
+cmd/livecheck/           — аудит живого дампа кэша (пустые дни, даты, пары)
 cmd/migrate-pg/          — миграция данных из PostgreSQL в SQLite
 internal/
   api/                   — gin REST API
+  apikey/                — пломбирование API-ключей (AES-CBC + HMAC) и лимитер
+  apiprobe/              — проверка локальных маршрутов /api и /metrics
+  app/                   — сборка процесса: конфиг, хранилища, API, бот, планировщик, парсер
   archive/               — SQLite-архив расписания
+  backup/                — ротация SQLite-снимков и восстановление
+  build/                 — версия сборки, подставляемая линкером
   cache/                 — файловый кэш расписания и события для уведомлений
   calendar/              — экспорт ICS
   config/                — загрузка YAML-конфигурации
   formatter/             — форматы вывода расписания (default, compact, visual, litolax)
   google/                — Google OAuth, service account, синхронизация дней
+  health/                — метрики, алерты и журнал инцидентов
   i18n/                  — go-i18n, locales/ru.json
   image/                 — рендеринг расписания в PNG
   logger/                — zerolog + lumberjack
@@ -766,6 +773,11 @@ internal/
   notification/          — планировщик и события уведомлений
   parity/                — компаратор поверхностей TS ↔ Go
   parser/                — парсер расписания (группы, преподаватели, звонки, диагностика)
+  racecheck/             — проверка cgo-инструментов для детектора гонок
+  reminder/              — окна напоминаний о ближайшей паре
+  rooms/                 — свободные кабинеты и нормализация их названий
+  schedulediff/          — построчный diff расписания по дням
+  search/                — нечёткий поиск групп, преподавателей и предметов
   sqlitedb/              — единственный владелец подключений к SQLite: busy_timeout, проверка режима журнала, повторы после занятой блокировки
   preflight/             — предстартовая проверка: конфиг, ключи, webhook, Bot API, локаль, хранение, метрики, сайт, картинка
   tgstub/                — заглушка Telegram Bot API для smoke-теста контейнера: пишет вызовы бота, отвечает как Telegram
@@ -793,6 +805,7 @@ internal/
     debug_commands.go    — служебные /chat, /id, /error, /test, /indexToStrDate, /strToIndex
     admin.go, admin_commands.go — админские команды и утилиты
     google_calendar.go, google_store.go — меню Google Calendar и его состояние в базе
+  timetable/             — типизированная модель расписания: недели, дни, пары
   utils/                 — учебные недели, предметы
 configs/config.example.yaml — шаблон конфигурации
 configs/config.dev.yaml     — офлайн-профиль разработки: заглушка Bot API, состояние в ./.dev/

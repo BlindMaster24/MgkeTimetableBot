@@ -749,10 +749,16 @@ The `tests/docs_test.go` suite keeps this documentation honest: it asserts that 
 
 ```
 cmd/bot/                 — bot entrypoint
+cmd/livecheck/           — audit of a live cache dump (empty days, dates, lessons)
 cmd/migrate-pg/          — one-off PostgreSQL to SQLite migration
 internal/
   api/                   — gin REST API
+  apikey/                — API key sealing (AES-CBC + HMAC) and the per-key limiter
+  apiprobe/              — probe of the local API and metrics routes
+  app/                   — wiring one process: config, stores, API, bot, scheduler, parser
   archive/               — SQLite timetable archive
+  backup/                — rotated SQLite snapshots and restore
+  build/                 — version stamp injected by the linker
   cache/                 — file-backed timetable cache and notification events
   calendar/              — ICS export
   config/                — YAML and environment configuration
@@ -766,6 +772,11 @@ internal/
   notification/          — scheduler, events and health alerts
   parity/                — TypeScript ↔ Go surface comparator
   parser/                — timetable parser (groups, teachers, bell schedule, diagnostics)
+  racecheck/             — cgo toolchain check for the race detector
+  reminder/              — reminder windows for the next lesson
+  rooms/                 — free rooms and room name normalization
+  schedulediff/          — per-day timetable diff
+  search/                — fuzzy search over groups, teachers and subjects
   sqlitedb/              — the single owner of SQLite connections: pool pin, busy timeout, verified journal mode, retries after a busy lock
   preflight/             — pre-deploy check: config, credentials, webhook, Bot API, locale, storage, metrics, live site, image
   tgstub/                — stub Telegram Bot API for the container smoke test: records the bot calls and answers like Telegram
@@ -793,6 +804,7 @@ internal/
     debug_commands.go    — the /chat, /id, /error, /test, /indexToStrDate and /strToIndex helpers
     admin.go, admin_commands.go — admin commands and utilities
     google_calendar.go, google_store.go — the Google Calendar menu and its database state
+  timetable/             — typed timetable model: weeks, days, lessons
   utils/                 — academic weeks, subjects
 configs/config.example.yaml — configuration template
 configs/config.dev.yaml     — offline development profile: stub Bot API, state under ./.dev/

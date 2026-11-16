@@ -1,3 +1,4 @@
+// Package archive keeps the timetable in SQLite and mirrors the cache into it.
 package archive
 
 import (

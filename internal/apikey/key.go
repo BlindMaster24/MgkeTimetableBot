@@ -1,3 +1,4 @@
+// Package apikey seals API keys with AES-CBC and HMAC-SHA1 and limits their use.
 package apikey
 
 import (

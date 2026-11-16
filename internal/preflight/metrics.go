@@ -1,3 +1,4 @@
+// Package preflight checks a deployment before the bot starts.
 package preflight
 
 import (

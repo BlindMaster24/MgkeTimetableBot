@@ -398,3 +398,114 @@ func TestDocsAreLinkedBothWays(t *testing.T) {
 		t.Error("README.en.md does not link back to README.md")
 	}
 }
+
+var (
+	readmePackageLine = regexp.MustCompile(`(?m)^  ([a-z0-9]+)/\s+—`)
+	readmeCommandLine = regexp.MustCompile(`(?m)^cmd/([a-z0-9-]+)/`)
+)
+
+// TestReadmeStructureListsEveryPackage keeps the project layout honest: a new
+// internal package or command must reach both READMEs, and a removed one must
+// leave them.
+func TestReadmeStructureListsEveryPackage(t *testing.T) {
+	packages := map[string]bool{}
+	entries, err := os.ReadDir(filepath.Join("..", "internal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			packages[entry.Name()] = true
+		}
+	}
+
+	commands := map[string]bool{}
+	cmdEntries, err := os.ReadDir(filepath.Join("..", "cmd"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range cmdEntries {
+		if entry.IsDir() {
+			commands[entry.Name()] = true
+		}
+	}
+
+	for _, doc := range []string{"README.md", "README.en.md"} {
+		content := readRepoFile(t, doc)
+
+		listed := map[string]bool{}
+		for _, match := range readmePackageLine.FindAllStringSubmatch(content, -1) {
+			listed[match[1]] = true
+			if !packages[match[1]] {
+				t.Errorf("%s lists internal/%s, which does not exist", doc, match[1])
+			}
+		}
+		for pkg := range packages {
+			if !listed[pkg] {
+				t.Errorf("%s does not list internal/%s", doc, pkg)
+			}
+		}
+
+		listedCommands := map[string]bool{}
+		for _, match := range readmeCommandLine.FindAllStringSubmatch(content, -1) {
+			listedCommands[match[1]] = true
+			if !commands[match[1]] {
+				t.Errorf("%s lists cmd/%s, which does not exist", doc, match[1])
+			}
+		}
+		for command := range commands {
+			if !listedCommands[command] {
+				t.Errorf("%s does not list cmd/%s", doc, command)
+			}
+		}
+	}
+}
+
+// TestEveryPackageHasADocComment keeps `go doc` useful: each package starts
+// with the sentence that explains it.
+func TestEveryPackageHasADocComment(t *testing.T) {
+	for _, root := range []string{filepath.Join("..", "internal"), filepath.Join("..", "cmd")} {
+		dirs, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, dir := range dirs {
+			if !dir.IsDir() {
+				continue
+			}
+			path := filepath.Join(root, dir.Name())
+			pattern := filepath.Join(path, "*.go")
+			files, err := filepath.Glob(pattern)
+			if err != nil || len(files) == 0 {
+				continue
+			}
+			if !hasPackageDoc(t, files) {
+				t.Errorf("%s has no package doc comment", path)
+			}
+		}
+	}
+}
+
+func hasPackageDoc(t *testing.T, files []string) bool {
+	t.Helper()
+
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "package ") {
+				return false
+			}
+			if strings.HasPrefix(line, "// Package ") || strings.HasPrefix(line, "// Command ") {
+				return true
+			}
+		}
+	}
+	return false
+}

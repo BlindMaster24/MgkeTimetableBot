@@ -1,3 +1,4 @@
+// Package racecheck detects the cgo toolchain the race detector needs.
 package racecheck
 
 import (

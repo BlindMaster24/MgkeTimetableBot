@@ -1,3 +1,4 @@
+// Package sqlitedb owns the SQLite connections, their pragmas and their retries.
 package sqlitedb
 
 import (

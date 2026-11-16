@@ -1,3 +1,4 @@
+// Package schedulediff reports per-day changes between two schedules.
 package schedulediff
 
 import (
