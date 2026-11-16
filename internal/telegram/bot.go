@@ -148,6 +148,7 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 	b.aliasRepo = NewAliasRepository(chatRepo)
 	b.aliasRepo.EnsureTable()
 	b.registerAll()
+	b.log.Info().Int("commands", len(b.commands)).Int("callbacks", len(b.callbacks)).Msg("bot handlers loaded")
 	return b, nil
 }
 
@@ -381,7 +382,11 @@ func (b *Bot) handleCallback(ctx context.Context, cb *telego.CallbackQuery) {
 	if bestHandler != nil {
 		b.countCallback(bestPrefix)
 		if err := bestHandler.Handler(ctx, u); err != nil {
-			b.log.Error().Err(err).Str("prefix", bestPrefix).Msg("callback error")
+			chatID := cb.From.ID
+			if cb.Message != nil {
+				chatID = cb.Message.GetChat().ID
+			}
+			b.log.Error().Err(err).Str("prefix", bestPrefix).Int64("userID", cb.From.ID).Int64("chatID", chatID).Msg("callback error")
 		}
 	}
 }
@@ -435,7 +440,11 @@ func (b *Bot) SetMyCommands() error {
 		}
 	}
 
-	return errors.Join(errs...)
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	b.log.Info().Int("commands", len(commands)).Int("adminCommands", len(adminCommands)).Msg("bot commands set")
+	return nil
 }
 
 func (b *Bot) SendText(chatID int64, text string) error {

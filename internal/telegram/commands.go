@@ -585,7 +585,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		}
 		b.countCommand(cmd)
 		if err := cmd.Handler(ctx, u); err != nil {
-			b.log.Error().Err(err).Str("cmd", u.Text).Msg("command error")
+			b.log.Error().Err(err).Str("cmd", u.Text).Int64("userID", u.UserID).Int64("chatID", u.ChatID).Msg("command error")
 		}
 		return true
 	}
@@ -602,7 +602,7 @@ func (b *Bot) dispatchTextCommand(ctx context.Context, u *Update, chat *Chat) bo
 		if cmd != nil && b.allowsCommand(cmd, u.UserID) {
 			b.countCommand(cmd)
 			if err := cmd.Handler(ctx, u); err != nil {
-				b.log.Error().Err(err).Str("cmd", cmdName).Msg("command error")
+				b.log.Error().Err(err).Str("cmd", cmdName).Int64("userID", u.UserID).Int64("chatID", u.ChatID).Msg("command error")
 			}
 			return true
 		}
