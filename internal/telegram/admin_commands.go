@@ -23,7 +23,7 @@ func (c *regexpCmd) Name() string { return "/regexp" }
 
 func (c *regexpCmd) AdminOnly() bool { return true }
 func (c *regexpCmd) Description() string {
-	return "Отобразить все команды и регулярки к ним"
+	return c.bot.loc("admcmd_1")
 }
 func (c *regexpCmd) MatchText(text string) bool {
 	return text == "/regexp"
@@ -42,7 +42,7 @@ type vanishCmd struct{ bot *Bot }
 func (c *vanishCmd) AdminOnly() bool { return true }
 
 func (c *vanishCmd) Name() string        { return "/vanish" }
-func (c *vanishCmd) Description() string { return "Почистить базу данных" }
+func (c *vanishCmd) Description() string { return c.bot.loc("admcmd_2") }
 func (c *vanishCmd) MatchText(text string) bool {
 	return text == "/vanish" || text == "/vacuum"
 }
@@ -51,9 +51,9 @@ func (c *vanishCmd) Handler(ctx context.Context, u *Update) error {
 	_, err := c.bot.chatRepo.db.Exec("VACUUM")
 	c.bot.chatRepo.mu.Unlock()
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("admcmd_3"), err))
 	}
-	return u.Bot.SendText(u.ChatID, "Бд почищена")
+	return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_4"))
 }
 
 type parserLogsCmd struct{ bot *Bot }
@@ -62,7 +62,7 @@ func (c *parserLogsCmd) Name() string { return "/parserLogs" }
 
 func (c *parserLogsCmd) AdminOnly() bool { return true }
 func (c *parserLogsCmd) Description() string {
-	return "Логи последних обновлений парсера"
+	return c.bot.loc("admcmd_5")
 }
 func (c *parserLogsCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
@@ -70,7 +70,7 @@ func (c *parserLogsCmd) MatchText(text string) bool {
 }
 func (c *parserLogsCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_6"))
 	}
 	logs := c.bot.GetParseLogs()
 	var lines []string
@@ -106,7 +106,7 @@ func (c *parserHealthCmd) Description() string {
 }
 func (c *parserHealthCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_7"))
 	}
 	kb := buttonsKeyboard(notification.HealthAlertButtons(health.AlertParserGuard, func(k string) string { return c.bot.loc(k) }))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.parserHealthText(), kb)
@@ -114,27 +114,27 @@ func (c *parserHealthCmd) Handler(ctx context.Context, u *Update) error {
 
 func (b *Bot) parserHealthText() string {
 	if b.health == nil {
-		return "Метрики здоровья недоступны"
+		return b.loc("admcmd_8")
 	}
 
 	snapshot := b.health.Snapshot()
 	parser := snapshot.Parser
 
-	lines := []string{"-- Парсер расписания --"}
-	state := "✅ без сбоев"
+	lines := []string{b.loc("admcmd_9")}
+	state := b.loc("admcmd_10")
 	if parser.ConsecutiveFailures > 0 {
-		state = fmt.Sprintf("⚠️ сбоев подряд: %d", parser.ConsecutiveFailures)
+		state = fmt.Sprintf(b.loc("admcmd_11"), parser.ConsecutiveFailures)
 	}
-	lines = append(lines, "Состояние: "+state)
-	lines = append(lines, fmt.Sprintf("Разборов: %d, ошибок: %d", parser.Runs, parser.Errors))
-	lines = append(lines, "Последний успех: "+healthMoment(parser.LastSuccessAt, parser.LagSeconds))
+	lines = append(lines, b.loc("admcmd_12")+state)
+	lines = append(lines, fmt.Sprintf(b.loc("admcmd_13"), parser.Runs, parser.Errors))
+	lines = append(lines, b.loc("admcmd_14")+b.healthMoment(parser.LastSuccessAt, parser.LagSeconds))
 	if parser.LastErrorAt != "" {
-		lines = append(lines, fmt.Sprintf("Последний сбой: %s — %s", healthTimestamp(parser.LastErrorAt), parser.LastError))
+		lines = append(lines, fmt.Sprintf(b.loc("admcmd_15"), healthTimestamp(parser.LastErrorAt), parser.LastError))
 	}
-	lines = append(lines, fmt.Sprintf("Длительность последнего разбора: %d мс", parser.LastDurationMS))
+	lines = append(lines, fmt.Sprintf(b.loc("admcmd_16"), parser.LastDurationMS))
 
 	if len(parser.Layout) > 0 {
-		lines = append(lines, "", fmt.Sprintf("-- Вёрстка сайта (подряд %d) --", parser.LayoutFailures))
+		lines = append(lines, "", fmt.Sprintf(b.loc("admcmd_17"), parser.LayoutFailures))
 		for _, issue := range parser.Layout {
 			if issue.Advisory {
 				lines = append(lines, b.locData("parser_health_layout_advisory", map[string]interface{}{
@@ -156,31 +156,31 @@ func (b *Bot) parserHealthText() string {
 				}))
 				continue
 			}
-			lines = append(lines, fmt.Sprintf("%s: %s (найдено %d)", issue.Source, issue.Selector, issue.Found))
+			lines = append(lines, fmt.Sprintf(b.loc("admcmd_18"), issue.Source, issue.Selector, issue.Found))
 		}
 	}
 
 	if len(parser.Guard) > 0 {
-		lines = append(lines, "", fmt.Sprintf("-- Защита данных (подряд %d) --", parser.GuardFailures))
+		lines = append(lines, "", fmt.Sprintf(b.loc("admcmd_19"), parser.GuardFailures))
 		for _, issue := range parser.Guard {
 			lines = append(lines, fmt.Sprintf("%s: %s: %s", issue.Source, issue.Reason, issue.Detail))
 		}
 	}
 
 	if len(snapshot.Alerts) == 0 {
-		lines = append(lines, "", "Активных алертов нет")
+		lines = append(lines, "", b.loc("admcmd_20"))
 	} else {
-		lines = append(lines, "", "-- Активные алерты --")
+		lines = append(lines, "", b.loc("admcmd_21"))
 		for _, alert := range snapshot.Alerts {
 			lines = append(lines, fmt.Sprintf("⚠️ %s: %s", alert.Key, alert.Detail))
 		}
 	}
 
 	if b.cache != nil {
-		lines = append(lines, "", "-- Кэш --", fmt.Sprintf("Групп: %d, преподавателей: %d", len(b.cache.GetGroups()), len(b.cache.GetTeachers())))
+		lines = append(lines, "", b.loc("admcmd_22"), fmt.Sprintf(b.loc("admcmd_23"), len(b.cache.GetGroups()), len(b.cache.GetTeachers())))
 	}
 
-	lines = append(lines, "", "Кнопка ниже запускает разбор немедленно.")
+	lines = append(lines, "", b.loc("admcmd_24"))
 	return strings.Join(lines, "\n")
 }
 
@@ -194,7 +194,7 @@ func (c *incidentsCmd) Description() string {
 }
 func (c *incidentsCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_25"))
 	}
 	return u.Bot.SendTextWithKeyboard(u.ChatID, c.bot.incidentsText(), c.bot.incidentButtons())
 }
@@ -353,14 +353,14 @@ func healthTimestamp(value string) string {
 	return parsed.Local().Format("02.01 15:04:05")
 }
 
-func healthMoment(value string, lagSeconds int64) string {
+func (b *Bot) healthMoment(value string, lagSeconds int64) string {
 	if value == "" {
-		return "не было"
+		return b.loc("admcmd_26")
 	}
 	if lagSeconds < 0 {
 		return healthTimestamp(value)
 	}
-	return fmt.Sprintf("%s (%s назад)", healthTimestamp(value), time.Duration(lagSeconds)*time.Second)
+	return fmt.Sprintf(b.loc("admcmd_27"), healthTimestamp(value), time.Duration(lagSeconds)*time.Second)
 }
 
 type requireNewButtonsCmd struct{ bot *Bot }
@@ -369,7 +369,7 @@ func (c *requireNewButtonsCmd) Name() string { return "/requireNewButtons" }
 
 func (c *requireNewButtonsCmd) AdminOnly() bool { return true }
 func (c *requireNewButtonsCmd) Description() string {
-	return "Выставляет метку, что после обращения юзера бот обновит клавиатуру"
+	return c.bot.loc("admcmd_28")
 }
 func (c *requireNewButtonsCmd) MatchText(text string) bool {
 	return text == "/requireNewButtons"
@@ -393,7 +393,7 @@ func (c *createApiKeyCmd) MatchText(text string) bool {
 }
 func (c *createApiKeyCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_29"))
 	}
 
 	fields := strings.Fields(strings.TrimSpace(u.Text))
@@ -501,18 +501,18 @@ type sqlCmd struct{ bot *Bot }
 func (c *sqlCmd) AdminOnly() bool { return true }
 
 func (c *sqlCmd) Name() string        { return "/sql" }
-func (c *sqlCmd) Description() string { return "Выполнить SQL (sqlite) запрос" }
+func (c *sqlCmd) Description() string { return c.bot.loc("admcmd_30") }
 func (c *sqlCmd) MatchText(text string) bool {
 	lower := strings.ToLower(text)
 	return strings.HasPrefix(lower, "/sql") || strings.HasPrefix(lower, "/db")
 }
 func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_31"))
 	}
 	query := strings.TrimSpace(trimSqlPrefix(u.Text))
 	if query == "" {
-		return u.Bot.SendText(u.ChatID, "Укажите SQL запрос после /sql")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_32"))
 	}
 	if !readOnlyQuery(query) {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("sql_read_only"))
@@ -523,13 +523,13 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 
 	tx, err := c.bot.chatRepo.db.BeginTx(ctx, nil)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("admcmd_33"), err))
 	}
 	defer tx.Rollback()
 
 	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
-		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("admcmd_34"), err))
 	}
 	defer rows.Close()
 	cols, _ := rows.Columns()
@@ -542,7 +542,7 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 			ptrs[i] = &vals[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+			return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("admcmd_35"), err))
 		}
 		parts := make([]string, len(cols))
 		for i, v := range vals {
@@ -558,11 +558,11 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 		lines = append(lines, strings.Join(parts, " | "))
 	}
 	if err := rows.Err(); err != nil {
-		return u.Bot.SendText(u.ChatID, fmt.Sprintf("❌ Ошибка: %v", err))
+		return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("admcmd_36"), err))
 	}
 	if len(lines) > 50 {
 		lines = lines[:50]
-		lines = append(lines, "... (обрезано)")
+		lines = append(lines, c.bot.loc("admcmd_37"))
 	}
 	return u.Bot.SendText(u.ChatID, strings.Join(lines, "\n"))
 }
@@ -577,16 +577,16 @@ func (c *restartCmd) AdminOnly() bool { return true }
 
 func (c *restartCmd) Name() string { return "/restart" }
 func (c *restartCmd) Description() string {
-	return "Перезапуск бота (нужен супервизор: systemd, PM2 или Docker)"
+	return c.bot.loc("admcmd_38")
 }
 func (c *restartCmd) MatchText(text string) bool {
 	return text == "/restart"
 }
 func (c *restartCmd) Handler(ctx context.Context, u *Update) error {
 	if !c.bot.isAdmin(u.UserID) {
-		return u.Bot.SendText(u.ChatID, "⛔ Доступ запрещён")
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_39"))
 	}
-	u.Bot.SendText(u.ChatID, "🔄 Перезапуск...")
+	u.Bot.SendText(u.ChatID, c.bot.loc("admcmd_40"))
 	if c.bot.shutdown != nil {
 		c.bot.shutdown()
 	}
