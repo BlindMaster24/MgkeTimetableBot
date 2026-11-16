@@ -1,34 +1,42 @@
 package api
 
 import (
-	"reflect"
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
 )
 
-func TestSortNamesMatchesTSSort(t *testing.T) {
-	got := sortNames([]string{"100", "99", "ПСМ", "10"})
-	want := []string{"10", "99", "100", "ПСМ"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("sortNames = %v, want %v", got, want)
+func TestGroupsEndpointSortsNumericFirstLikeTS(t *testing.T) {
+	srv := setupTestServerWith(t, health.NewDefaultTracker())
+	srv.cache.SetGroups(t.Context(), map[string]any{
+		"100": map[string]any{"days": []any{}},
+		"99":  map[string]any{"days": []any{}},
+		"ПСМ": map[string]any{"days": []any{}},
+		"10":  map[string]any{"days": []any{}},
+	}, "sorted")
+
+	w := call(t, srv, "GET", "/api/groups")
+	if w.Code != 200 {
+		t.Fatalf("status = %d", w.Code)
 	}
 
-	got = sortNames([]string{"b", "A", "a"})
-	want = []string{"A", "a", "b"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("sortNames = %v, want %v", got, want)
+	var body struct {
+		Groups []string `json:"groups"`
 	}
-
-	got = sortNames([]string{"063", "63"})
-	want = []string{"063", "63"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("stable order for numeric twins = %v, want %v", got, want)
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
 	}
-
-	if got := sortNames(nil); len(got) != 0 {
-		t.Fatalf("sortNames(nil) = %v, want empty", got)
+	want := []string{"10", "63", "64", "99", "100", "ПСМ"}
+	if len(body.Groups) != len(want) {
+		t.Fatalf("groups = %v, want %v", body.Groups, want)
+	}
+	for i := range want {
+		if body.Groups[i] != want[i] {
+			t.Fatalf("groups = %v, want %v", body.Groups, want)
+		}
 	}
 }
 
