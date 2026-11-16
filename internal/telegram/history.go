@@ -16,7 +16,7 @@ type historyCmd struct{ bot *Bot }
 func (c *historyCmd) Name() string        { return "/history" }
 func (c *historyCmd) Description() string { return c.bot.loc("cmd_history") }
 func (c *historyCmd) MatchText(text string) bool {
-	return text == "📚 История"
+	return text == c.bot.loc("histtext_1")
 }
 func (c *historyCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
@@ -32,7 +32,7 @@ func (c *historyCmd) Handler(ctx context.Context, u *Update) error {
 	c.bot.chatRepo.SetScene(chat, "history_teacher")
 	c.bot.chatRepo.Save(chat)
 
-	prompt := fmt.Sprintf("Введите фамилию преподавателя или выберите из списка ниже (например, %s)", randomKey(teachers))
+	prompt := fmt.Sprintf(c.bot.loc("histtext_2"), randomKey(teachers))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
@@ -43,18 +43,18 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	input := strings.TrimSpace(u.Text)
 
 	if len(input) < 3 {
-		return u.Bot.SendText(u.ChatID, "Фамилия введена некорректно")
+		return u.Bot.SendText(u.ChatID, s.bot.loc("histtext_3"))
 	}
 
 	matched, tooMany := matchTeacherList(input, teachers, s.bot.cache.GetTeamNames(), s.bot.searchAliases(u.UserID))
 	if len(matched) == 0 {
-		return u.Bot.SendText(u.ChatID, "Данный преподаватель не найден")
+		return u.Bot.SendText(u.ChatID, s.bot.loc("histtext_4"))
 	}
 	if tooMany {
-		return u.Bot.SendText(u.ChatID, "Слишком много результатов для выборки.")
+		return u.Bot.SendText(u.ChatID, s.bot.loc("histtext_5"))
 	}
 	if len(matched) > 1 {
-		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
+		msg := s.bot.loc("histtext_6") + strings.Join(matched, "\n")
 		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, withCancelButton(verticalValuesKeyboard(matched)))
 	}
 
@@ -65,7 +65,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	chat.Scene = sceneHistoryWeek
 	s.bot.chatRepo.Save(chat)
 
-	prompt := "Введите номер учебной недели или дату (дд.мм или дд.мм.гггг)"
+	prompt := s.bot.loc("histtext_7")
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, withCancelButton(teacherHistoryKeyboard(chat)))
 }
 
@@ -85,7 +85,7 @@ func (s *historyWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 
 func (b *Bot) showWeekDays(ctx context.Context, u *Update, chat *Chat, kind, value string, weekIndex *utils.WeekIndex) error {
 	if b.archive == nil {
-		return u.Bot.SendText(u.ChatID, "Архив недоступен")
+		return u.Bot.SendText(u.ChatID, b.loc("histtext_8"))
 	}
 
 	bounds, err := b.archive.WeekIndexBounds(ctx)
