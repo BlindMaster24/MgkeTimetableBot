@@ -240,7 +240,7 @@ func (c *sendCmd) runBroadcast(chatID int64, progressID int, chats []*Chat, text
 
 		if time.Since(lastEdit) >= 1*time.Second || i == total-1 {
 			pct := float64(i+1) / float64(total) * 100
-			editText := fmt.Sprintf("tg: %d/%d (%.2f%%)", i+1, total, pct)
+			editText := fmt.Sprintf("telegram: %d/%d (%.2f%%)", i+1, total, pct)
 			if failed > 0 {
 				editText += fmt.Sprintf(c.bot.loc("admintext_28"), failed)
 			}
