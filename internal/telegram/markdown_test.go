@@ -186,3 +186,28 @@ func TestFormatForReadsChatIDsOfBothShapes(t *testing.T) {
 		t.Errorf("a constructor without a resolver must default to markdown, got %q", got)
 	}
 }
+
+func FuzzMarkdownV2SurvivesAnyInput(f *testing.F) {
+	for _, seed := range []string{
+		"Группа 100 1. Пара (лек)",
+		"<b>жирный</b> и <i>курсив</i>",
+		`<a href="https://example.com/a_b">ссылка</a>`,
+		"<code>a+b=c. ok</code>",
+		"<b>незакрытый",
+		`&lt;some&gt; &amp; &quot;кавычки&quot;`,
+		"100% | a > b {x} [y] *z* _w_ ~t~ `c` # + - = !",
+		"",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, text string) {
+		out := markdownV2(text)
+		// The output goes back into the same converter when a handler forwards
+		// a message; it must survive that without panicking or growing holes.
+		again := markdownV2(out)
+		if again == "" && out != "" {
+			t.Fatalf("converting %q twice lost everything (first pass: %q)", text, out)
+		}
+	})
+}
