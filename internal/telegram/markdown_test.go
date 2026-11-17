@@ -150,3 +150,39 @@ func TestMarkdownConstructorRewritesAMultipartCaption(t *testing.T) {
 		t.Fatalf("parse_mode was not switched:\n%s", form)
 	}
 }
+
+func TestFormatForReadsChatIDsOfBothShapes(t *testing.T) {
+	var seen []int64
+	constructor := markdownConstructor{formatOf: func(chatID int64) string {
+		seen = append(seen, chatID)
+		if chatID == 42 {
+			return FormatHTML
+		}
+		return FormatMarkdown
+	}}
+
+	cases := []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{"number", `{"chat_id": 42}`, FormatHTML},
+		{"string", `{"chat_id": "42"}`, FormatHTML},
+		{"padded string", `{"chat_id": " 42 "}`, FormatHTML},
+		{"other chat", `{"chat_id": 7}`, FormatMarkdown},
+		{"no chat", `{"text": "x"}`, FormatMarkdown},
+		{"broken", `{`, FormatMarkdown},
+		{"nonsense", `{"chat_id": "abc"}`, FormatMarkdown},
+	}
+	for _, tc := range cases {
+		if got := constructor.formatFor([]byte(tc.payload)); got != tc.want {
+			t.Errorf("%s: formatFor = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	if len(seen) != 4 {
+		t.Errorf("the chat callback must run only for parsable ids, got %v", seen)
+	}
+	if got := (markdownConstructor{}).formatFor([]byte(`{"chat_id": 42}`)); got != FormatMarkdown {
+		t.Errorf("a constructor without a resolver must default to markdown, got %q", got)
+	}
+}
