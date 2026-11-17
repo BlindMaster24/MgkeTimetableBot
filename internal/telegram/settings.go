@@ -23,6 +23,8 @@ func (b *Bot) currentSettingsText(chat *Chat) string {
 		fmt.Sprintf(b.loc("settings_hide_past"), b.yesNo(chat.HidePastDays)),
 		fmt.Sprintf(b.loc("settings_parser_time"), b.yesNo(chat.ShowParserTime)),
 		fmt.Sprintf(b.loc("settings_hints"), b.yesNo(chat.ShowHints)),
+		fmt.Sprintf(b.loc("settings_delete_last_msg"), b.yesNo(chat.DeleteLastMsg)),
+		fmt.Sprintf(b.loc("settings_delete_user_msg"), b.yesNo(chat.DeleteUserMsg)),
 		fmt.Sprintf(b.loc("settings_diff"), b.yesNo(chat.DiffEnabled)),
 		fmt.Sprintf(b.loc("settings_diff_week"), b.yesNo(chat.DiffAutoInWeek)),
 		fmt.Sprintf(b.loc("settings_diff_updates"), b.yesNo(chat.DiffAutoInUpdates)),

@@ -141,6 +141,10 @@ func (c *viewToggleTextCmd) MatchText(text string) bool {
 		return text == c.bot.loc("settext_24") || text == c.bot.loc("settext_25")
 	case "show_hints":
 		return text == c.bot.loc("settext_26") || text == c.bot.loc("settext_27")
+	case "delete_last_msg":
+		return text == c.bot.noYesSmile(true, c.bot.loc("kbtext_53")) || text == c.bot.noYesSmile(false, c.bot.loc("kbtext_53"))
+	case "delete_user_msg":
+		return text == c.bot.noYesSmile(true, c.bot.loc("kbtext_54")) || text == c.bot.noYesSmile(false, c.bot.loc("kbtext_54"))
 	}
 	return false
 }
@@ -162,6 +166,12 @@ func (c *viewToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "show_hints":
 		chat.ShowHints = !chat.ShowHints
 		reply = fmt.Sprintf(c.bot.loc("settext_30"), c.bot.yesNo(chat.ShowHints))
+	case "delete_last_msg":
+		chat.DeleteLastMsg = !chat.DeleteLastMsg
+		reply = fmt.Sprintf(c.bot.loc("settext_31"), c.bot.yesNo(chat.DeleteLastMsg))
+	case "delete_user_msg":
+		chat.DeleteUserMsg = !chat.DeleteUserMsg
+		reply = fmt.Sprintf(c.bot.loc("settext_32"), c.bot.yesNo(chat.DeleteUserMsg))
 	}
 	c.bot.chatRepo.Save(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsView(chat))

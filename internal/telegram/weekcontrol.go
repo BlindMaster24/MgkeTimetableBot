@@ -207,7 +207,7 @@ func (b *Bot) showWeekSchedule(ctx context.Context, u *Update, chat *Chat) error
 	}
 
 	kb := b.weekControlKeyboard(ctx, target.typeName, target.value, week.Value(), chat.HidePastDays)
-	return b.sendOrEdit(u, text, kb)
+	return b.sendScheduleText(u, chat, text, kb)
 }
 
 func (b *Bot) buildWeekLabelFromWeek(week utils.WeekIndex) string {

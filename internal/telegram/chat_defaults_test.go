@@ -1,8 +1,11 @@
 package telegram
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
+
+	"github.com/mymmrac/telego"
 )
 
 func TestRepositoryNewChatShowsMainButtons(t *testing.T) {
@@ -109,5 +112,69 @@ func TestANewChatHidesPassedDaysLikeTheOldBot(t *testing.T) {
 	}
 	if !chat.HidePastDays {
 		t.Fatal("a new chat must hide the passed days, the old bot did")
+	}
+}
+
+func TestScheduleMessageCleanupFollowsTheChatSettings(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+
+	chat, err := b.chatRepo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat.DeleteLastMsg = true
+	chat.DeleteUserMsg = true
+	chat.LastMsgID = 55
+	if err := b.chatRepo.Save(chat); err != nil {
+		t.Fatal(err)
+	}
+
+	u := makeUpdate(userID, "/day")
+	u.Bot = b
+	u.Message = &telego.Message{MessageID: 900, Chat: telego.Chat{ID: userID}, From: &telego.User{ID: userID}}
+	b.handleMessageText(context.Background(), u)
+
+	deleted := caller.deletedMessages()
+	if len(deleted) != 2 || deleted[0] != 55 || deleted[1] != 900 {
+		t.Fatalf("deleted = %v, want the previous bot message and the user message", deleted)
+	}
+
+	saved, err := b.chatRepo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.LastMsgID == 55 || saved.LastMsgID == 0 {
+		t.Fatalf("LastMsgID = %d, want the id of the fresh timetable message", saved.LastMsgID)
+	}
+}
+
+func TestViewTogglesRememberTheMessageCleanup(t *testing.T) {
+	b, _, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	chat, err := b.chatRepo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat.Scene = sceneSettings
+	if err := b.chatRepo.Save(chat); err != nil {
+		t.Fatal(err)
+	}
+
+	toggle := &viewToggleTextCmd{bot: b, kind: "delete_last_msg"}
+	if !toggle.MatchText(b.noYesSmile(true, b.loc("kbtext_53"))) {
+		t.Fatal("the toggle must match its own button label")
+	}
+
+	u := makeUpdate(userID, b.noYesSmile(true, b.loc("kbtext_53")))
+	u.Bot = b
+	if err := toggle.Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := b.chatRepo.FindOrCreate("telegram", userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !saved.DeleteLastMsg {
+		t.Fatal("the toggle must switch DeleteLastMsg on")
 	}
 }

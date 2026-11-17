@@ -521,6 +521,18 @@
       "kind": "extra_in_go",
       "value": "format",
       "reason": "the port sends MarkdownV2 by default and lets a chat switch its own messages to HTML; the TypeScript bot had one fixed format"
+    },
+    {
+      "section": "buttons",
+      "kind": "extra_in_go",
+      "value": "Удалять прошлое сообщение бота",
+      "reason": "the TS bot toggled this from the /deleteLastMsg slash command; the port exposes it as a view-menu button so the state is visible next to the other display switches"
+    },
+    {
+      "section": "buttons",
+      "kind": "extra_in_go",
+      "value": "Удалять сообщение пользователя",
+      "reason": "the TS bot toggled this from the /deleteUserMsg slash command and required a group admin; the port exposes it as a view-menu button, and the deletion itself only fires for accepted chats"
     }
   ]
 }

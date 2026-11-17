@@ -87,6 +87,8 @@ func (b *Bot) replySettingsView(chat *Chat) *telego.ReplyKeyboardMarkup {
 			{{Text: b.noYesSmile(chat.HidePastDays, b.loc("kbtext_22"))}},
 			{{Text: b.noYesSmile(chat.ShowParserTime, b.loc("kbtext_23"))}},
 			{{Text: b.noYesSmile(chat.ShowHints, b.loc("kbtext_24")) + b.yesNoCapital(chat.ShowHints)}},
+			{{Text: b.noYesSmile(chat.DeleteLastMsg, b.loc("kbtext_53"))}},
+			{{Text: b.noYesSmile(chat.DeleteUserMsg, b.loc("kbtext_54"))}},
 			settingsBotNavRow(b),
 		},
 		IsPersistent:   true,

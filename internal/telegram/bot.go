@@ -689,6 +689,73 @@ func (b *Bot) sendOrEdit(u *Update, text string, inlineKb *telego.InlineKeyboard
 	return b.SendTextWithKeyboard(u.ChatID, text, inlineKb)
 }
 
+// DeleteMessage removes one message of the chat.
+func (b *Bot) DeleteMessage(chatID int64, messageID int) error {
+	if messageID <= 0 {
+		return nil
+	}
+	return b.client.DeleteMessage(context.Background(), &telego.DeleteMessageParams{
+		ChatID:    telego.ChatID{ID: chatID},
+		MessageID: messageID,
+	})
+}
+
+// sendTextTracked sends a text message and answers its id, so the chat can
+// delete it later when it asked to keep only the fresh timetable.
+func (b *Bot) sendTextTracked(chatID int64, text string, kb *telego.InlineKeyboardMarkup) (int, error) {
+	params := &telego.SendMessageParams{
+		ChatID:    telego.ChatID{ID: chatID},
+		Text:      text,
+		ParseMode: "HTML",
+	}
+	if kb != nil {
+		params.ReplyMarkup = kb
+	}
+	message, err := b.client.SendMessage(context.Background(), params)
+	b.noteUndeliverable(chatID, err)
+	if err != nil {
+		return 0, b.countSendError(transportSendMessage, err)
+	}
+	return message.MessageID, nil
+}
+
+// sendScheduleText shows a timetable message and honours the two cleanup
+// switches the old bot had: drop the previous bot message and the message that
+// asked for the schedule.
+func (b *Bot) sendScheduleText(u *Update, chat *Chat, text string, kb *telego.InlineKeyboardMarkup) error {
+	if u.MessageID > 0 {
+		if err := b.EditMessageText(u.ChatID, u.MessageID, text, kb); err == nil || messageNotModified(err) {
+			return nil
+		}
+	}
+
+	if chat.DeleteLastMsg && chat.LastMsgID > 0 {
+		if err := b.DeleteMessage(u.ChatID, int(chat.LastMsgID)); err == nil {
+			chat.LastMsgID = 0
+		} else {
+			b.log.Debug().Err(err).Int64("messageID", chat.LastMsgID).Msg("failed to delete the previous timetable message")
+		}
+	}
+
+	id, err := b.sendTextTracked(u.ChatID, text, kb)
+	if err != nil {
+		return err
+	}
+
+	userMessageID := 0
+	if u.Message != nil && u.MessageID == 0 {
+		userMessageID = u.Message.MessageID
+	}
+	if chat.DeleteUserMsg && userMessageID > 0 {
+		if err := b.DeleteMessage(u.ChatID, userMessageID); err != nil {
+			b.log.Debug().Err(err).Int("messageID", userMessageID).Msg("failed to delete the message of the user")
+		}
+	}
+
+	chat.LastMsgID = int64(id)
+	return b.chatRepo.Save(chat)
+}
+
 func messageNotModified(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "message is not modified")
 }

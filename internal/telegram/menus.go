@@ -102,6 +102,8 @@ func (b *Bot) menuSpecs() []menuSpec {
 				func(b *Bot) Command { return &viewToggleTextCmd{bot: b, kind: "hide_past_days"} },
 				func(b *Bot) Command { return &viewToggleTextCmd{bot: b, kind: "show_parser_time"} },
 				func(b *Bot) Command { return &viewToggleTextCmd{bot: b, kind: "show_hints"} },
+				func(b *Bot) Command { return &viewToggleTextCmd{bot: b, kind: "delete_last_msg"} },
+				func(b *Bot) Command { return &viewToggleTextCmd{bot: b, kind: "delete_user_msg"} },
 			},
 		},
 		{

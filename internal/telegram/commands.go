@@ -221,7 +221,7 @@ func (b *Bot) showDaySchedule(u *Update, chat *Chat) error {
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("setup_needed"), startButtonKeyboard(b))
 	}
 
-	return b.sendOrEdit(u, text, nil)
+	return b.sendScheduleText(u, chat, text, nil)
 }
 
 type weekCmd struct{ bot *Bot }

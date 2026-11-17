@@ -26,6 +26,7 @@ type capturingCaller struct {
 	messages  []capturedMessage
 	documents []string
 	answers   []string
+	deletions []int
 }
 
 func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.RequestData) (*telegoapi.Response, error) {
@@ -39,6 +40,16 @@ func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.
 			c.messages = append(c.messages, capturedMessage{chatID: payload.ChatID, text: payload.Text})
 			c.mu.Unlock()
 		}
+	}
+	if strings.HasSuffix(url, "/deleteMessage") {
+		var payload struct {
+			MessageID json.Number `json:"message_id"`
+		}
+		_ = json.Unmarshal(data.BodyRaw, &payload)
+		id, _ := payload.MessageID.Int64()
+		c.mu.Lock()
+		c.deletions = append(c.deletions, int(id))
+		c.mu.Unlock()
 	}
 	if strings.HasSuffix(url, "/answerCallbackQuery") {
 		var payload struct {
@@ -74,6 +85,13 @@ func (c *capturingCaller) documentPayload() string {
 }
 
 // lastAnswer returns the text of the latest callback answer.
+// deletedMessages lists the message ids the bot asked to delete.
+func (c *capturingCaller) deletedMessages() []int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]int(nil), c.deletions...)
+}
+
 func (c *capturingCaller) lastAnswer() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
