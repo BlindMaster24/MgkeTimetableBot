@@ -446,6 +446,8 @@ func (b *Bot) showGoogleCalendarAdd(u *Update, chat *Chat) error {
 			return u.Bot.SendText(u.ChatID, b.loc("gcal_45"))
 		}
 		created = true
+		b.log.Info().Str("type", kind).Str("value", value).Str("calendar", calendarID).
+			Int64("chatID", u.ChatID).Msg("google calendar created")
 	}
 
 	if created {
@@ -515,7 +517,12 @@ func (b *Bot) SyncGoogleCalendars(ctx context.Context) (int, error) {
 		if err != nil {
 			b.log.Error().Err(err).Str("calendar", calendar.CalendarID).Msg("google calendar reconcile failed")
 			failures = append(failures, err)
+			continue
 		}
+		b.log.Debug().Str("calendar", calendar.CalendarID).Int("days", days).Msg("google calendar reconciled")
+	}
+	if synced > 0 {
+		b.log.Info().Int("days", synced).Int("calendars", len(calendars)).Msg("google calendars reconciled")
 	}
 	return synced, errors.Join(failures...)
 }
@@ -560,7 +567,12 @@ func (b *Bot) SyncGoogleCalendarChanges(ctx context.Context, changes []GoogleDay
 		if err != nil {
 			b.log.Error().Err(err).Str("calendar", calendar.CalendarID).Msg("google calendar day sync failed")
 			failures = append(failures, err)
+			continue
 		}
+		b.log.Debug().Str("calendar", calendar.CalendarID).Int("days", days).Msg("google calendar days synced")
+	}
+	if synced > 0 {
+		b.log.Info().Int("days", synced).Int("calendars", len(calendars)).Msg("google calendar changes applied")
 	}
 	return synced, errors.Join(failures...)
 }
