@@ -136,7 +136,7 @@ func (r *Repository) migrate() error {
 		show_calls INTEGER NOT NULL DEFAULT 1,
 		show_fast_group INTEGER NOT NULL DEFAULT 1,
 		show_fast_teacher INTEGER NOT NULL DEFAULT 1,
-		hide_past_days INTEGER NOT NULL DEFAULT 0,
+		hide_past_days INTEGER NOT NULL DEFAULT 1,
 		delete_last_msg INTEGER NOT NULL DEFAULT 0,
 		last_msg_id INTEGER NOT NULL DEFAULT 0,
 		allow_send_mess INTEGER NOT NULL DEFAULT 1,
@@ -275,10 +275,12 @@ func (r *Repository) FindOrCreate(service string, peerID int64) (*Chat, error) {
 	}
 
 	_, err = r.db.Exec(
+		// hide_past_days is spelled out because the TypeScript bot hid the
+		// passed lessons by default, and old databases still carry DEFAULT 0.
 		`INSERT OR IGNORE INTO bot_chats (
 			service, peer_id, accepted, show_about, show_daily, show_weekly,
-			show_calls, show_fast_group, show_fast_teacher
-		) VALUES (?, ?, ?, 1, 1, 1, 1, 1, 1)`,
+			show_calls, show_fast_group, show_fast_teacher, hide_past_days
+		) VALUES (?, ?, ?, 1, 1, 1, 1, 1, 1, 1)`,
 		service, peerID, accepted,
 	)
 	if err != nil {

@@ -1,6 +1,9 @@
 package telegram
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestRepositoryNewChatShowsMainButtons(t *testing.T) {
 	repo, err := New(t.TempDir() + "/test.db")
@@ -90,5 +93,21 @@ func TestRepositoryKeepsCustomizedButtons(t *testing.T) {
 	}
 	if !chat.ShowDaily {
 		t.Error("the other buttons must stay enabled")
+	}
+}
+
+func TestANewChatHidesPassedDaysLikeTheOldBot(t *testing.T) {
+	repo, err := New(filepath.Join(t.TempDir(), "chats.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { repo.Close() })
+
+	chat, err := repo.FindOrCreate("telegram", 777001)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !chat.HidePastDays {
+		t.Fatal("a new chat must hide the passed days, the old bot did")
 	}
 }
