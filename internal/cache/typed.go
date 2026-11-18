@@ -2,7 +2,6 @@ package cache
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/timetable"
 )
@@ -54,7 +53,7 @@ func onlyDatedEntries(entries map[string]any) map[string]any {
 			if !ok {
 				continue
 			}
-			if dated.Date == strings.TrimSpace(label) {
+			if dated.Date == label {
 				days = append(days, raw)
 				continue
 			}

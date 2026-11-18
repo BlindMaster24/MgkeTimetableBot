@@ -91,3 +91,50 @@ func TestGroupKeysListsEveryGroup(t *testing.T) {
 		t.Fatalf("GroupKeys() = %v", keys)
 	}
 }
+
+func TestDueAtBoundaries(t *testing.T) {
+	moment := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	interval := time.Hour
+
+	cases := []struct {
+		name      string
+		updatedAt int64
+		interval  time.Duration
+		want      bool
+	}{
+		{"no interval", moment.UnixMilli(), 0, true},
+		{"no interval with a future stamp", moment.Add(time.Hour).UnixMilli(), 0, true},
+		{"negative interval", moment.UnixMilli(), -time.Minute, true},
+		{"never updated", 0, interval, true},
+		{"sub-nanosecond interval", moment.UnixMilli(), time.Nanosecond, false},
+		{"exactly on the interval", moment.Add(-interval).UnixMilli(), interval, true},
+		{"just inside", moment.Add(-interval + time.Millisecond).UnixMilli(), interval, false},
+		{"long ago", moment.Add(-2 * interval).UnixMilli(), interval, true},
+	}
+	for _, tc := range cases {
+		if got := dueAt(moment, tc.updatedAt, tc.interval); got != tc.want {
+			t.Errorf("%s: dueAt = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestCallsVariantSlotsCountsTheLongestDay(t *testing.T) {
+	weekday := [][2][2]string{{{"08:00", "08:45"}}, {{"09:00", "09:45"}}}
+	saturday := [][2][2]string{{{"09:00", "09:45"}}, {{"10:00", "10:45"}}, {{"11:00", "11:45"}}}
+
+	cases := []struct {
+		name    string
+		variant CallsVariant
+		want    int
+	}{
+		{"week longer", CallsVariant{Schedule: CallsSchedule{Weekdays: saturday, Saturday: weekday}}, 3},
+		{"saturday longer", CallsVariant{Schedule: CallsSchedule{Weekdays: weekday, Saturday: saturday}}, 3},
+		{"same length", CallsVariant{Schedule: CallsSchedule{Weekdays: weekday, Saturday: weekday}}, 2},
+		{"empty", CallsVariant{}, 0},
+	}
+	for _, tc := range cases {
+		if got := tc.variant.Slots(); got != tc.want {
+			t.Errorf("%s: Slots = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
