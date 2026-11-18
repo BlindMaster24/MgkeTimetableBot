@@ -28,19 +28,6 @@ func NewAliasRepository(chatRepo *Repository) *AliasRepository {
 	return &AliasRepository{db: chatRepo}
 }
 
-func (r *AliasRepository) EnsureTable() {
-	r.db.mu.Lock()
-	defer r.db.mu.Unlock()
-	r.db.db.Exec(`CREATE TABLE IF NOT EXISTS aliases (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		chat_id INTEGER NOT NULL,
-		telegram_user_id INTEGER NOT NULL,
-		key TEXT NOT NULL,
-		value TEXT NOT NULL,
-		UNIQUE(telegram_user_id, key)
-	)`)
-}
-
 func (r *AliasRepository) List(userID int64) ([]Alias, error) {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()

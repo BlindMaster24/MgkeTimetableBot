@@ -20,29 +20,6 @@ type GoogleCalendar struct {
 	LastManualSyncedDay int64
 }
 
-func (r *Repository) migrateGoogle() error {
-	_, err := r.db.Exec(`CREATE TABLE IF NOT EXISTS google_accounts (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		email TEXT NOT NULL UNIQUE,
-		refresh_token TEXT,
-		access_token TEXT,
-		access_token_expires INTEGER NOT NULL DEFAULT 0
-	)`)
-	if err != nil {
-		return err
-	}
-
-	_, err = r.db.Exec(`CREATE TABLE IF NOT EXISTS google_calendars (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		type TEXT NOT NULL,
-		value TEXT NOT NULL,
-		calendar_id TEXT NOT NULL UNIQUE,
-		last_manual_synced_day INTEGER NOT NULL DEFAULT 0,
-		UNIQUE(type, value)
-	)`)
-	return err
-}
-
 func (r *Repository) SaveGoogleAccount(account *GoogleAccount) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

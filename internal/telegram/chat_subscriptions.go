@@ -23,17 +23,6 @@ type Subscription struct {
 	Value  string
 }
 
-func (r *Repository) migrateSubscriptions() error {
-	_, err := r.db.Exec(`CREATE TABLE IF NOT EXISTS subscriptions (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		chat_id INTEGER NOT NULL,
-		type TEXT NOT NULL,
-		value TEXT NOT NULL,
-		UNIQUE(chat_id, type, value)
-	)`)
-	return err
-}
-
 func (r *Repository) AddSubscription(chatID int64, subType, value string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
