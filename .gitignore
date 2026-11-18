@@ -69,3 +69,6 @@ Thumbs.db
 /.cloud-attachments/
 .metrics/
 coverage.out
+
+# mutation testing overlays
+/target/
