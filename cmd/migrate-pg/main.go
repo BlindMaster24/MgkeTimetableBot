@@ -4,6 +4,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -57,6 +58,9 @@ func main() {
 	if *pgURL == "" {
 		log.Fatal("Usage: migrate-pg -pg 'postgresql://user:pass@host:port/dbname' [-sqlite bot_chats.db] [-force]")
 	}
+	if err := prepareOutput(*sqlitePath, *force); err != nil {
+		log.Fatal(err)
+	}
 
 	log.Printf("Connecting to PostgreSQL...")
 	pgDB, err := sql.Open("postgres", *pgURL)
@@ -102,6 +106,9 @@ func main() {
 		}
 		chats = append(chats, c)
 	}
+	if err := rows.Err(); err != nil {
+		log.Fatalf("read pg rows: %v", err)
+	}
 
 	log.Printf("Found %d chats in PostgreSQL (service='tg', accepted=true)", len(chats))
 
@@ -110,12 +117,6 @@ func main() {
 		return
 	}
 
-	if _, err := os.Stat(*sqlitePath); err == nil {
-		if !*force {
-			log.Fatalf("%s already exists, pass -force to replace it", *sqlitePath)
-		}
-		os.Remove(*sqlitePath)
-	}
 	log.Printf("Creating SQLite database: %s", *sqlitePath)
 	sqliteDB, err := sql.Open("sqlite", *sqlitePath)
 	if err != nil {
@@ -141,6 +142,20 @@ func main() {
 	var count int
 	sqliteDB.QueryRow(`SELECT COUNT(*) FROM bot_chats`).Scan(&count)
 	log.Printf("Verification: %d rows in SQLite", count)
+}
+
+// prepareOutput makes sure the SQLite target can be written: an existing file
+// is only replaced when the caller asked for it.
+func prepareOutput(path string, force bool) error {
+	if _, err := os.Stat(path); err == nil {
+		if !force {
+			return fmt.Errorf("%s already exists, pass -force to replace it", path)
+		}
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("remove %s: %w", path, err)
+		}
+	}
+	return nil
 }
 
 const createChatsTable = `CREATE TABLE IF NOT EXISTS bot_chats (

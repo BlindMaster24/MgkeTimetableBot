@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -30,67 +31,41 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	issues := 0
-	fetcher := parser.NewFetcher(log, rasp, parser.Options{OnReport: func(report parser.Report) {
-		fmt.Printf("report %s: items=%d probes=%d warnings=%d fallbacks=%d keptOld=%v\n",
-			report.Source, report.Items, len(report.Probes), len(report.Warnings), len(report.Fallbacks), report.KeptOld)
-		for _, probe := range report.Probes {
-			if !probe.OK() {
-				fmt.Printf("  probe failed: %s %s (expected %q, found %d)\n", probe.Source, probe.Selector, probe.Expected, probe.Found)
-				issues++
-			}
-		}
-		for _, warning := range report.Warnings {
-			fmt.Println("  warning:", warning)
-			issues++
-		}
-		for _, fallback := range report.Fallbacks {
-			fmt.Println("  fallback:", fallback)
-		}
-		if report.KeptOld {
-			fmt.Println("  kept previous cache entry")
-			issues++
-		}
-	}})
+	audit := &reportAudit{out: os.Stdout}
+	fetcher := parser.NewFetcher(log, rasp, parser.Options{OnReport: audit.onReport})
 
 	started := time.Now()
 	ctx := context.Background()
 	if err := fetcher.Timetable(ctx, cfg.Parser.Endpoints.TimetableGroup, cfg.Parser.Endpoints.TimetableTeacher); err != nil {
 		fmt.Println("timetable error:", err)
-		issues++
+		audit.fail()
 	}
 	if err := fetcher.Calls(ctx, cfg.Parser.Endpoints.BellSchedule); err != nil {
 		fmt.Println("calls error:", err)
-		issues++
+		audit.fail()
 	}
 	if err := fetcher.Team(ctx, cfg.Parser.Endpoints.Team); err != nil {
 		fmt.Println("team error:", err)
-		issues++
+		audit.fail()
 	}
 	fmt.Printf("fetched in %s\n", time.Since(started))
 
 	for kind, entries := range map[string]map[string]any{"group": rasp.GetGroups(), "teacher": rasp.GetTeachers()} {
 		result := auditEntries(kind, entries)
 		result.report(kind)
-		issues += result.Issues()
+		audit.add(result.Issues())
 	}
 	fmt.Printf("groups=%d teachers=%d teamNames=%d\n", len(rasp.GetGroups()), len(rasp.GetTeachers()), len(rasp.GetTeamNames()))
 
 	calls := rasp.GetCalls()
 	fmt.Printf("calls: weekdays=%d saturday=%d source=%q\n", len(calls.Active.Schedule.Weekdays), len(calls.Active.Schedule.Saturday), calls.Active.Source)
-	if len(calls.Active.Schedule.Weekdays) == 0 || len(calls.Active.Schedule.Saturday) == 0 {
-		fmt.Println("  issue: active calls schedule is empty")
-		issues++
-	}
-	for i, slot := range calls.Active.Schedule.Weekdays {
-		if slot[0][0] == "" || slot[1][1] == "" {
-			fmt.Println("  issue: weekday slot", i, "has empty bounds")
-			issues++
-		}
+	for _, problem := range callsProblems(calls.Active.Schedule) {
+		fmt.Println("  issue:", problem)
+		audit.fail()
 	}
 
-	if issues > 0 {
-		fmt.Printf("FAILED with %d issues\n", issues)
+	if total := audit.Issues(); total > 0 {
+		fmt.Printf("FAILED with %d issues\n", total)
 		os.Exit(1)
 	}
 	fmt.Println("all invariants hold")
@@ -203,4 +178,60 @@ func (r auditResult) report(kind string) {
 	}
 	fmt.Printf("%s audit: entries=%d emptyDays=%d badDates=%d lessonlessDays=%d badLessons=%d dayCounts=%v emptyWeekdays=%v\n",
 		kind, r.Entries, r.EmptyDays, r.BadDates, r.LessonlessDays, r.BadLessons, r.DayCounts, r.EmptyWeekdays)
+}
+
+// reportAudit turns parser reports into findings and a running issue count.
+type reportAudit struct {
+	out    io.Writer
+	issues int
+}
+
+// onReport prints one parser report and counts its problems.
+func (a *reportAudit) onReport(report parser.Report) {
+	fmt.Fprintf(a.out, "report %s: items=%d probes=%d warnings=%d fallbacks=%d keptOld=%v\n",
+		report.Source, report.Items, len(report.Probes), len(report.Warnings), len(report.Fallbacks), report.KeptOld)
+	for _, probe := range report.Probes {
+		if !probe.OK() {
+			fmt.Fprintf(a.out, "  probe failed: %s %s (expected %q, found %d)\n", probe.Source, probe.Selector, probe.Expected, probe.Found)
+			a.issues++
+		}
+	}
+	for _, warning := range report.Warnings {
+		fmt.Fprintln(a.out, "  warning:", warning)
+		a.issues++
+	}
+	for _, fallback := range report.Fallbacks {
+		fmt.Fprintln(a.out, "  fallback:", fallback)
+	}
+	if report.KeptOld {
+		fmt.Fprintln(a.out, "  kept previous cache entry")
+		a.issues++
+	}
+}
+
+// Issues is the number of findings that make the dump unhealthy.
+func (a *reportAudit) Issues() int {
+	return a.issues
+}
+
+func (a *reportAudit) fail() {
+	a.issues++
+}
+
+func (a *reportAudit) add(count int) {
+	a.issues += count
+}
+
+// callsProblems lists the reasons an active bell schedule cannot be used.
+func callsProblems(schedule cache.CallsSchedule) []string {
+	var problems []string
+	if len(schedule.Weekdays) == 0 || len(schedule.Saturday) == 0 {
+		problems = append(problems, "active calls schedule is empty")
+	}
+	for i, slot := range schedule.Weekdays {
+		if slot[0][0] == "" || slot[1][1] == "" {
+			problems = append(problems, fmt.Sprintf("weekday slot %d has empty bounds", i))
+		}
+	}
+	return problems
 }
