@@ -161,7 +161,7 @@ func (b *Bot) parseWeekIndex(text string) *utils.WeekIndex {
 		return nil
 	}
 
-	date := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.Local)
+	date := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, utils.SiteLocation)
 	wi := utils.WeekIndexFromDate(date)
 	return &wi
 }

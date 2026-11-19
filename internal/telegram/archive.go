@@ -71,7 +71,7 @@ func (c *archiveCmd) showDay(ctx context.Context, u *Update, chat *Chat, raw str
 		return u.Bot.SendText(u.ChatID, c.bot.loc("archtext_7"))
 	}
 
-	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local)
+	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, utils.SiteLocation)
 	index := int64(utils.DayIndexFromDate(date))
 
 	bounds, err := c.bot.archive.DayIndexBounds(ctx)

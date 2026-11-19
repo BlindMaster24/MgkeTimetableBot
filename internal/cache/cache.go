@@ -258,7 +258,7 @@ func (c *RaspCache) SetTeachers(ctx context.Context, teachers map[string]any, ha
 }
 
 func (c *RaspCache) setTimetable(kind string, old map[string]any, data map[string]any, previousWeekIndex int) (map[string]any, int, bool) {
-	todayIdx := utils.DayIndexFromDate(time.Now())
+	todayIdx := utils.DayIndexFromDate(utils.SiteNow())
 
 	var newEvents []Event
 	var newChanges []DayChange

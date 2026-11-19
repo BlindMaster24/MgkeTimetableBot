@@ -762,7 +762,7 @@ func TestNotificationTimeIsInterpretedInTheEvaluationZone(t *testing.T) {
 	}
 }
 
-func TestSchedulerBindsTheCronToTheProcessTimezone(t *testing.T) {
+func TestSchedulerBindsTheCronToTheCollegeTimezone(t *testing.T) {
 	c, err := cache.New(t.TempDir())
 	if err != nil {
 		t.Fatalf("cache: %v", err)
@@ -772,8 +772,8 @@ func TestSchedulerBindsTheCronToTheProcessTimezone(t *testing.T) {
 
 	s := NewScheduler(cfg, c, logger.New("error", nil), &mockEventSender{}, &mockEventChatFinder{}, nil, nil)
 
-	if s.Location() != time.Local {
-		t.Errorf("the scheduler must follow the process zone, got %v", s.Location())
+	if s.Location() != utils.SiteLocation {
+		t.Errorf("the scheduler must follow the college zone, got %v", s.Location())
 	}
 }
 

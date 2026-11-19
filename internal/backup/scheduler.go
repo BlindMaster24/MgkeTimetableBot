@@ -1,8 +1,8 @@
 package backup
 
 import (
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"strings"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/robfig/cron/v3"
@@ -18,7 +18,7 @@ type Scheduler struct {
 
 func NewScheduler(schedule string, log *logger.Logger, task func()) *Scheduler {
 	return &Scheduler{
-		cron:     cron.New(cron.WithSeconds(), cron.WithLocation(time.Local)),
+		cron:     cron.New(cron.WithSeconds(), cron.WithLocation(utils.SiteLocation)),
 		log:      log,
 		schedule: strings.TrimSpace(schedule),
 		task:     task,

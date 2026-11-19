@@ -2,6 +2,7 @@ package notification
 
 import (
 	"fmt"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"math/rand"
 	"strings"
 	"time"
@@ -32,8 +33,8 @@ type Scheduler struct {
 
 func NewScheduler(cfg *config.Config, c *cache.RaspCache, log *logger.Logger, sender EventSender, chats EventChatFinder, tracker *health.Tracker, store health.StateStore) *Scheduler {
 	return &Scheduler{
-		cron:          cron.New(cron.WithSeconds(), cron.WithLocation(time.Local)),
-		location:      time.Local,
+		cron:          cron.New(cron.WithSeconds(), cron.WithLocation(utils.SiteLocation)),
+		location:      utils.SiteLocation,
 		cfg:           cfg,
 		cache:         c,
 		log:           log,

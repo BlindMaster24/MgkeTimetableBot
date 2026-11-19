@@ -124,7 +124,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 }
 
 func pickFutureDay(days []map[string]any) map[string]any {
-	todayIdx := utils.DayIndexFromDate(time.Now())
+	todayIdx := utils.DayIndexFromDate(utils.SiteNow())
 	for _, day := range days {
 		dateStr, _ := day["day"].(string)
 		t, err := time.Parse("02.01.2006", dateStr)
@@ -148,7 +148,7 @@ func (b *Bot) subscriptionDayPhrase(day string) string {
 	}
 
 	dayIdx := utils.DayIndexFromDate(t)
-	todayIdx := utils.DayIndexFromDate(time.Now())
+	todayIdx := utils.DayIndexFromDate(utils.SiteNow())
 	if dayIdx == todayIdx {
 		return b.loc("subtest_13")
 	}

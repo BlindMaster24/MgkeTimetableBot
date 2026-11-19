@@ -6,6 +6,23 @@ import (
 
 var startingWeekIndexDate = time.Date(1970, 1, 5, 0, 0, 0, 0, time.UTC)
 
+// SiteLocation is the time zone the timetable lives in. The bot's clock may
+// run in UTC while the college lives in Moscow, so anything that turns "now"
+// into a calendar day must use this location instead of time.Local.
+var SiteLocation = loadSiteLocation()
+
+// SiteNow is the current moment in SiteLocation.
+func SiteNow() time.Time {
+	return time.Now().In(SiteLocation)
+}
+
+func loadSiteLocation() *time.Location {
+	if loc, err := time.LoadLocation("Europe/Moscow"); err == nil {
+		return loc
+	}
+	return time.FixedZone("Europe/Moscow", 3*60*60)
+}
+
 func dayNumber(date time.Time) int64 {
 	year, month, day := date.Date()
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC).UnixMilli() / oneDayMs
@@ -22,10 +39,9 @@ type WeekIndex struct {
 
 func WeekIndexFromDate(date time.Time) WeekIndex {
 	year, month, dayOfMonth := date.Date()
+	// A Monday-start index already keeps Sunday inside its own week (it is the
+	// sixth day), so the weekday itself needs no adjustment.
 	day := time.Date(year, month, dayOfMonth, 0, 0, 0, 0, time.UTC)
-	if day.Weekday() == time.Sunday {
-		day = day.AddDate(0, 0, -1)
-	}
 	days := dayNumber(day) - dayNumber(startingWeekIndexDate)
 	return WeekIndex{value: int(days / 7)}
 }
@@ -69,7 +85,7 @@ func (w WeekIndex) Next() WeekIndex {
 }
 
 func (w WeekIndex) IsFutureWeek() bool {
-	return w.value > WeekIndexFromDate(time.Now()).Value()
+	return w.value > WeekIndexFromDate(SiteNow()).Value()
 }
 
 func (w WeekIndex) String() string {
