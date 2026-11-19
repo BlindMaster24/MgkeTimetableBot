@@ -132,7 +132,7 @@ func TestEndingsCountsOnlyTheNearestDayOfEachGroup(t *testing.T) {
 func TestBrovkaExportsAWindows1251Csv(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeTeacher, "", "Иванов И.И.")
 
-	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "teacher", "Иванов И.И.", start, map[string]any{
 		"lesson": "Матем", "type": "лек", "group": "100", "cabinet": "101",

@@ -209,8 +209,8 @@ func runArchive(t *testing.T, b *Bot, userID int64, text string) {
 func TestArchiveCommandRendersAWeek(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeStudent, "100", "")
 
-	academicNumber := utils.WeekIndexFromDate(time.Now()).AcademicWeekNumber()
-	week := utils.WeekIndexFromAcademicNumber(academicNumber, time.Now())
+	academicNumber := utils.WeekIndexFromDate(utils.SiteNow()).AcademicWeekNumber()
+	week := utils.WeekIndexFromAcademicNumber(academicNumber, utils.SiteNow())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "group", "100", start, groupLesson("АрхивнаяМатематика"))
 
@@ -228,7 +228,7 @@ func TestArchiveCommandRendersAWeek(t *testing.T) {
 func TestArchiveCommandRendersASingleDay(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeStudent, "100", "")
 
-	day, _ := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value() - 2).WeekRange()
+	day, _ := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value() - 2).WeekRange()
 	seedArchivedDay(t, archiveRepo, "group", "100", day, groupLesson("ДеньИзАрхива"))
 
 	runArchive(t, b, userID, "/archive "+day.Format("02.01.2006"))
@@ -245,7 +245,7 @@ func TestArchiveCommandRendersASingleDay(t *testing.T) {
 func TestArchiveCommandRendersTeacherDays(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeTeacher, "", "Иванов И.И.")
 
-	day, _ := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value() - 2).WeekRange()
+	day, _ := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value() - 2).WeekRange()
 	seedArchivedDay(t, archiveRepo, "teacher", "Иванов И.И.", day, map[string]any{
 		"lesson": "ПараУчителя", "type": "Лек", "group": "100", "cabinet": "101",
 	})
@@ -283,7 +283,7 @@ func TestArchiveCommandInputErrors(t *testing.T) {
 func TestArchiveCommandRendersAGroupWeekFromTheArchive(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeParent, "100", "")
 
-	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "group", "100", start, groupLesson("АрхивнаяНеделя"))
 
@@ -297,7 +297,7 @@ func TestArchiveCommandRendersAGroupWeekFromTheArchive(t *testing.T) {
 func TestTeacherWeekFlowAsksForTheWeek(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeTeacher, "", "")
 
-	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "teacher", "Иванов И.И.", start, map[string]any{
 		"lesson": "ПараНедели", "type": "Лек", "group": "100", "cabinet": "101",

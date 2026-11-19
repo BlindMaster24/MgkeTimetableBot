@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -179,7 +180,7 @@ func findCheck(t *testing.T, report Report, name string) Check {
 }
 
 func todayPlus(days int) string {
-	return time.Now().AddDate(0, 0, days).Format("02.01.2006")
+	return utils.SiteNow().AddDate(0, 0, days).Format("02.01.2006")
 }
 
 func TestRun_LiveSiteChecks(t *testing.T) {

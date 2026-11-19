@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
@@ -13,7 +12,7 @@ import (
 func TestStatsCountsEverySubgroupEntryOnce(t *testing.T) {
 	b, caller, repo, userID := setupArchiveBot(t, ModeStudent, "100", "")
 
-	day := time.Now().AddDate(0, 0, -7)
+	day := utils.SiteNow().AddDate(0, 0, -7)
 	lessons := []any{
 		[]any{
 			map[string]any{"lesson": "Матем", "subgroup": float64(1)},
@@ -49,7 +48,7 @@ func TestStatsCountsEverySubgroupEntryOnce(t *testing.T) {
 func TestStatsTeacherCountsLessons(t *testing.T) {
 	b, caller, repo, userID := setupArchiveBot(t, ModeTeacher, "", "Иванов И.И.")
 
-	day := time.Now().AddDate(0, 0, -7)
+	day := utils.SiteNow().AddDate(0, 0, -7)
 	seedArchivedDay(t, repo, "teacher", "Иванов И.И.", day, map[string]any{
 		"lesson": "Матем", "group": "100", "cabinet": "101",
 	})

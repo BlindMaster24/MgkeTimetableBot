@@ -26,7 +26,7 @@ func TestReminderFixturesReadTheClockOnlyInTheirAnchor(t *testing.T) {
 
 	anchored := false
 	for number, line := range lines {
-		if !strings.Contains(line, "time.Now(") {
+		if !strings.Contains(line, "time.Now(") && !strings.Contains(line, "utils.SiteNow(") {
 			continue
 		}
 		if number >= start && number <= end {

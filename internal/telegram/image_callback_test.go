@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
@@ -22,7 +21,7 @@ func imageCallbackUpdate(bot *Bot, userID int64, messageID int, data string) *Up
 func weeklyArchiveDays(t *testing.T, repo *archive.Repository) string {
 	t.Helper()
 
-	week := utils.WeekIndexFromDate(time.Now())
+	week := utils.WeekIndexFromDate(utils.SiteNow())
 	minIdx, _ := week.WeekDayIndexRange()
 	day := utils.DayIndexToDate(minIdx).Format("02.01.2006")
 

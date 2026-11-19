@@ -10,6 +10,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/reminder"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
 func reminderSlot(start, end time.Time) [2][2]string {
@@ -17,7 +18,7 @@ func reminderSlot(start, end time.Time) [2][2]string {
 }
 
 func reminderMoment() time.Time {
-	now := time.Now()
+	now := utils.SiteNow()
 	for now.Weekday() == time.Saturday || now.Weekday() == time.Sunday {
 		now = now.AddDate(0, 0, 1)
 	}

@@ -69,7 +69,7 @@ func TestNextWeekNoticeReachesTheSubscribedChats(t *testing.T) {
 
 	notifier := noticeNotifier(b, repo)
 
-	current := utils.WeekIndexFromDate(time.Now())
+	current := utils.WeekIndexFromDate(utils.SiteNow())
 	next := current.Next()
 	currentDay := current.FirstDayDate().Format("02.01.2006")
 	nextDay := next.FirstDayDate().Format("02.01.2006")
@@ -116,7 +116,7 @@ func TestTriggerRunsTheDayNoticeThroughTheWiredFunction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	today := time.Now()
+	today := utils.SiteNow()
 	tomorrow := today.AddDate(0, 0, 1)
 	b.cache.SetGroups(t.Context(), map[string]any{"100": groupDays("100",
 		lessonDay(today.Format("02.01.2006"), "Математика", "Физика", "Информатика"),

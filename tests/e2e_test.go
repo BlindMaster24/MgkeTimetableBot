@@ -2,6 +2,7 @@ package tests
 
 import (
 	"errors"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"strings"
 	"testing"
 	"time"
@@ -155,7 +156,7 @@ func TestE2E_ChangedDayReachesOnlyInterestedChats(t *testing.T) {
 	finder := &repoChatFinder{repo: repo}
 	notifier := notification.NewEventNotifier(raspCache, &config.Config{}, logger.New("error", nil), sender, finder)
 
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	tomorrow := utils.SiteNow().AddDate(0, 0, 1).Format("02.01.2006")
 
 	raspCache.SetGroups(t.Context(), map[string]any{
 		"100": groupEntry(groupDay(tomorrow, "Математика")),

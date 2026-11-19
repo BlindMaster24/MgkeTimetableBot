@@ -215,7 +215,7 @@ func notificationScenarios() []messageScenario {
 					"63": map[string]any{"days": []any{goldenDay(1)}},
 					"77": map[string]any{"days": []any{goldenDay(1)}},
 				}, "golden")
-				n.UpdateWeek(cache.KindGroups, testgolden.RelevantWeek(time.Now()).Value())
+				n.UpdateWeek(cache.KindGroups, testgolden.RelevantWeek(utils.SiteNow()).Value())
 			},
 		},
 		{
@@ -229,7 +229,7 @@ func notificationScenarios() []messageScenario {
 					Group:          "63",
 					NoticeNextWeek: true,
 				}}
-				n.WithdrawWeek(cache.KindGroups, testgolden.RelevantWeek(time.Now()).Value(), []string{"63"})
+				n.WithdrawWeek(cache.KindGroups, testgolden.RelevantWeek(utils.SiteNow()).Value(), []string{"63"})
 			},
 		},
 		{

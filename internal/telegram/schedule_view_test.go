@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"strings"
 	"testing"
 	"time"
@@ -15,8 +16,8 @@ func seedDayViewBot(t *testing.T) (*Bot, *recordingCaller) {
 	caller := &recordingCaller{}
 	b, repo := setupE2EBotWithCaller(t, caller, 4242)
 
-	today := time.Now().Format("02.01.2006")
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
+	tomorrow := utils.SiteNow().AddDate(0, 0, 1).Format("02.01.2006")
 
 	groups := map[string]any{
 		"777": e2eJsonRoundTrip(map[string]any{

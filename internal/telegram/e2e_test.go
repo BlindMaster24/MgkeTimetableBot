@@ -661,7 +661,7 @@ func TestE2E_CurrentSettings(t *testing.T) {
 
 func TestE2E_WeekControlKeyboard(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	currentWeek := utils.WeekIndexFromDate(time.Now())
+	currentWeek := utils.WeekIndexFromDate(utils.SiteNow())
 	kb := b.weekControlKeyboard(context.Background(), "group", "100", currentWeek.Value(), true)
 	texts := flattenKeyboardTexts(kb)
 
@@ -681,7 +681,7 @@ func TestE2E_WeekControlKeyboard(t *testing.T) {
 
 func TestE2E_AcademicWeekLabel(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	week := utils.WeekIndexFromDate(time.Now())
+	week := utils.WeekIndexFromDate(utils.SiteNow())
 	label := b.buildWeekLabelFromWeek(week)
 	if !strings.Contains(label, "Учебная неделя №") {
 		t.Errorf("week label missing academic number: %q", label)
@@ -1211,7 +1211,7 @@ func TestE2E_GetWeekTimetableKeyboard(t *testing.T) {
 
 func TestE2E_WeekControlKeyboardPrefix(t *testing.T) {
 	b, _ := setupE2EBot(t)
-	kb := b.weekControlKeyboard(context.Background(), "group", "100", utils.WeekIndexFromDate(time.Now()).Value(), false)
+	kb := b.weekControlKeyboard(context.Background(), "group", "100", utils.WeekIndexFromDate(utils.SiteNow()).Value(), false)
 
 	for _, row := range kb.InlineKeyboard {
 		for _, btn := range row {
@@ -1393,7 +1393,7 @@ func TestE2E_TimetableCallbackReadsArchive(t *testing.T) {
 	}
 	b.archive = archiveRepo
 
-	currentWeek := utils.WeekIndexFromDate(time.Now()).Value()
+	currentWeek := utils.WeekIndexFromDate(utils.SiteNow()).Value()
 	pastWeek := currentWeek - 3
 	futureWeek := currentWeek + 3
 

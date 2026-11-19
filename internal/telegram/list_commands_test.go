@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
@@ -34,7 +33,7 @@ func TestTeachersListingShowsFullNamesAndPageTimestamps(t *testing.T) {
 	rasp := b.GetRaspCache()
 	rasp.SetTeam(t.Context(), map[string]string{"Иванов И.И.": "Иванов Иван Иванович"}, []string{"hash"})
 
-	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "teacher", "Иванов И.И.", start, map[string]any{"lesson": "Пара", "group": "100"})
 	seedArchivedDay(t, archiveRepo, "teacher", "Петров П.П.", start, map[string]any{"lesson": "Пара", "group": "100"})
@@ -60,7 +59,7 @@ func TestTeachersListingShowsFullNamesAndPageTimestamps(t *testing.T) {
 func TestGroupsListingUsesTheArchiveAndFallsBackToTheCache(t *testing.T) {
 	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeStudent, "100", "")
 
-	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(time.Now()).Value())
+	week := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value())
 	start, _ := week.WeekRange()
 	seedArchivedDay(t, archiveRepo, "group", "100", start, groupLesson("Пара"))
 
