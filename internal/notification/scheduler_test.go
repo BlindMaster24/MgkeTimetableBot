@@ -91,11 +91,11 @@ func newTestNotifier(t *testing.T) (*EventNotifier, *mockEventSender, *mockEvent
 }
 
 func todayStr() string {
-	return time.Now().Format("02.01.2006")
+	return utils.SiteNow().Format("02.01.2006")
 }
 
 func tomorrowStr() string {
-	return time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+	return utils.SiteNow().AddDate(0, 0, 1).Format("02.01.2006")
 }
 
 func futureWeekStr() string {

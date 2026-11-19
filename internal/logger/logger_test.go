@@ -90,7 +90,17 @@ func TestLoggerInvalidLevel(t *testing.T) {
 }
 
 func TestRotatedLogsAreCompressed(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "bot.log")
+	// A manual directory: lumberjack compresses a rotated file in the
+	// background, and t.TempDir would fail its cleanup on the late write.
+	dir, err := os.MkdirTemp("", "logger-rotation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = os.RemoveAll(dir)
+	})
+	path := filepath.Join(dir, "bot.log")
 	log := New("info", &FileConfig{Enabled: true, Path: path, MaxSizeMB: 1, MaxFiles: 2})
 	defer log.Close()
 

@@ -25,6 +25,7 @@ import (
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 	parserpkg "github.com/blindmaster24/MgkeTimetableBot/internal/parser"
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
 // runtime carries the objects one bot process wires together. The steps live
@@ -63,6 +64,9 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 		return 1
 	}
 
+	// The timetable lives in the college's zone; pin it before any
+	// scheduler or day calculation reads the clock.
+	utils.SiteLocation = cfg.Location()
 	fmt.Printf("config loaded: %s\n", cfgPath)
 
 	fileCfg := &logger.FileConfig{}

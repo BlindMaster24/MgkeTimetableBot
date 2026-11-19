@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"image/color"
 	"image/png"
 	"os"
@@ -64,7 +65,7 @@ func (r *Renderer) clock() time.Time {
 	if r.now != nil {
 		return r.now()
 	}
-	return time.Now()
+	return utils.SiteNow()
 }
 
 type Column struct {

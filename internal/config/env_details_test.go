@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseBoolUnderstandsEverySpelling(t *testing.T) {
@@ -114,5 +115,38 @@ func TestHasEnvBelowWalksStructsAndPointers(t *testing.T) {
 	}
 	if hasEnvBelow(typ, "APP", lookup("OTHER")) {
 		t.Error("an unknown prefix must not match")
+	}
+}
+
+func TestTimezoneDefaultsToMoscowAndValidatesItsName(t *testing.T) {
+	cfg := &Config{}
+	if got := cfg.ResolvedTimezone(); got != DefaultTimezone {
+		t.Fatalf("ResolvedTimezone = %q, want %q", got, DefaultTimezone)
+	}
+	if loc := cfg.Location(); loc.String() != DefaultTimezone {
+		t.Fatalf("Location = %q, want %q", loc, DefaultTimezone)
+	}
+	if _, offset := time.Date(2026, 9, 7, 12, 0, 0, 0, cfg.Location()).Zone(); offset != 3*60*60 {
+		t.Fatalf("Moscow offset = %d, want three hours", offset)
+	}
+
+	cfg.Timezone = " Asia/Novosibirsk "
+	if got := cfg.ResolvedTimezone(); got != "Asia/Novosibirsk" {
+		t.Fatalf("ResolvedTimezone = %q, want the trimmed name", got)
+	}
+
+	cfg.Timezone = "Mars/Olympus"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "timezone must be an IANA zone name") {
+		t.Fatalf("an unknown zone must be rejected, got %v", err)
+	}
+
+	cfg.Timezone = "UTC"
+	cfg.HTTP.Port = 8080
+	cfg.Telegram.Token = "token"
+	cfg.DBPath = "archive.db"
+	cfg.ChatDBPath = "chat.db"
+	cfg.CacheDir = "cache"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("UTC must be accepted: %v", err)
 	}
 }

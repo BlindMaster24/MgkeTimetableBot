@@ -1,9 +1,9 @@
 package notification
 
 import (
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
@@ -47,7 +47,7 @@ func TestIntegration_TwoDayParseSequence(t *testing.T) {
 	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
 
 	tomorrow := tomorrowStr()
-	tomorrowAfter := time.Now().AddDate(0, 0, 2).Format("02.01.2006")
+	tomorrowAfter := utils.SiteNow().AddDate(0, 0, 2).Format("02.01.2006")
 
 	firstParse := map[string]any{
 		"63": entryWithDays(

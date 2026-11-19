@@ -2,6 +2,7 @@ package formatter
 
 import (
 	"encoding/json"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,9 +11,9 @@ import (
 )
 
 func makeTestDaysData() []any {
-	today := time.Now().Format("02.01.2006")
-	tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
-	nextWeek := time.Now().AddDate(0, 0, 7).Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
+	tomorrow := utils.SiteNow().AddDate(0, 0, 1).Format("02.01.2006")
+	nextWeek := utils.SiteNow().AddDate(0, 0, 7).Format("02.01.2006")
 
 	return []any{
 		map[string]any{
@@ -40,7 +41,7 @@ func makeDataWithDays(days []any) map[string]any {
 }
 
 func makeSingleLessonData() map[string]any {
-	today := time.Now().Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
 	return map[string]any{
 		"days": []any{
 			map[string]any{
@@ -54,7 +55,7 @@ func makeSingleLessonData() map[string]any {
 }
 
 func makeSubgroupData() map[string]any {
-	today := time.Now().Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
 	return map[string]any{
 		"days": []any{
 			map[string]any{
@@ -147,7 +148,7 @@ func TestDefaultFormatter_GroupDay(t *testing.T) {
 }
 
 func makeTeacherDaysData() map[string]any {
-	today := time.Now().Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
 	return map[string]any{
 		"days": []any{
 			map[string]any{
@@ -232,7 +233,7 @@ func TestLitolaxFormatter_GroupDay(t *testing.T) {
 
 func TestDayHintsToday(t *testing.T) {
 	for _, f := range AllFormatters {
-		today := time.Now().Format("02.01.2006")
+		today := utils.SiteNow().Format("02.01.2006")
 		data := map[string]any{
 			"days": []any{
 				map[string]any{"day": today, "lessons": []any{map[string]any{"lesson": "Тест", "cabinet": "1"}}},
@@ -250,7 +251,7 @@ func TestDayHintsToday(t *testing.T) {
 
 func TestDayHintsTomorrow(t *testing.T) {
 	for _, f := range AllFormatters {
-		tomorrow := time.Now().AddDate(0, 0, 1).Format("02.01.2006")
+		tomorrow := utils.SiteNow().AddDate(0, 0, 1).Format("02.01.2006")
 		data := map[string]any{
 			"days": []any{
 				map[string]any{"day": tomorrow, "lessons": []any{map[string]any{"lesson": "Тест", "cabinet": "1"}}},
@@ -515,7 +516,7 @@ func TestFormatSeconds(t *testing.T) {
 func TestSubgroupLayoutMatchesTheOldBot(t *testing.T) {
 	day := func(lessons []any) []map[string]any {
 		return extractDaysFromData(map[string]any{
-			"days": []any{map[string]any{"day": time.Now().Format("02.01.2006"), "lessons": lessons}},
+			"days": []any{map[string]any{"day": utils.SiteNow().Format("02.01.2006"), "lessons": lessons}},
 		})
 	}
 

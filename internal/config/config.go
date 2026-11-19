@@ -72,6 +72,7 @@ type Config struct {
 	DBPath     string `yaml:"db_path" env:"DB_PATH"`
 	ChatDBPath string `yaml:"chat_db_path"`
 	CacheDir   string `yaml:"cache_dir"`
+	Timezone   string `yaml:"timezone"`
 
 	Logging struct {
 		Level  string `yaml:"level" env:"LOG_LEVEL"`
@@ -264,6 +265,28 @@ func (c *Config) RetentionEnabled() bool {
 
 func (c *Config) MaintenanceEnabled() bool {
 	return c.BackupEnabled() || c.RetentionEnabled()
+}
+
+// DefaultTimezone is the college's zone; the timetable is meaningless in any
+// other one, so the bot never falls back to the server clock.
+const DefaultTimezone = "Europe/Moscow"
+
+// ResolvedTimezone is the configured zone or DefaultTimezone.
+func (c *Config) ResolvedTimezone() string {
+	if c == nil {
+		return DefaultTimezone
+	}
+	return pathOr(strings.TrimSpace(c.Timezone), DefaultTimezone)
+}
+
+// Location loads the resolved zone, falling back to a fixed Moscow offset
+// when the system has no tzdata.
+func (c *Config) Location() *time.Location {
+	name := c.ResolvedTimezone()
+	if loc, err := time.LoadLocation(name); err == nil {
+		return loc
+	}
+	return time.FixedZone(name, 3*60*60)
 }
 
 func (c *Config) ResolvedStampFormat() string {

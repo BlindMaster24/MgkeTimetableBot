@@ -2,6 +2,7 @@ package formatter
 
 import (
 	"fmt"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"math"
 	"strings"
 	"time"
@@ -47,7 +48,7 @@ func (o FormatOptions) now() time.Time {
 	if !o.Now.IsZero() {
 		return o.Now
 	}
-	return time.Now()
+	return utils.SiteNow()
 }
 
 var labelKeys = []string{

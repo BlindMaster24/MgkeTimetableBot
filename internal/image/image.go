@@ -2,6 +2,7 @@ package image
 
 import (
 	"fmt"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func RenderTeacherDays(teacher string, dayMaps []map[string]any, outputDir strin
 }
 
 func daysFromMaps(dayMaps []map[string]any, isGroup bool, texts Texts) []DayData {
-	now := time.Now()
+	now := utils.SiteNow()
 	today := now.Format("02.01.2006")
 	tomorrow := now.AddDate(0, 0, 1).Format("02.01.2006")
 

@@ -118,6 +118,7 @@ Everything lives in `configs/config.yaml` (template: `configs/config.example.yam
 | `db_path` | SQLite file with the timetable archive (default `./timetable_archive.db`); a `./sqlite3.db` left by an older version is adopted automatically while the new file does not exist |
 | `chat_db_path` | SQLite file with chats, aliases, subscriptions and Google accounts (default `./bot_chats.db`) |
 | `cache_dir` | Directory of the file-backed timetable cache (default `./cache/rasp`) |
+| `timezone` | IANA zone of the college (default `Europe/Moscow`): "today", the week number and the cron schedule are all computed in it, so the bot keeps the right day even when the server clock runs in UTC |
 | `logging` | Level, log file, rotation settings |
 | `http` | HTTP port of the server (API and Google OAuth) |
 | `telegram` | Bot token, the Bot API base URL (`telegram.api_base_url`), admin IDs, the `noticer` flag, the update delivery mode (`telegram.webhook`) |

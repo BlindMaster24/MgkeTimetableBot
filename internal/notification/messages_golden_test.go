@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -84,7 +85,7 @@ func renderScenario(t *testing.T, scenario messageScenario) string {
 	n, sender, finder, _ := newTestNotifier(t)
 	scenario.run(t, n, sender, finder)
 
-	now := time.Now()
+	now := utils.SiteNow()
 	week := testgolden.RelevantWeek(now).Value()
 
 	var b strings.Builder
@@ -104,7 +105,7 @@ func renderScenario(t *testing.T, scenario messageScenario) string {
 
 func goldenDay(offset int) map[string]any {
 	return map[string]any{
-		"day": time.Now().AddDate(0, 0, offset).Format("02.01.2006"),
+		"day": utils.SiteNow().AddDate(0, 0, offset).Format("02.01.2006"),
 		"lessons": []any{
 			map[string]any{"lesson": "Математика", "type": "Лек", "teacher": "Иванов И.И.", "cabinet": "101"},
 			map[string]any{"lesson": "Физика", "type": "ЛР", "teacher": "Петров П.П.", "cabinet": "202"},
@@ -114,7 +115,7 @@ func goldenDay(offset int) map[string]any {
 
 func goldenTeacherDay(offset int) map[string]any {
 	return map[string]any{
-		"day": time.Now().AddDate(0, 0, offset).Format("02.01.2006"),
+		"day": utils.SiteNow().AddDate(0, 0, offset).Format("02.01.2006"),
 		"lessons": []any{
 			map[string]any{"lesson": "Математика", "type": "Лек", "group": "63", "cabinet": "101"},
 			map[string]any{"lesson": "Физика", "type": "ЛР", "group": "77", "cabinet": "202"},
@@ -263,7 +264,7 @@ func notificationScenarios() []messageScenario {
 				n.cfg.Parser.LessonIndexIfEmpty = 2
 				n.cache.SetGroups(t.Context(), map[string]any{
 					"63": map[string]any{"days": []any{
-						map[string]any{"day": time.Now().Format("02.01.2006"), "lessons": []any{
+						map[string]any{"day": utils.SiteNow().Format("02.01.2006"), "lessons": []any{
 							map[string]any{"lesson": "Математика", "type": "Лек", "cabinet": "101"},
 							map[string]any{"lesson": "Физика", "type": "ЛР", "cabinet": "202"},
 						}},
