@@ -192,6 +192,21 @@ func TestGuardTripsOnlyAboveTheConfiguredLimits(t *testing.T) {
 	if invalid != guard {
 		t.Errorf("invalid thresholds must fall back to the defaults: %+v", invalid)
 	}
+
+	// The boundaries are the interesting ones: one item and one percent are
+	// valid, zero and a hundred are not.
+	if got := (Guard{MinItems: 1, MaxDropPercent: 1}).WithDefaults(); got.MinItems != 1 || got.MaxDropPercent != 1 {
+		t.Errorf("the smallest valid thresholds must survive: %+v", got)
+	}
+	if got := (Guard{MinItems: 0, MaxDropPercent: 0}).WithDefaults(); got != guard {
+		t.Errorf("zero thresholds must fall back to the defaults: %+v", got)
+	}
+	if got := (Guard{MaxDropPercent: 100}).WithDefaults(); got != guard {
+		t.Errorf("a hundred percent must fall back to the default: %+v", got)
+	}
+	if got := (Guard{MaxDropPercent: 99}).WithDefaults(); got.MaxDropPercent != 99 {
+		t.Errorf("ninety nine percent must survive: %+v", got)
+	}
 }
 
 func TestFetcherGuardHonoursTheConfiguredDropLimit(t *testing.T) {
