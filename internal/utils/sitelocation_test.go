@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-func TestSiteLocationIsMoscow(t *testing.T) {
-	if name := SiteLocation.String(); name != "Europe/Moscow" {
-		t.Fatalf("SiteLocation = %q, want Europe/Moscow", name)
+func TestSiteLocationIsMinsk(t *testing.T) {
+	if name := SiteLocation.String(); name != "Europe/Minsk" {
+		t.Fatalf("SiteLocation = %q, want Europe/Minsk", name)
 	}
 	_, offset := time.Date(2026, 9, 7, 12, 0, 0, 0, SiteLocation).Zone()
 	if offset != 3*60*60 {
@@ -27,7 +27,7 @@ func TestSiteNowFollowsTheCollegeClock(t *testing.T) {
 
 // TestSiteNowKeepsLateSundayOutOfThePreviousWeek documents the bug the old
 // bot's users hit: a server clock in UTC on Sunday evening is already Monday
-// in Moscow, so the previous day's math put the coming Monday into the
+// in Minsk, so the previous day's math put the coming Monday into the
 // finished week.
 func TestSiteNowKeepsLateSundayOutOfThePreviousWeek(t *testing.T) {
 	utcSundayEvening := time.Date(2026, 11, 15, 22, 0, 0, 0, time.UTC)
@@ -37,10 +37,10 @@ func TestSiteNowKeepsLateSundayOutOfThePreviousWeek(t *testing.T) {
 		t.Fatalf("fixture drift: %v / %v", utcSundayEvening.Weekday(), mondayMorning.Weekday())
 	}
 	if DayIndexFromDate(utcSundayEvening) >= DayIndexFromDate(mondayMorning) {
-		t.Fatal("the Moscow morning must be a later calendar day")
+		t.Fatal("the Minsk morning must be a later calendar day")
 	}
 	if WeekIndexFromDate(utcSundayEvening).Value() >= WeekIndexFromDate(mondayMorning).Value() {
-		t.Fatalf("the UTC day belongs to the finished week, Moscow already to the next one: %d vs %d",
+		t.Fatalf("the UTC day belongs to the finished week, Minsk already to the next one: %d vs %d",
 			WeekIndexFromDate(utcSundayEvening).Value(), WeekIndexFromDate(mondayMorning).Value())
 	}
 }

@@ -16,10 +16,10 @@ import (
 const (
 	dateLayout   = "02.01.2006"
 	clockLayout  = "15:04"
-	timeZoneName = "Europe/Moscow"
+	timeZoneName = "Europe/Minsk"
 )
 
-var moscow = time.FixedZone(timeZoneName, 3*60*60)
+var minsk = time.FixedZone(timeZoneName, 3*60*60)
 
 type CalendarService struct {
 	cfg *config.Config
@@ -93,7 +93,7 @@ func (s *CalendarService) SyncDay(ctx context.Context, calendarID string, date s
 		return err
 	}
 
-	day, err := time.ParseInLocation(dateLayout, date, moscow)
+	day, err := time.ParseInLocation(dateLayout, date, minsk)
 	if err != nil {
 		return fmt.Errorf("parse date %s: %w", date, err)
 	}
@@ -189,7 +189,7 @@ func parseClock(day time.Time, value string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("parse time %s: %w", value, err)
 	}
-	return time.Date(day.Year(), day.Month(), day.Day(), parsed.Hour(), parsed.Minute(), 0, 0, moscow), nil
+	return time.Date(day.Year(), day.Month(), day.Day(), parsed.Hour(), parsed.Minute(), 0, 0, minsk), nil
 }
 
 func buildEvent(lesson DayLesson, start, end time.Time) *calendar.Event {

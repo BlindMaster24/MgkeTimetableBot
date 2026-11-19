@@ -32,7 +32,7 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("chat_db_path must not be empty"))
 	}
 	if _, err := time.LoadLocation(c.ResolvedTimezone()); err != nil {
-		errs = append(errs, fmt.Errorf("timezone must be an IANA zone name such as Europe/Moscow, got %q", c.ResolvedTimezone()))
+		errs = append(errs, fmt.Errorf("timezone must be an IANA zone name such as Europe/Minsk, got %q", c.ResolvedTimezone()))
 	}
 	if strings.TrimSpace(c.ResolvedCacheDir()) == "" {
 		errs = append(errs, errors.New("cache_dir must not be empty"))

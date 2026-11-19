@@ -269,7 +269,7 @@ func (c *Config) MaintenanceEnabled() bool {
 
 // DefaultTimezone is the college's zone; the timetable is meaningless in any
 // other one, so the bot never falls back to the server clock.
-const DefaultTimezone = "Europe/Moscow"
+const DefaultTimezone = "Europe/Minsk"
 
 // ResolvedTimezone is the configured zone or DefaultTimezone.
 func (c *Config) ResolvedTimezone() string {
@@ -279,7 +279,7 @@ func (c *Config) ResolvedTimezone() string {
 	return pathOr(strings.TrimSpace(c.Timezone), DefaultTimezone)
 }
 
-// Location loads the resolved zone, falling back to a fixed Moscow offset
+// Location loads the resolved zone, falling back to a fixed Minsk offset
 // when the system has no tzdata.
 func (c *Config) Location() *time.Location {
 	name := c.ResolvedTimezone()

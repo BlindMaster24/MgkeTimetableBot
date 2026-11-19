@@ -157,7 +157,7 @@ func spanStrings(spans []eventSpan) []string {
 }
 
 func TestLessonTimeSpansUseBellSchedule(t *testing.T) {
-	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, moscow)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, minsk)
 
 	spans, err := lessonTimeSpans(callsSchedule(), day, 0)
 	if err != nil {
@@ -181,7 +181,7 @@ func TestLessonTimeSpansUseBellSchedule(t *testing.T) {
 }
 
 func TestLessonTimeSpansSaturday(t *testing.T) {
-	saturday := time.Date(2026, time.September, 19, 0, 0, 0, 0, moscow)
+	saturday := time.Date(2026, time.September, 19, 0, 0, 0, 0, minsk)
 	spans, err := lessonTimeSpans(callsSchedule(), saturday, 0)
 	if err != nil {
 		t.Fatalf("lessonTimeSpans: %v", err)
@@ -194,7 +194,7 @@ func TestLessonTimeSpansSaturday(t *testing.T) {
 }
 
 func TestLessonTimeSpansFallBackToLastSlot(t *testing.T) {
-	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, moscow)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, minsk)
 	spans, err := lessonTimeSpans(callsSchedule(), day, 9)
 	if err != nil {
 		t.Fatalf("lessonTimeSpans: %v", err)
@@ -205,7 +205,7 @@ func TestLessonTimeSpansFallBackToLastSlot(t *testing.T) {
 }
 
 func TestLessonTimeSpansSkipEmptyBounds(t *testing.T) {
-	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, moscow)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, minsk)
 	calls := Schedule{Weekdays: [][2][2]string{{{"08:00", "10:40"}, {"", ""}}}}
 	spans, err := lessonTimeSpans(calls, day, 0)
 	if err != nil {
@@ -218,14 +218,14 @@ func TestLessonTimeSpansSkipEmptyBounds(t *testing.T) {
 }
 
 func TestLessonTimeSpansWithoutSchedule(t *testing.T) {
-	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, moscow)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, minsk)
 	if _, err := lessonTimeSpans(Schedule{}, day, 0); err == nil {
 		t.Error("expected an error when the calls schedule is empty")
 	}
 }
 
 func TestBuildEvent(t *testing.T) {
-	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, moscow)
+	day := time.Date(2026, time.September, 14, 0, 0, 0, 0, minsk)
 	spans, _ := lessonTimeSpans(callsSchedule(), day, 0)
 
 	event := buildEvent(DayLesson{
@@ -328,7 +328,7 @@ func TestClearDayRemovesExistingEvents(t *testing.T) {
 		t.Fatalf("new service: %v", err)
 	}
 
-	if err := clearDay(context.Background(), service, "cal-1", time.Date(2026, time.September, 14, 0, 0, 0, 0, moscow)); err != nil {
+	if err := clearDay(context.Background(), service, "cal-1", time.Date(2026, time.September, 14, 0, 0, 0, 0, minsk)); err != nil {
 		t.Fatalf("clearDay: %v", err)
 	}
 	if len(deleted) != 2 {

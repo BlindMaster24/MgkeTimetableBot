@@ -3,7 +3,7 @@ chat_db_path: "./bot_chats.db"
 cache_dir: "./cache/rasp"
 # IANA zone of the college. Every "today", week number and cron tick uses it,
 # so the bot agrees with the students even when the server clock runs in UTC.
-timezone: "Europe/Moscow"
+timezone: "Europe/Minsk"
 
 logging:
   level: "debug"

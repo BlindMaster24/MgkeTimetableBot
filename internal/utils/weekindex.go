@@ -7,7 +7,7 @@ import (
 var startingWeekIndexDate = time.Date(1970, 1, 5, 0, 0, 0, 0, time.UTC)
 
 // SiteLocation is the time zone the timetable lives in. The bot's clock may
-// run in UTC while the college lives in Moscow, so anything that turns "now"
+// run in UTC while the college lives in Minsk, so anything that turns "now"
 // into a calendar day must use this location instead of time.Local.
 var SiteLocation = loadSiteLocation()
 
@@ -17,10 +17,10 @@ func SiteNow() time.Time {
 }
 
 func loadSiteLocation() *time.Location {
-	if loc, err := time.LoadLocation("Europe/Moscow"); err == nil {
+	if loc, err := time.LoadLocation("Europe/Minsk"); err == nil {
 		return loc
 	}
-	return time.FixedZone("Europe/Moscow", 3*60*60)
+	return time.FixedZone("Europe/Minsk", 3*60*60)
 }
 
 func dayNumber(date time.Time) int64 {

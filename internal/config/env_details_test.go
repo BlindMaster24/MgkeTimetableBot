@@ -118,7 +118,7 @@ func TestHasEnvBelowWalksStructsAndPointers(t *testing.T) {
 	}
 }
 
-func TestTimezoneDefaultsToMoscowAndValidatesItsName(t *testing.T) {
+func TestTimezoneDefaultsToMinskAndValidatesItsName(t *testing.T) {
 	cfg := &Config{}
 	if got := cfg.ResolvedTimezone(); got != DefaultTimezone {
 		t.Fatalf("ResolvedTimezone = %q, want %q", got, DefaultTimezone)
@@ -127,7 +127,7 @@ func TestTimezoneDefaultsToMoscowAndValidatesItsName(t *testing.T) {
 		t.Fatalf("Location = %q, want %q", loc, DefaultTimezone)
 	}
 	if _, offset := time.Date(2026, 9, 7, 12, 0, 0, 0, cfg.Location()).Zone(); offset != 3*60*60 {
-		t.Fatalf("Moscow offset = %d, want three hours", offset)
+		t.Fatalf("Minsk offset = %d, want three hours", offset)
 	}
 
 	cfg.Timezone = " Asia/Novosibirsk "
