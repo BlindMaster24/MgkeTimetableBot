@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -27,6 +28,20 @@ type capturingCaller struct {
 	documents []string
 	answers   []string
 	deletions []int
+	commands  []capturedCommands
+	// failSetMyCommands makes the stub reject a menu update.
+	failSetMyCommands bool
+}
+
+var errStubRejectsMenu = errors.New("stub rejects the menu")
+
+// capturedCommands is one /setMyCommands payload the bot sent.
+type capturedCommands struct {
+	Scope    string
+	Commands []struct {
+		Command     string `json:"command"`
+		Description string `json:"description"`
+	} `json:"commands"`
 }
 
 func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.RequestData) (*telegoapi.Response, error) {
@@ -58,6 +73,25 @@ func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.
 		_ = json.Unmarshal(data.BodyRaw, &payload)
 		c.mu.Lock()
 		c.answers = append(c.answers, payload.Text)
+		c.mu.Unlock()
+	}
+	if strings.HasSuffix(url, "/setMyCommands") {
+		if c.failSetMyCommands {
+			return nil, errStubRejectsMenu
+		}
+		var payload capturedCommands
+		_ = json.Unmarshal(data.BodyRaw, &payload)
+		var scope struct {
+			Type string `json:"type"`
+		}
+		var wrapper struct {
+			Scope json.RawMessage `json:"scope"`
+		}
+		_ = json.Unmarshal(data.BodyRaw, &wrapper)
+		_ = json.Unmarshal(wrapper.Scope, &scope)
+		payload.Scope = scope.Type
+		c.mu.Lock()
+		c.commands = append(c.commands, payload)
 		c.mu.Unlock()
 	}
 	if strings.HasSuffix(url, "/sendDocument") {
@@ -105,6 +139,12 @@ func (c *capturingCaller) answerCount() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.answers)
+}
+
+func (c *capturingCaller) commandPayloads() []capturedCommands {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]capturedCommands(nil), c.commands...)
 }
 
 func (c *capturingCaller) last() string {
