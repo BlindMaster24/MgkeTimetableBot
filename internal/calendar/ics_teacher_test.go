@@ -59,7 +59,7 @@ func TestICSBuilderTeacherDayWithoutSubgroupHasNoSuffix(t *testing.T) {
 	b.AddTeacherDay(day, "Иванов И.И.")
 
 	built := b.Build()
-	if strings.Contains(built, "подгруппа") {
+	if strings.Contains(built, ", подгр.") {
 		t.Errorf("a lesson without a subgroup must not gain one: %s", built)
 	}
 	if !strings.Contains(built, "DESCRIPTION:Группа: 63") {
@@ -78,5 +78,20 @@ func TestICSBuilderSkipsADayWithAnUnreadableDate(t *testing.T) {
 
 	if b.EventCount() != 0 {
 		t.Fatalf("an impossible date must produce no events, got %d", b.EventCount())
+	}
+}
+
+func TestICSBuilderSkipsUnreadableBellTimes(t *testing.T) {
+	broken := [][2][2]string{{{"99:99", "99:99"}, {"99:99", "99:99"}}}
+	day := model.GroupDay{
+		Day:     "01.09.2025",
+		Lessons: []model.GroupLesson{&model.GroupLessonExplain{Lesson: "Математика"}},
+	}
+
+	b := fixedBuilder(broken, saturdayCalls, 1)
+	b.AddGroupDay(day, "63")
+
+	if b.EventCount() != 0 {
+		t.Fatalf("a bell time that cannot be parsed must drop the lesson, got %d events", b.EventCount())
 	}
 }
