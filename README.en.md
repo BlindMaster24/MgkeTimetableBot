@@ -491,7 +491,7 @@ What to know about the image:
 - the process runs as an unprivileged user, CGO is not needed (SQLite and image rendering are pure Go);
 - a built-in `HEALTHCHECK` calls `GET /api/health` every 30 seconds and marks the container unhealthy while alerts are active;
 - only the HTTP port (`http.port`) is published — Telegram works over long polling by default, so no inbound ports are required; with the webhook mode (`telegram.webhook.enabled`) the webhook port is opened too (`telegram.webhook.listen`, a loopback address by default, since TLS normally terminates on a reverse proxy);
-- the image installs `tzdata` and sets `TZ=Europe/Minsk`, and `docker-compose.yml` passes `TZ` through (same Minsk default) — “today”, the academic week number and the notification times all depend on the timezone, so the container must not run in UTC;
+- the image installs `tzdata` and sets `TZ=Europe/Minsk`, and `docker-compose.yml` passes `TZ` through (same Minsk default); the bot itself takes its zone from `timezone` in the config and never from the server clock — `TZ` keeps the logs and the shell tools inside the container consistent with it;
 - the image installs `font-dejavu`: the schedule pictures are drawn by `fogleman/gg`, which looks for a font among the known Debian/Alpine, macOS and Windows paths and otherwise scans the system font directories, so the “generate an image” button works inside the container and locally on all three platforms;
 - state lives in the `/data` volume, and the config can be replaced through `CONFIG_PATH`; the version, commit and build date are injected by the linker (`-X main.*`) and surfaced in `/api/health` and `/debug`.
 
