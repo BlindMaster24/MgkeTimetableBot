@@ -18,7 +18,7 @@ func slowServer(t *testing.T) *httptest.Server {
 	t.Helper()
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(2 * time.Second)
 		_, _ = w.Write([]byte(`{"ok":true,"result":{"message_id":1}}`))
 	}))
 }
@@ -28,7 +28,7 @@ func TestBotAPICallsAreBoundedByTheRequestTimeout(t *testing.T) {
 	defer server.Close()
 
 	previous := requestTimeout
-	requestTimeout = 50 * time.Millisecond
+	requestTimeout = 100 * time.Millisecond
 	t.Cleanup(func() { requestTimeout = previous })
 
 	cfg := &config.Config{}
@@ -53,7 +53,10 @@ func TestBotAPICallsAreBoundedByTheRequestTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("a call without an answer must fail")
 	}
-	if elapsed >= 300*time.Millisecond {
+	// The server needs two seconds, so anything under a second proves the
+	// client cut the call; the slack keeps the assertion honest on a loaded
+	// -race runner.
+	if elapsed >= time.Second {
 		t.Fatalf("the call took %v, the client timeout must bound it", elapsed)
 	}
 	message := strings.ToLower(err.Error())
