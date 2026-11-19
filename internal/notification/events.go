@@ -97,7 +97,7 @@ func (n *EventNotifier) nowTime() time.Time {
 	if n.now != nil {
 		return n.now()
 	}
-	return time.Now()
+	return utils.SiteNow()
 }
 
 func (n *EventNotifier) getDayPhrase(now time.Time, day string, nextDayPhrase string) string {

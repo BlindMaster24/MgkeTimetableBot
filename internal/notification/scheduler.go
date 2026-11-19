@@ -120,7 +120,7 @@ func (s *Scheduler) registerReminders() {
 	}
 	r := s.rand
 	if _, err := s.cron.AddFunc("0 * * * * *", func() {
-		s.notifier.RemindUpcoming(time.Now(), lead, window, r)
+		s.notifier.RemindUpcoming(utils.SiteNow(), lead, window, r)
 	}); err != nil {
 		s.log.Error().Err(err).Msg("failed to schedule lesson reminders")
 		return
