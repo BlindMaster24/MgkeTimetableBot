@@ -168,30 +168,6 @@ func teacherDayFromRaw(dayRaw map[string]any) (Day, error) {
 	return day, nil
 }
 
-func FromGroupDay(day model.GroupDay) (Day, error) {
-	encoded, err := json.Marshal(day)
-	if err != nil {
-		return Day{}, err
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(encoded, &raw); err != nil {
-		return Day{}, err
-	}
-	return groupDayFromRaw(raw)
-}
-
-func FromTeacherDay(day model.TeacherDay) (Day, error) {
-	encoded, err := json.Marshal(day)
-	if err != nil {
-		return Day{}, err
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(encoded, &raw); err != nil {
-		return Day{}, err
-	}
-	return teacherDayFromRaw(raw)
-}
-
 func GroupScheduleFromJSON(data []byte) (GroupSchedule, error) {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
