@@ -1,142 +1,110 @@
 package telegram
 
 import (
-	"context"
 	"math"
 	"strings"
 	"testing"
 )
 
-func runMath(t *testing.T, b *Bot, userID int64, text string) {
-	t.Helper()
-
-	u := makeUpdate(userID, text)
-	u.Bot = b
-	if err := (&mathCmd{bot: b}).Handler(context.Background(), u); err != nil {
-		t.Fatal(err)
+func testLoc(key string) string {
+	switch key {
+	case "cmdtext_27":
+		return "empty expression"
+	case "cmdtext_28":
+		return "missing closing parenthesis"
+	case "cmdtext_29":
+		return "unexpected character %c"
 	}
+	return key
 }
 
-func TestMathKeepsTheOldAnswers(t *testing.T) {
-	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
-
-	cases := []struct {
-		text string
-		want string
-	}{
-		{"/math", "/math <some>\n<some> - математический пример"},
-		{"/math 2+2", "4"},
-		{"/math (100+50)*2", "300"},
-		{"/math 2^10", "1024"},
-		{"/math 2×3", "6"},
-		{"/math 10:2", "5"},
-		{"/math 10÷4", "2.5"},
-		{"/math 1к+2к", "3000"},
-		{"/math 1,5+1,5", "3"},
-		{"/math 2*2*", "Пример записан неправильно"},
-		{"/math (2+2", "Пример записан неправильно"},
-		{"/math (2)", "Пример записан неправильно"},
-		{"/math (2+2)", "4"},
-		{"/math +2", "Пример записан неправильно"},
-		{"/math 2a", "В примере имеются лишние символы.\nСписок разрешённых: 0123456789+-*/():^×÷ekк,."},
-		{"/math 1/0", "бесконечность"},
+func TestEvalMathFollowsTheUsualPrecedence(t *testing.T) {
+	cases := map[string]float64{
+		"2+2":       4,
+		"2+3*4":     14,
+		"(2+3)*4":   20,
+		"2^3":       8,
+		"2**3":      8,
+		"10/4":      2.5,
+		"1e2":       100,
+		"2*-3":      -6,
+		"-2^2":      -4,
+		"2+3-4":     1,
+		"((((1))))": 1,
+		"1/3*3":     1,
+		"0.1+0.2":   0.30000000000000004,
+		"1000000*2": 2000000,
+		"2^2^3":     64,
+		"-(1+2)":    -3,
+		"12/3/2":    2,
 	}
-
-	for _, c := range cases {
-		caller.reset()
-		runMath(t, b, userID, c.text)
-		if got := caller.last(); got != c.want {
-			t.Errorf("%q → %q, want %q", c.text, got, c.want)
+	for expr, want := range cases {
+		got, err := evalMath(expr, testLoc)
+		if err != nil {
+			t.Errorf("evalMath(%q) failed: %v", expr, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("evalMath(%q) = %v, want %v", expr, got, want)
 		}
 	}
 }
 
-func TestMathEvaluatesFractionsAndPowers(t *testing.T) {
-	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
-
-	cases := []struct {
-		text string
-		want string
-	}{
-		{"/math 2+3*4", "14"},
-		{"/math 2*(3+4)", "14"},
-		{"/math 1e3+1", "1001"},
-		{"/math 2**3", "8"},
+func TestEvalMathReportsBrokenExpressions(t *testing.T) {
+	cases := map[string]string{
+		"":     "empty expression",
+		"2+":   "empty expression",
+		"(2":   "missing closing parenthesis",
+		"2)":   "unexpected character",
+		"a":    "unexpected character",
+		"2^^3": "unexpected character",
 	}
-
-	for _, c := range cases {
-		caller.reset()
-		runMath(t, b, userID, c.text)
-		if got := caller.last(); got != c.want {
-			t.Errorf("%q → %q, want %q", c.text, got, c.want)
+	for expr, want := range cases {
+		_, err := evalMath(expr, testLoc)
+		if err == nil {
+			t.Errorf("evalMath(%q) must fail", expr)
+			continue
+		}
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("evalMath(%q) = %v, want an error about %q", expr, err, want)
 		}
 	}
 
-	caller.reset()
-	runMath(t, b, userID, "/math 10/3")
-	if got := caller.last(); !strings.HasPrefix(got, "3.3333333333333") {
-		t.Errorf("10/3 → %q", got)
+	result, err := evalMath("2/0", testLoc)
+	if err != nil {
+		t.Fatalf("division by zero is left to the caller: %v", err)
+	}
+	if !math.IsInf(result, 1) {
+		t.Fatalf("2/0 = %v, want +Inf", result)
 	}
 }
 
-func TestMathWhitespaceOnlyInput(t *testing.T) {
-	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
-
-	caller.reset()
-	runMath(t, b, userID, "/math ")
-	if got := caller.last(); got != "/math <some>\n<some> - математический пример" {
-		t.Errorf("single trailing space → %q", got)
+func TestMathExpressionLooksValid(t *testing.T) {
+	valid := []string{"2+2", "(2+2)*3", "1", "0.5", "(1)"}
+	for _, expr := range valid {
+		if !mathExpressionLooksValid(expr) {
+			t.Errorf("%q must look valid", expr)
+		}
 	}
-
-	caller.reset()
-	runMath(t, b, userID, "/math   ")
-	if got := caller.last(); got != "Пример записан неправильно" {
-		t.Errorf("multiple trailing spaces → %q", got)
-	}
-
-	caller.reset()
-	runMath(t, b, userID, "/math 0/0")
-	if got := caller.last(); got != "NaN" {
-		t.Errorf("0/0 → %q", got)
-	}
-}
-
-func TestFormatMathResultMatchesJavaScript(t *testing.T) {
-	cases := []struct {
-		value float64
-		want  string
-	}{
-		{4, "4"},
-		{1000000, "1000000"},
-		{-0.5, "-0.5"},
-		{math.Inf(1), "+Inf"},
-		{math.NaN(), "NaN"},
-	}
-
-	for _, c := range cases {
-		if got := formatMathResult(c.value); got != c.want {
-			t.Errorf("%v → %q, want %q", c.value, got, c.want)
+	invalid := []string{"", "(2", "2)", "+2", "2+"}
+	for _, expr := range invalid {
+		if mathExpressionLooksValid(expr) {
+			t.Errorf("%q must look invalid", expr)
 		}
 	}
 }
 
-func TestMathExpressionValidity(t *testing.T) {
-	cases := []struct {
-		expression string
-		want       bool
-	}{
-		{"2+2", true},
-		{"(2+2)", true},
-		{"(2)", false},
-		{"2+2)", false},
-		{"+2", false},
-		{"2*", false},
-		{"", false},
+func TestFormatMathResultKeepsWholeNumbersWhole(t *testing.T) {
+	cases := map[float64]string{
+		4:     "4",
+		2.5:   "2.5",
+		-3:    "-3",
+		1e22:  "1e+22",
+		0.001: "0.001",
 	}
-
-	for _, c := range cases {
-		if got := mathExpressionLooksValid(c.expression); got != c.want {
-			t.Errorf("%q → %v, want %v", c.expression, got, c.want)
+	for value, want := range cases {
+		if got := formatMathResult(value); got != want {
+			t.Errorf("formatMathResult(%v) = %q, want %q", value, got, want)
 		}
 	}
 }

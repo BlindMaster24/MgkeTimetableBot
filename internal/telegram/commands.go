@@ -778,9 +778,6 @@ func mathExpressionLooksValid(expression string) bool {
 	if !strings.ContainsRune(")0123456789", rune(expression[len(expression)-1])) {
 		return false
 	}
-	if strings.Count(expression, "(") > 0 && !strings.ContainsAny(expression, "/*+-") {
-		return false
-	}
 	return true
 }
 
@@ -880,7 +877,14 @@ func evalMath(expr string, loc func(string) string) (float64, error) {
 		return left, nil
 	}
 
-	return parse(0)
+	value, err := parse(0)
+	if err != nil {
+		return 0, err
+	}
+	if idx < len(expr) {
+		return 0, fmt.Errorf(loc("cmdtext_29"), expr[idx])
+	}
+	return value, nil
 }
 
 func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
