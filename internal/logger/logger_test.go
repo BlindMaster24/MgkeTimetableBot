@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewLogger(t *testing.T) {
@@ -85,5 +86,33 @@ func TestLoggerInvalidLevel(t *testing.T) {
 	log := New("invalid_level", nil)
 	if log == nil {
 		t.Fatal("expected non-nil logger (should default to info)")
+	}
+}
+
+func TestRotatedLogsAreCompressed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bot.log")
+	log := New("info", &FileConfig{Enabled: true, Path: path, MaxSizeMB: 1, MaxFiles: 2})
+	defer log.Close()
+
+	// One megabyte per file, so a few thousand lines cross the threshold.
+	line := strings.Repeat("x", 1024)
+	for i := 0; i < 3000; i++ {
+		log.Info().Str("line", line).Msg("padding")
+	}
+
+	// lumberjack compresses a rotated file in the background, so poll briefly.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		matches, err := filepath.Glob(filepath.Join(filepath.Dir(path), "*.gz"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(matches) > 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no compressed rotation found next to %s", path)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
