@@ -132,3 +132,62 @@ func TestOpenRefusesAPathItCannotUse(t *testing.T) {
 		t.Errorf("error %q must name the database layer", err)
 	}
 }
+
+func TestWaitBackoffGrowsAndSaturates(t *testing.T) {
+	ctx := t.Context()
+
+	for _, attempt := range []int{0, 1, 5, 15} {
+		started := time.Now()
+		if err := waitBackoff(ctx, attempt); err != nil {
+			t.Fatalf("attempt %d: %v", attempt, err)
+		}
+		waited := time.Since(started)
+		want := retryBaseDelay << attempt
+		if want > retryMaxDelay || attempt >= 16 {
+			want = retryMaxDelay
+		}
+		// Jitter cuts the delay to 50-100% of the calculated value.
+		if waited < want/2 || waited > want+50*time.Millisecond {
+			t.Errorf("attempt %d waited %v, want %v..%v", attempt, waited, want/2, want)
+		}
+	}
+
+	started := time.Now()
+	if err := waitBackoff(ctx, 16); err != nil {
+		t.Fatal(err)
+	}
+	if waited := time.Since(started); waited < retryMaxDelay/2 {
+		t.Errorf("attempt 16 waited %v, want at least %v", waited, retryMaxDelay/2)
+	}
+}
+
+func TestDataSourceNameWithoutABusyTimeoutLeavesThePragmaOut(t *testing.T) {
+	dsn, err := dataSourceName("cache.db", Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(dsn, "busy_timeout") {
+		t.Fatalf("dsn = %q, want no busy_timeout pragma for a zero timeout", dsn)
+	}
+
+	dsn, err = dataSourceName("cache.db", Options{BusyTimeout: 250 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(dsn, "_pragma=busy_timeout(250)") {
+		t.Fatalf("dsn = %q, want the configured timeout", dsn)
+	}
+}
+
+func TestReadPragmaIntReportsAClosedDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pragma.db")
+	db, err := Open(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+
+	if _, err := readPragmaInt(db, path, "user_version"); err == nil {
+		t.Fatal("reading a pragma from a closed database must fail")
+	}
+}
