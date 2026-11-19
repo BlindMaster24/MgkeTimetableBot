@@ -93,3 +93,80 @@ func TestCallsParserReportsSlotRowsWithoutAValidSlot(t *testing.T) {
 		t.Errorf("report must mention the unreadable row: %s", report.Summary())
 	}
 }
+
+func TestCallsParserMarksTheRequiredProbes(t *testing.T) {
+	_, report := ParseCallsVariants(docFromHTML(t, callsPage(`<h5>01.09.2026</h5>`, validCallsRow)))
+
+	bySelector := make(map[string]Probe, len(report.Probes))
+	for _, probe := range report.Probes {
+		bySelector[probe.Selector] = probe
+	}
+
+	required := map[string]int{
+		"table":                   1,
+		"tr with two time ranges": 1,
+	}
+	for selector, found := range required {
+		probe, ok := bySelector[selector]
+		if !ok {
+			t.Fatalf("probe %q is missing: %s", selector, report.Summary())
+		}
+		if !probe.Required || probe.Advisory {
+			t.Errorf("probe %q must be required and not advisory: %+v", selector, probe)
+		}
+		if probe.Found != found {
+			t.Errorf("probe %q found %d, want %d", selector, probe.Found, found)
+		}
+	}
+
+	date := bySelector["[date-updated] with dd.MM.yyyy"]
+	if !date.Advisory || date.Required {
+		t.Errorf("the page date must stay advisory: %+v", date)
+	}
+	if !report.OK() {
+		t.Errorf("a healthy page must parse cleanly: %s", report.Summary())
+	}
+}
+
+func TestCallsParserUsesTheScopedTablesOnly(t *testing.T) {
+	page := `<html><body>
+<div class="entry"><div class="content">
+<h2>Расписание звонков</h2>
+<h5>01.09.2026</h5>
+<table><tr><td>1 пара</td><td>8.00 &ndash; 8.45<br />8.55 &ndash; 9.40</td></tr></table>
+</div></div>
+<table><tr><td>9 пара</td><td>20.00 &ndash; 20.45<br />20.55 &ndash; 21.40</td></tr></table>
+</body></html>`
+
+	variants, report := ParseCallsVariants(docFromHTML(t, page))
+	if len(variants) != 1 {
+		t.Fatalf("variants = %+v", variants)
+	}
+	if got := len(variants[0].Schedule.Weekdays); got != 1 {
+		t.Fatalf("only the scoped table may be parsed, got %d slots", got)
+	}
+
+	var contentBlock Probe
+	for _, probe := range report.Probes {
+		if probe.Expected == "content block with tables" {
+			contentBlock = probe
+		}
+	}
+	if !contentBlock.Required || contentBlock.Advisory {
+		t.Errorf("the scoped block probe must stay required: %+v", contentBlock)
+	}
+}
+
+func TestCallsParserKeepsGoingAfterAnEmptyTable(t *testing.T) {
+	page := `<html><body><div class="entry"><div class="content">
+<h2>Расписание звонков</h2>
+<h5>01.09.2026</h5>
+<table><tr><th>Смена</th></tr></table>
+<table><tr><td>1 пара</td><td>8.00 &ndash; 8.45<br />8.55 &ndash; 9.40</td></tr></table>
+</div></div></body></html>`
+
+	variants, _ := ParseCallsVariants(docFromHTML(t, page))
+	if len(variants) != 1 || len(variants[0].Schedule.Weekdays) != 1 {
+		t.Fatalf("an empty table before a full one must not stop the parse: %+v", variants)
+	}
+}
