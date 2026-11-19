@@ -101,6 +101,12 @@ func TestDiffMovedLesson(t *testing.T) {
 	if moved[0].From != 2 || moved[0].To != 4 || moved[0].New.Subject != "Ф" {
 		t.Errorf("move = %+v, want Ф from 2 to 4", moved[0])
 	}
+	if removed := result.Of(Removed); len(removed) != 0 {
+		t.Errorf("a moved lesson must not also count as removed: %+v", removed)
+	}
+	if len(result.Changes) != 1 {
+		t.Errorf("changes = %+v, want exactly the move", result.Changes)
+	}
 	if result.Empty() {
 		t.Errorf("Empty() = true, want false with changes present")
 	}
