@@ -959,7 +959,14 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
 	input := strings.TrimSpace(u.Text)
 
-	list, _ := b.chatRepo.GetSubscriptions(u.UserID)
+	list, err := b.chatRepo.GetSubscriptions(u.UserID)
+	if err != nil {
+		b.log.Error().Err(err).Int64("chatID", u.UserID).Msg("failed to read the subscriptions")
+		chat.Scene = ""
+		b.saveChat(chat)
+		b.SendText(u.ChatID, b.loc("data_not_loaded"))
+		return
+	}
 	chat.Scene = ""
 	b.saveChat(chat)
 
@@ -975,6 +982,10 @@ func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	target := list[idx-1]
-	b.chatRepo.RemoveSubscription(u.UserID, target.ID)
+	if err := b.chatRepo.RemoveSubscription(u.UserID, target.ID); err != nil {
+		b.log.Error().Err(err).Int64("chatID", u.UserID).Int64("subscription", target.ID).Msg("failed to remove the subscription")
+		b.SendText(u.ChatID, b.loc("data_not_loaded"))
+		return
+	}
 	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_36"), b.replySubscriptionsMenu())
 }

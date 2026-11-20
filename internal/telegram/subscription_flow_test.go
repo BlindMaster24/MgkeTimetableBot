@@ -175,3 +175,22 @@ func TestSetTeacherStillAcceptsAUniqueName(t *testing.T) {
 		t.Fatalf("answer = %q, want the about text the scene answers with", got)
 	}
 }
+
+func TestSubscriptionRemoveReportsAStorageFailure(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	if _, err := b.chatRepo.AddSubscription(userID, "group", "100"); err != nil {
+		t.Fatal(err)
+	}
+	chat, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	chat.Scene = sceneSubRemove
+	_ = b.chatRepo.Save(chat)
+
+	if err := b.chatRepo.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	b.handleSubRemove(t.Context(), &Update{Bot: b, ChatID: userID, UserID: userID, Text: "1"}, chat)
+	if got := caller.last(); !strings.Contains(got, b.loc("data_not_loaded")) {
+		t.Fatalf("answer = %q, want the storage hint", got)
+	}
+}
