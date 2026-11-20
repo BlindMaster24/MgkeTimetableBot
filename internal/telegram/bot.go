@@ -116,7 +116,9 @@ func NewBot(cfg *config.Config, log *logger.Logger, loc *i18n.Localizer, chatRep
 
 	var self *Bot
 	options := []telego.BotOption{
-		telego.WithDefaultDebugLogger(),
+		// The library debug log dumps every request body (messages included) to
+		// stdout; the bot logs what matters itself, so the transport stays quiet.
+		telego.WithDiscardLogger(),
 		telego.WithHTTPClient(&http.Client{Timeout: requestTimeout}),
 		telego.WithRequestConstructor(markdownConstructor{
 			inner: telegoapi.DefaultConstructor{},
