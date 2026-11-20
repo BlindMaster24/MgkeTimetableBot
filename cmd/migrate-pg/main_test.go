@@ -23,55 +23,59 @@ func TestInsertChatMapsEveryColumn(t *testing.T) {
 	db := openTestDB(t)
 
 	chat := OldChat{
-		ID:                  77,
-		Service:             "tg",
-		Accepted:            true,
-		Ref:                 "ref-1",
-		Scene:               "set_group",
-		Mode:                "student",
-		Group:               "100",
-		Teacher:             "Иванов И.И.",
-		GoogleEmail:         "bot@example.com",
-		ShowAbout:           true,
-		ShowDaily:           true,
-		ShowWeekly:          true,
-		ShowCalls:           true,
-		ShowFastGroup:       true,
-		ShowFastTeacher:     true,
-		HidePastDays:        true,
-		DeleteLastMsg:       true,
-		LastMsgID:           4242,
-		AllowSendMess:       true,
-		NoticeChanges:       true,
-		NoticeNextWeek:      true,
-		NoticeCalls:         true,
-		NoticeParserErrors:  true,
-		ShowParserTime:      true,
-		ShowHints:           true,
-		DiffEnabled:         true,
-		DiffAutoInWeek:      true,
-		DiffAutoInUpdates:   true,
-		DiffShowBeforeAfter: true,
-		DiffMaxLines:        31,
-		ScheduleFormatter:   2,
+		PeerID:                   6409603928,
+		Accepted:                 true,
+		EULA:                     true,
+		Ref:                      "ref-1",
+		Scene:                    "set_group",
+		Mode:                     "student",
+		Group:                    "100",
+		Teacher:                  "Иванов И.И.",
+		GoogleEmail:              "bot@example.com",
+		ShowAbout:                true,
+		ShowDaily:                true,
+		ShowWeekly:               true,
+		ShowCalls:                true,
+		ShowFastGroup:            true,
+		ShowFastTeacher:          true,
+		HidePastDays:             true,
+		DeleteLastMsg:            true,
+		DeleteUserMsg:            true,
+		LastMsgID:                4242,
+		LastMsgTime:              1795171844000,
+		AllowSendMess:            true,
+		SubscribeDistribution:    true,
+		NeedUpdateButtons:        true,
+		DeactivateSecondaryCheck: true,
+		NoticeChanges:            true,
+		NoticeNextWeek:           true,
+		NoticeParserErrors:       true,
+		ShowParserTime:           true,
+		ShowHints:                true,
+		HistoryGroup:             `["71"]`,
+		HistoryTeacher:           `["Петров"]`,
+		ScheduleFormatter:        2,
 	}
 	if err := insertChat(db, chat); err != nil {
 		t.Fatal(err)
 	}
 
 	var (
-		service, scene, mode, group, teacher, email, ref string
-		peerID, formatter, lastMsgID, diffMaxLines       int
-		accepted, showDaily, allowSend, noticeChanges    int
-		showFastTeacher, deleteLastMsg                   int
+		service, scene, mode, group, teacher, email, ref                   string
+		historyGroup, historyTeacher                                       string
+		peerID, formatter, lastMsgID, lastMsgTime                          int64
+		accepted, eula, showDaily, allowSend, noticeChanges, deleteUserMsg int
+		showFastTeacher, deleteLastMsg, needUpdate, deactivateSecondary    int
 	)
-	err := db.QueryRow(`SELECT service, peer_id, accepted, scene, mode, "group", teacher,
-		google_email, formatter, last_msg_id, allow_send_mess, notice_changes,
-		show_daily, show_fast_teacher, delete_last_msg, diff_max_lines, ref
-		FROM bot_chats WHERE peer_id = ?`, chat.ID).Scan(
-		&service, &peerID, &accepted, &scene, &mode, &group, &teacher,
-		&email, &formatter, &lastMsgID, &allowSend, &noticeChanges,
-		&showDaily, &showFastTeacher, &deleteLastMsg, &diffMaxLines, &ref,
+	err := db.QueryRow(`SELECT service, peer_id, accepted, eula, scene, mode, "group", teacher,
+		google_email, formatter, last_msg_id, last_msg_time, allow_send_mess, notice_changes,
+		show_daily, show_fast_teacher, delete_last_msg, delete_user_msg, need_update_buttons,
+		deactivate_secondary_check, history_group, history_teacher, ref
+		FROM bot_chats WHERE peer_id = ?`, chat.PeerID).Scan(
+		&service, &peerID, &accepted, &eula, &scene, &mode, &group, &teacher,
+		&email, &formatter, &lastMsgID, &lastMsgTime, &allowSend, &noticeChanges,
+		&showDaily, &showFastTeacher, &deleteLastMsg, &deleteUserMsg, &needUpdate,
+		&deactivateSecondary, &historyGroup, &historyTeacher, &ref,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -80,37 +84,39 @@ func TestInsertChatMapsEveryColumn(t *testing.T) {
 	if service != "telegram" {
 		t.Errorf("service = %q, the SQLite schema expects telegram", service)
 	}
-	if peerID != chat.ID {
-		t.Errorf("peer_id = %d, want %d", peerID, chat.ID)
+	if peerID != chat.PeerID {
+		t.Errorf("peer_id = %d, want the Telegram id %d, not the surrogate row id", peerID, chat.PeerID)
 	}
 	for name, got := range map[string]string{"scene": scene, "mode": mode, "group": group, "teacher": teacher, "email": email, "ref": ref} {
 		if got == "" {
 			t.Errorf("%s was not copied", name)
 		}
 	}
-	if accepted != 1 || showDaily != 1 || allowSend != 1 || noticeChanges != 1 || showFastTeacher != 1 || deleteLastMsg != 1 {
+	if accepted != 1 || eula != 1 || showDaily != 1 || allowSend != 1 || noticeChanges != 1 ||
+		showFastTeacher != 1 || deleteLastMsg != 1 || deleteUserMsg != 1 || needUpdate != 1 ||
+		deactivateSecondary != 1 {
 		t.Error("booleans must land as 1")
 	}
 	if formatter != 2 {
 		t.Errorf("formatter = %d, want 2", formatter)
 	}
-	if lastMsgID != 4242 {
-		t.Errorf("last_msg_id = %d, want 4242", lastMsgID)
+	if lastMsgID != 4242 || lastMsgTime != 1795171844000 {
+		t.Errorf("message bookkeeping = %d / %d", lastMsgID, lastMsgTime)
 	}
-	if diffMaxLines != 31 {
-		t.Errorf("diff_max_lines = %d, want 31", diffMaxLines)
+	if historyGroup != `["71"]` || historyTeacher != `["Петров"]` {
+		t.Errorf("history = %q / %q", historyGroup, historyTeacher)
 	}
 }
 
 func TestInsertChatReplacesTheSamePeer(t *testing.T) {
 	db := openTestDB(t)
 
-	first := OldChat{ID: 77, Accepted: true, Group: "100", DiffMaxLines: 20}
+	first := OldChat{PeerID: 77, Accepted: true, Group: "100"}
 	if err := insertChat(db, first); err != nil {
 		t.Fatal(err)
 	}
 
-	second := OldChat{ID: 77, Accepted: true, Group: "200", DiffMaxLines: 5}
+	second := OldChat{PeerID: 77, Accepted: true, Group: "200"}
 	if err := insertChat(db, second); err != nil {
 		t.Fatal(err)
 	}
@@ -124,12 +130,11 @@ func TestInsertChatReplacesTheSamePeer(t *testing.T) {
 	}
 
 	var group string
-	var maxLines int
-	if err := db.QueryRow(`SELECT "group", diff_max_lines FROM bot_chats WHERE peer_id = 77`).Scan(&group, &maxLines); err != nil {
+	if err := db.QueryRow(`SELECT "group" FROM bot_chats WHERE peer_id = 77`).Scan(&group); err != nil {
 		t.Fatal(err)
 	}
-	if group != "200" || maxLines != 5 {
-		t.Fatalf("the second run must win, got %q / %d", group, maxLines)
+	if group != "200" {
+		t.Fatalf("the second run must win, got %q", group)
 	}
 }
 

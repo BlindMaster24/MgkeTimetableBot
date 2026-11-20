@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - Entrypoint: `cmd/bot/main.go` — wires config, logger, i18n, cache, archive, API, Telegram bot, notification scheduler, parser loop.
-- `cmd/migrate-pg/` — one-off migration of chats and subscriptions from PostgreSQL to SQLite.
+- `cmd/migrate-pg/` — one-off migration of chats from the legacy PostgreSQL schema; it joins `bot_chats_tg` because `bot_chats.id` is an internal counter and the Telegram id lives in `bot_chats_tg."peerId"`.
 - Internal packages (`internal/`):
   - `config/` — YAML configuration plus reflection-based `MGKE_*` environment overrides.
   - `logger/` — zerolog with lumberjack rotation.
