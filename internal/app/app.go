@@ -460,12 +460,21 @@ func (r *runtime) startParser(ctx context.Context) <-chan struct{} {
 func (r *runtime) serve(ctx context.Context) int {
 	r.log.Info().Msg("bot starting, press Ctrl+C to stop")
 	if err := r.bot.Run(ctx); err != nil {
-		r.log.Error().Err(err).Msg("bot stopped")
+		if ctx.Err() != nil {
+			r.log.Info().Msg("bot stopped on shutdown")
+		} else {
+			r.log.Error().Err(err).Msg("bot stopped")
+		}
 	}
 
 	r.saveMetrics("shutdown")
 
-	if err := r.cache.Save(ctx); err != nil {
+	// The signal context is already cancelled here, so the last save needs its
+	// own deadline: with the cancelled one every write fails and the cache is
+	// lost exactly when it matters.
+	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := r.cache.Save(saveCtx); err != nil {
 		r.log.Error().Err(err).Msg("failed to save cache")
 	}
 	r.log.Info().Msg("shutdown complete")

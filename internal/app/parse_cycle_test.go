@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
@@ -52,6 +53,10 @@ func newParseRuntime(t *testing.T) *runtime {
 	cfg.Telegram.Token = "123456:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	// Keep the bot offline: every Bot API call goes to this stub.
 	apiStub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/getUpdates") {
+			_, _ = w.Write([]byte(`{"ok":true,"result":[]}`))
+			return
+		}
 		_, _ = w.Write([]byte(`{"ok":true,"result":true}`))
 	}))
 	t.Cleanup(apiStub.Close)
@@ -65,7 +70,12 @@ func newParseRuntime(t *testing.T) *runtime {
 
 	loc := i18n.New("ru")
 	log := logger.New("error", nil)
-	rasp := builderCache(t)
+	cacheDir := t.TempDir()
+	cfg.CacheDir = cacheDir
+	rasp, err := cache.New(cacheDir)
+	if err != nil {
+		t.Fatalf("cache: %v", err)
+	}
 	bot, err := telegrambot.NewBot(cfg, log, loc, chats, rasp, nil)
 	if err != nil {
 		t.Fatal(err)
