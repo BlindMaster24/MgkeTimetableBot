@@ -12,7 +12,7 @@ import (
 type callsEditInputScene struct{ bot *Bot }
 
 func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
-	parsed := parseCallsInput(u.Text)
+	parsed := parseCallsInput(u.Text, s.bot.loc)
 	if parsed == nil {
 		return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_unrecognized"))
 	}
@@ -23,7 +23,7 @@ func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat)
 
 	reasonKb := s.bot.withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
-			{{Text: s.bot.loc("calls_edit_skip"), CallbackData: "answer:Пропустить"}},
+			{{Text: s.bot.loc("calls_edit_skip"), CallbackData: "answer:" + s.bot.loc("calls_edit_skip")}},
 		},
 	})
 
@@ -41,8 +41,8 @@ func (s *callsEditReasonScene) Handle(ctx context.Context, u *Update, chat *Chat
 	confirmKb := s.bot.withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
 			{
-				{Text: s.bot.loc("calls_edit_send"), CallbackData: "answer:Отправить"},
-				{Text: s.bot.loc("calls_edit_dont_send"), CallbackData: "answer:Не отправлять"},
+				{Text: s.bot.loc("calls_edit_send"), CallbackData: "answer:" + s.bot.loc("calls_edit_send")},
+				{Text: s.bot.loc("calls_edit_dont_send"), CallbackData: "answer:" + s.bot.loc("calls_edit_dont_send")},
 			},
 		},
 	})
@@ -53,15 +53,14 @@ func (s *callsEditReasonScene) Handle(ctx context.Context, u *Update, chat *Chat
 type callsEditConfirmScene struct{ bot *Bot }
 
 func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Chat) error {
-	confirmText := strings.ToLower(u.Text)
-	notifyNow := strings.Contains(confirmText, "отправить")
+	notifyNow := strings.EqualFold(strings.TrimSpace(u.Text), s.bot.loc("calls_edit_send"))
 
 	reason := strings.TrimSpace(chat.CallsEditReason)
 	if reason == "" || strings.EqualFold(reason, s.bot.loc("calls_edit_reason_skip")) || strings.EqualFold(reason, s.bot.loc("calls_edit_reason_skip_short")) {
 		reason = ""
 	}
 
-	parsed := parseCallsInput(chat.CallsEditInput)
+	parsed := parseCallsInput(chat.CallsEditInput, s.bot.loc)
 	if parsed == nil {
 		chat.Scene = ""
 		chat.CallsEditInput = ""
@@ -90,7 +89,7 @@ type callsParsed struct {
 	Saturday [][2][2]string
 }
 
-func parseCallsInput(text string) *callsParsed {
+func parseCallsInput(text string, loc func(string) string) *callsParsed {
 	var weekdays, saturday [][2][2]string
 	var target *[][2][2]string
 
@@ -100,11 +99,11 @@ func parseCallsInput(text string) *callsParsed {
 			continue
 		}
 		lower := strings.ToLower(line)
-		if strings.Contains(lower, "суббот") || strings.Contains(lower, "saturday") {
+		if strings.Contains(lower, loc("calls_parse_saturday")) || strings.Contains(lower, "saturday") {
 			target = &saturday
 			continue
 		}
-		if strings.Contains(lower, "будн") || strings.Contains(lower, "weekday") {
+		if strings.Contains(lower, loc("calls_parse_weekday")) || strings.Contains(lower, "weekday") {
 			target = &weekdays
 			continue
 		}

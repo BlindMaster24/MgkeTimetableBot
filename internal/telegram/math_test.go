@@ -14,6 +14,10 @@ func testLoc(key string) string {
 		return "missing closing parenthesis"
 	case "cmdtext_29":
 		return "unexpected character %c"
+	case "calls_parse_saturday":
+		return "суббот"
+	case "calls_parse_weekday":
+		return "будн"
 	}
 	return key
 }

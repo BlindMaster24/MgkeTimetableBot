@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/formatter"
 	imagepkg "github.com/blindmaster24/MgkeTimetableBot/internal/image"
@@ -212,25 +213,25 @@ func (b *Bot) sendGroupResult(ctx context.Context, u *Update, chat *Chat, group,
 func (b *Bot) resolveTeacherInput(ctx context.Context, u *Update, chat *Chat, input, kind string) error {
 	teachers := b.cache.GetTeachers()
 
-	if len(input) < 3 {
-		message := "Фамилия введена некорректно"
+	if utf8.RuneCountInString(input) < 3 {
+		message := b.loc("cmpgrp_7")
 		if kind == "set" {
-			message = fmt.Sprintf("Неправильный синтаксис команды\n\nПример:\n/setTeacher %s", randomKey(teachers))
+			message = b.locData("set_teacher_syntax", map[string]interface{}{"Teacher": randomKey(teachers)})
 		}
 		return b.sendTeacherError(u, chat, message)
 	}
 
 	matched, tooMany := matchTeacherList(input, teachers, b.cache.GetTeamNames(), b.searchAliases(u.UserID))
 	if len(matched) == 0 {
-		return b.sendTeacherError(u, chat, "Данный преподаватель не найден")
+		return b.sendTeacherError(u, chat, b.loc("cmpgrp_8"))
 	}
 	if tooMany {
-		return b.sendTeacherError(u, chat, "Слишком много результатов для выборки.")
+		return b.sendTeacherError(u, chat, b.loc("cmpgrp_9"))
 	}
 	if len(matched) > 1 {
 		chat.Scene = sceneGetTeacher + ":" + kind
 		b.chatRepo.Save(chat)
-		msg := "Найдено несколько преподавателей.\nКакой именно нужен?\n\n" + strings.Join(matched, "\n")
+		msg := b.loc("cmpgrp_10") + strings.Join(matched, "\n")
 		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, b.withCancelButton(verticalValuesKeyboard(matched)))
 	}
 

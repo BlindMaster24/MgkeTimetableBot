@@ -51,7 +51,7 @@ func (r *handlerRegistry) commandByName(name string) Command {
 	return nil
 }
 
-func (r *handlerRegistry) botCommands(includeAdmin bool) []telego.BotCommand {
+func (r *handlerRegistry) botCommands(includeAdmin bool, adminMarker string) []telego.BotCommand {
 	cmds := make([]telego.BotCommand, 0, len(r.commandOrder))
 	for _, cmd := range r.commandOrder {
 		if hidden, ok := cmd.(HiddenCommand); ok && hidden.Hidden() {
@@ -68,7 +68,7 @@ func (r *handlerRegistry) botCommands(includeAdmin bool) []telego.BotCommand {
 
 		description := cmd.Description()
 		if admin {
-			description = "[адм] " + description
+			description = adminMarker + description
 		}
 
 		cmds = append(cmds, telego.BotCommand{

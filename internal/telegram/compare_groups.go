@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
@@ -79,7 +80,7 @@ func (b *Bot) findGroupWithKeyboard(u *Update, chat *Chat, input string, keyboar
 }
 
 func (b *Bot) findTeacherWithKeyboard(u *Update, chat *Chat, input string, keyboard *telego.ReplyKeyboardMarkup) (string, bool, bool) {
-	if len(input) < 3 {
+	if utf8.RuneCountInString(input) < 3 {
 		u.Bot.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_7"), keyboard)
 		return "", false, false
 	}

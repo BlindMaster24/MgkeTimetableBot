@@ -21,7 +21,7 @@ func commandIsHidden(cmd Command) bool {
 func TestBotCommandsAreTelegramSafe(t *testing.T) {
 	b := setupTestBot(t)
 
-	for _, cmd := range b.botCommands(true) {
+	for _, cmd := range b.botCommands(true, b.loc("admin_marker")) {
 		if !telegramCommandPattern.MatchString(cmd.Command) {
 			t.Errorf("command %q is not a valid Telegram command name", cmd.Command)
 		}
@@ -35,7 +35,7 @@ func TestBotCommandsSkipAdminsInTheDefaultScope(t *testing.T) {
 	b := setupTestBot(t)
 
 	public := make(map[string]bool)
-	for _, cmd := range b.botCommands(false) {
+	for _, cmd := range b.botCommands(false, b.loc("admin_marker")) {
 		public[cmd.Command] = true
 	}
 
@@ -54,7 +54,7 @@ func TestBotCommandsSkipAdminsInTheDefaultScope(t *testing.T) {
 		t.Errorf("default scope = %d commands, expected %d", len(public), expected)
 	}
 
-	for _, cmd := range b.botCommands(true) {
+	for _, cmd := range b.botCommands(true, b.loc("admin_marker")) {
 		if public[cmd.Command] {
 			continue
 		}
@@ -69,7 +69,7 @@ func TestBotCommandsMarkAdmins(t *testing.T) {
 	b := setupTestBot(t)
 
 	marked := 0
-	for _, cmd := range b.botCommands(true) {
+	for _, cmd := range b.botCommands(true, b.loc("admin_marker")) {
 		registered := b.commandByName(cmd.Command)
 		if registered == nil || !commandIsAdmin(registered) {
 			if strings.HasPrefix(cmd.Description, "[адм] ") {
@@ -87,7 +87,7 @@ func TestBotCommandsMarkAdmins(t *testing.T) {
 	if marked == 0 {
 		t.Fatal("expected at least one admin command")
 	}
-	if len(b.botCommands(true)) <= len(b.botCommands(false)) {
+	if len(b.botCommands(true, b.loc("admin_marker"))) <= len(b.botCommands(false, b.loc("admin_marker"))) {
 		t.Error("the admin scope must extend the default one")
 	}
 }
@@ -96,7 +96,7 @@ func TestBotCommandsAreDeduplicated(t *testing.T) {
 	b := setupTestBot(t)
 
 	seen := make(map[string]bool)
-	for _, cmd := range b.botCommands(true) {
+	for _, cmd := range b.botCommands(true, b.loc("admin_marker")) {
 		if seen[cmd.Command] {
 			t.Errorf("command %s is listed twice", cmd.Command)
 		}

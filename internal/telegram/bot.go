@@ -463,8 +463,9 @@ func validateBotCommands(commands []telego.BotCommand) error {
 	return errors.Join(errs...)
 }
 func (b *Bot) SetMyCommands() error {
-	commands := b.botCommands(false)
-	adminCommands := b.botCommands(true)
+	marker := b.loc("admin_marker")
+	commands := b.botCommands(false, marker)
+	adminCommands := b.botCommands(true, marker)
 	if err := errors.Join(validateBotCommands(commands), validateBotCommands(adminCommands)); err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ func TestRegistryShimKeepsHandlersWorking(t *testing.T) {
 	if prefix, cb := b.findCallback("answer:test"); cb == nil || prefix != "answer:" {
 		t.Fatalf("registry must resolve answer callback, got %q %v", prefix, cb)
 	}
-	if len(b.botCommands(false)) == 0 {
+	if len(b.botCommands(false, b.loc("admin_marker"))) == 0 {
 		t.Fatal("registry must list bot commands")
 	}
 }

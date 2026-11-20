@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
@@ -42,7 +43,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	teachers := s.bot.cache.GetTeachers()
 	input := strings.TrimSpace(u.Text)
 
-	if len(input) < 3 {
+	if utf8.RuneCountInString(input) < 3 {
 		return u.Bot.SendText(u.ChatID, s.bot.loc("histtext_3"))
 	}
 

@@ -1,0 +1,18 @@
+# Go files that may hold Cyrillic string literals, one path per line with a
+# reason after " — ". Everything else must keep its text in
+# internal/i18n/locales/*.json and reach the user through Bot.loc/locData.
+# tests/text_locales_test.go fails when a literal shows up outside this list.
+internal/image/golden.go — sample timetable cells the golden renders are compared against
+internal/parity/parity.go — suffixes the legacy texts carry, trimmed only for comparison
+internal/parser/calls.go — bell-schedule page markup and labels the parser reads
+internal/parser/group.go — group page markup, elective type and comment markers
+internal/parser/table.go — weekday headings and cabinet prefixes of the site
+internal/parser/teacher.go — teacher page markup
+internal/rooms/rooms.go — cabinet prefix used to clean the site rooms
+internal/search/normalize.go — ё/е fold shared by every search
+internal/search/translit.go — Cyrillic keyboard layout and transliteration tables
+internal/telegram/archive.go — the /archive week matcher accepts the Russian word
+internal/telegram/commands.go — the calculator alphabet includes Cyrillic к as "000"
+internal/telegram/inputcmds.go — matchers for the localized reply-keyboard buttons
+internal/telegram/surface.go — sample chats the parity surface walks
+internal/testgolden/golden.go — regexes that normalize Russian message goldens
