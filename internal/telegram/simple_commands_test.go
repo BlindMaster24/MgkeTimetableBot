@@ -70,3 +70,27 @@ func TestAPIKeyErrorsNameTheReason(t *testing.T) {
 		t.Fatalf("other error answer = %q, want api_error", got)
 	}
 }
+
+func TestRegexpListsEveryCommand(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+
+	answer := runCommand(t, b, caller, (&regexpCmd{bot: b}).Handler, userID, "/regexp")
+	if !strings.Contains(answer, "/start") || !strings.Contains(answer, "/alias") {
+		t.Fatalf("answer = %q, want the command names", answer)
+	}
+	lines := strings.Split(answer, "\n")
+	for i := 1; i < len(lines); i++ {
+		if lines[i-1] > lines[i] {
+			t.Fatalf("commands are not sorted: %q before %q", lines[i-1], lines[i])
+		}
+	}
+}
+
+func TestVanishAnswersTheVacuumResult(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+
+	answer := runCommand(t, b, caller, (&vanishCmd{bot: b}).Handler, userID, "/vanish")
+	if !strings.Contains(answer, b.loc("admcmd_4")) {
+		t.Fatalf("answer = %q, want the vacuum confirmation", answer)
+	}
+}
