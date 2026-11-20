@@ -47,14 +47,6 @@ func (r *AliasRepository) List(userID int64) ([]Alias, error) {
 	return result, rows.Err()
 }
 
-func (r *AliasRepository) Count(userID int64) (int, error) {
-	r.db.mu.Lock()
-	defer r.db.mu.Unlock()
-	var count int
-	err := r.db.db.QueryRow(`SELECT COUNT(*) FROM aliases WHERE telegram_user_id = ?`, userID).Scan(&count)
-	return count, err
-}
-
 func (r *AliasRepository) Add(userID int64, key, value string) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
