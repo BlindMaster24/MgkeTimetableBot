@@ -694,10 +694,20 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	input := strings.TrimSpace(u.Text)
-	matched, _ := matchTeacherList(input, teachers, b.cache.GetTeamNames(), b.searchAliases(u.UserID))
+	matched, tooMany := matchTeacherList(input, teachers, b.cache.GetTeamNames(), b.searchAliases(u.UserID))
 
 	if len(matched) == 0 {
 		b.SendText(u.ChatID, b.loc("teacher_not_found"))
+		return
+	}
+	// The old bot refused to guess between several teachers, and so does the
+	// port: picking the first match silently set the wrong one.
+	if tooMany {
+		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_9"), replyMainMenu(b, chat))
+		return
+	}
+	if len(matched) > 1 {
+		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmpgrp_10")+strings.Join(matched, "\n"), replyMainMenu(b, chat))
 		return
 	}
 	chat.Teacher = matched[0]

@@ -26,7 +26,7 @@ type getGroupWeekCmd struct{ bot *Bot }
 
 func (c *getGroupWeekCmd) Name() string { return "/groupweek" }
 func (c *getGroupWeekCmd) Description() string {
-	return "Узнать расписание на неделю указанной группы (не зависит от текущего вашего)"
+	return c.bot.loc("cmd_group_week_desc")
 }
 func (c *getGroupWeekCmd) MatchText(text string) bool {
 	return groupWeekButtonRe.MatchString(text)
@@ -39,7 +39,7 @@ type getGroupImageCmd struct{ bot *Bot }
 
 func (c *getGroupImageCmd) Name() string { return "/groupimage" }
 func (c *getGroupImageCmd) Description() string {
-	return "Сгенерировать фотографию расписания группы (не зависит от текущего вашего)"
+	return c.bot.loc("cmd_group_image_desc")
 }
 func (c *getGroupImageCmd) MatchText(text string) bool {
 	return groupImageButtonRe.MatchString(text)
@@ -52,7 +52,7 @@ type getTeacherWeekCmd struct{ bot *Bot }
 
 func (c *getTeacherWeekCmd) Name() string { return "/teacherweek" }
 func (c *getTeacherWeekCmd) Description() string {
-	return "Узнать расписание на неделю указанного преподавателя (не зависит от текущего вашего)"
+	return c.bot.loc("cmd_teacher_week_desc")
 }
 func (c *getTeacherWeekCmd) MatchText(text string) bool {
 	return teacherWeekButtonRe.MatchString(text)
@@ -65,7 +65,7 @@ type getTeacherImageCmd struct{ bot *Bot }
 
 func (c *getTeacherImageCmd) Name() string { return "/teacherimage" }
 func (c *getTeacherImageCmd) Description() string {
-	return "Сгенерировать фотографию расписания преподавателя (не зависит от текущего вашего)"
+	return c.bot.loc("cmd_teacher_image_desc")
 }
 func (c *getTeacherImageCmd) MatchText(text string) bool {
 	return teacherImageButtonRe.MatchString(text)
@@ -305,7 +305,7 @@ func (c *setGroupCmd) Hidden() bool { return true }
 
 func (c *setGroupCmd) Name() string { return "/setgroup" }
 func (c *setGroupCmd) Description() string {
-	return "Изменить группу этого чата"
+	return c.bot.loc("cmd_set_group_desc")
 }
 func (c *setGroupCmd) MatchText(text string) bool {
 	return strings.HasPrefix(strings.ToLower(text), "/setgroup")
@@ -324,7 +324,7 @@ func (c *setTeacherCmd) Hidden() bool { return true }
 
 func (c *setTeacherCmd) Name() string { return "/setteacher" }
 func (c *setTeacherCmd) Description() string {
-	return "Изменить преподавателя этого чата"
+	return c.bot.loc("cmd_set_teacher_desc")
 }
 func (c *setTeacherCmd) MatchText(text string) bool {
 	return strings.HasPrefix(strings.ToLower(text), "/setteacher")

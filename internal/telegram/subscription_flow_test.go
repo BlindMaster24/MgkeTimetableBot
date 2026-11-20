@@ -135,3 +135,43 @@ func TestSubscriptionSaveFailureIsReported(t *testing.T) {
 		t.Fatalf("answer = %q, want the storage hint", got)
 	}
 }
+
+func TestSetTeacherRefusesToGuess(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	b.GetRaspCache().SetTeachers(t.Context(), map[string]any{
+		"Сидорова Мария Петровна": map[string]any{"days": []any{}},
+		"Сидоров Пётр Иванович":   map[string]any{"days": []any{}},
+	}, "hash")
+
+	chat, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	u := &Update{Bot: b, ChatID: userID, UserID: userID, Text: "Сидоров"}
+	b.handleSetTeacher(t.Context(), u, chat)
+
+	got := caller.last()
+	if !strings.Contains(got, b.loc("cmpgrp_10")) {
+		t.Fatalf("answer = %q, want the ambiguity hint", got)
+	}
+	saved, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	if saved.Mode != ModeStudent || saved.Teacher != "" {
+		t.Fatalf("the chat was changed to %+v, want the student mode kept", saved)
+	}
+}
+
+func TestSetTeacherStillAcceptsAUniqueName(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	b.GetRaspCache().SetTeachers(t.Context(), map[string]any{
+		"Сидорова Мария Петровна": map[string]any{"days": []any{}},
+	}, "hash")
+
+	chat, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	u := &Update{Bot: b, ChatID: userID, UserID: userID, Text: "Сидорова"}
+	b.handleSetTeacher(t.Context(), u, chat)
+
+	saved, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	if saved.Mode != ModeTeacher || saved.Teacher != "Сидорова Мария Петровна" {
+		t.Fatalf("chat = %+v, want the teacher mode", saved)
+	}
+	if got := caller.last(); !strings.Contains(got, b.loc("about_bot")) {
+		t.Fatalf("answer = %q, want the about text the scene answers with", got)
+	}
+}
