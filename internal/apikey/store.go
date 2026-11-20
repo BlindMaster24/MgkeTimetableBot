@@ -84,18 +84,7 @@ func (s *Store) Rotate(chatID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	result, err := s.db.Exec(`UPDATE api_keys SET iv = ? WHERE chat_id = ?`, iv, chatID)
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return ErrKeyNotFound
-	}
-	return nil
+	return s.updateKey(`UPDATE api_keys SET iv = ? WHERE chat_id = ?`, iv, chatID)
 }
 
 func (s *Store) ByChatID(chatID int64) (*Key, error) {
@@ -141,7 +130,13 @@ func (s *Store) SetLimit(chatID int64, limit int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	result, err := s.db.Exec(`UPDATE api_keys SET limit_per_sec = ? WHERE chat_id = ?`, limit, chatID)
+	return s.updateKey(`UPDATE api_keys SET limit_per_sec = ? WHERE chat_id = ?`, limit, chatID)
+}
+
+// updateKey runs a one-row update and turns a missing row into ErrKeyNotFound,
+// so every caller reports the same answer for an unknown chat.
+func (s *Store) updateKey(query string, args ...any) error {
+	result, err := s.db.Exec(query, args...)
 	if err != nil {
 		return err
 	}
