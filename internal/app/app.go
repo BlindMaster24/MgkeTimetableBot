@@ -402,7 +402,7 @@ func (r *runtime) afterParse(ctx context.Context) {
 	}
 }
 
-func (r *runtime) startParser(ctx context.Context) {
+func (r *runtime) startParser(ctx context.Context) <-chan struct{} {
 	r.drainEvents(ctx, "startup")
 
 	parserLoop := parserpkg.LoopConfigFrom(r.cfg)
@@ -431,7 +431,7 @@ func (r *runtime) startParser(ctx context.Context) {
 	}
 
 	if !r.cfg.Parser.Enabled {
-		return
+		return nil
 	}
 
 	go parserpkg.RunLoop(ctx, parserLoop, r.log, func() error { return parseOnce(false) })
@@ -442,7 +442,9 @@ func (r *runtime) startParser(ctx context.Context) {
 		Ints("activity_hours", parserLoop.Activity[:]).
 		Msg("parser loop started")
 
+	initialDone := make(chan struct{})
 	go func() {
+		defer close(initialDone)
 		r.log.Info().Msg("initial parse starting")
 		if err := parseOnce(false); err != nil {
 			r.log.Error().Err(err).Msg("initial parse failed")
@@ -450,6 +452,7 @@ func (r *runtime) startParser(ctx context.Context) {
 		}
 		r.log.Info().Int("groups", len(r.cache.GetGroups())).Int("teachers", len(r.cache.GetTeachers())).Msg("initial parse done")
 	}()
+	return initialDone
 }
 
 // serve runs the bot until the signal context ends and saves the state.

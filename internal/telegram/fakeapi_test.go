@@ -288,7 +288,19 @@ func TestBotOverRealHTTPWebhookReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go func() { _ = b.consumeUpdates(ctx, updates) }()
+	consumerDone := make(chan struct{})
+	go func() {
+		defer close(consumerDone)
+		_ = b.consumeUpdates(ctx, updates)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-consumerDone:
+		case <-time.After(5 * time.Second):
+			t.Error("the webhook consumer did not stop")
+		}
+	})
 
 	request, err := http.NewRequest(http.MethodPost, server.URL+settings.Path,
 		strings.NewReader(fakeUpdateJSON(t, 2, userID, "/start")))

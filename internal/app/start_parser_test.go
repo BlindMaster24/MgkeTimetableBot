@@ -35,14 +35,14 @@ func TestStartParserLoadsTheInitialDump(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	r.startParser(ctx)
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if len(r.cache.GetGroups()) == 3 && len(r.cache.GetTeachers()) == 2 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	initialDone := r.startParser(ctx)
+	if initialDone == nil {
+		t.Fatal("an enabled parser must report the initial parse")
+	}
+	select {
+	case <-initialDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the initial parse did not finish")
 	}
 	if got := len(r.cache.GetGroups()); got != 3 {
 		t.Fatalf("groups = %d, want the initial parse to seed 3", got)
