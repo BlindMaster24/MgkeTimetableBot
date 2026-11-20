@@ -187,8 +187,9 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_24"))
 	}
 	// One over-long text would be rejected for every chat in the broadcast, so
-	// the admin hears about it before anything is sent.
-	if utf8.RuneCountInString(text) > telegramTextLimit {
+	// the admin hears about it before anything is sent. The check runs on the
+	// MarkdownV2 form, which is the longest one the transport can produce.
+	if utf8.RuneCountInString(markdownV2(text)) > telegramTextLimit {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_too_long"))
 	}
 
