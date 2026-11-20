@@ -62,6 +62,9 @@ type Bot struct {
 	answered     sync.Map
 }
 
+// telegramTextLimit is the Bot API limit for one message text, in characters.
+const telegramTextLimit = 4096
+
 type Update struct {
 	Bot       *Bot
 	Message   *telego.Message

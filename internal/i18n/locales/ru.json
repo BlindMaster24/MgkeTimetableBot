@@ -514,6 +514,7 @@
   "cmd_teacher_image_desc": "Сгенерировать фотографию расписания преподавателя (не зависит от текущего вашего)",
   "cmd_set_group_desc": "Изменить группу этого чата",
   "cmd_set_teacher_desc": "Изменить преподавателя этого чата",
+  "admintext_too_long": "Сообщение слишком длинное: Telegram принимает не больше 4096 символов.",
   "admin_marker": "[адм] ",
   "set_teacher_syntax": "Неправильный синтаксис команды\n\nПример:\n/setTeacher {{.Teacher}}",
   "calls_parse_saturday": "суббот",

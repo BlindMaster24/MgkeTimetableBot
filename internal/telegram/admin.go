@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 )
@@ -184,6 +185,11 @@ func (c *sendCmd) Handler(ctx context.Context, u *Update) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_24"))
+	}
+	// One over-long text would be rejected for every chat in the broadcast, so
+	// the admin hears about it before anything is sent.
+	if utf8.RuneCountInString(text) > telegramTextLimit {
+		return u.Bot.SendText(u.ChatID, c.bot.loc("admintext_too_long"))
 	}
 
 	if !c.bot.broadcast.TryLock() {
