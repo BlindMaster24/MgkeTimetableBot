@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
@@ -48,6 +50,12 @@ func newParseRuntime(t *testing.T) *runtime {
 	cfg.Parser.Endpoints.BellSchedule = "http://example.test/calls"
 	cfg.Parser.Endpoints.Team = []string{"http://example.test/team"}
 	cfg.Telegram.Token = "123456:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	// Keep the bot offline: every Bot API call goes to this stub.
+	apiStub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true,"result":true}`))
+	}))
+	t.Cleanup(apiStub.Close)
+	cfg.Telegram.APIBaseURL = apiStub.URL
 
 	chats, err := telegrambot.New(t.TempDir() + "/chats.db")
 	if err != nil {
