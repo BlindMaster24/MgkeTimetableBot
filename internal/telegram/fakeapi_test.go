@@ -351,6 +351,9 @@ func TestBotOverRealHTTPWebhookTransportStopsWithTheContext(t *testing.T) {
 
 	api := newFakeTelegramAPI(t)
 	b, repo := setupE2EBotWithFakeAPI(t, api, 999)
+	// The acceptance notice is not what this test measures, and sending it
+	// while the test tears the repo down used to crash the coverage build.
+	repo.SetDefaultAccepted(true)
 
 	chat, err := repo.FindOrCreate("telegram", userID)
 	if err != nil {
