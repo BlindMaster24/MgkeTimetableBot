@@ -203,6 +203,7 @@ func (r *runtime) openChats() bool {
 // startAPI creates the HTTP server and restores the persisted health state.
 func (r *runtime) startAPI() bool {
 	r.api = api.NewServer(r.cache, r.cfg.HTTP.Port, r.metrics, r.build, r.keys, r.loc)
+	r.api.SetLogger(r.log)
 
 	if err := r.metrics.Restore(r.chats); err != nil {
 		r.log.Warn().Err(err).Msg("failed to restore health metrics")

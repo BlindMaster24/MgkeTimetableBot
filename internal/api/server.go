@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/rs/zerolog"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/apikey"
@@ -39,6 +41,8 @@ type Server struct {
 	metricsPath    string
 	metricsToken   string
 	metricsSources MetricsSources
+
+	logger *zerolog.Logger
 }
 
 func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info, keys *apikey.Store, loc *i18n.Localizer) *Server {
@@ -85,6 +89,12 @@ func (w *captureWriter) Write(data []byte) (int, error) {
 	return w.ResponseWriter.Write(data)
 }
 
+// SetLogger makes the server report failed requests. A nil logger keeps the
+// API silent, which is what the embedders without a logger expect.
+func (s *Server) SetLogger(logger *zerolog.Logger) {
+	s.logger = logger
+}
+
 func (s *Server) observe() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -94,13 +104,30 @@ func (s *Server) observe() gin.HandlerFunc {
 		defer func() {
 			if value := recover(); value != nil {
 				s.recordAPI(c, writer, start, http.StatusInternalServerError, fmt.Sprint(value))
+				s.logFailure(c, http.StatusInternalServerError, fmt.Sprint(value))
 				panic(value)
 			}
-			s.recordAPI(c, writer, start, writer.Status(), writer.body.String())
+			status := writer.Status()
+			s.recordAPI(c, writer, start, status, writer.body.String())
+			if status >= http.StatusInternalServerError {
+				s.logFailure(c, status, writer.body.String())
+			}
 		}()
 
 		c.Next()
 	}
+}
+
+func (s *Server) logFailure(c *gin.Context, status int, detail string) {
+	if s.logger == nil {
+		return
+	}
+	s.logger.Error().
+		Str("method", c.Request.Method).
+		Str("path", apiPath(c)).
+		Int("status", status).
+		Str("detail", strings.TrimSpace(detail)).
+		Msg("api request failed")
 }
 
 func (s *Server) authorize() gin.HandlerFunc {
