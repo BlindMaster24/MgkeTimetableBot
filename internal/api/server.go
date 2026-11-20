@@ -42,7 +42,13 @@ type Server struct {
 	metricsToken   string
 	metricsSources MetricsSources
 
-	logger *zerolog.Logger
+	logger ErrorLogger
+}
+
+// ErrorLogger is the little slice of the logging API the server needs, so the
+// owner can pass its own logger wrapper instead of a zerolog value.
+type ErrorLogger interface {
+	Error() *zerolog.Event
 }
 
 func NewServer(cache *cache.RaspCache, port int, tracker *health.Tracker, info build.Info, keys *apikey.Store, loc *i18n.Localizer) *Server {
@@ -91,7 +97,7 @@ func (w *captureWriter) Write(data []byte) (int, error) {
 
 // SetLogger makes the server report failed requests. A nil logger keeps the
 // API silent, which is what the embedders without a logger expect.
-func (s *Server) SetLogger(logger *zerolog.Logger) {
+func (s *Server) SetLogger(logger ErrorLogger) {
 	s.logger = logger
 }
 
