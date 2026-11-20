@@ -343,6 +343,65 @@ func (r *runtime) configureMetrics() {
 }
 
 // startParser wires the fetcher and starts the parse loop.
+
+// parseProbe is the part of the fetcher the parse cycle needs. It exists so
+// the cycle (due checks, success flag, logs, follow-up work) can be tested
+// without the network.
+type parseProbe interface {
+	Timetable(ctx context.Context, groupURL, teacherURL string) error
+	Calls(ctx context.Context, url string) error
+	Team(ctx context.Context, urls []string) error
+}
+
+// parseOnce runs one parse cycle: the timetable always, calls and team by
+// their intervals (or all three when force is set), then records the result
+// and refreshes the derived stores in the background.
+func (r *runtime) parseOnce(ctx context.Context, probe parseProbe, loop parserpkg.LoopConfig, force bool) error {
+	started := time.Now()
+
+	parseErr := probe.Timetable(ctx, r.cfg.Parser.Endpoints.TimetableGroup, r.cfg.Parser.Endpoints.TimetableTeacher)
+	if loop.CallsEnabled && (force || r.cache.CallsDue(started, loop.CallsInterval)) {
+		parseErr = errors.Join(parseErr, probe.Calls(ctx, r.cfg.Parser.Endpoints.BellSchedule))
+	}
+	if force || r.cache.TeamDue(started, loop.TeamInterval) {
+		parseErr = errors.Join(parseErr, probe.Team(ctx, r.cfg.Parser.Endpoints.Team))
+	}
+
+	r.cache.SetSuccessUpdate(ctx, parseErr == nil)
+
+	if parseErr != nil {
+		r.metrics.ParserFailure(parseErr)
+		r.bot.AddParseLog(false, parseErr.Error())
+		if r.notifier != nil {
+			go r.notifier.ParserError(parseErr)
+		}
+	} else {
+		r.metrics.ParserSuccess(time.Since(started))
+		r.bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(r.cache.GetGroups()), len(r.cache.GetTeachers())))
+		r.drainEvents(ctx, "parse")
+	}
+
+	go r.afterParse(ctx)
+
+	return parseErr
+}
+
+// afterParse refreshes everything that is derived from the cache. The stores
+// are optional so the cycle can run in tests without them.
+func (r *runtime) afterParse(ctx context.Context) {
+	if r.archive != nil {
+		r.syncArchive(ctx, "parse")
+	}
+	if r.google != nil {
+		if _, err := r.syncCalendars(ctx, "parse"); err != nil {
+			r.log.Error().Err(err).Msg("calendar sync failed")
+		}
+	}
+	if r.metrics != nil {
+		r.saveMetrics("parse")
+	}
+}
+
 func (r *runtime) startParser(ctx context.Context) {
 	r.drainEvents(ctx, "startup")
 
@@ -363,39 +422,7 @@ func (r *runtime) startParser(ctx context.Context) {
 		OnReport: onParserReport,
 	})
 
-	parseOnce := func(force bool) error {
-		started := time.Now()
-
-		parseErr := fetcher.Timetable(ctx, r.cfg.Parser.Endpoints.TimetableGroup, r.cfg.Parser.Endpoints.TimetableTeacher)
-		if parserLoop.CallsEnabled && (force || r.cache.CallsDue(started, parserLoop.CallsInterval)) {
-			parseErr = errors.Join(parseErr, fetcher.Calls(ctx, r.cfg.Parser.Endpoints.BellSchedule))
-		}
-		if force || r.cache.TeamDue(started, parserLoop.TeamInterval) {
-			parseErr = errors.Join(parseErr, fetcher.Team(ctx, r.cfg.Parser.Endpoints.Team))
-		}
-
-		r.cache.SetSuccessUpdate(ctx, parseErr == nil)
-
-		if parseErr != nil {
-			r.metrics.ParserFailure(parseErr)
-			r.bot.AddParseLog(false, parseErr.Error())
-			if r.notifier != nil {
-				go r.notifier.ParserError(parseErr)
-			}
-		} else {
-			r.metrics.ParserSuccess(time.Since(started))
-			r.bot.AddParseLog(true, fmt.Sprintf("groups=%d teachers=%d", len(r.cache.GetGroups()), len(r.cache.GetTeachers())))
-			r.drainEvents(ctx, "parse")
-		}
-
-		go func() {
-			r.syncArchive(ctx, "parse")
-			r.syncCalendars(ctx, "parse")
-			r.saveMetrics("parse")
-		}()
-
-		return parseErr
-	}
+	parseOnce := func(force bool) error { return r.parseOnce(ctx, fetcher, parserLoop, force) }
 
 	r.bot.SetParseFunc(func() error { return parseOnce(true) })
 
