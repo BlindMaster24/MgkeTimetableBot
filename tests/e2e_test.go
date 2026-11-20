@@ -143,7 +143,7 @@ func TestE2E_ChangedDayReachesOnlyInterestedChats(t *testing.T) {
 	newChat(t, repo, 5002, "100", false)
 
 	subscriber := newChat(t, repo, 5003, "999", true)
-	if _, err := repo.AddSubscription(subscriber.ID, "group", "200"); err != nil {
+	if _, err := repo.AddSubscription(subscriber.PeerID, "group", "200"); err != nil {
 		t.Fatal(err)
 	}
 

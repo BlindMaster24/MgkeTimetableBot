@@ -335,7 +335,7 @@ func (r *Repository) FindSubscribedChatsByGroup(service, group string, noticeCha
 	defer r.mu.RUnlock()
 
 	query := `SELECT ` + selectEventChats("c.") + ` FROM bot_chats c
-		 JOIN subscriptions s ON s.chat_id = c.id AND s.type = 'group' AND s.value = ?
+		 JOIN subscriptions s ON s.chat_id = c.peer_id AND s.type = 'group' AND s.value = ?
 		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1`
 	query += noticeChangesFilter("c.", noticeChanges)
 
@@ -353,7 +353,7 @@ func (r *Repository) FindSubscribedChatsByTeacher(service, teacher string, notic
 	defer r.mu.RUnlock()
 
 	query := `SELECT ` + selectEventChats("c.") + ` FROM bot_chats c
-		 JOIN subscriptions s ON s.chat_id = c.id AND s.type = 'teacher' AND s.value = ?
+		 JOIN subscriptions s ON s.chat_id = c.peer_id AND s.type = 'teacher' AND s.value = ?
 		 WHERE c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1`
 	query += noticeChangesFilter("c.", noticeChanges)
 

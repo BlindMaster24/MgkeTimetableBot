@@ -9,7 +9,7 @@ func (r *Repository) CountSubscriptionsByType(service, subType string) (int, err
 	var count int
 	err := r.db.QueryRow(
 		`SELECT COUNT(DISTINCT s.chat_id) FROM subscriptions s
-		 JOIN bot_chats c ON c.id = s.chat_id
+		 JOIN bot_chats c ON c.peer_id = s.chat_id
 		 WHERE s.type = ? AND c.service = ? AND c.accepted = 1 AND c.allow_send_mess = 1`,
 		subType, service,
 	).Scan(&count)

@@ -103,7 +103,7 @@ func TestEventChatFinderMatchesTheNotifierContract(t *testing.T) {
 	if err := repo.Save(chat); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.AddSubscription(chat.ID, "group", "100"); err != nil {
+	if _, err := repo.AddSubscription(chat.PeerID, "group", "100"); err != nil {
 		t.Fatal(err)
 	}
 
