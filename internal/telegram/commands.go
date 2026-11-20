@@ -902,7 +902,12 @@ func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
 		return
 	}
 
-	added, _ := b.chatRepo.AddSubscription(u.UserID, "group", matched)
+	added, err := b.chatRepo.AddSubscription(u.UserID, "group", matched)
+	if err != nil {
+		b.log.Error().Err(err).Int64("chatID", u.UserID).Str("group", matched).Msg("failed to store the subscription")
+		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("data_not_loaded"), b.replySubscriptionsMenu())
+		return
+	}
 	if added {
 		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf(b.loc("cmdtext_30"), matched), b.replySubscriptionsMenu())
 		return
@@ -928,7 +933,12 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 		return
 	}
 
-	added, _ := b.chatRepo.AddSubscription(u.UserID, "teacher", matched)
+	added, err := b.chatRepo.AddSubscription(u.UserID, "teacher", matched)
+	if err != nil {
+		b.log.Error().Err(err).Int64("chatID", u.UserID).Str("teacher", matched).Msg("failed to store the subscription")
+		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("data_not_loaded"), b.replySubscriptionsMenu())
+		return
+	}
 	if added {
 		b.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf(b.loc("cmdtext_32"), matched), b.replySubscriptionsMenu())
 		return

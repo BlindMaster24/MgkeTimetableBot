@@ -115,3 +115,23 @@ func TestSubscriptionAddTeacherFindsASingleMatch(t *testing.T) {
 		t.Fatalf("subscriptions = %+v, want one teacher", subs)
 	}
 }
+
+func TestSubscriptionSaveFailureIsReported(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	cacheWithGroups(t, b, "200")
+
+	chat, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	chat.Scene = sceneSubAddGroup
+	_ = b.chatRepo.Save(chat)
+
+	// Closing the database makes the insert fail the way a broken store would.
+	if err := b.chatRepo.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	b.handleSubAddGroup(t.Context(), &Update{Bot: b, ChatID: userID, UserID: userID, Text: "200"}, chat)
+
+	if got := caller.last(); !strings.Contains(got, b.loc("data_not_loaded")) {
+		t.Fatalf("answer = %q, want the storage hint", got)
+	}
+}
