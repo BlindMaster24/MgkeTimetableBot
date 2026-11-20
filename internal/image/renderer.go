@@ -140,17 +140,16 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 
 	const (
 		padding     = 10
-		titleBandH  = 60
+		titleBandH  = 70
 		titleFont   = 30
 		dayTitleH   = 30
-		colHeaderH  = 26
 		minRowH     = 28
 		lineH       = 18
 		cellPadX    = 6
 		cellPadY    = 5
 		footerBandH = 40
 		footerFont  = 8
-		logoSize    = 70
+		logoSize    = 40
 	)
 
 	colsWidth := 0
@@ -193,7 +192,7 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		}
 		rowHeights[di] = heights
 
-		tableH := float64(dayTitleH+colHeaderH) + 4
+		tableH := float64(dayTitleH) + 4
 		for _, h := range heights {
 			tableH += h
 		}
@@ -220,12 +219,14 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 		return "", fmt.Errorf("no suitable font found on this system")
 	}
 
+	// The logo has to stay inside the title band: the tables are painted after
+	// it, so anything taller than the band disappears under the first row.
 	if logo, err := png.Decode(bytes.NewReader(logoPNG)); err == nil {
 		bounds := logo.Bounds()
 		if bounds.Dx() > 0 && bounds.Dy() > 0 {
 			scale := float64(logoSize) / float64(bounds.Dx())
 			dc.Push()
-			dc.Translate(padding, padding)
+			dc.Translate(padding, float64(titleBandH-logoSize)/2)
 			dc.Scale(scale, scale)
 			dc.DrawImageAnchored(logo, 0, 0, 0, 0)
 			dc.Pop()
@@ -238,11 +239,10 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 	if !isGroup {
 		title = fmt.Sprintf(titleFormat(r.texts.TeacherTitle), ti.Teacher)
 	}
-	dc.DrawStringAnchored(title, float64(totalW)/2, 45, 0.5, 0.5)
+	dc.DrawStringAnchored(title, float64(totalW)/2, float64(titleBandH)/2+4, 0.5, 0.5)
 
 	grid := color.RGBA{R: 205, G: 205, B: 205, A: 255}
 	headFill := color.RGBA{R: 242, G: 242, B: 242, A: 255}
-	subHeadFill := color.RGBA{R: 248, G: 248, B: 248, A: 255}
 
 	for row := 0; row < rows; row++ {
 		for col := 0; col < cellsPerRow; col++ {
@@ -265,20 +265,7 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 			dc.LoadFontFace(fontPath, 18)
 			dc.DrawStringAnchored(fmt.Sprintf("%s, %s", day.Weekday, day.Date), tx+tableW/2, ty+float64(dayTitleH)/2, 0.5, 0.5)
 
-			dc.SetColor(subHeadFill)
-			dc.DrawRectangle(tx, ty+dayTitleH, tableW, colHeaderH)
-			dc.Fill()
-
-			dc.SetColor(color.Black)
-			dc.LoadFontFace(fontPath, 14)
-			headerY := ty + float64(dayTitleH) + float64(colHeaderH)/2
-			cx := tx
-			for _, c := range cols {
-				dc.DrawStringAnchored(c.Title, cx+float64(c.Width)/2, headerY, 0.5, 0.5)
-				cx += float64(c.Width)
-			}
-
-			bodyTop := ty + float64(dayTitleH+colHeaderH)
+			bodyTop := ty + float64(dayTitleH)
 			ry := bodyTop
 			for i := 0; i < maxLessons; i++ {
 				rowH := heights[i]
@@ -312,7 +299,7 @@ func (r *Renderer) renderTimetable(ti TimetableImage, isGroup bool) (string, err
 
 			dc.SetColor(grid)
 			dc.SetLineWidth(1)
-			cx = tx
+			cx := tx
 			for _, c := range cols {
 				cx += float64(c.Width)
 				dc.DrawLine(cx, ty, cx, bodyBottom)
