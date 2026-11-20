@@ -1,6 +1,8 @@
 package apikey
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"testing"
@@ -177,5 +179,64 @@ func TestLimiterKeepsKeysApart(t *testing.T) {
 	}
 	if limiter.Allow(1, 1) {
 		t.Fatal("the first key must be limited")
+	}
+}
+
+func TestABase64SecretMatchesTheRawKeyBytes(t *testing.T) {
+	raw := make([]byte, 32)
+	for i := range raw {
+		raw[i] = byte(i * 7)
+	}
+	encoded := base64.StdEncoding.EncodeToString(raw)
+
+	fromRaw := NewTool(string(raw))
+	fromBase64 := NewTool("base64:" + encoded)
+	iv := []byte("0123456789abcdef")
+
+	token, err := fromRaw.Encode(42, iv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, parsedIV, err := fromBase64.Decode(token)
+	if err != nil {
+		t.Fatalf("decode with the base64 secret: %v", err)
+	}
+	if id != 42 || string(parsedIV) != string(iv) {
+		t.Fatalf("decoded id = %d, iv = %q", id, parsedIV)
+	}
+
+	// A legacy token was built from the raw bytes, so the base64 form must
+	// produce exactly the same string.
+	legacy, err := fromBase64.Encode(42, iv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy != token {
+		t.Fatalf("base64 secret encodes %q, raw bytes encode %q", legacy, token)
+	}
+}
+
+func TestLegacyTypeScriptTokenDecodesHere(t *testing.T) {
+	// Built by the old TypeScript bot from this exact key and iv; keep the pair
+	// so a migrated database keeps its tokens valid.
+	const legacy = "YD8F7WrLD9NSdUWVtZCN4dDRfVjUcRiURNnPYYexh0IzjOlozD0lVv7ew2mvrYHdQ643xQ"
+	tool := NewTool("base64:VrbPG9ccdGJSp3zWF2X/F8PJGqV9FzbHyVXWCNYs7XM=")
+
+	id, iv, err := tool.Decode(legacy)
+	if err != nil {
+		t.Fatalf("decode the legacy token: %v", err)
+	}
+	if id != 137 {
+		t.Fatalf("id = %d, want 137", id)
+	}
+	if got := hex.EncodeToString(iv); got != "d471189444d9cf6187b18742338ce968" {
+		t.Fatalf("iv = %s", got)
+	}
+	again, err := tool.Encode(id, iv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != legacy {
+		t.Fatalf("re-encoded token = %s", again)
 	}
 }

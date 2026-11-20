@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"strings"
 )
 
 const (
@@ -29,7 +30,18 @@ type Tool struct {
 	secret []byte
 }
 
+// secretPrefix marks an encrypt_key that holds the raw key bytes encoded as
+// base64. The legacy TypeScript bot took encrypt_key straight from a base64
+// constant, so a database migrated from it keeps its API tokens readable only
+// when the same 32 bytes are used here.
+const secretPrefix = "base64:"
+
 func newTool(secret string) *Tool {
+	if encoded, ok := strings.CutPrefix(secret, secretPrefix); ok {
+		if raw, err := base64.StdEncoding.DecodeString(encoded); err == nil {
+			return &Tool{secret: raw}
+		}
+	}
 	return &Tool{secret: []byte(secret)}
 }
 
