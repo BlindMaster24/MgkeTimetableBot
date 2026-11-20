@@ -2,8 +2,11 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/mymmrac/telego"
 )
 
 func TestAliasAddRejectsInputWithoutBothSides(t *testing.T) {
@@ -118,5 +121,48 @@ func TestSendGroupResultFallsBackToTheTextSchedule(t *testing.T) {
 	}
 	if chat.Scene != "" {
 		t.Fatalf("the scene must be cleared, got %q", chat.Scene)
+	}
+}
+
+func TestAliasRemoveKeyboardKeepsThePayloadShort(t *testing.T) {
+	b, _, _, _ := setupArchiveBot(t, ModeStudent, "100", "")
+	long := strings.Repeat("Длинный-алиас-", 6)
+	aliases := []Alias{{ID: 7, Key: long, Value: long}}
+
+	for _, row := range aliasRemoveKeyboard(b, aliases).InlineKeyboard {
+		for _, button := range row {
+			if len(button.CallbackData) > 64 {
+				t.Fatalf("callback data %q is %d bytes, the Bot API allows 64", button.CallbackData, len(button.CallbackData))
+			}
+			if strings.HasPrefix(button.CallbackData, "alias:del:") && button.CallbackData != "alias:del:7" {
+				t.Fatalf("callback data = %q, want the row id", button.CallbackData)
+			}
+		}
+	}
+}
+
+func TestAliasRemovalUsesTheRowID(t *testing.T) {
+	b, caller, _, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	if err := b.aliasRepo.Add(userID, "мат", "Математика"); err != nil {
+		t.Fatal(err)
+	}
+	list, err := b.aliasRepo.List(userID)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("aliases = %v, %v", list, err)
+	}
+
+	u := &Update{Bot: b, ChatID: userID, UserID: userID, Data: fmt.Sprintf("alias:del:%d", list[0].ID), Callback: &telego.CallbackQuery{ID: "cb-1"}}
+	if err := (&aliasDelCb{bot: b}).Handler(t.Context(), u); err != nil {
+		t.Fatal(err)
+	}
+	rest, err := b.aliasRepo.List(userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rest) != 0 {
+		t.Fatalf("aliases after removal = %v, want none", rest)
+	}
+	if got := caller.last(); !strings.Contains(got, b.loc("aliastext_9")) {
+		t.Fatalf("answer = %q, want the empty list hint", got)
 	}
 }

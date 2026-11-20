@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
@@ -77,6 +78,13 @@ func (r *AliasRepository) Remove(userID int64, key string) error {
 	return err
 }
 
+func (r *AliasRepository) RemoveByID(userID int64, id int64) error {
+	r.db.mu.Lock()
+	defer r.db.mu.Unlock()
+	_, err := r.db.db.Exec(`DELETE FROM aliases WHERE telegram_user_id = ? AND id = ?`, userID, id)
+	return err
+}
+
 func (r *AliasRepository) Clear(userID int64) error {
 	r.db.mu.Lock()
 	defer r.db.mu.Unlock()
@@ -142,8 +150,10 @@ func aliasMenuLabel(b *Bot) string {
 func aliasRemoveKeyboard(b *Bot, aliases []Alias) *telego.InlineKeyboardMarkup {
 	var rows [][]telego.InlineKeyboardButton
 	for _, a := range aliases {
+		// The callback carries the row id: a long alias would blow the 64 byte
+		// limit of the payload and Telegram would reject the whole keyboard.
 		rows = append(rows, []telego.InlineKeyboardButton{
-			{Text: fmt.Sprintf("❌ %s → %s", a.Key, a.Value), CallbackData: fmt.Sprintf("alias:del:%s", a.Key)},
+			{Text: fmt.Sprintf("❌ %s → %s", a.Key, a.Value), CallbackData: fmt.Sprintf("alias:del:%d", a.ID)},
 		})
 	}
 	rows = append(rows, []telego.InlineKeyboardButton{
@@ -157,8 +167,14 @@ type aliasDelCb struct{ bot *Bot }
 func (cb *aliasDelCb) Prefix() string { return "alias:del:" }
 func (cb *aliasDelCb) Handler(ctx context.Context, u *Update) error {
 	cb.bot.AnswerCallback(u.Callback.ID, "")
-	key := strings.TrimPrefix(u.Data, "alias:del:")
-	cb.bot.aliasRepo.Remove(u.UserID, key)
+	id, err := strconv.ParseInt(strings.TrimPrefix(u.Data, "alias:del:"), 10, 64)
+	if err != nil {
+		return cb.bot.showAliasRemoveList(u, u.UserID)
+	}
+	if err := cb.bot.aliasRepo.RemoveByID(u.UserID, id); err != nil {
+		cb.bot.log.Error().Err(err).Int64("userID", u.UserID).Int64("alias", id).Msg("failed to remove the alias")
+		return u.Bot.SendText(u.ChatID, cb.bot.loc("data_not_loaded"))
+	}
 	return cb.bot.showAliasRemoveList(u, u.UserID)
 }
 
