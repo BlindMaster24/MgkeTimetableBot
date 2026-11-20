@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/ratelimit"
 )
 
 func (b *Bot) isAdmin(userID int64) bool {
@@ -224,25 +225,16 @@ func (c *sendCmd) runBroadcast(chatID int64, progressID int, chats []*Chat, text
 	sent := 0
 	failed := 0
 	total := len(chats)
-	sentTimestamps := make([]time.Time, 0, 25)
+	limiter := ratelimit.New(ratelimit.DefaultPerSecond)
 	lastEdit := time.Now()
 
 	for i, chat := range chats {
-		now := time.Now()
-		if len(sentTimestamps) >= 25 {
-			oldest := sentTimestamps[0]
-			waitUntil := oldest.Add(60 * time.Second)
-			if waitUntil.After(now) {
-				time.Sleep(waitUntil.Sub(now))
-			}
-			sentTimestamps = sentTimestamps[1:]
-		}
+		limiter.Wait()
 
 		if err := c.bot.SendText(chat.PeerID, text); err != nil {
 			failed++
 		} else {
 			sent++
-			sentTimestamps = append(sentTimestamps, time.Now())
 		}
 
 		if time.Since(lastEdit) >= 1*time.Second || i == total-1 {

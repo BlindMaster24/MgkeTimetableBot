@@ -299,7 +299,7 @@ Available to the IDs listed in `telegram.admin_ids` only — the Telegram comman
 
 `/debug`, `/send`, `/trigger`, `/noticedebug`, `/archivestats`, `/forceparse`, `/resetcache`, `/flushcache`, `/acceptbot`, `/buttons_reload`, `/parserLogs`, `/parserhealth`, `/incidents`, `/webhook`, `/imagelayout`, `/backup`, `/restart`, `/sql`, `/regexp`, `/vanish`, `/math`, `/dev`, `/createApiKey`, `/requireNewButtons`, `/chat`, `/id`, `/error`, `/test`, `/indexToStrDate`, `/strToIndex`, `/endings`, `/subscriptions_test`, `/setgroup`, `/setteacher`, `/vychetkaDlyaBrovkiDSOnline`.
 
-`/send` broadcasts a message to every chat and throttles itself to 25 messages per minute to stay inside Telegram limits; the broadcast runs in the background so other commands are not held up, and a second `/send` while it runs answers that a broadcast is already in progress. A text longer than 4096 characters is refused up front, because Telegram would reject it for every chat.
+`/send` broadcasts a message to every chat at up to 30 messages per second, the Bot API ceiling for one bot, while every private chat still receives a single message; the broadcast runs in the background so other commands are not held up, and a second `/send` while it runs answers that a broadcast is already in progress. A text longer than 4096 characters is refused up front, because Telegram would reject it for every chat.
 
 `/parserhealth` prints a live parser health snapshot — state, run and error counts, the last success and failure, run duration, the layout problems (advisory ones that raise no alert included, such as a missing bell-schedule page date, next to the time the bell schedule was last parsed so freshness is still judged) and guard trips it found, the active alerts and the cache size — and can start a parse immediately instead of waiting for the next cycle.
 
@@ -780,6 +780,7 @@ internal/
   schedulediff/          — per-day timetable diff
   search/                — fuzzy search over groups, teachers and subjects
   sqlitedb/              — the single owner of SQLite connections: pool pin, busy timeout, verified journal mode, retries after a busy lock
+  ratelimit/             — the shared send-rate limiter (30 messages per second, the Bot API ceiling)
   preflight/             — pre-deploy check: config, credentials, webhook, Bot API, locale, storage, metrics, live site, image
   tgstub/                — stub Telegram Bot API for the container smoke test: records the bot calls and answers like Telegram
   testgolden/            — golden text normalization (tests only)
