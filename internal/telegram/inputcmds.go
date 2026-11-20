@@ -89,7 +89,7 @@ func (b *Bot) startGetGroup(ctx context.Context, u *Update, kind string) error {
 	}
 
 	chat.Scene = sceneGetGroup + ":" + kind
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	prompt := fmt.Sprintf("%s (например, %s)", b.loc("enter_group_number"), randomKey(groups))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, b.withCancelButton(groupHistoryKeyboard(chat)))
@@ -110,7 +110,7 @@ func (b *Bot) startGetTeacher(ctx context.Context, u *Update, kind string) error
 	}
 
 	chat.Scene = sceneGetTeacher + ":" + kind
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	prompt := fmt.Sprintf("Введите фамилию преподавателя или выберите из списка ниже (например, %s)", randomKey(teachers))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, b.withCancelButton(teacherHistoryKeyboard(chat)))
@@ -171,7 +171,7 @@ func (b *Bot) resolveGroupInput(ctx context.Context, u *Update, chat *Chat, inpu
 		chat.Mode = ModeStudent
 		chat.Teacher = ""
 		chat.Scene = ""
-		b.chatRepo.Save(chat)
+		b.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Группа этого чата была успешно изменена на '%s'", normalized), replyMainMenu(b, chat))
 	}
 
@@ -180,13 +180,13 @@ func (b *Bot) resolveGroupInput(ctx context.Context, u *Update, chat *Chat, inpu
 
 func (b *Bot) sendGroupError(u *Update, chat *Chat, msg string) error {
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, msg, replyMainMenu(b, chat))
 }
 
 func (b *Bot) sendGroupResult(ctx context.Context, u *Update, chat *Chat, group, kind string) error {
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	data := b.cache.GetGroups()[group]
 
@@ -230,7 +230,7 @@ func (b *Bot) resolveTeacherInput(ctx context.Context, u *Update, chat *Chat, in
 	}
 	if len(matched) > 1 {
 		chat.Scene = sceneGetTeacher + ":" + kind
-		b.chatRepo.Save(chat)
+		b.saveChat(chat)
 		msg := b.loc("cmpgrp_10") + strings.Join(matched, "\n")
 		return u.Bot.SendTextWithKeyboard(u.ChatID, msg, b.withCancelButton(verticalValuesKeyboard(matched)))
 	}
@@ -243,7 +243,7 @@ func (b *Bot) resolveTeacherInput(ctx context.Context, u *Update, chat *Chat, in
 		chat.Mode = ModeTeacher
 		chat.Group = ""
 		chat.Scene = ""
-		b.chatRepo.Save(chat)
+		b.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, fmt.Sprintf("Преподвателя этого чата был успешно изменен на '%s'", teacher), replyMainMenu(b, chat))
 	}
 
@@ -252,20 +252,20 @@ func (b *Bot) resolveTeacherInput(ctx context.Context, u *Update, chat *Chat, in
 
 func (b *Bot) sendTeacherError(u *Update, chat *Chat, msg string) error {
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, msg, replyMainMenu(b, chat))
 }
 
 func (b *Bot) sendTeacherResult(ctx context.Context, u *Update, chat *Chat, teacher, kind string) error {
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	data := b.cache.GetTeachers()[teacher]
 
 	switch kind {
 	case "week":
 		chat.Scene = sceneGetTeacherWeek + ":" + teacher
-		b.chatRepo.Save(chat)
+		b.saveChat(chat)
 		return u.Bot.SendTextWithKeyboard(u.ChatID, b.loc("history_enter_week"), b.withCancelButton(teacherHistoryKeyboard(chat)))
 	case "image":
 		_, days := b.relevantWeekDays(data)
@@ -294,7 +294,7 @@ func (s *teacherWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	}
 
 	chat.Scene = ""
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	return s.bot.showWeekDays(ctx, u, chat, "teacher", teacher, weekIndex)
 }

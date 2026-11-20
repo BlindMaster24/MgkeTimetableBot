@@ -19,7 +19,7 @@ func (s *callsEditInputScene) Handle(ctx context.Context, u *Update, chat *Chat)
 
 	chat.CallsEditInput = u.Text
 	chat.Scene = sceneCallsEditReason
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	reasonKb := s.bot.withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -36,7 +36,7 @@ func (s *callsEditReasonScene) Handle(ctx context.Context, u *Update, chat *Chat
 	reasonText := strings.TrimSpace(u.Text)
 	chat.CallsEditReason = reasonText
 	chat.Scene = sceneCallsEditConfirm
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	confirmKb := s.bot.withCancelButton(&telego.InlineKeyboardMarkup{
 		InlineKeyboard: [][]telego.InlineKeyboardButton{
@@ -65,7 +65,7 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 		chat.Scene = ""
 		chat.CallsEditInput = ""
 		chat.CallsEditReason = ""
-		s.bot.chatRepo.Save(chat)
+		s.bot.saveChat(chat)
 		return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_unrecognized"))
 	}
 
@@ -74,7 +74,7 @@ func (s *callsEditConfirmScene) Handle(ctx context.Context, u *Update, chat *Cha
 	chat.Scene = ""
 	chat.CallsEditInput = ""
 	chat.CallsEditReason = ""
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	if notifyNow {
 		return u.Bot.SendText(u.ChatID, s.bot.loc("calls_edit_done_notified"))

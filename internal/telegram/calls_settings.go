@@ -57,7 +57,7 @@ func (c *callsSettingsTextCmd) Handler(ctx context.Context, u *Update) error {
 		return c.bot.refreshCallsNow(u, chat)
 	case "edit":
 		chat.Scene = sceneCallsEditInput
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("callset_13"), c.bot.replyCancel())
 	case "source_site", "source_manual", "source_config":
 		source := strings.TrimPrefix(c.kind, "source_")

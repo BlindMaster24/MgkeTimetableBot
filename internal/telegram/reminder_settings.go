@@ -54,8 +54,6 @@ func (c *reminderLeadTextCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chat.ReminderLeadMinutes = c.minutes
-	if err := c.bot.chatRepo.Save(chat); err != nil {
-		return err
-	}
+	c.bot.saveChat(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.reminderLeadReply(chat), c.bot.replySettingsReminders(chat))
 }

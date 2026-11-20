@@ -31,7 +31,7 @@ func (c *historyCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	c.bot.chatRepo.SetScene(chat, "history_teacher")
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 
 	prompt := fmt.Sprintf(c.bot.loc("histtext_2"), randomKey(teachers))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, c.bot.withCancelButton(teacherHistoryKeyboard(chat)))
@@ -64,7 +64,7 @@ func (s *historyTeacherScene) Handle(ctx context.Context, u *Update, chat *Chat)
 	chat.Teacher = teacher
 	chat.Mode = ModeTeacher
 	chat.Scene = sceneHistoryWeek
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	prompt := s.bot.loc("histtext_7")
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, s.bot.withCancelButton(teacherHistoryKeyboard(chat)))
@@ -79,7 +79,7 @@ func (s *historyWeekScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	}
 
 	chat.Scene = ""
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	return s.bot.showWeekDays(ctx, u, chat, "teacher", chat.Teacher, weekIndex)
 }

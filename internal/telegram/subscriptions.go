@@ -30,7 +30,7 @@ func (b *Bot) subTestPrompt(u *Update) error {
 		return u.Bot.SendText(u.ChatID, b.loc("data_not_loaded"))
 	}
 	chat.Scene = "sub_test_pick"
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	prompt := b.loc("subs_test_prompt") + b.formatSubscriptionsList(list)
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, b.replySubscriptionsMenu())

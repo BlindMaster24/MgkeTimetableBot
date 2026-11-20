@@ -760,6 +760,14 @@ func (b *Bot) sendScheduleText(u *Update, chat *Chat, text string, kb *telego.In
 	return b.chatRepo.Save(chat)
 }
 
+// saveChat stores the chat and reports a failure instead of dropping it, so a
+// broken database shows up in the log rather than as silently lost settings.
+func (b *Bot) saveChat(chat *Chat) {
+	if err := b.chatRepo.Save(chat); err != nil {
+		b.log.Error().Err(err).Int64("chatID", chat.PeerID).Msg("failed to save the chat")
+	}
+}
+
 func messageNotModified(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "message is not modified")
 }

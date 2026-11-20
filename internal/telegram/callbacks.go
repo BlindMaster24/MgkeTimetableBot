@@ -104,7 +104,7 @@ func (cb *cancelCb) Handler(ctx context.Context, u *Update) error {
 	if err == nil {
 		wasSetup := chat.Scene == sceneSetup
 		chat.Scene = ""
-		cb.bot.chatRepo.Save(chat)
+		cb.bot.saveChat(chat)
 		if wasSetup {
 			return cb.bot.SendTextWithReplyKeyboard(u.ChatID, cb.bot.loc("about_bot"), replyMainMenu(cb.bot, chat))
 		}

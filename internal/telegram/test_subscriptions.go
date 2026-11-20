@@ -16,7 +16,7 @@ func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	list, _ := s.bot.chatRepo.GetSubscriptions(u.UserID)
 	if len(list) == 0 {
 		chat.Scene = ""
-		s.bot.chatRepo.Save(chat)
+		s.bot.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("subtest_1"), s.bot.replySubscriptionsMenu())
 	}
 
@@ -47,7 +47,7 @@ func (s *subTestPickScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	}
 
 	chat.Scene = "sub_test_mode:" + target.Type + ":" + target.Value
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	prompt := s.bot.loc("subtest_3")
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, s.bot.replySubscriptionsMenu())
@@ -64,7 +64,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	parts := strings.SplitN(payload, ":", 2)
 	if len(parts) != 2 {
 		chat.Scene = ""
-		s.bot.chatRepo.Save(chat)
+		s.bot.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.loc("subtest_4"), s.bot.replySubscriptionsMenu())
 	}
 	subType, subValue := parts[0], parts[1]
@@ -82,7 +82,7 @@ func (s *subTestModeScene) Handle(ctx context.Context, u *Update, chat *Chat) er
 	}
 
 	chat.Scene = ""
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	week := s.bot.relevantWeekIndex()
 	days := s.bot.weekDays(ctx, daysFromArchive, subType, subValue, week)

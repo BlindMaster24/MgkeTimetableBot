@@ -10,7 +10,7 @@ import (
 
 func (b *Bot) sendSettingsMenu(u *Update, chat *Chat) error {
 	chat.Scene = sceneSettings
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 	return b.SendTextWithReplyKeyboard(u.ChatID, b.loc("settings_menu"), b.replySettingsMain())
 }
 
@@ -77,7 +77,7 @@ func (c *btnToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 		chat.ShowFastTeacher = !chat.ShowFastTeacher
 		reply = fmt.Sprintf(c.bot.loc("settext_12"), c.bot.yesNo(chat.ShowFastTeacher))
 	}
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsButtons(chat))
 }
 
@@ -120,7 +120,7 @@ func (c *noticeToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 		chat.NoticeCalls = !chat.NoticeCalls
 		reply = fmt.Sprintf(c.bot.loc("settext_21"), c.bot.onOff(chat.NoticeCalls))
 	}
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsNotice(chat))
 }
 
@@ -173,7 +173,7 @@ func (c *viewToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 		chat.DeleteUserMsg = !chat.DeleteUserMsg
 		reply = fmt.Sprintf(c.bot.loc("settext_32"), c.bot.yesNo(chat.DeleteUserMsg))
 	}
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsView(chat))
 }
 
@@ -215,7 +215,7 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	switch c.kind {
 	case "enabled":
 		chat.DiffEnabled = !chat.DiffEnabled
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		reply := fmt.Sprintf(c.bot.loc("settext_38"), c.bot.yesNo(chat.DiffEnabled))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiff(chat))
 	case "max_lines":
@@ -228,24 +228,24 @@ func (c *diffToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 			}
 		}
 		chat.DiffMaxLines = presets[(idx+1)%len(presets)]
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		reply := fmt.Sprintf(c.bot.loc("settext_39"), chat.DiffMaxLines)
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiff(chat))
 	case "advanced":
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_40"), c.bot.replySettingsDiffAdvanced(chat))
 	case "auto_week":
 		chat.DiffAutoInWeek = !chat.DiffAutoInWeek
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		reply := fmt.Sprintf(c.bot.loc("settext_41"), c.bot.yesNo(chat.DiffAutoInWeek))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "auto_updates":
 		chat.DiffAutoInUpdates = !chat.DiffAutoInUpdates
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		reply := fmt.Sprintf(c.bot.loc("settext_42"), c.bot.yesNo(chat.DiffAutoInUpdates))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "before_after":
 		chat.DiffShowBeforeAfter = !chat.DiffShowBeforeAfter
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		reply := fmt.Sprintf(c.bot.loc("settext_43"), c.bot.yesNo(chat.DiffShowBeforeAfter))
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsDiffAdvanced(chat))
 	case "back_basic":
@@ -282,7 +282,7 @@ func (c *formatterSelectTextCmd) Handler(ctx context.Context, u *Update) error {
 	for i, f := range formatter.AllFormatters {
 		if strings.HasPrefix(u.Text, f.Label(opts)) {
 			chat.Formatter = i
-			c.bot.chatRepo.Save(chat)
+			c.bot.saveChat(chat)
 			return c.bot.SendTextWithReplyKeyboard(
 				u.ChatID,
 				fmt.Sprintf(c.bot.loc("settext_46"), f.Label(opts)),
@@ -322,7 +322,7 @@ func (c *settingsNavTextCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chat.Scene = ""
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 	return c.bot.showSchedule(u, chat)
 }
 
@@ -409,7 +409,7 @@ func (c *aliasActionTextCmd) Handler(ctx context.Context, u *Update) error {
 		return c.bot.showAliasList(u, u.UserID)
 	case "add":
 		chat.Scene = sceneAliasAdd
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		return u.Bot.SendText(u.ChatID, c.bot.loc("settext_55"))
 	case "remove":
 		return c.bot.showAliasRemoveList(u, u.UserID)
@@ -461,7 +461,7 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 			return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("settext_62"), MAX_SUBSCRIPTIONS))
 		}
 		chat.Scene = sceneSubAddGroup
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		prompt := fmt.Sprintf(c.bot.loc("settext_63"), randomKey(groups))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
 	case "add_teacher":
@@ -474,7 +474,7 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 			return u.Bot.SendText(u.ChatID, fmt.Sprintf(c.bot.loc("settext_64"), MAX_SUBSCRIPTIONS))
 		}
 		chat.Scene = sceneSubAddTeacher
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		prompt := fmt.Sprintf(c.bot.loc("settext_65"), randomKey(teachers))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
 	case "list":
@@ -489,7 +489,7 @@ func (c *subsActionTextCmd) Handler(ctx context.Context, u *Update) error {
 			return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_67"), c.bot.replySubscriptionsMenu())
 		}
 		chat.Scene = sceneSubRemove
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("settext_68")+c.bot.formatSubscriptionsList(list), c.bot.replySubscriptionsMenu())
 	case "test":
 		return c.bot.subTestPrompt(u)
@@ -530,7 +530,7 @@ func (c *setupModeTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "guest":
 		chat.Mode = ModeGuest
 		chat.Scene = ""
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("about_bot"), replyMainMenu(c.bot, chat))
 	case "student", "parent":
 		groups := c.bot.cache.GetGroups()
@@ -543,12 +543,12 @@ func (c *setupModeTextCmd) Handler(ctx context.Context, u *Update) error {
 			chat.Mode = ModeParent
 		}
 		chat.Scene = sceneSetGroup
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		prompt := fmt.Sprintf(c.bot.loc("settext_79"), c.bot.loc("setup_enter_group"), randomKey(groups))
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, prompt, c.bot.replyCancel())
 	case "skip":
 		chat.Scene = ""
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		return c.bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("about_bot"), replyMainMenu(c.bot, chat))
 	}
 	return nil

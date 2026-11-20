@@ -97,7 +97,7 @@ func (c *aliasCmd) Handler(ctx context.Context, u *Update) error {
 		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
 	}
 	chat.Scene = sceneSettingsAlias
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 	return c.bot.showAliasMenu(u)
 }
 
@@ -173,7 +173,7 @@ func (cb *aliasMenuCb) Handler(ctx context.Context, u *Update) error {
 func (b *Bot) handleAliasAdd(ctx context.Context, u *Update, chat *Chat) {
 	input := strings.TrimSpace(u.Text)
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	parts := strings.SplitN(input, "=", 2)
 	if len(parts) != 2 {

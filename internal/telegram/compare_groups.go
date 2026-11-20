@@ -21,7 +21,7 @@ func (s *compareGroupsStepA) Handle(ctx context.Context, u *Update, chat *Chat) 
 	}
 
 	chat.Scene = sceneCompareInput + ":" + group
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	prompt := fmt.Sprintf(s.bot.loc("cmpgrp_1"), randomKey(s.bot.cache.GetGroups()))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, s.bot.withCancelButton(groupHistoryKeyboard(chat)))
@@ -33,7 +33,7 @@ func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *C
 	groupA := strings.TrimPrefix(chat.Scene, sceneCompareInput+":")
 
 	chat.Scene = ""
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	groupB, ok := s.bot.findGroup(u, chat, strings.TrimSpace(u.Text))
 	if !ok {
@@ -46,7 +46,7 @@ func (s *compareGroupsInputScene) Handle(ctx context.Context, u *Update, chat *C
 
 	chat.AppendGroupHistory(groupA)
 	chat.AppendGroupHistory(groupB)
-	s.bot.chatRepo.Save(chat)
+	s.bot.saveChat(chat)
 
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, s.bot.compareGroupsMessage(ctx, groupA, groupB), replyMainMenu(s.bot, chat))
 }

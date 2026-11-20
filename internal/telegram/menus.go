@@ -204,9 +204,7 @@ func (b *Bot) menuByID(id string) (menuSpec, bool) {
 
 func (b *Bot) openMenu(u *Update, chat *Chat, spec menuSpec) error {
 	chat.Scene = spec.scene
-	if err := b.chatRepo.Save(chat); err != nil {
-		return err
-	}
+	b.saveChat(chat)
 	if spec.open != nil {
 		return spec.open(b, u, chat)
 	}

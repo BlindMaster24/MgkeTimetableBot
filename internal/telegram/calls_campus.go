@@ -93,9 +93,7 @@ func (c *callsCampusTextCmd) Handler(ctx context.Context, u *Update) error {
 	if name == c.bot.loc("campus_auto") {
 		chat.CallsCampus = ""
 	}
-	if err := c.bot.chatRepo.Save(chat); err != nil {
-		return u.Bot.SendText(u.ChatID, c.bot.loc("data_not_loaded"))
-	}
+	c.bot.saveChat(chat)
 
 	lines := []string{c.bot.campusConfirmation(chat), c.bot.callsMenuText(chat, c.bot.isAdmin(u.UserID))}
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, strings.Join(lines, "\n\n"), c.bot.replyCallsSettings(chat, c.bot.isAdmin(u.UserID)))

@@ -41,7 +41,7 @@ func (c *startCmd) Handler(ctx context.Context, u *Update) error {
 
 	if chat.Mode == "" {
 		chat.Scene = sceneSetup
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 		return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), c.bot.replySelectMode())
 	}
 
@@ -140,7 +140,7 @@ func (c *cancelCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err == nil {
 		chat.Scene = ""
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 	}
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("input_cancelled"), replyMainMenu(c.bot, chat))
 }
@@ -156,7 +156,7 @@ func (c *setupCmd) Handler(ctx context.Context, u *Update) error {
 	chat, err := c.bot.chatRepo.FindOrCreate("telegram", u.UserID)
 	if err == nil {
 		chat.Scene = sceneSetup
-		c.bot.chatRepo.Save(chat)
+		c.bot.saveChat(chat)
 	}
 	return u.Bot.SendTextWithReplyKeyboard(u.ChatID, c.bot.loc("setup_select_mode"), c.bot.replySelectMode())
 }
@@ -553,7 +553,7 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	if chat.NeedUpdateButtons {
 		chat.NeedUpdateButtons = false
 		chat.Scene = ""
-		b.chatRepo.Save(chat)
+		b.saveChat(chat)
 		b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_15"), replyMainMenu(b, chat))
 	}
 
@@ -572,7 +572,7 @@ func (b *Bot) handleMessageText(ctx context.Context, u *Update) {
 	}
 
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("cmdtext_16"), replyMainMenu(b, chat))
 }
 
@@ -683,7 +683,7 @@ func (b *Bot) handleSetGroup(ctx context.Context, u *Update, chat *Chat) {
 	chat.Mode = ModeStudent
 	chat.Teacher = ""
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("about_bot"), replyMainMenu(b, chat))
 }
 
@@ -704,7 +704,7 @@ func (b *Bot) handleSetTeacher(ctx context.Context, u *Update, chat *Chat) {
 	chat.Mode = ModeTeacher
 	chat.Group = ""
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 	b.SendTextWithReplyKeyboard(u.ChatID, b.loc("about_bot"), replyMainMenu(b, chat))
 }
 
@@ -896,7 +896,7 @@ func (b *Bot) handleSubAddGroup(ctx context.Context, u *Update, chat *Chat) {
 	matched, ok := b.findGroupWithKeyboard(u, chat, strings.TrimSpace(u.Text), b.replySubscriptionsMenu())
 
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	if !ok {
 		return
@@ -922,7 +922,7 @@ func (b *Bot) handleSubAddTeacher(ctx context.Context, u *Update, chat *Chat) {
 	}
 
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	if !ok {
 		return
@@ -941,7 +941,7 @@ func (b *Bot) handleSubRemove(ctx context.Context, u *Update, chat *Chat) {
 
 	list, _ := b.chatRepo.GetSubscriptions(u.UserID)
 	chat.Scene = ""
-	b.chatRepo.Save(chat)
+	b.saveChat(chat)
 
 	if len(list) == 0 {
 		b.SendText(u.ChatID, b.loc("cmdtext_34"))

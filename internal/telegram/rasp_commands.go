@@ -286,7 +286,7 @@ func (c *compareGroupsCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chat.Scene = sceneCompareStepA
-	c.bot.chatRepo.Save(chat)
+	c.bot.saveChat(chat)
 
 	prompt := fmt.Sprintf(c.bot.loc("rasptext_27"), randomKey(groups))
 	return u.Bot.SendTextWithKeyboard(u.ChatID, prompt, c.bot.withCancelButton(groupHistoryKeyboard(chat)))

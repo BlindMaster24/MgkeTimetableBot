@@ -45,9 +45,7 @@ func (c *textFormatCmd) Handler(ctx context.Context, u *Update) error {
 	}
 
 	chat.TextFormat = chosen
-	if err := c.bot.chatRepo.Save(chat); err != nil {
-		return err
-	}
+	c.bot.saveChat(chat)
 	return u.Bot.SendText(u.ChatID, c.bot.locData("format_set", map[string]interface{}{"Format": formatName(chosen)}))
 }
 
