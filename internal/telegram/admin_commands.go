@@ -479,6 +479,11 @@ var readOnlyQueryPrefixes = map[string]bool{
 }
 
 func readOnlyQuery(query string) bool {
+	// One statement only: the driver hands the text to SQLite as is, so a
+	// trailing "; DELETE ..." would run after the read.
+	if strings.Contains(query, ";") {
+		return false
+	}
 	fields := strings.Fields(query)
 	if len(fields) == 0 {
 		return false

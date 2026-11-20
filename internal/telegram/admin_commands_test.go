@@ -394,3 +394,24 @@ func botWithCaller(t *testing.T, caller telegoapi.Caller) *telego.Bot {
 	}
 	return client
 }
+
+func TestSQLRefusesAStatementChain(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+	if _, err := b.chatRepo.FindOrCreate("telegram", 4242); err != nil {
+		t.Fatal(err)
+	}
+	u := makeUpdate(777, "/sql SELECT COUNT(*) FROM bot_chats; DELETE FROM bot_chats")
+	u.Bot = b
+	if err := (&sqlCmd{bot: b}).Handler(t.Context(), u); err != nil {
+		t.Fatal(err)
+	}
+	if got := caller.last(); !strings.Contains(got, b.loc("sql_read_only")) {
+		t.Fatalf("answer = %q, want the read-only hint", got)
+	}
+	// The chat table must still be there.
+	rows, err := b.chatRepo.FindOrCreate("telegram", 777)
+	if err != nil || rows == nil {
+		t.Fatalf("the chat store is gone: %v", err)
+	}
+}
