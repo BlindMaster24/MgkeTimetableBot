@@ -31,6 +31,9 @@ type capturingCaller struct {
 	commands  []capturedCommands
 	// failSetMyCommands makes the stub reject a menu update.
 	failSetMyCommands bool
+	// editNotModified makes the stub answer an edit with Telegram's
+	// "message is not modified" error.
+	editNotModified bool
 }
 
 var errStubRejectsMenu = errors.New("stub rejects the menu")
@@ -65,6 +68,12 @@ func (c *capturingCaller) Call(ctx context.Context, url string, data *telegoapi.
 		c.mu.Lock()
 		c.deletions = append(c.deletions, int(id))
 		c.mu.Unlock()
+	}
+	if strings.HasSuffix(url, "/editMessageText") && c.editNotModified {
+		return &telegoapi.Response{
+			Ok:    false,
+			Error: &telegoapi.Error{ErrorCode: 400, Description: "Bad Request: message is not modified: specified new message content and reply markup are exactly the same"},
+		}, nil
 	}
 	if strings.HasSuffix(url, "/answerCallbackQuery") {
 		var payload struct {

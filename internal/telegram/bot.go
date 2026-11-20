@@ -674,6 +674,9 @@ func (b *Bot) EditMessageText(chatID int64, messageID int, text string, kb *tele
 		params.ReplyMarkup = kb
 	}
 	_, err := b.client.EditMessageText(context.Background(), params)
+	if messageNotModified(err) {
+		return err
+	}
 	return b.countSendError(transportEditMessage, err)
 }
 
