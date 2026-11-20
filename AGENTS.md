@@ -257,7 +257,7 @@ The rules below come from how mature Go services and bots are built (go-i18n gui
 - **Telegram transport**: every call is bounded (`requestTimeout`), sends are paced under the Bot API limit and respect `retry_after`, a broadcast is single-flight, the webhook carries `secret_token`, and shutdown flushes the cache and metrics before exit.
 - **Errors**: wrap with `%w`, handle or return, log once at the boundary with stable fields (`err`, `cmd`, `userID`, `chatID`). A user-visible failure gets an answer and a log line; a silent `_ =` is only for cleanup.
 - **Storage**: SQLite with WAL, `busy_timeout`, one writer, identity through `application_id`/`user_version`; DDL and migrations live in `*_schema.go`; upserts are idempotent; a subscription keys the Telegram peer id, a row id is not an identity.
-- **Tests**: deterministic and offline, fakes at the boundary, goldens for output, parity against `old/` for behaviour, mutation-guided gaps. A fixed bug keeps a regression test; an invariant that can be checked mechanically gets a guard test (locale keys, docs structure, timezone reads, Cyrillic literals).
+- **Tests**: deterministic and offline, fakes at the boundary, goldens for output, parity against `old/` for behaviour, mutation-guided gaps. A fixed bug keeps a regression test; an invariant that can be checked mechanically gets a guard test (locale keys, locale language, docs structure, timezone reads, Cyrillic literals: `tests/locale_keys_test.go`, `tests/locale_language_test.go`, `tests/docs_test.go`, `tests/timezone_test.go`, `tests/text_locales_test.go`).
 - **Docs**: `AGENTS.md` is the single AI-facing guide, README stays bilingual, and `go test ./tests/` proves both still describe the tree.
 
 
