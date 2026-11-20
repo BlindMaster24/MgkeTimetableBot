@@ -149,3 +149,48 @@ func TestUserAPISetUserRoleNormalisesTheRole(t *testing.T) {
 		t.Fatalf("roles = %v, want %v", roles, want)
 	}
 }
+
+func TestUserAPIAddsAndRemovesACalendar(t *testing.T) {
+	var calls []string
+	api := newUserAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodDelete {
+			w.Write([]byte(`{}`))
+			return
+		}
+		w.Write([]byte(`{"id": "abc@group.calendar.google.com"}`))
+	})
+
+	ctx := context.Background()
+	if err := api.AddCalendarToUser(ctx, "abc@group.calendar.google.com"); err != nil {
+		t.Fatalf("AddCalendarToUser: %v", err)
+	}
+	if err := api.RemoveCalendarFromUser(ctx, "abc@group.calendar.google.com"); err != nil {
+		t.Fatalf("RemoveCalendarFromUser: %v", err)
+	}
+
+	if len(calls) != 2 {
+		t.Fatalf("calls = %v, want an insert and a delete", calls)
+	}
+	if !strings.HasPrefix(calls[0], http.MethodPost+" ") || !strings.HasSuffix(calls[0], "/users/me/calendarList") {
+		t.Fatalf("insert call = %q", calls[0])
+	}
+	if !strings.HasPrefix(calls[1], http.MethodDelete+" ") || !strings.Contains(calls[1], "calendarList/abc%40group.calendar.google.com") && !strings.Contains(calls[1], "calendarList/abc@group.calendar.google.com") {
+		t.Fatalf("delete call = %q", calls[1])
+	}
+}
+
+func TestUserAPIReportsAFailedCalendarChange(t *testing.T) {
+	api := newUserAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error": {"code": 403, "message": "denied"}}`))
+	})
+
+	if err := api.AddCalendarToUser(context.Background(), "abc"); err == nil {
+		t.Fatal("a denied insert must return an error")
+	}
+	if err := api.RemoveCalendarFromUser(context.Background(), "abc"); err == nil {
+		t.Fatal("a denied delete must return an error")
+	}
+}
