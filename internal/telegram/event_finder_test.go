@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
 )
 
 func TestTheFinderMapsTheTeacherFieldsForNotifications(t *testing.T) {
@@ -104,6 +106,94 @@ func TestIDCommandReportsTheIdentifiers(t *testing.T) {
 	for _, want := range []string{"chat_id:", "peer_id: 6409603928", "user_id: 6409603928"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("/id answer does not contain %q: %q", want, text)
+		}
+	}
+}
+
+// TestEveryFinderCarriesTheWholeEventChat guards the class of bug where a new
+// column is added to the notification view but the SELECT list is not: each
+// finder must return every field the notifier reads.
+func TestEveryFinderCarriesTheWholeEventChat(t *testing.T) {
+	repo, err := New(t.TempDir() + "/chats.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { repo.Close() })
+
+	fill := func(peer int64, mode ChatMode, group, teacher string) int64 {
+		t.Helper()
+		chat, err := repo.FindOrCreate("telegram", peer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		chat.Mode = mode
+		chat.Group = group
+		chat.Teacher = teacher
+		chat.NoticeChanges = true
+		chat.NoticeNextWeek = true
+		chat.NoticeCalls = true
+		chat.NoticeParserErrors = true
+		chat.AllowSendMess = true
+		chat.ReminderLeadMinutes = 15
+		chat.CallsCampus = "Кн"
+		chat.Formatter = 3
+		chat.HidePastDays = true
+		chat.ShowHints = true
+		chat.ShowParserTime = true
+		if err := repo.Save(chat); err != nil {
+			t.Fatal(err)
+		}
+		return chat.PeerID
+	}
+	student := fill(7001, ModeStudent, "100", "Иванов И.И.")
+	teacher := fill(7002, ModeTeacher, "", "Иванов И.И.")
+	if _, err := repo.AddSubscription(7001, "group", "100"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.AddSubscription(7001, "teacher", "Иванов И.И."); err != nil {
+		t.Fatal(err)
+	}
+
+	finder := NewEventChatFinder(repo, []int64{7001})
+	cases := []struct {
+		name string
+		want int64
+		run  func() ([]*notification.EventChat, error)
+	}{
+		{"by groups", student, func() ([]*notification.EventChat, error) {
+			return finder.FindChatsByGroups("telegram", []string{"100"}, true)
+		}},
+		{"by teachers", teacher, func() ([]*notification.EventChat, error) {
+			return finder.FindChatsByTeachers("telegram", []string{"Иванов И.И."}, true)
+		}},
+		{"subscribed by group", student, func() ([]*notification.EventChat, error) {
+			return finder.FindSubscribedChatsByGroup("telegram", "100", true)
+		}},
+		{"subscribed by teacher", student, func() ([]*notification.EventChat, error) {
+			return finder.FindSubscribedChatsByTeacher("telegram", "Иванов И.И.", true)
+		}},
+		{"without the notice filter", student, func() ([]*notification.EventChat, error) {
+			return finder.FindSubscribedChatsByTeacher("telegram", "Иванов И.И.", false)
+		}},
+		{"admins", student, func() ([]*notification.EventChat, error) {
+			return finder.FindAdminChats("telegram")
+		}},
+	}
+	for _, tc := range cases {
+		found, err := tc.run()
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if len(found) != 1 {
+			t.Fatalf("%s returned %d chats, want 1", tc.name, len(found))
+		}
+		got := found[0]
+		if got.PeerID != tc.want {
+			t.Fatalf("%s returned peer %d, want %d", tc.name, got.PeerID, tc.want)
+		}
+		if got.CallsCampus != "Кн" || got.ReminderLeadMinutes != 15 || got.Formatter != 3 ||
+			!got.NoticeCalls || !got.ShowParserTime || !got.HidePastDays || !got.AllowSendMess {
+			t.Fatalf("%s dropped a field: %+v", tc.name, got)
 		}
 	}
 }
