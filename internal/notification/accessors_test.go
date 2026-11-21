@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blindmaster24/MgkeTimetableBot/internal/config"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 )
 
 func TestSetNowDrivesTheNotifierClock(t *testing.T) {
@@ -47,5 +49,39 @@ func TestHealthAlertTitleCoversEveryAlert(t *testing.T) {
 	// generic "something happened".
 	if got := HealthAlertTitle("not_an_alert", func(string) string { return "fallback" }); got != "not_an_alert" {
 		t.Fatalf("an unknown alert = %q, want the key itself", got)
+	}
+}
+
+func TestCronDayAllCoversGroupsAndTeachers(t *testing.T) {
+	n, sender, finder, c := newTestNotifier(t)
+	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student"}}
+	finder.byTeachers = []*EventChat{{ID: 2, PeerID: 1002, Teacher: "Иванов И.И.", Mode: "teacher"}}
+
+	lessons := []any{map[string]any{"lesson": "A"}, map[string]any{"lesson": "B"}}
+	week := []any{
+		map[string]any{"day": todayStr(), "lessons": lessons},
+		map[string]any{"day": tomorrowStr(), "lessons": lessons},
+	}
+	c.SetGroups(t.Context(), map[string]any{"63": map[string]any{"days": week}}, "h1")
+	c.SetTeachers(t.Context(), map[string]any{"Иванов И.И.": map[string]any{"days": week}}, "h2")
+
+	n.CronDayAll(1)
+	if len(sender.sent) != 2 {
+		t.Fatalf("CronDayAll sent %d messages, want one per kind", len(sender.sent))
+	}
+}
+
+func TestSchedulerEntriesAndIncidents(t *testing.T) {
+	_, _, _, c := newTestNotifier(t)
+	scheduler := NewScheduler(&config.Config{}, c, logger.New("error", nil), nil, nil, health.NewTracker(health.DefaultThresholds()), nil)
+
+	scheduler.SetIncidents(nil)
+	if before := scheduler.Entries(); before != 0 {
+		t.Fatalf("an unstarted scheduler has no entries, got %d", before)
+	}
+	scheduler.Start()
+	t.Cleanup(scheduler.Stop)
+	if started := scheduler.Entries(); started == 0 {
+		t.Fatal("a started scheduler must arm its cron entries")
 	}
 }
