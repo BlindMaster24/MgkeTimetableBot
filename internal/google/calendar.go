@@ -63,6 +63,9 @@ type OAuthConfig struct {
 }
 
 func (s *CalendarService) OAuthConfig() OAuthConfig {
+	if s.cfg == nil {
+		return OAuthConfig{}
+	}
 	return OAuthConfig{
 		ClientID:     s.cfg.Google.OAuth.ClientID,
 		ClientSecret: s.cfg.Google.OAuth.ClientSecret,
@@ -71,6 +74,9 @@ func (s *CalendarService) OAuthConfig() OAuthConfig {
 }
 
 func (s *CalendarService) SyncEnabled() bool {
+	if s.cfg == nil {
+		return false
+	}
 	account := s.cfg.Google.ServiceAccount
 	return account.ClientEmail != "" && account.PrivateKey != ""
 }

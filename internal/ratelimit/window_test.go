@@ -54,3 +54,29 @@ func TestZeroWindowUsesTheDefault(t *testing.T) {
 		t.Fatal("a zero window must fall back to the default limit")
 	}
 }
+
+func TestWaitReturnsAtOnceWhenTheWindowHasRoom(t *testing.T) {
+	w := New(2)
+	started := time.Now()
+	w.Wait()
+	w.Wait()
+	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
+		t.Fatalf("two free slots must not sleep, took %s", elapsed)
+	}
+}
+
+func TestWaitSleepsUntilTheOldestSlotLeavesTheWindow(t *testing.T) {
+	w := New(1)
+	w.Reserve(time.Now())
+
+	started := time.Now()
+	w.Wait()
+	elapsed := time.Since(started)
+
+	if elapsed < 900*time.Millisecond {
+		t.Fatalf("Wait returned after %s, the window was still full", elapsed)
+	}
+	if elapsed > 2500*time.Millisecond {
+		t.Fatalf("Wait slept for %s, it must wake once the slot expires", elapsed)
+	}
+}

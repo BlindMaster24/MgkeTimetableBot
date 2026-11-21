@@ -53,13 +53,17 @@ func (p *persistSource) Token() (*oauth2.Token, error) {
 	return token, nil
 }
 
+// googleEndpoint is the OAuth2 endpoint the config points at; a test swaps it
+// for a stub so the refresh path runs without the real Google.
+var googleEndpoint = google.Endpoint
+
 func (s *CalendarService) oauthConfig() *oauth2.Config {
 	conf := s.OAuthConfig()
 	return &oauth2.Config{
 		ClientID:     conf.ClientID,
 		ClientSecret: conf.ClientSecret,
 		RedirectURL:  strings.TrimRight(conf.RedirectURL, "/"),
-		Endpoint:     google.Endpoint,
+		Endpoint:     googleEndpoint,
 		Scopes:       []string{calendar.CalendarScope, userInfoScope},
 	}
 }
