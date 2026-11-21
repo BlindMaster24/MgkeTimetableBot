@@ -26,6 +26,13 @@ const (
 	AlertBackupFailed     = "backup_failed"
 )
 
+// AlertKeys names every alert the tracker can raise, so the notifier can be
+// held to a title for each one instead of drifting behind a new constant.
+var AlertKeys = []string{
+	AlertParserStale, AlertParserFailures, AlertParserLayout, AlertParserGuard,
+	AlertCalendarStale, AlertCalendarFailures, AlertAPIErrors, AlertBackupFailed,
+}
+
 type Thresholds struct {
 	ParserStale      time.Duration
 	ParserFailures   int
