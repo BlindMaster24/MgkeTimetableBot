@@ -18,57 +18,72 @@ import (
 
 func main() {
 	log := logger.New("info", nil)
-	cfg, err := config.LoadWithEnv(os.Args[1], os.LookupEnv)
+	issues, err := run(context.Background(), os.Args[1], os.Stdout, log)
 	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if issues > 0 {
+		os.Exit(1)
+	}
+}
+
+// run fetches the live pages into a throwaway cache and audits what the parser
+// produced. It returns the number of invariant breaks instead of exiting, so an
+// operator gets a message rather than a panic when the config is wrong.
+func run(ctx context.Context, cfgPath string, out io.Writer, log *logger.Logger) (int, error) {
+	cfg, err := config.LoadWithEnv(cfgPath, os.LookupEnv)
+	if err != nil {
+		return 0, err
 	}
 	dir, err := os.MkdirTemp("", "livecheck")
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 	defer os.RemoveAll(dir)
 	rasp, err := cache.New(dir)
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
-	audit := &reportAudit{out: os.Stdout}
+	audit := &reportAudit{out: out}
 	fetcher := parser.NewFetcher(log, rasp, parser.Options{OnReport: audit.onReport})
 
 	started := time.Now()
-	ctx := context.Background()
 	if err := fetcher.Timetable(ctx, cfg.Parser.Endpoints.TimetableGroup, cfg.Parser.Endpoints.TimetableTeacher); err != nil {
-		fmt.Println("timetable error:", err)
+		fmt.Fprintln(out, "timetable error:", err)
 		audit.fail()
 	}
 	if err := fetcher.Calls(ctx, cfg.Parser.Endpoints.BellSchedule); err != nil {
-		fmt.Println("calls error:", err)
+		fmt.Fprintln(out, "calls error:", err)
 		audit.fail()
 	}
 	if err := fetcher.Team(ctx, cfg.Parser.Endpoints.Team); err != nil {
-		fmt.Println("team error:", err)
+		fmt.Fprintln(out, "team error:", err)
 		audit.fail()
 	}
-	fmt.Printf("fetched in %s\n", time.Since(started))
+	fmt.Fprintf(out, "fetched in %s\n", time.Since(started))
 
 	for kind, entries := range map[string]map[string]any{"group": rasp.GetGroups(), "teacher": rasp.GetTeachers()} {
 		result := auditEntries(kind, entries)
 		result.report(kind)
 		audit.add(result.Issues())
 	}
-	fmt.Printf("groups=%d teachers=%d teamNames=%d\n", len(rasp.GetGroups()), len(rasp.GetTeachers()), len(rasp.GetTeamNames()))
+	fmt.Fprintf(out, "groups=%d teachers=%d teamNames=%d\n", len(rasp.GetGroups()), len(rasp.GetTeachers()), len(rasp.GetTeamNames()))
 
 	calls := rasp.GetCalls()
-	fmt.Printf("calls: weekdays=%d saturday=%d source=%q\n", len(calls.Active.Schedule.Weekdays), len(calls.Active.Schedule.Saturday), calls.Active.Source)
+	fmt.Fprintf(out, "calls: weekdays=%d saturday=%d source=%q\n", len(calls.Active.Schedule.Weekdays), len(calls.Active.Schedule.Saturday), calls.Active.Source)
 	for _, problem := range callsProblems(calls.Active.Schedule) {
-		fmt.Println("  issue:", problem)
+		fmt.Fprintln(out, "  issue:", problem)
 		audit.fail()
 	}
 
-	if total := audit.Issues(); total > 0 {
-		fmt.Printf("FAILED with %d issues\n", total)
-		os.Exit(1)
+	total := audit.Issues()
+	if total > 0 {
+		fmt.Fprintf(out, "FAILED with %d issues\n", total)
+		return total, nil
 	}
-	fmt.Println("all invariants hold")
+	fmt.Fprintln(out, "all invariants hold")
+	return 0, nil
 }
 
 type auditResult struct {
