@@ -68,7 +68,9 @@ parser:
       - "https://mgkct.minskedu.gov.by/about/collective/maintenance"
     bell_schedule: "https://mgkct.minskedu.gov.by/personnel/for-teachers/bell-schedule"
   update_interval:
-    default: 3600
+    # Five minutes keeps a changed lesson visible long before the chat asks,
+    # and stays above health.parser_stale_minutes (15) with room to spare.
+    default: 300
     activity: 30
     error: 60
     teams: 86400

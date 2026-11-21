@@ -37,6 +37,19 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.ResolvedCacheDir()) == "" {
 		errs = append(errs, errors.New("cache_dir must not be empty"))
 	}
+	// A stale alert cannot fire on a healthy bot: the parser sleeps for at
+	// least update_interval.default between cycles, so a threshold below that
+	// interval turns every quiet hour into an alert.
+	staleMinutes := 0
+	if c.Health != nil {
+		staleMinutes = c.Health.ParserStaleMinutes
+	}
+	if intervalSeconds := c.Parser.UpdateInterval.Default; staleMinutes > 0 && intervalSeconds > 0 && staleMinutes*60 < intervalSeconds {
+		errs = append(errs, fmt.Errorf(
+			"health.parser_stale_minutes (%d) must be at least parser.update_interval.default (%ds), otherwise a healthy parser keeps alerting",
+			staleMinutes, intervalSeconds))
+	}
+
 	activity := c.Parser.Activity
 	if activity[0] < 0 || activity[0] > 23 || activity[1] < 0 || activity[1] > 23 || activity[0] > activity[1] {
 		errs = append(errs, fmt.Errorf("parser.activity must hold two hours 0-23 with start <= end, got %v", activity))

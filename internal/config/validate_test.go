@@ -69,3 +69,19 @@ func TestValidateCollectsEveryProblem(t *testing.T) {
 		t.Errorf("Validate() = %q, want both http.port and telegram.token", err.Error())
 	}
 }
+
+func TestTheStaleThresholdMustExceedTheParserInterval(t *testing.T) {
+	cfg := validTestConfig()
+	cfg.Parser.UpdateInterval.Default = 3600
+	cfg.Health = &HealthConfig{ParserStaleMinutes: 15}
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "parser_stale_minutes") {
+		t.Fatalf("err = %v, want a parser_stale_minutes complaint", err)
+	}
+
+	cfg.Parser.UpdateInterval.Default = 300
+	cfg.Health = &HealthConfig{ParserStaleMinutes: 15}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("a five minute interval under a fifteen minute threshold must pass: %v", err)
+	}
+}
