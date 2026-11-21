@@ -141,13 +141,19 @@ func TestCIRunsStaticcheck(t *testing.T) {
 	}
 }
 
-func TestCIRunsTheNewestToolchain(t *testing.T) {
-	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml"))
+func TestTheToolchainWorkflowTriesTheNewestGo(t *testing.T) {
+	workflow := readRepoFile(t, filepath.Join(".github", "workflows", "toolchain.yml"))
 
 	if !strings.Contains(workflow, "go-version: stable") {
-		t.Error("CI must run the suite on the newest stable Go, not only on the pinned minimum")
+		t.Error("the suite must keep running on the newest stable Go somewhere")
 	}
-	if !strings.Contains(workflow, "GOTOOLCHAIN: local") {
+	if !strings.Contains(workflow, "schedule:") {
+		t.Error("the newest toolchain is not this commit's business, so it runs on a schedule")
+	}
+	if strings.Contains(readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml")), "go-version: stable") {
+		t.Error("a push must not spend a runner on the newest Go: put it back into the toolchain workflow")
+	}
+	if !strings.Contains(readRepoFile(t, filepath.Join(".github", "workflows", "ci.yml")), "GOTOOLCHAIN: local") {
 		t.Error("the pinned toolchain must stay local so Go never substitutes one silently")
 	}
 }
@@ -266,10 +272,15 @@ func TestMainKeepsItsCIRunWhenANewerCommitArrives(t *testing.T) {
 	}
 }
 
-func TestSecuritySkipsMarkdownOnlyPushes(t *testing.T) {
+func TestSecurityScansOnlyGoChanges(t *testing.T) {
 	workflow := readRepoFile(t, ".github/workflows/security.yml")
-	if !strings.Contains(workflow, "paths-ignore:") || !strings.Contains(workflow, "'**/*.md'") {
-		t.Fatal("security.yml must not scan a markdown-only push")
+	for _, kept := range []string{"'**/*.go'", "'go.mod'", "'go.sum'"} {
+		if !strings.Contains(workflow, kept) {
+			t.Fatalf("security.yml must still scan a push that touches %s", kept)
+		}
+	}
+	if strings.Contains(workflow, "paths-ignore:") {
+		t.Fatal("security.yml lists what to scan, not what to skip: every non-Go file is irrelevant to govulncheck")
 	}
 	if !strings.Contains(workflow, "schedule:") {
 		t.Fatal("the weekly scan must stay, otherwise a quiet month goes unaudited")

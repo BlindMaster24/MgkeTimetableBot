@@ -727,7 +727,6 @@ go run ./scripts/racecheck -pkgs ./internal/telegram/...
 | --- | --- |
 | `quality` | на `ubuntu-latest` и `windows-latest`: `go build ./...`, `go vet ./...` и сборка всех трёх бинарников (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (любой неотформатированный файл валит job) и кросс-компиляция релизных целей (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) выполняются на Linux |
 | `test` | полный набор тестов на `ubuntu-latest` и `windows-latest` с покрытием: итог уходит в summary запуска, `coverage.out` — в артефакты на 14 дней (загружается с Linux) |
-| `newest-toolchain` | тот же набор на `ubuntu-latest` и `windows-latest` под последней стабильной версией Go (`go-version: stable`), чтобы минимальная версия из `go.mod` и свежий тулчейн проверялись независимо |
 | `race` | `go run ./scripts/racecheck` на `ubuntu-latest` и `windows-latest` — тот же набор под `-race`, чтобы гонки в кэше, планировщике и боте не доезжали до пользователей |
 | `parity` | сравнение поверхности с веткой `old`, golden-раскладки клавиатур и docs-guard |
 | `monitoring` | `go run ./scripts/monitoringcheck -strict` и `promtool test rules` с promtool 3.15.0, скачанным по закреплённому SHA-256: правила, дашборд, конфиг Alertmanager, копии для Kubernetes и имена метрик проверяются так же, как локально |
@@ -735,9 +734,11 @@ go run ./scripts/racecheck -pkgs ./internal/telegram/...
 | `devbot` | офлайн-профиль без Docker: сборка `scripts/devbot`, запуск с `-command ping` против заглушки на loopback, ожидание `pong` в `/_stub/calls`, проверка, что в логе нет `api.telegram.org`, и корректное завершение по `SIGTERM` |
 | `workflow-lint` | `actionlint` по самим workflow-файлам |
 
-`.github/workflows/security.yml` — отдельный контур безопасности: `govulncheck` по модулю и зависимостям запускается на push в `main`, по расписанию (понедельник, 06:00 UTC) и вручную. Он не блокирует pull request'ы и не входит в CI: его задача — сообщить об известной уязвимости, а не остановить разработку.
+`.github/workflows/security.yml` — отдельный контур безопасности: `govulncheck` по модулю и зависимостям запускается на push в `main`, по расписанию (понедельник, 06:00 UTC) и вручную. На push он срабатывает только на изменения `*.go`, `go.mod` и `go.sum`: вердикт `govulncheck` зависит от графа модулей и пакетов, поэтому правка README, конфига или тестовых данных его не меняет, а недельное расписание всё равно проверяет уязвимости, опубликованные позже. Контур не блокирует pull request'ы и не входит в CI: его задача — сообщить об известной уязвимости, а не остановить разработку.
 
-Раннеры берутся в варианте `-latest` (`ubuntu-latest` и `windows-latest`: macOS-раннеры для этого репозитория не выдаются, job висят в очереди и отменяются, поэтому darwin-бинарники проверяются кросс-компиляцией в `quality`), а проверки идут на самых свежих образах GitHub; точная версия тулчейна задаётся `go.mod` (`GOTOOLCHAIN: local` не даёт Go молча подменить его), а job `newest-toolchain` дополнительно прогоняет набор на последнем стабильном релизе Go.
+`.github/workflows/toolchain.yml` — недельная проверка на последней стабильной версии Go (`go-version: stable`, `GOTOOLCHAIN: auto`): по понедельникам в 03:00 UTC и вручную. Свежий тулчейн меняется независимо от наших коммитов, поэтому его поломка не должна красить каждый push; недельный прогон ловит её в пределах суток.
+
+Раннеры берутся в варианте `-latest` (`ubuntu-latest` и `windows-latest`: macOS-раннеры для этого репозитория не выдаются, job висят в очереди и отменяются, поэтому darwin-бинарники проверяются кросс-компиляцией в `quality`), а проверки идут на самых свежих образах GitHub; точная версия тулчейна задаётся `go.mod` (`GOTOOLCHAIN: local` не даёт Go молча подменить его), а недельный `toolchain.yml` дополнительно прогоняет набор на последнем стабильном релизе Go.
 
 ``.github/workflows/release.yml` — доставка. Перед публикацией job `verify` прогоняет сборку, vet и тесты на том же коммите на `ubuntu-latest` и `windows-latest`, поэтому сломанный тег или push в `main` не публикуется:
 

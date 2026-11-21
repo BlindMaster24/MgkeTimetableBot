@@ -3,10 +3,13 @@ name: Security
 on:
   push:
     branches: [main]
-    # A markdown edit cannot change a dependency, and the weekly schedule still
-    # scans the module even if nobody pushes code for a while.
-    paths-ignore:
-      - '**/*.md'
+    # govulncheck only reads the module graph and the packages that import it,
+    # so nothing except Go code and the module files can change its verdict.
+    # The weekly schedule still scans advisories that arrive later.
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:

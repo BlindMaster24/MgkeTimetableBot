@@ -1,0 +1,43 @@
+name: Toolchain
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: toolchain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The point of this workflow is to try the newest Go, so the pinned version
+  # from go.mod must not win here. Every other workflow sets it to local.
+  GOTOOLCHAIN: auto
+
+jobs:
+  newest-toolchain:
+    name: newest Go toolchain (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Show the toolchain
+        run: go version
+
+      - name: Test
+        run: go test -count=1 -p 1 ./internal/... ./tests/... ./cmd/...
+

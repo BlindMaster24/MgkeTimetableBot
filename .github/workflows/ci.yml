@@ -129,29 +129,6 @@ jobs:
           path: coverage.out
           retention-days: 14
 
-  newest-toolchain:
-    name: newest Go toolchain (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: stable
-          cache: true
-
-      - name: Show the toolchain
-        run: go version
-
-      - name: Test
-        run: go test -count=1 -p 1 ./internal/... ./tests/... ./cmd/...
-
   race:
     name: tests under the race detector (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

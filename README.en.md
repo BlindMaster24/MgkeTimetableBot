@@ -724,7 +724,6 @@ CI runs the same checks — see “CI and releases” below.
 | --- | --- |
 | `quality` | on `ubuntu-latest` and `windows-latest`: `go build ./...`, `go vet ./...` and a build of all three binaries (`bot`, `migrate-pg`, `paritycheck`); `gofmt -l` (any unformatted file fails the job) and the cross-compilation of the release targets (`linux/amd64`, `linux/arm64`, `windows/amd64`, `darwin/arm64`) run on Linux |
 | `test` | the full suite with coverage on `ubuntu-latest` and `windows-latest`: the total lands in the run summary, `coverage.out` is kept as an artifact for 14 days (uploaded from Linux) |
-| `newest-toolchain` | the same suite on `ubuntu-latest` and `windows-latest` with the newest stable Go (`go-version: stable`), so the minimum version from `go.mod` and the fresh toolchain are checked independently |
 | `race` | `go run ./scripts/racecheck` on `ubuntu-latest` and `windows-latest` — the same suite under `-race`, so a race in the cache, the scheduler or the bot never reaches users |
 | `parity` | the surface comparison against the `old` branch, the golden keyboard layouts and the docs guard |
 | `monitoring` | `go run ./scripts/monitoringcheck -strict` plus `promtool test rules`, with promtool 3.15.0 downloaded against a pinned SHA-256: the rules, the dashboard, the Alertmanager config, the Kubernetes copies and the metric names are checked the same way as locally |
@@ -732,9 +731,11 @@ CI runs the same checks — see “CI and releases” below.
 | `devbot` | the offline profile without Docker: builds `scripts/devbot`, runs it with `-command ping` against the loopback stub, waits for `pong` in `/_stub/calls`, checks the log never mentions `api.telegram.org` and requires a graceful `SIGTERM` shutdown |
 | `workflow-lint` | `actionlint` over the workflow files themselves |
 
-`.github/workflows/security.yml` is a separate security lane: `govulncheck` scans the module and its dependencies on every push to `main`, on a schedule (Monday, 06:00 UTC) and on demand. It does not block pull requests and is not part of CI: its job is to report a known vulnerability, not to stop development.
+`.github/workflows/security.yml` is a separate security lane: `govulncheck` scans the module and its dependencies on a push to `main`, on a schedule (Monday, 06:00 UTC) and on demand. A push triggers it only for `*.go`, `go.mod` and `go.sum`: the verdict depends on the module graph and the packages that import it, so a README, config or fixture edit cannot change it, and the weekly schedule still catches advisories published later. It does not block pull requests and is not part of CI: its job is to report a known vulnerability, not to stop development.
 
-Runners are used in their `-latest` flavour (`ubuntu-latest` and `windows-latest`: this repository gets no macOS runner, the jobs wait in the queue and get cancelled, so the darwin binaries are covered by the cross-compilation in `quality`), and the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the `newest-toolchain` job runs the suite on the newest stable Go release as well.
+`.github/workflows/toolchain.yml` is the weekly newest-toolchain check (`go-version: stable`, `GOTOOLCHAIN: auto`): Mondays at 03:00 UTC and on demand. A fresh toolchain changes independently of our commits, so its breakage must not paint every push red; the weekly run catches it within a day.
+
+Runners are used in their `-latest` flavour (`ubuntu-latest` and `windows-latest`: this repository gets no macOS runner, the jobs wait in the queue and get cancelled, so the darwin binaries are covered by the cross-compilation in `quality`), and the checks run on the freshest GitHub images; the exact toolchain comes from `go.mod` (`GOTOOLCHAIN: local` keeps Go from silently swapping it), and the weekly `toolchain.yml` runs the suite on the newest stable Go release as well.
 
 `.github/workflows/release.yml` is the delivery side. A `verify` job runs build, vet and the test suite on the same revision on `ubuntu-latest` and `windows-latest` before anything is published, so a broken tag or `main` push never ships:
 
