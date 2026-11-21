@@ -129,10 +129,10 @@ func replyMainMenu(b *Bot, chat *Chat) *telego.ReplyKeyboardMarkup {
 	if !chat.ShowAbout && canShowCalls {
 		level3 = append(level3, telego.KeyboardButton{Text: t("button_calls")})
 	}
-	if b.cfg.Google.OAuth.ClientID != "" {
+	if b.cfg.Google.OAuth.ClientID != "" && chat.ShowGoogleCalendar {
 		level3 = append(level3, telego.KeyboardButton{Text: t("button_google_calendar")})
 	}
-	if b.cfg.Calendar.ICS.Enabled {
+	if b.cfg.Calendar.ICS.Enabled && chat.ShowICS {
 		level3 = append(level3, telego.KeyboardButton{Text: t("button_ics")})
 	}
 	level3 = append(level3, telego.KeyboardButton{Text: t("button_settings")})

@@ -19,6 +19,8 @@ func (b *Bot) currentSettingsText(chat *Chat) string {
 		fmt.Sprintf(b.loc("settings_show_about"), b.yesNo(chat.ShowAbout)),
 		fmt.Sprintf(b.loc("settings_show_group"), b.yesNo(chat.ShowFastGroup)),
 		fmt.Sprintf(b.loc("settings_show_teacher"), b.yesNo(chat.ShowFastTeacher)),
+		fmt.Sprintf(b.loc("settings_show_gcal"), b.yesNo(chat.ShowGoogleCalendar)),
+		fmt.Sprintf(b.loc("settings_show_ics"), b.yesNo(chat.ShowICS)),
 		"",
 		fmt.Sprintf(b.loc("settings_hide_past"), b.yesNo(chat.HidePastDays)),
 		fmt.Sprintf(b.loc("settings_parser_time"), b.yesNo(chat.ShowParserTime)),

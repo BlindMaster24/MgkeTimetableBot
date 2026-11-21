@@ -50,6 +50,8 @@ func (r *Repository) migrate() error {
 		show_calls INTEGER NOT NULL DEFAULT 1,
 		show_fast_group INTEGER NOT NULL DEFAULT 1,
 		show_fast_teacher INTEGER NOT NULL DEFAULT 1,
+		show_gcal INTEGER NOT NULL DEFAULT 1,
+		show_ics INTEGER NOT NULL DEFAULT 1,
 		hide_past_days INTEGER NOT NULL DEFAULT 1,
 		delete_last_msg INTEGER NOT NULL DEFAULT 0,
 		delete_user_msg INTEGER NOT NULL DEFAULT 0,
@@ -99,6 +101,8 @@ func (r *Repository) migrate() error {
 		{"calls_campus", "ALTER TABLE bot_chats ADD COLUMN calls_campus TEXT"},
 		{"reminder_lead_minutes", "ALTER TABLE bot_chats ADD COLUMN reminder_lead_minutes INTEGER NOT NULL DEFAULT 0"},
 		{"text_format", "ALTER TABLE bot_chats ADD COLUMN text_format TEXT NOT NULL DEFAULT ''"},
+		{"show_gcal", "ALTER TABLE bot_chats ADD COLUMN show_gcal INTEGER NOT NULL DEFAULT 1"},
+		{"show_ics", "ALTER TABLE bot_chats ADD COLUMN show_ics INTEGER NOT NULL DEFAULT 1"},
 	} {
 		var count int
 		if err := r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('bot_chats') WHERE name = ?`, col.name).Scan(&count); err != nil {
@@ -229,7 +233,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	row := r.db.QueryRow(
 		`SELECT id, service, peer_id, accepted, eula, scene, mode, "group", teacher,
 		        google_email, formatter, show_about, show_daily, show_weekly,
-		        show_calls, show_fast_group, show_fast_teacher, hide_past_days,
+		        show_calls, show_fast_group, show_fast_teacher, show_gcal, show_ics, hide_past_days,
 		        delete_last_msg, delete_user_msg, last_msg_id, allow_send_mess, notice_changes,
 		        notice_next_week, notice_calls, notice_parser_errors,
 		        reminder_lead_minutes,
@@ -247,6 +251,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	var hidePastDays, deleteLastMsg, deleteUserMsg, allowSendMess, noticeChanges, noticeNextWeek, noticeCalls, noticeParserErrors int
 	var showParserTime, showHints, diffEnabled, diffAutoInWeek, diffAutoInUpdates, diffShowBeforeAfter int
 	var subscribeDistribution, needUpdateButtons, deactivateSecondaryCheck int
+	var showGoogleCalendar, showICS int
 
 	var nsScene, nsMode, nsGroup, nsTeacher, nsGoogleEmail, nsRef sql.NullString
 	var nsHistoryGroup, nsHistoryTeacher sql.NullString
@@ -256,7 +261,7 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 		&chat.ID, &chat.Service, &chat.PeerID, &accepted, &eula, &nsScene, &nsMode,
 		&nsGroup, &nsTeacher, &nsGoogleEmail, &chat.Formatter,
 		&showAbout, &showDaily, &showWeekly, &showCalls, &showFastGroup, &showFastTeacher,
-		&hidePastDays, &deleteLastMsg, &deleteUserMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
+		&showGoogleCalendar, &showICS, &hidePastDays, &deleteLastMsg, &deleteUserMsg, &chat.LastMsgID, &allowSendMess, &noticeChanges,
 		&noticeNextWeek, &noticeCalls, &noticeParserErrors, &chat.ReminderLeadMinutes, &showParserTime, &showHints,
 		&diffEnabled, &diffAutoInWeek, &diffAutoInUpdates, &diffShowBeforeAfter,
 		&chat.DiffMaxLines, &nsRef, &nsHistoryGroup, &nsHistoryTeacher,
@@ -283,6 +288,8 @@ func (r *Repository) findByPeerID(service string, peerID int64) (*Chat, error) {
 	chat.ShowCalls = showCalls != 0
 	chat.ShowFastGroup = showFastGroup != 0
 	chat.ShowFastTeacher = showFastTeacher != 0
+	chat.ShowGoogleCalendar = showGoogleCalendar != 0
+	chat.ShowICS = showICS != 0
 	chat.HidePastDays = hidePastDays != 0
 	chat.DeleteLastMsg = deleteLastMsg != 0
 	chat.DeleteUserMsg = deleteUserMsg != 0

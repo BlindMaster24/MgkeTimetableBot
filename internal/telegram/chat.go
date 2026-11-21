@@ -36,6 +36,8 @@ type Chat struct {
 	ShowCalls                bool
 	ShowFastGroup            bool
 	ShowFastTeacher          bool
+	ShowGoogleCalendar       bool
+	ShowICS                  bool
 	HidePastDays             bool
 	DeleteLastMsg            bool
 	DeleteUserMsg            bool
@@ -151,7 +153,7 @@ func (r *Repository) Save(chat *Chat) error {
 		`UPDATE bot_chats SET
 			accepted=?, eula=?, scene=?, mode=?, "group"=?, teacher=?,
 			google_email=?, formatter=?, show_about=?, show_daily=?, show_weekly=?,
-			show_calls=?, show_fast_group=?, show_fast_teacher=?, hide_past_days=?,
+			show_calls=?, show_fast_group=?, show_fast_teacher=?, show_gcal=?, show_ics=?, hide_past_days=?,
 			delete_last_msg=?, delete_user_msg=?, last_msg_id=?, allow_send_mess=?, notice_changes=?,
 			notice_next_week=?, notice_calls=?, notice_parser_errors=?,
 			reminder_lead_minutes=?,
@@ -164,7 +166,8 @@ func (r *Repository) Save(chat *Chat) error {
 		toInt(chat.Accepted), toInt(chat.EULA), chat.Scene, string(chat.Mode), chat.Group, chat.Teacher,
 		chat.GoogleEmail, chat.Formatter, toInt(chat.ShowAbout), toInt(chat.ShowDaily),
 		toInt(chat.ShowWeekly), toInt(chat.ShowCalls), toInt(chat.ShowFastGroup),
-		toInt(chat.ShowFastTeacher), toInt(chat.HidePastDays), toInt(chat.DeleteLastMsg),
+		toInt(chat.ShowFastTeacher), toInt(chat.ShowGoogleCalendar), toInt(chat.ShowICS),
+		toInt(chat.HidePastDays), toInt(chat.DeleteLastMsg),
 		toInt(chat.DeleteUserMsg), chat.LastMsgID, toInt(chat.AllowSendMess), toInt(chat.NoticeChanges),
 		toInt(chat.NoticeNextWeek), toInt(chat.NoticeCalls), toInt(chat.NoticeParserErrors),
 		chat.ReminderLeadMinutes,

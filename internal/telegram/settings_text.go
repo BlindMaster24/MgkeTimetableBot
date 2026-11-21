@@ -145,6 +145,10 @@ func (c *viewToggleTextCmd) MatchText(text string) bool {
 		return text == c.bot.noYesSmile(true, c.bot.loc("kbtext_53")) || text == c.bot.noYesSmile(false, c.bot.loc("kbtext_53"))
 	case "delete_user_msg":
 		return text == c.bot.noYesSmile(true, c.bot.loc("kbtext_54")) || text == c.bot.noYesSmile(false, c.bot.loc("kbtext_54"))
+	case "show_gcal":
+		return text == c.bot.noYesSmile(true, c.bot.loc("kbtext_55")) || text == c.bot.noYesSmile(false, c.bot.loc("kbtext_55"))
+	case "show_ics":
+		return text == c.bot.noYesSmile(true, c.bot.loc("kbtext_56")) || text == c.bot.noYesSmile(false, c.bot.loc("kbtext_56"))
 	}
 	return false
 }
@@ -172,6 +176,12 @@ func (c *viewToggleTextCmd) Handler(ctx context.Context, u *Update) error {
 	case "delete_user_msg":
 		chat.DeleteUserMsg = !chat.DeleteUserMsg
 		reply = fmt.Sprintf(c.bot.loc("settext_32"), c.bot.yesNo(chat.DeleteUserMsg))
+	case "show_gcal":
+		chat.ShowGoogleCalendar = !chat.ShowGoogleCalendar
+		reply = fmt.Sprintf(c.bot.loc("settext_33"), c.bot.yesNo(chat.ShowGoogleCalendar))
+	case "show_ics":
+		chat.ShowICS = !chat.ShowICS
+		reply = fmt.Sprintf(c.bot.loc("settext_34"), c.bot.yesNo(chat.ShowICS))
 	}
 	c.bot.saveChat(chat)
 	return c.bot.SendTextWithReplyKeyboard(u.ChatID, reply, c.bot.replySettingsView(chat))
