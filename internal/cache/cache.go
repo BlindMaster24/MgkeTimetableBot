@@ -608,14 +608,38 @@ func (c *RaspCache) Save(ctx context.Context) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	// The timetable is written in the parser's own shape, not the typed view:
+	// then the file, the comparison in dayLessonsChanged and what the parser
+	// hands over next time all speak the same language. The typed view is
+	// derived on load and never needs to round-trip through disk.
+	type fileEntry struct {
+		Timetable     any    `json:"timetable"`
+		Update        int64  `json:"update"`
+		Changed       int64  `json:"changed"`
+		LastWeekIndex int    `json:"lastWeekIndex"`
+		Hash          string `json:"hash"`
+	}
+
 	type named struct {
 		name string
 		data any
 	}
 
 	entries := []named{
-		{"groups.json", c.Groups},
-		{"teachers.json", c.Teachers},
+		{"groups.json", fileEntry{
+			Timetable:     c.groupsAny,
+			Update:        c.Groups.Update,
+			Changed:       c.Groups.Changed,
+			LastWeekIndex: c.Groups.LastWeekIndex,
+			Hash:          c.Groups.Hash,
+		}},
+		{"teachers.json", fileEntry{
+			Timetable:     c.teachersAny,
+			Update:        c.Teachers.Update,
+			Changed:       c.Teachers.Changed,
+			LastWeekIndex: c.Teachers.LastWeekIndex,
+			Hash:          c.Teachers.Hash,
+		}},
 		{"team.json", c.Team},
 		{"calls.json", c.Calls},
 	}
