@@ -265,3 +265,13 @@ func TestMainKeepsItsCIRunWhenANewerCommitArrives(t *testing.T) {
 		t.Fatal("ci.yml must not cancel the run of a commit on main")
 	}
 }
+
+func TestSecuritySkipsMarkdownOnlyPushes(t *testing.T) {
+	workflow := readRepoFile(t, ".github/workflows/security.yml")
+	if !strings.Contains(workflow, "paths-ignore:") || !strings.Contains(workflow, "'**/*.md'") {
+		t.Fatal("security.yml must not scan a markdown-only push")
+	}
+	if !strings.Contains(workflow, "schedule:") {
+		t.Fatal("the weekly scan must stay, otherwise a quiet month goes unaudited")
+	}
+}

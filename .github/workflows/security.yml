@@ -3,6 +3,10 @@ name: Security
 on:
   push:
     branches: [main]
+    # A markdown edit cannot change a dependency, and the weekly schedule still
+    # scans the module even if nobody pushes code for a while.
+    paths-ignore:
+      - '**/*.md'
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
