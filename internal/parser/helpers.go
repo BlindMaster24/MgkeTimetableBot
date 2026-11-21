@@ -3,7 +3,6 @@ package parser
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -25,11 +24,6 @@ var contentScopes = []string{
 	"#main-p",
 	".common-page-left-block",
 	".entry",
-}
-
-func findContent(doc *goquery.Document) *goquery.Selection {
-	scope, _, _ := findScope(doc)
-	return scope
 }
 
 func findScope(doc *goquery.Document) (*goquery.Selection, string, bool) {
@@ -160,11 +154,6 @@ func hasImpossibleDayString(text string) bool {
 
 func hashDocument(doc *goquery.Document) string {
 	return hashBytes([]byte(doc.Text()))
-}
-
-func hashJSON(v any) string {
-	data, _ := json.Marshal(v)
-	return hashBytes(data)
 }
 
 func hashBytes(data []byte) string {
