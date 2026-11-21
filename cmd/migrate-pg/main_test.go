@@ -207,3 +207,55 @@ func TestWriteChatsReportsTheInsertedRows(t *testing.T) {
 		t.Fatalf("peer id = %d, want 6409603928", peer)
 	}
 }
+
+func TestPrepareOutputReplacesOnlyWithForce(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "chats.db")
+	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := prepareOutput(path, true); err != nil {
+		t.Fatalf("prepareOutput with -force: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("-force must remove the previous file")
+	}
+	if err := prepareOutput(path, false); err != nil {
+		t.Fatalf("a missing target needs no force: %v", err)
+	}
+}
+
+func TestReadChatsReportsABrokenConnectionString(t *testing.T) {
+	if _, err := readChats("postgres://[::1"); err == nil {
+		t.Fatal("a malformed connection string must be reported")
+	}
+}
+
+func TestWriteChatsReportsAnUnwritableTarget(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := writeChats([]OldChat{{PeerID: 1}}, filepath.Join(blocker, "chats.db"))
+	if err == nil || !strings.Contains(err.Error(), "schema") {
+		t.Fatalf("an unwritable target must be reported, got %v", err)
+	}
+}
+
+func TestRunContinuesPastTheForceCheck(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "chats.db")
+	if err := os.WriteFile(target, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := run([]string{"-pg", "postgresql://127.0.0.1:1/mgkt?sslmode=disable&connect_timeout=1", "-sqlite", target, "-force"}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "ping postgres") {
+		t.Fatalf("with -force the run must go on to the connection, got %v", err)
+	}
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Fatal("-force removed the old file before the failed connection")
+	}
+}
