@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/cache"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 )
 
 func weekEntry(day string, lesson map[string]any) map[string]any {
@@ -35,7 +35,7 @@ func newEventsRuntime(t *testing.T) *runtime {
 func TestDrainEventsSummarisesAndEmptiesTheQueue(t *testing.T) {
 	r := newEventsRuntime(t)
 	ctx := context.Background()
-	today := time.Now().Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
 
 	r.cache.SetGroups(ctx, map[string]any{"100": weekEntry(today, map[string]any{"lesson": "Математика"})}, "h1")
 	r.cache.DrainEvents(ctx)
@@ -54,7 +54,7 @@ func TestDrainEventsSummarisesAndEmptiesTheQueue(t *testing.T) {
 
 func TestSyncCalendarsStaysQuietWhenGoogleIsOff(t *testing.T) {
 	r := newEventsRuntime(t)
-	today := time.Now().Format("02.01.2006")
+	today := utils.SiteNow().Format("02.01.2006")
 	r.cache.SetGroups(context.Background(), map[string]any{"100": weekEntry(today, nil)}, "")
 
 	days, err := r.syncCalendars(context.Background(), "test")
