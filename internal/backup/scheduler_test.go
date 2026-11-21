@@ -1,7 +1,9 @@
 package backup
 
 import (
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/logger"
 	"github.com/robfig/cron/v3"
@@ -59,4 +61,31 @@ func TestSchedulerRejectsABrokenExpression(t *testing.T) {
 
 func TestSchedulerStopsBeforeItStarted(t *testing.T) {
 	NewScheduler("0 30 4 * * *", testLogger(), func() {}).Stop()
+}
+
+func TestSchedulerStopCancelsTheRunningTicks(t *testing.T) {
+	var ticks atomic.Int32
+	s := NewScheduler("* * * * * *", testLogger(), func() { ticks.Add(1) })
+
+	if !s.Start() {
+		t.Fatal("an every-second schedule must arm the maintenance job")
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for ticks.Load() == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if ticks.Load() == 0 {
+		s.Stop()
+		t.Fatal("the scheduler never ticked, the test cannot prove that Stop cancels")
+	}
+
+	s.Stop()
+	afterStop := ticks.Load()
+	time.Sleep(1500 * time.Millisecond)
+	if got := ticks.Load(); got != afterStop {
+		t.Fatalf("ticks went from %d to %d after Stop, the cron is still armed", afterStop, got)
+	}
+
+	// Stop is idempotent: a second call must not panic or wait on a closed channel.
+	s.Stop()
 }

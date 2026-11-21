@@ -2,6 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -145,5 +149,61 @@ func TestCreateChatsSchemaIsIdempotent(t *testing.T) {
 	}
 	if err := createChatsSchema(db); err != nil {
 		t.Fatalf("a third schema pass must pass: %v", err)
+	}
+}
+
+func TestRunDemandsAConnectionString(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	err := run(nil, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "usage: migrate-pg") {
+		t.Fatalf("run without a source must explain the usage, got %v", err)
+	}
+}
+
+func TestRunFallsBackToTheEnvironment(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://127.0.0.1:1/mgkt?sslmode=disable&connect_timeout=1")
+	target := filepath.Join(t.TempDir(), "chats.db")
+	err := run([]string{"-sqlite", target}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "ping postgres") {
+		t.Fatalf("the environment must supply the source, got %v", err)
+	}
+}
+
+func TestRunRefusesToOverwriteWithoutForce(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgresql://127.0.0.1:1/mgkt?sslmode=disable&connect_timeout=1")
+	target := filepath.Join(t.TempDir(), "chats.db")
+	if err := os.WriteFile(target, []byte("already here"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := run([]string{"-pg", "postgresql://127.0.0.1:1/mgkt?sslmode=disable&connect_timeout=1", "-sqlite", target}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "already exists, pass -force") {
+		t.Fatalf("an existing target without -force must stop before the connection, got %v", err)
+	}
+	body, readErr := os.ReadFile(target)
+	if readErr != nil || string(body) != "already here" {
+		t.Fatalf("the existing database must stay untouched, got %q (%v)", body, readErr)
+	}
+}
+
+func TestWriteChatsReportsTheInsertedRows(t *testing.T) {
+	db := openTestDB(t)
+	if err := createChatsSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "chats.db")
+	if err := writeChats([]OldChat{{PeerID: 6409603928, Mode: "student", Group: "167", Accepted: true, EULA: true}}, path); err != nil {
+		t.Fatalf("writeChats: %v", err)
+	}
+	check, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer check.Close()
+	var peer int64
+	if err := check.QueryRow(`SELECT peer_id FROM bot_chats`).Scan(&peer); err != nil {
+		t.Fatal(err)
+	}
+	if peer != 6409603928 {
+		t.Fatalf("peer id = %d, want 6409603928", peer)
 	}
 }

@@ -9,8 +9,10 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -55,30 +57,57 @@ type OldChat struct {
 }
 
 func main() {
-	pgURL := flag.String("pg", "", "PostgreSQL connection string (postgresql://user:pass@host:port/dbname)")
-	sqlitePath := flag.String("sqlite", "bot_chats.db", "Output SQLite file path")
-	force := flag.Bool("force", false, "Replace the output file if it already exists")
-	flag.Parse()
+	if err := run(os.Args[1:], os.Stdout); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+}
 
+// run parses the flags and drives the migration, so a test can cover every
+// decision without spawning a process and without a running PostgreSQL.
+func run(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("migrate-pg", flag.ContinueOnError)
+	fs.SetOutput(out)
+	pgURL := fs.String("pg", "", "PostgreSQL connection string (postgresql://user:pass@host:port/dbname)")
+	sqlitePath := fs.String("sqlite", "bot_chats.db", "Output SQLite file path")
+	force := fs.Bool("force", false, "Replace the output file if it already exists")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 	if *pgURL == "" {
 		*pgURL = os.Getenv("DATABASE_URL")
 	}
 	if *pgURL == "" {
-		log.Fatal("Usage: migrate-pg -pg 'postgresql://user:pass@host:port/dbname' [-sqlite bot_chats.db] [-force]")
+		return errors.New("usage: migrate-pg -pg 'postgresql://user:pass@host:port/dbname' [-sqlite bot_chats.db] [-force]")
 	}
 	if err := prepareOutput(*sqlitePath, *force); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	log.Printf("Connecting to PostgreSQL...")
-	pgDB, err := sql.Open("postgres", *pgURL)
+	chats, err := readChats(*pgURL)
 	if err != nil {
-		log.Fatalf("open postgres: %v", err)
+		return err
+	}
+	log.Printf("Found %d Telegram chats in PostgreSQL", len(chats))
+	if len(chats) == 0 {
+		log.Println("Nothing to migrate.")
+		return nil
+	}
+	return writeChats(chats, *sqlitePath)
+}
+
+// readChats joins the settings table with the Telegram identity, because
+// bot_chats.id is an internal counter and the peer id lives in bot_chats_tg.
+func readChats(pgURL string) ([]OldChat, error) {
+	log.Printf("Connecting to PostgreSQL...")
+	pgDB, err := sql.Open("postgres", pgURL)
+	if err != nil {
+		return nil, fmt.Errorf("open postgres: %w", err)
 	}
 	defer pgDB.Close()
 
 	if err := pgDB.Ping(); err != nil {
-		log.Fatalf("ping postgres: %v", err)
+		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
 	log.Printf("Reading bot_chats from PostgreSQL...")
@@ -99,7 +128,7 @@ func main() {
 		ORDER BY t."peerId"
 	`)
 	if err != nil {
-		log.Fatalf("query pg: %v", err)
+		return nil, fmt.Errorf("query pg: %w", err)
 	}
 	defer rows.Close()
 
@@ -122,24 +151,23 @@ func main() {
 		chats = append(chats, c)
 	}
 	if err := rows.Err(); err != nil {
-		log.Fatalf("read pg rows: %v", err)
+		return nil, fmt.Errorf("read pg rows: %w", err)
 	}
+	return chats, nil
+}
 
-	log.Printf("Found %d Telegram chats in PostgreSQL", len(chats))
-	if len(chats) == 0 {
-		log.Println("Nothing to migrate.")
-		return
-	}
-
-	log.Printf("Creating SQLite database: %s", *sqlitePath)
-	sqliteDB, err := sql.Open("sqlite", *sqlitePath)
+// writeChats creates the SQLite schema and inserts the rows one by one, so a
+// single bad row cannot take the whole migration down.
+func writeChats(chats []OldChat, path string) error {
+	log.Printf("Creating SQLite database: %s", path)
+	sqliteDB, err := sql.Open("sqlite", path)
 	if err != nil {
-		log.Fatalf("open sqlite: %v", err)
+		return fmt.Errorf("open sqlite: %w", err)
 	}
 	defer sqliteDB.Close()
 
 	if err := createChatsSchema(sqliteDB); err != nil {
-		log.Fatalf("create the chats schema: %v", err)
+		return fmt.Errorf("create the chats schema: %w", err)
 	}
 
 	migrated := 0
@@ -151,11 +179,13 @@ func main() {
 		migrated++
 	}
 
-	log.Printf("Migrated %d/%d chats to %s", migrated, len(chats), *sqlitePath)
-
+	log.Printf("Migrated %d/%d chats to %s", migrated, len(chats), path)
 	var count int
-	sqliteDB.QueryRow(`SELECT COUNT(*) FROM bot_chats`).Scan(&count)
+	if err := sqliteDB.QueryRow(`SELECT COUNT(*) FROM bot_chats`).Scan(&count); err != nil {
+		return fmt.Errorf("count sqlite rows: %w", err)
+	}
 	log.Printf("Verification: %d rows in SQLite", count)
+	return nil
 }
 
 // prepareOutput makes sure the SQLite target can be written: an existing file

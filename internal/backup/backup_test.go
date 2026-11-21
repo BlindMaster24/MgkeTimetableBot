@@ -357,3 +357,75 @@ func TestSnapshotRefusesToOverwriteAnExistingBackup(t *testing.T) {
 		t.Fatalf("the existing file was overwritten: %q %v", content, err)
 	}
 }
+
+func TestSnapshotBusyTimeoutIgnoresNegativeValues(t *testing.T) {
+	if got := snapshotBusyTimeout(Options{BusyTimeout: -time.Second}); got != sqlitedb.DefaultBusyTimeout {
+		t.Fatalf("timeout = %s, want the default for a negative value", got)
+	}
+}
+
+func TestUniquePrefixesTrimsDropsEmptyAndRepeats(t *testing.T) {
+	got := uniquePrefixes([]string{" sqlite3 ", "sqlite3", "", "   ", "archive", "archive", "bot_chats"})
+	want := []string{"sqlite3", "archive", "bot_chats"}
+	if len(got) != len(want) {
+		t.Fatalf("prefixes = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("prefixes = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestParseStampOnlyAcceptsItsOwnNameShape(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+		want   bool
+	}{
+		{"sqlite3-20260101-120000.db", "sqlite3", true},
+		{"sqlite3-20260101-120000.db.bak", "sqlite3", false},
+		{"sqlite3x-20260101-120000.db", "sqlite3", false},
+		{"sqlite3-20261301-120000.db", "sqlite3", false},
+		{"sqlite3-2026-01-01-120000.db", "sqlite3", false},
+		{"sqlite3-20260101-120000", "sqlite3", false},
+		{"", "sqlite3", false},
+	}
+	for _, tc := range tests {
+		if _, ok := parseStamp(tc.name, tc.prefix); ok != tc.want {
+			t.Errorf("parseStamp(%q, %q) = %v, want %v", tc.name, tc.prefix, ok, tc.want)
+		}
+	}
+}
+
+func TestPruneSortsTiesByNameAndKeepsNegativeLimits(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"sqlite3-20260101-120000.db",
+		"sqlite3-20260101-120000.db.tmp",
+		"prefix-20260101-120000.db",
+	} {
+		writeFile(t, filepath.Join(dir, name), "snapshot")
+	}
+
+	removed, kept, err := Prune(dir, []string{"sqlite3", "prefix"}, -3)
+	if err != nil {
+		t.Fatalf("a negative limit must keep everything: %v", err)
+	}
+	if len(removed) != 0 || len(kept) != 2 {
+		t.Fatalf("removed = %v kept = %v, want both snapshots kept", removed, kept)
+	}
+}
+
+func TestPruneOwnsAnOverlappingPrefixOnlyOnce(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "reach-20260101-120000.db"), "snapshot")
+
+	removed, kept, err := Prune(dir, []string{"reach", "re"}, 0)
+	if err != nil {
+		t.Fatalf("a file matched by two prefixes must be handled once: %v", err)
+	}
+	if len(removed) != 0 || len(kept) != 1 || kept[0] != "reach-20260101-120000.db" {
+		t.Fatalf("removed = %v kept = %v, want the file kept once", removed, kept)
+	}
+}
