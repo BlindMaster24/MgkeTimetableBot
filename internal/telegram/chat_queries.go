@@ -275,7 +275,7 @@ var eventChatColumns = []string{
 	"COALESCE(%sallow_send_mess, 1)", "COALESCE(%snotice_changes, 1)", "COALESCE(%snotice_next_week, 1)",
 	"COALESCE(%snotice_calls, 1)", "COALESCE(%snotice_parser_errors, 1)", "COALESCE(%sformatter, 0)",
 	"COALESCE(%shide_past_days, 0)", "COALESCE(%sshow_hints, 1)", "COALESCE(%sshow_parser_time, 0)",
-	"COALESCE(%sreminder_lead_minutes, 0)",
+	"COALESCE(%sreminder_lead_minutes, 0)", "COALESCE(%scalls_campus, '')",
 }
 
 func selectEventChats(prefix string) string {
@@ -311,7 +311,7 @@ func scanEventChats(rows *sql.Rows) ([]*Chat, error) {
 		)
 		err := rows.Scan(&chat.ID, &chat.PeerID, &mode, &chat.Group, &chat.Teacher,
 			&allowSend, &noticeCh, &noticeWeek, &noticeCall, &noticeErr, &chat.Formatter,
-			&hidePast, &hints, &parserTime, &reminderLead)
+			&hidePast, &hints, &parserTime, &reminderLead, &chat.CallsCampus)
 		if err != nil {
 			return nil, err
 		}
