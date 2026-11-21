@@ -501,7 +501,24 @@ func (r *runtime) drainEvents(ctx context.Context, tag string) {
 	if len(events) == 0 {
 		return
 	}
-	r.log.Info().Int("count", len(events)).Str("tag", tag).Msg("draining cache events")
+	days, calls, weeks := 0, 0, 0
+	for _, event := range events {
+		switch {
+		case event.Day != nil:
+			days++
+		case event.Calls != nil:
+			calls++
+		case event.Week != nil:
+			weeks++
+		}
+	}
+	event := r.log.Info().Int("count", len(events)).Int("days", days).Int("calls", calls).Int("weeks", weeks).Str("tag", tag)
+	if len(events) > 0 && events[0].Day != nil {
+		first := events[0].Day
+		date, _ := first.Day["day"].(string)
+		event = event.Str("firstKind", first.Kind).Str("firstValue", first.Value).Str("firstDate", date).Str("firstType", first.Type)
+	}
+	event.Msg("draining cache events")
 	if r.notifier != nil {
 		r.notifier.HandleEvents(events)
 	}
