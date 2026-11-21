@@ -258,3 +258,10 @@ func TestRaceCommandCoversTheWholeSuite(t *testing.T) {
 		t.Errorf("command prefix = %q", racecheck.CommandPrefix)
 	}
 }
+
+func TestMainKeepsItsCIRunWhenANewerCommitArrives(t *testing.T) {
+	workflow := readRepoFile(t, ".github/workflows/ci.yml")
+	if !strings.Contains(workflow, "cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}") {
+		t.Fatal("ci.yml must not cancel the run of a commit on main")
+	}
+}
