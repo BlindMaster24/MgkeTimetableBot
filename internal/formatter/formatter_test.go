@@ -513,7 +513,7 @@ func TestFormatSeconds(t *testing.T) {
 	}
 }
 
-func TestSubgroupLayoutMatchesTheOldBot(t *testing.T) {
+func TestSubgroupLayoutAcrossFormatters(t *testing.T) {
 	day := func(lessons []any) []map[string]any {
 		return extractDaysFromData(map[string]any{
 			"days": []any{map[string]any{"day": utils.SiteNow().Format("02.01.2006"), "lessons": lessons}},
@@ -534,7 +534,7 @@ func TestSubgroupLayoutMatchesTheOldBot(t *testing.T) {
 			want: map[string]string{
 				"default": "1. Программирование (лабораторная)\n├── 1. А {10}\n└── 2. Б {20}",
 				"visual":  "1️⃣ Пара:\n    📚 Программирование (лабораторная)\n\n    🎒 Подгруппа 1:\n    🎓 А\n    🏫 10\n\n    🎒 Подгруппа 2:\n    🎓 Б\n    🏫 20",
-				"compact": "1. Программирование\n- 1. {10}\n- 2. {20}",
+				"compact": "1. Программирование\n- 1. А {10}\n- 2. Б {20}",
 				"litolax": "Пара: №1\n1. Программирование (лабораторная) А\n2. Программирование (лабораторная) Б\nКаб: 10 20",
 			},
 		},
@@ -544,7 +544,7 @@ func TestSubgroupLayoutMatchesTheOldBot(t *testing.T) {
 			want: map[string]string{
 				"default": "1. Программирование (лабораторная)\n└── 1. А {10}",
 				"visual":  "1️⃣ Пара:\n    📚 Программирование (лабораторная)\n\n    🎒 Подгруппа 1:\n    🎓 А\n    🏫 10",
-				"compact": "1. Программирование\n- 1. {10}",
+				"compact": "1. Программирование\n- 1. А {10}",
 				"litolax": "Пара: №1\n1. Программирование (лабораторная) А\nКаб: 10",
 			},
 		},

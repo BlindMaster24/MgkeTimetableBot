@@ -112,6 +112,10 @@ func (f *CompactFormatter) formatGroupLessonLine(p LessonPart, show map[string]b
 		parts = append(parts, p.Lesson)
 	}
 
+	if show["teacher"] && p.Teacher != "" {
+		parts = append(parts, p.Teacher)
+	}
+
 	if show["cabinet"] && p.Cabinet != "" {
 		parts = append(parts, "{"+p.Cabinet+"}")
 	}
