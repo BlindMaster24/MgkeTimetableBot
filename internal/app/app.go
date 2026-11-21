@@ -53,6 +53,7 @@ type runtime struct {
 
 	calendarSyncEnabled bool
 	notifier            *notification.EventNotifier
+	scheduler           *notification.Scheduler
 	schedulerEntries    func() int
 	trackedReminders    func() int
 }
@@ -122,6 +123,9 @@ func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
 }
 
 func (r *runtime) close() {
+	if r.scheduler != nil {
+		r.scheduler.Stop()
+	}
 	if r.chats != nil {
 		r.chats.Close()
 	}
@@ -283,6 +287,13 @@ func (r *runtime) startMaintenance(ctx context.Context) {
 
 // startCalendar wires Google Calendar, the webhook status and the HTTP API.
 func (r *runtime) startCalendar() {
+	r.wireCalendar()
+	r.serveAPI()
+}
+
+// wireCalendar gives the bot the Google service and the OAuth callback; the
+// HTTP listener is a separate step so both halves stay testable.
+func (r *runtime) wireCalendar() {
 	r.google = google.NewCalendarService(r.cfg)
 	r.bot.SetGoogleService(r.google)
 	r.calendarSyncEnabled = r.google.SyncEnabled()
@@ -291,16 +302,19 @@ func (r *runtime) startCalendar() {
 	r.api.SetWebhookStatus(func(ctx context.Context) any { return r.webhook.Get(ctx) })
 	r.api.HandleGoogleOAuth(r.cfg.Google.URL, googleOAuthHandler(r.google, r.chats, r.bot, r.log, r.loc))
 
+	r.bot.SetCalendarSyncFunc(func(ctx context.Context) (int, error) {
+		return r.syncCalendars(ctx, "manual")
+	})
+}
+
+// serveAPI hands the listener to the gin server in the background.
+func (r *runtime) serveAPI() {
 	go func() {
 		r.log.Info().Int("port", r.cfg.HTTP.Port).Msg("API server starting")
 		if err := r.api.Run(); err != nil {
 			r.log.Error().Err(err).Msg("API server error")
 		}
 	}()
-
-	r.bot.SetCalendarSyncFunc(func(ctx context.Context) (int, error) {
-		return r.syncCalendars(ctx, "manual")
-	})
 }
 
 // startNotifier arms the event notifier and the notification scheduler.
@@ -320,6 +334,7 @@ func (r *runtime) startNotifier() {
 	scheduler.SetIncidents(r.incidents)
 	scheduler.SetCounterSink(r.counters)
 	scheduler.Start()
+	r.scheduler = scheduler
 	r.schedulerEntries = scheduler.Entries
 	r.trackedReminders = scheduler.TrackedReminders
 	r.log.Info().Msg("notification scheduler started")

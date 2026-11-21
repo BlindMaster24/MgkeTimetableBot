@@ -191,3 +191,92 @@ func TestTheWiringChainReachesABot(t *testing.T) {
 
 	r.configureMetrics()
 }
+
+func wiredRuntime(t *testing.T) *runtime {
+	t.Helper()
+
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true,"result":[]}`))
+	}))
+	t.Cleanup(stub.Close)
+
+	r := newWiringRuntime(t)
+	r.cfg.Telegram.Token = "123456:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	r.cfg.Telegram.APIBaseURL = stub.URL
+	r.build = build.Info{Version: "test"}
+	r.counters = health.NewTelegramCounters()
+	r.loc = i18n.New("ru")
+
+	if !r.openStores() {
+		t.Fatal("openStores")
+	}
+	t.Cleanup(r.close)
+	if !r.openChats() {
+		t.Fatal("openChats")
+	}
+	t.Cleanup(func() { r.chats.Close() })
+	if !r.startAPI() {
+		t.Fatal("startAPI")
+	}
+	if !r.startBot() {
+		t.Fatal("startBot")
+	}
+	return r
+}
+
+func TestWireCalendarFollowsTheServiceAccount(t *testing.T) {
+	r := wiredRuntime(t)
+
+	r.wireCalendar()
+	if r.calendarSyncEnabled {
+		t.Fatal("an empty service account must leave the calendar sync off")
+	}
+	if r.google == nil || r.webhook == nil {
+		t.Fatal("wireCalendar must build the Google service and the webhook source")
+	}
+
+	r.cfg.Google.ServiceAccount.PrivateKey = "-----BEGIN PRIVATE KEY-----\nMIIB\n-----END PRIVATE KEY-----"
+	enabled := wiredRuntime(t)
+	enabled.cfg.Google.ServiceAccount.ClientEmail = "calendar@example.test"
+	enabled.cfg.Google.ServiceAccount.PrivateKey = "PEM"
+	enabled.wireCalendar()
+	if !enabled.calendarSyncEnabled {
+		t.Fatalf("a configured service account must switch the calendar sync on (email=%q key=%q service=%v)",
+			enabled.cfg.Google.ServiceAccount.ClientEmail,
+			enabled.cfg.Google.ServiceAccount.PrivateKey,
+			enabled.google.SyncEnabled())
+	}
+}
+
+func TestStartNotifierRespectsTheNoticerSwitch(t *testing.T) {
+	r := wiredRuntime(t)
+	r.incidents = health.NewIncidentLog(r.chats, health.IncidentLimit)
+	r.cfg.Telegram.Noticer = false
+
+	r.startNotifier()
+	if r.notifier != nil {
+		t.Fatal("a disabled noticer must not build the event notifier")
+	}
+	if got := r.schedulerEntries(); got != 0 {
+		t.Fatalf("scheduler entries = %d, want none", got)
+	}
+}
+
+func TestStartNotifierArmsAndStopsTheScheduler(t *testing.T) {
+	r := wiredRuntime(t)
+	r.incidents = health.NewIncidentLog(r.chats, health.IncidentLimit)
+	r.cfg.Telegram.Noticer = true
+
+	r.startNotifier()
+	if r.notifier == nil || r.scheduler == nil {
+		t.Fatal("startNotifier must build the notifier and keep the scheduler for shutdown")
+	}
+	if r.schedulerEntries() == 0 {
+		t.Fatal("the scheduler must register its cron entries")
+	}
+
+	r.close()
+	if r.schedulerEntries() == 0 {
+		t.Fatal("the entries stay registered after a stop; the count must not change")
+	}
+}
