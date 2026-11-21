@@ -40,14 +40,35 @@ func (b *Bot) lookupGroup(input string, userID int64) (string, bool) {
 	return "", false
 }
 
+// teacherSolidMatchScore separates a prefix, substring or alias hit from a
+// fuzzy typo hit.
+const teacherSolidMatchScore = 1.5
+
 func matchTeacherList(input string, candidates map[string]any, fullNames map[string]string, aliases []search.Alias) ([]string, bool) {
 	const matchLimit = 5
 	results := search.SearchTeachers(input, sortedKeys(candidates), aliases, matchLimit+2)
+
+	// A surname someone spells out has to narrow the list, not widen it: when
+	// at least one teacher matches by a prefix or a substring, the fuzzy hits
+	// (which only exist for typos) are dropped. Without a real match the fuzzy
+	// ones stay, so "ивнаов" still finds Иванов.
+	solid := false
+	for _, r := range results {
+		if r.Score >= teacherSolidMatchScore {
+			solid = true
+			break
+		}
+	}
+
 	var matched []string
 	for _, r := range results {
-		if _, ok := candidates[r.Name]; ok {
-			matched = append(matched, r.Name)
+		if _, ok := candidates[r.Name]; !ok {
+			continue
 		}
+		if solid && r.Score < teacherSolidMatchScore {
+			continue
+		}
+		matched = append(matched, r.Name)
 	}
 	if len(matched) > 0 && len(results) > 0 && results[0].Score == 3 && results[0].Name == matched[0] {
 		return matched[:1], false

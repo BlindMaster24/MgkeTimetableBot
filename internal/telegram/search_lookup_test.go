@@ -130,3 +130,22 @@ func TestSetupSceneAcceptsTeacherTranslitTypo(t *testing.T) {
 		t.Fatalf("chat = %+v, want teacher Иванов И.И. with cleared scene", loaded)
 	}
 }
+
+func TestLookupTeacherBySurnameDoesNotWiden(t *testing.T) {
+	candidates := map[string]any{
+		"Галенко А.А.":  struct{}{},
+		"Гладилин Б.Б.": struct{}{},
+		"Голубев В.В.":  struct{}{},
+		"Козлов К.К.":   struct{}{},
+	}
+
+	matched, tooMany := matchTeacherList("галенко", candidates, nil, nil)
+	if tooMany || len(matched) != 1 || matched[0] != "Галенко А.А." {
+		t.Fatalf("matched = %v tooMany = %v, want only Галенко А.А.", matched, tooMany)
+	}
+
+	matched, tooMany = matchTeacherList("галенко а.а.", candidates, nil, nil)
+	if tooMany || len(matched) != 1 || matched[0] != "Галенко А.А." {
+		t.Fatalf("with initials matched = %v tooMany = %v", matched, tooMany)
+	}
+}
