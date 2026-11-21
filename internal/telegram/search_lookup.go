@@ -80,7 +80,9 @@ func matchTeacherList(input string, candidates map[string]any, fullNames map[str
 		if containsString(matched, key) {
 			continue
 		}
-		if !strings.Contains(strings.ToLower(fullNames[key]), strings.ToLower(input)) {
+		// Normalize both sides: "петров петр" has to find "Петров Пётр
+		// Петрович", and the old plain lowercase check missed the ё.
+		if !strings.Contains(search.Normalize(fullNames[key]), search.Normalize(input)) {
 			continue
 		}
 		matched = append(matched, key)

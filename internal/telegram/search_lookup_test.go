@@ -149,3 +149,13 @@ func TestLookupTeacherBySurnameDoesNotWiden(t *testing.T) {
 		t.Fatalf("with initials matched = %v tooMany = %v", matched, tooMany)
 	}
 }
+
+func TestLookupTeacherAcceptsAFullNameWithoutYo(t *testing.T) {
+	candidates := map[string]any{"Петров П.П.": struct{}{}}
+	fullNames := map[string]string{"Петров П.П.": "Петров Пётр Петрович"}
+
+	matched, tooMany := matchTeacherList("петров петр", candidates, fullNames, nil)
+	if tooMany || len(matched) != 1 || matched[0] != "Петров П.П." {
+		t.Fatalf("matched = %v tooMany = %v, want Петров П.П.", matched, tooMany)
+	}
+}
