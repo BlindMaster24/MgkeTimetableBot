@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/api"
@@ -56,6 +57,11 @@ type runtime struct {
 	scheduler           *notification.Scheduler
 	schedulerEntries    func() int
 	trackedReminders    func() int
+
+	// afterMu keeps a slow site from stacking sync passes: the parse loop
+	// starts the derived work in a goroutine, and two overlapping parses
+	// would otherwise hit SQLite and Google at the same time.
+	afterMu sync.Mutex
 }
 
 func Run(ctx context.Context, cfgPath string, buildInfo build.Info) int {
@@ -405,6 +411,11 @@ func (r *runtime) parseOnce(ctx context.Context, probe parseProbe, loop parserpk
 // afterParse refreshes everything that is derived from the cache. The stores
 // are optional so the cycle can run in tests without them.
 func (r *runtime) afterParse(ctx context.Context) {
+	if !r.afterMu.TryLock() {
+		r.log.Warn().Msg("skipping the derived sync, the previous one is still running")
+		return
+	}
+	defer r.afterMu.Unlock()
 	if r.archive != nil {
 		r.syncArchive(ctx, "parse")
 	}
