@@ -37,7 +37,7 @@ func (b *Bot) weekControlKeyboardHeader(ctx context.Context, typeName, value str
 	if hidePastDays && weekIndex == currentWeek {
 		navRow = append(navRow, telego.InlineKeyboardButton{
 			Text:         "🔼",
-			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:0:%s", typeLetter, value, weekIndex, payloadFlag(showHeader)),
+			CallbackData: fmt.Sprintf("timetable_%s:%s:%d:a:%s", typeLetter, value, weekIndex, payloadFlag(showHeader)),
 		})
 	}
 
@@ -131,10 +131,12 @@ func (b *Bot) handleTimetableCb(ctx context.Context, u *Update, chat *Chat, type
 		if len(parts) >= 2 {
 			fmt.Sscanf(parts[1], "%d", &p.WeekIndex)
 		}
-		if len(parts) >= 3 {
-			p.HidePastDays = parts[2] == "1" || parts[2] == "true"
-		} else {
-			p.HidePastDays = chat.HidePastDays
+		// The chat setting decides; "a" is the explicit "show the whole week"
+		// button. Older payloads carry 1/0 snapshots, so a stale "0" no longer
+		// reopens the past days after the operator turned hiding on.
+		p.HidePastDays = chat.HidePastDays
+		if len(parts) >= 3 && parts[2] == "a" {
+			p.HidePastDays = false
 		}
 		if len(parts) >= 4 {
 			p.ShowHeader = parts[3] == "1" || parts[3] == "true"
