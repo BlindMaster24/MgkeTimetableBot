@@ -12,6 +12,7 @@ import (
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/health"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/notification"
+	"github.com/blindmaster24/MgkeTimetableBot/internal/utils"
 	"github.com/mymmrac/telego"
 )
 
@@ -539,7 +540,11 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 	defer rows.Close()
 	cols, _ := rows.Columns()
 	var lines []string
-	lines = append(lines, strings.Join(cols, " | "))
+	escapedCols := make([]string, len(cols))
+	for i, col := range cols {
+		escapedCols[i] = utils.EscapeHTML(col)
+	}
+	lines = append(lines, strings.Join(escapedCols, " | "))
 	for rows.Next() {
 		vals := make([]any, len(cols))
 		ptrs := make([]any, len(cols))
@@ -559,6 +564,11 @@ func (c *sqlCmd) Handler(ctx context.Context, u *Update) error {
 			default:
 				parts[i] = fmt.Sprintf("%v", val)
 			}
+		}
+		// The console replies with ParseMode HTML, so a stored "<" would make
+		// Telegram reject the whole message.
+		for i, part := range parts {
+			parts[i] = utils.EscapeHTML(part)
 		}
 		lines = append(lines, strings.Join(parts, " | "))
 	}

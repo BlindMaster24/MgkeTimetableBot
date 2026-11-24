@@ -415,3 +415,27 @@ func TestSQLRefusesAStatementChain(t *testing.T) {
 		t.Fatalf("the chat store is gone: %v", err)
 	}
 }
+
+func TestSqlCommandEscapesAnglesFromStoredRows(t *testing.T) {
+	caller := &capturingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 777)
+	if _, err := b.chatRepo.FindOrCreate("telegram", 4243); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.chatRepo.db.Exec("UPDATE bot_chats SET scene = '<b>check</b> & co' WHERE peer_id = 4243"); err != nil {
+		t.Fatal(err)
+	}
+
+	u := makeUpdate(777, "/sql SELECT scene FROM bot_chats WHERE peer_id = 4243")
+	u.Bot = b
+	if err := (&sqlCmd{bot: b}).Handler(context.Background(), u); err != nil {
+		t.Fatal(err)
+	}
+	got := caller.last()
+	if !strings.Contains(got, "&lt;b&gt;check&lt;/b&gt; &amp; co") {
+		t.Fatalf("stored angles must be escaped for HTML, got %q", got)
+	}
+	if strings.Contains(got, "<b>") {
+		t.Fatalf("raw angles reached the HTML payload: %q", got)
+	}
+}
