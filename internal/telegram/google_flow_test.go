@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
 	"github.com/mymmrac/telego"
@@ -77,8 +78,9 @@ func TestGoogleMenuAsksToLinkTheAccountFirst(t *testing.T) {
 }
 
 func TestGoogleStateRoundTrip(t *testing.T) {
-	state := EncodeGoogleState("telegram", 7712)
-	service, peer, err := DecodeGoogleState(state)
+	now := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+	state := EncodeGoogleState("secret", "telegram", 7712, now)
+	service, peer, err := DecodeGoogleState("secret", state, now)
 	if err != nil {
 		t.Fatalf("state %q does not decode: %v", state, err)
 	}
@@ -86,10 +88,10 @@ func TestGoogleStateRoundTrip(t *testing.T) {
 		t.Fatalf("state = %q/%d, want telegram/7712", service, peer)
 	}
 
-	if _, _, err := DecodeGoogleState("not base64"); err == nil {
+	if _, _, err := DecodeGoogleState("secret", "not base64", now); err == nil {
 		t.Fatal("broken base64 must be rejected")
 	}
-	if _, _, err := DecodeGoogleState(EncodeGoogleState("", 0)); err == nil {
+	if _, _, err := DecodeGoogleState("secret", EncodeGoogleState("secret", "", 0, now), now); err == nil {
 		t.Fatal("an empty state must be rejected")
 	}
 }

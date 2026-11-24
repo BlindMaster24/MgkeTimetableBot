@@ -2,6 +2,7 @@ package app
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/i18n"
@@ -9,7 +10,7 @@ import (
 	telegrambot "github.com/blindmaster24/MgkeTimetableBot/internal/telegram"
 )
 
-func googleOAuthHandler(service *google.CalendarService, chats *telegrambot.Repository, bot *telegrambot.Bot, log *logger.Logger, loc *i18n.Localizer) http.HandlerFunc {
+func googleOAuthHandler(service *google.CalendarService, chats *telegrambot.Repository, bot *telegrambot.Bot, log *logger.Logger, loc *i18n.Localizer, stateSecret string) http.HandlerFunc {
 	text := func(key string) string {
 		return loc.T("ru", key, nil)
 	}
@@ -20,7 +21,7 @@ func googleOAuthHandler(service *google.CalendarService, chats *telegrambot.Repo
 			return
 		}
 
-		serviceName, peerID, err := telegrambot.DecodeGoogleState(r.URL.Query().Get("state"))
+		serviceName, peerID, err := telegrambot.DecodeGoogleState(stateSecret, r.URL.Query().Get("state"), time.Now())
 		if err != nil {
 			http.Error(w, text("oauth_missing_state"), http.StatusBadRequest)
 			return

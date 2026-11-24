@@ -71,7 +71,7 @@ func TestSyncCalendarsStaysQuietWhenGoogleIsOff(t *testing.T) {
 func TestGoogleOAuthHandlerRejectsIncompleteRequests(t *testing.T) {
 	r := wiredRuntime(t)
 	service := google.NewCalendarService(r.cfg)
-	handler := googleOAuthHandler(service, r.chats, r.bot, r.log, r.loc)
+	handler := googleOAuthHandler(service, r.chats, r.bot, r.log, r.loc, r.cfg.EncryptKey)
 
 	request := httptest.NewRequest(http.MethodGet, "/google/oauth", nil)
 	recorder := httptest.NewRecorder()

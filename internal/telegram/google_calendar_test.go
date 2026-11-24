@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
 	"github.com/mymmrac/telego"
@@ -339,16 +340,27 @@ func TestGoogleCalendarStoreRoundTrip(t *testing.T) {
 }
 
 func TestGoogleAuthStateRoundTrip(t *testing.T) {
-	state := EncodeGoogleState("telegram", 12345)
-	service, peerID, err := DecodeGoogleState(state)
+	now := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+	state := EncodeGoogleState("secret", "telegram", 12345, now)
+	service, peerID, err := DecodeGoogleState("secret", state, now.Add(time.Minute))
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if service != "telegram" || peerID != 12345 {
 		t.Errorf("state mismatch: %q %d", service, peerID)
 	}
-	if _, _, err := DecodeGoogleState("not-base64"); err == nil {
+	if _, _, err := DecodeGoogleState("secret", "not-base64", now); err == nil {
 		t.Error("expected decode error")
+	}
+	if _, _, err := DecodeGoogleState("other", state, now); err == nil {
+		t.Error("a state signed with another secret must be rejected")
+	}
+	if _, _, err := DecodeGoogleState("secret", state, now.Add(2*time.Hour)); err == nil {
+		t.Error("an expired state must be rejected")
+	}
+	tampered := state[:len(state)-2] + "AA"
+	if _, _, err := DecodeGoogleState("secret", tampered, now); err == nil {
+		t.Error("a tampered state must be rejected")
 	}
 }
 

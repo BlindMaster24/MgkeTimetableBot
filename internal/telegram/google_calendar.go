@@ -2,6 +2,8 @@ package telegram
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -9,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/blindmaster24/MgkeTimetableBot/internal/archive"
 	"github.com/blindmaster24/MgkeTimetableBot/internal/google"
@@ -73,22 +76,42 @@ func (a calendarServiceAdapter) SyncDay(ctx context.Context, calendarID string, 
 func (a calendarServiceAdapter) SyncEnabled() bool { return a.service.SyncEnabled() }
 
 type googleAuthState struct {
-	Service string `json:"service"`
-	PeerID  int64  `json:"peerId"`
+	Service  string `json:"service"`
+	PeerID   int64  `json:"peerId"`
+	IssuedAt int64  `json:"issuedAt"`
 }
 
-func EncodeGoogleState(service string, peerID int64) string {
-	raw, err := json.Marshal(googleAuthState{Service: service, PeerID: peerID})
+// googleStateTTL bounds how long the OAuth link may sit in a chat, so a leaked
+// message cannot be replayed next month.
+const googleStateTTL = 15 * time.Minute
+
+// EncodeGoogleState signs the state with the instance secret: without the MAC
+// anyone could craft ...?state=<victim chat> and link their own Google account
+// to somebody else's chat.
+func EncodeGoogleState(secret, service string, peerID int64, now time.Time) string {
+	raw, err := json.Marshal(googleAuthState{Service: service, PeerID: peerID, IssuedAt: now.Unix()})
 	if err != nil {
 		return ""
 	}
-	return base64.RawURLEncoding.EncodeToString(raw)
+	payload := base64.RawURLEncoding.EncodeToString(raw)
+	return payload + "." + base64.RawURLEncoding.EncodeToString(googleStateMAC(secret, payload))
 }
 
-func DecodeGoogleState(state string) (string, int64, error) {
-	raw, err := base64.RawURLEncoding.DecodeString(state)
+func DecodeGoogleState(secret, state string, now time.Time) (string, int64, error) {
+	payload, signature, ok := strings.Cut(state, ".")
+	if !ok || payload == "" || signature == "" {
+		return "", 0, errors.New("invalid google auth state")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(payload)
 	if err != nil {
 		return "", 0, err
+	}
+	want, err := base64.RawURLEncoding.DecodeString(signature)
+	if err != nil {
+		return "", 0, err
+	}
+	if !hmac.Equal(want, googleStateMAC(secret, payload)) {
+		return "", 0, errors.New("invalid google auth state")
 	}
 	parsed := googleAuthState{}
 	if err := json.Unmarshal(raw, &parsed); err != nil {
@@ -97,7 +120,17 @@ func DecodeGoogleState(state string) (string, int64, error) {
 	if parsed.Service == "" || parsed.PeerID == 0 {
 		return "", 0, errors.New("invalid google auth state")
 	}
+	issued := time.Unix(parsed.IssuedAt, 0)
+	if issued.After(now.Add(time.Minute)) || now.Sub(issued) > googleStateTTL {
+		return "", 0, errors.New("expired google auth state")
+	}
 	return parsed.Service, parsed.PeerID, nil
+}
+
+func googleStateMAC(secret, payload string) []byte {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(payload))
+	return mac.Sum(nil)
 }
 
 type googleCalendarCmd struct{ bot *Bot }
@@ -176,7 +209,7 @@ func (b *Bot) showGoogleAuth(u *Update, chat *Chat) error {
 	if !b.googleReady() {
 		return u.Bot.SendText(u.ChatID, b.loc("gcal_4"))
 	}
-	state := EncodeGoogleState("telegram", chat.PeerID)
+	state := EncodeGoogleState(b.cfg.EncryptKey, "telegram", chat.PeerID, b.nowTime())
 	return b.sendOrEdit(u, b.loc("gcal_5"), googleAuthKeyboard(b, b.google.AuthURL(state)))
 }
 

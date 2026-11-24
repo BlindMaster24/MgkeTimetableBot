@@ -12,7 +12,7 @@ import (
 
 func TestOAuthHandlerRejectsAMissingCode(t *testing.T) {
 	loc := i18n.New("ru")
-	handler := googleOAuthHandler(nil, nil, nil, logger.New("error", nil), loc)
+	handler := googleOAuthHandler(nil, nil, nil, logger.New("error", nil), loc, "secret")
 
 	rec := httptest.NewRecorder()
 	handler(rec, httptest.NewRequest(http.MethodGet, "/oauth", nil))
@@ -27,7 +27,7 @@ func TestOAuthHandlerRejectsAMissingCode(t *testing.T) {
 
 func TestOAuthHandlerRejectsABrokenState(t *testing.T) {
 	loc := i18n.New("ru")
-	handler := googleOAuthHandler(nil, nil, nil, logger.New("error", nil), loc)
+	handler := googleOAuthHandler(nil, nil, nil, logger.New("error", nil), loc, "secret")
 
 	rec := httptest.NewRecorder()
 	handler(rec, httptest.NewRequest(http.MethodGet, "/oauth?code=abc&state=not-base64", nil))

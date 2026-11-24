@@ -300,7 +300,7 @@ func (r *runtime) wireCalendar() {
 
 	r.webhook = newWebhookStatusSource(r.bot.WebhookStatus)
 	r.api.SetWebhookStatus(func(ctx context.Context) any { return r.webhook.Get(ctx) })
-	r.api.HandleGoogleOAuth(r.cfg.Google.URL, googleOAuthHandler(r.google, r.chats, r.bot, r.log, r.loc))
+	r.api.HandleGoogleOAuth(r.cfg.Google.URL, googleOAuthHandler(r.google, r.chats, r.bot, r.log, r.loc, r.cfg.EncryptKey))
 
 	r.bot.SetCalendarSyncFunc(func(ctx context.Context) (int, error) {
 		return r.syncCalendars(ctx, "manual")
