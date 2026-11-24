@@ -153,7 +153,7 @@ func TestNextAsksForATargetWhenNoneIsChosen(t *testing.T) {
 	}
 }
 
-func TestNextAnswersWhenTodayHasNoTimetable(t *testing.T) {
+func TestNextLooksPastTodayWhenTodayHasNoTimetable(t *testing.T) {
 	b, caller := nextTestBot(t)
 	const userID = int64(3106)
 
@@ -171,8 +171,9 @@ func TestNextAnswersWhenTodayHasNoTimetable(t *testing.T) {
 		}}),
 	}, "next-tomorrow")
 
-	if text := sendNext(t, b, caller, userID); text != b.loc("next_no_data") {
-		t.Errorf("a day without a timetable must be answered, got %q", text)
+	text := sendNext(t, b, caller, userID)
+	if !strings.Contains(text, "Математика") || !strings.Contains(text, nextTestNow.AddDate(0, 0, 1).Format("02.01")) {
+		t.Errorf("the next lesson of the week must be answered, got %q", text)
 	}
 }
 
@@ -206,5 +207,39 @@ func TestNextHandlesAMissingBellSchedule(t *testing.T) {
 
 	if text := sendNext(t, b, caller, userID); text != b.loc("next_none") {
 		t.Errorf("a missing bell schedule must be answered, got %q", text)
+	}
+}
+
+func TestNextFindsTheFirstLessonOfTheNextDay(t *testing.T) {
+	caller := &recordingCaller{}
+	b, _ := setupE2EBotWithCaller(t, caller, 4242)
+	evening := nextTestNow.Add(9 * time.Hour)
+	b.SetNow(func() time.Time { return evening })
+
+	const userID = int64(3109)
+	chat, _ := b.chatRepo.FindOrCreate("telegram", userID)
+	chat.Mode = ModeStudent
+	chat.Group = "906"
+	b.chatRepo.Save(chat)
+
+	nextTestCalls(t, b)
+	tomorrow := evening.AddDate(0, 0, 1)
+	b.cache.SetGroups(context.Background(), map[string]any{
+		"906": e2eJsonRoundTrip(map[string]any{"group": "906", "days": []any{
+			map[string]any{"day": evening.Format("02.01.2006"), "lessons": []any{
+				map[string]any{"lesson": "Утренняя", "cabinet": "101"},
+			}},
+			map[string]any{"day": tomorrow.Format("02.01.2006"), "lessons": []any{
+				map[string]any{"lesson": "Завтрашняя", "cabinet": "202"},
+			}},
+		}}),
+	}, "next-evening")
+
+	text := sendNext(t, b, caller, userID)
+	if !strings.Contains(text, "Завтрашняя") || strings.Contains(text, "Утренняя") {
+		t.Fatalf("after the last bell the answer must be tomorrow's lesson, got %q", text)
+	}
+	if !strings.Contains(text, tomorrow.Format("02.01")) {
+		t.Errorf("the answer must name the day, got %q", text)
 	}
 }

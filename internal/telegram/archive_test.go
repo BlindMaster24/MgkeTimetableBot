@@ -402,3 +402,17 @@ func TestArchiveCommandWithoutArchive(t *testing.T) {
 		t.Errorf("an unavailable archive should be reported, got %q", text)
 	}
 }
+
+func TestArchiveCommandRejectsDatesTheCalendarDoesNotHave(t *testing.T) {
+	b, caller, archiveRepo, userID := setupArchiveBot(t, ModeStudent, "100", "")
+	day, _ := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value() - 2).WeekRange()
+	seedArchivedDay(t, archiveRepo, "group", "100", day, groupLesson("ДеньИзАрхива"))
+
+	for _, input := range []string{"31.02", "31.04", "29.02.2026", "00.09"} {
+		caller.reset()
+		runArchive(t, b, userID, "/archive "+input)
+		if text := caller.last(); text != b.loc("archtext_7") {
+			t.Errorf("%s must be rejected as a bad date, got %q", input, text)
+		}
+	}
+}
