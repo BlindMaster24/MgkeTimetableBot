@@ -86,6 +86,7 @@ type RaspCache struct {
 	SuccessUpdate bool                         `json:"successUpdate"`
 
 	callsPreferSite atomic.Bool
+	clock           atomic.Value
 
 	groupsAny   map[string]any
 	teachersAny map[string]any
@@ -107,6 +108,20 @@ type Stats struct {
 	TeachersUpdate int64  `json:"teachersUpdate"`
 	GroupsHash     string `json:"groupsHash"`
 	TeachersHash   string `json:"teachersHash"`
+}
+
+// SetClock lets the owner pin the clock the cache reasons about; without it the
+// cache uses the college clock. The value is read on paths that already hold
+// the cache lock, so it lives in an atomic instead of the guarded struct.
+func (c *RaspCache) SetClock(now func() time.Time) {
+	c.clock.Store(now)
+}
+
+func (c *RaspCache) clockNow() time.Time {
+	if pinned, ok := c.clock.Load().(func() time.Time); ok && pinned != nil {
+		return pinned()
+	}
+	return utils.SiteNow()
 }
 
 func New(dir string) (*RaspCache, error) {
@@ -278,7 +293,7 @@ func (c *RaspCache) setTimetable(kind string, old map[string]any, data map[strin
 		newChanges = append(newChanges, changes...)
 	}
 
-	weekEvents, maxWeek := collectWeekEvents(kind, previousWeekIndex, data)
+	weekEvents, maxWeek := c.collectWeekEvents(kind, previousWeekIndex, data)
 	newEvents = append(newEvents, weekEvents...)
 
 	var withdrawnEntries []string

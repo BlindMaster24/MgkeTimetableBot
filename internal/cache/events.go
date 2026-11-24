@@ -317,13 +317,13 @@ func (c *RaspCache) TeacherKeys() []string {
 	return keys
 }
 
-func collectWeekEvents(kind string, previousWeekIndex int, data map[string]any) (events []Event, maxWeek int) {
+func (c *RaspCache) collectWeekEvents(kind string, previousWeekIndex int, data map[string]any) (events []Event, maxWeek int) {
 	maxWeek = weekOfTimetable(data)
 
 	// "The next week is available" only makes sense for a week that is still
 	// ahead. On Monday the index grows by one while the dump still describes
 	// the current week, and that must not look like a fresh publication.
-	currentWeek := utils.WeekIndexFromDate(utils.SiteNow()).Value()
+	currentWeek := utils.WeekIndexFromDate(c.clockNow()).Value()
 	if previousWeekIndex > 0 && maxWeek > previousWeekIndex && maxWeek > currentWeek {
 		events = append(events, Event{Week: &WeekEvent{Kind: kind, Week: maxWeek}})
 	}

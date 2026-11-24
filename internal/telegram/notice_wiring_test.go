@@ -185,6 +185,7 @@ func TestDayNoticeWorksInEveryTimeZone(t *testing.T) {
 
 			notifier := noticeNotifier(b, repo)
 			notifier.SetNow(func() time.Time { return now })
+			b.cache.SetClock(func() time.Time { return now })
 			notifier.CronDayAll(2)
 
 			sent := caller.textsFor(userID)
