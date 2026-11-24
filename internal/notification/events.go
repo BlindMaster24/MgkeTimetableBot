@@ -532,7 +532,9 @@ func (n *EventNotifier) UpdateWeek(kind string, week int) {
 				continue
 			}
 			lessons, _ := m["lessons"].([]any)
-			if !t.Before(firstWeekDay) && len(lessons) > 0 {
+			// Days of a later week must not announce this one: the button
+			// would open an empty page.
+			if !t.Before(firstWeekDay) && t.Before(firstWeekDay.AddDate(0, 0, 7)) && len(lessons) > 0 {
 				values = append(values, value)
 				break
 			}

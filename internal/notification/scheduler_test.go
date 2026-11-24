@@ -805,3 +805,23 @@ func TestEventNotifier_CallsChangedEscapesTheReason(t *testing.T) {
 		t.Fatalf("the escaped reason is missing, got %q", text)
 	}
 }
+
+func TestUpdateWeekSkipsValuesWhoseLessonsStartLater(t *testing.T) {
+	n, sender, finder, c := newTestNotifier(t)
+	finder.byGroups = []*EventChat{{ID: 1, PeerID: 1001, Group: "63", Mode: "student", NoticeNextWeek: true}}
+
+	nextWeek := utils.WeekIndexFromNumber(utils.WeekIndexFromDate(utils.SiteNow()).Value() + 1)
+	laterWeek := utils.WeekIndexFromNumber(nextWeek.Value() + 1).FirstDayDate()
+	c.SetGroups(t.Context(), map[string]any{
+		"63": map[string]any{"days": []any{map[string]any{
+			"day":     laterWeek.Format("02.01.2006"),
+			"lessons": []any{map[string]any{"lesson": "X"}},
+		}}},
+	}, "h")
+
+	n.UpdateWeek(cache.KindGroups, nextWeek.Value())
+
+	if got := sender.buttoned(); len(got) != 0 {
+		t.Fatalf("a value whose week starts later must stay silent, got %+v", got)
+	}
+}
