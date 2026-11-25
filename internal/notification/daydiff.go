@@ -40,12 +40,22 @@ func (n *EventNotifier) changeSummary(ev *cache.DayEvent) string {
 		}))
 	}
 	for _, change := range ev.Diff.Of(schedulediff.RoomChanged) {
+		// The college often clears the room cell; "кабинет " with nothing
+		// after it looked like a broken message.
+		if change.New.Room == "" {
+			lines = append(lines, n.locData("notify_diff_room_removed", map[string]any{"Subject": change.New.Subject}))
+			continue
+		}
 		lines = append(lines, n.locData("notify_diff_room", map[string]any{
 			"Subject": change.New.Subject,
 			"Room":    change.New.Room,
 		}))
 	}
 	for _, change := range ev.Diff.Of(schedulediff.TeacherChanged) {
+		if change.New.Teacher == "" {
+			lines = append(lines, n.locData("notify_diff_teacher_removed", map[string]any{"Subject": change.New.Subject}))
+			continue
+		}
 		lines = append(lines, n.locData("notify_diff_teacher", map[string]any{
 			"Subject": change.New.Subject,
 			"Teacher": change.New.Teacher,
