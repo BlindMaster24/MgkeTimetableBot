@@ -456,7 +456,7 @@ func TestWebhookDeliversUpdatesToTheBot(t *testing.T) {
 			request.Header.Set(telego.WebhookSecretTokenHeader, secret)
 		}
 
-		response, err := http.DefaultClient.Do(request)
+		response, err := freshHTTPClient().Do(request)
 		if err != nil {
 			t.Fatalf("post update: %v", err)
 		}

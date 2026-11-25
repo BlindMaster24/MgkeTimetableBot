@@ -364,7 +364,7 @@ func TestMetricsEndpointAnswersOverARealSocket(t *testing.T) {
 	server := httptest.NewServer(srv.Handler())
 	defer server.Close()
 
-	unauthorized, err := http.Get(server.URL + DefaultMetricsPath)
+	unauthorized, err := server.Client().Get(server.URL + DefaultMetricsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestMetricsEndpointAnswersOverARealSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Authorization", "Bearer "+testMetricsToken)
-	response, err := http.DefaultClient.Do(req)
+	response, err := server.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

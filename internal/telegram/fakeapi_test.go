@@ -311,7 +311,7 @@ func TestBotOverRealHTTPWebhookReplies(t *testing.T) {
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set(telego.WebhookSecretTokenHeader, settings.SecretToken)
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := freshHTTPClient().Do(request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +389,7 @@ func TestBotOverRealHTTPWebhookTransportStopsWithTheContext(t *testing.T) {
 		}
 		request.Header.Set(telego.WebhookSecretTokenHeader, secret)
 
-		response, err := http.DefaultClient.Do(request)
+		response, err := freshHTTPClient().Do(request)
 		if err != nil {
 			return 0, err
 		}
@@ -453,6 +453,16 @@ func TestBotOverRealHTTPWebhookTransportStopsWithTheContext(t *testing.T) {
 
 const webhookCallbackPayloadPath = "testdata/webhook_callback_query.json"
 
+// freshHTTPClient avoids reusing pooled connections to a loopback port that a
+// previous test listened on: on Windows a recycled 127.0.0.1 port has once
+// crashed the test binary with "unexpected fault address".
+func freshHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+		Timeout:   5 * time.Second,
+	}
+}
+
 func TestWebhookDeliversACallbackQueryToTheInlineEditPath(t *testing.T) {
 	requireRealHTTPTransport(t)
 	const userID = int64(424242)
@@ -490,7 +500,7 @@ func TestWebhookDeliversACallbackQueryToTheInlineEditPath(t *testing.T) {
 		}
 		request.Header.Set(telego.WebhookSecretTokenHeader, "webhook-secret")
 
-		response, err := http.DefaultClient.Do(request)
+		response, err := freshHTTPClient().Do(request)
 		if err != nil {
 			return 0
 		}
@@ -568,7 +578,7 @@ func TestWebhookTransportDrainsTheInFlightUpdateBeforeStopping(t *testing.T) {
 		request.Header.Set(telego.WebhookSecretTokenHeader, "webhook-secret")
 		request.ContentLength = 64
 
-		response, err := http.DefaultClient.Do(request)
+		response, err := freshHTTPClient().Do(request)
 		if err != nil {
 			failure <- err
 			return
