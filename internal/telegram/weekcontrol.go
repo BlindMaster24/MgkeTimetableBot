@@ -79,11 +79,17 @@ func (b *Bot) relevantWeekIndex() utils.WeekIndex {
 		weekIndex = utils.WeekIndexFromNumber(weekIndex.Value() + 1)
 	}
 	relevant := weekIndex.Value()
-	if b.cache.Groups != nil && b.cache.Groups.LastWeekIndex > 0 && b.cache.Groups.LastWeekIndex < relevant {
-		relevant = b.cache.Groups.LastWeekIndex
+	// Fall back only when neither table reached the current week: a teacher
+	// table that lags a week behind must not drag every group back to it.
+	published := 0
+	if b.cache.Groups != nil && b.cache.Groups.LastWeekIndex > published {
+		published = b.cache.Groups.LastWeekIndex
 	}
-	if b.cache.Teachers != nil && b.cache.Teachers.LastWeekIndex > 0 && b.cache.Teachers.LastWeekIndex < relevant {
-		relevant = b.cache.Teachers.LastWeekIndex
+	if b.cache.Teachers != nil && b.cache.Teachers.LastWeekIndex > published {
+		published = b.cache.Teachers.LastWeekIndex
+	}
+	if published > 0 && published < relevant {
+		relevant = published
 	}
 	return utils.WeekIndexFromNumber(relevant)
 }
