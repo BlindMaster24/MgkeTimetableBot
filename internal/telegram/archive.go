@@ -211,7 +211,7 @@ func (c *endingsCmd) Handler(ctx context.Context, u *Update) error {
 		}
 		sort.Ints(lessons)
 
-		part := []string{"__ " + day + " __"}
+		part := []string{"<b>" + day + "</b>"}
 		for _, lesson := range lessons {
 			part = append(part, fmt.Sprintf(c.bot.loc("archtext_16"), stat[day][lesson], lesson))
 		}

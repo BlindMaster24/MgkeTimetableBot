@@ -533,6 +533,36 @@
       "kind": "extra_in_go",
       "value": "Удалять сообщение пользователя",
       "reason": "the TS bot toggled this from the /deleteUserMsg slash command and required a group admin; the port exposes it as a view-menu button, and the deletion itself only fires for accepted chats"
+    },
+    {
+      "section": "texts",
+      "kind": "missing_in_go",
+      "value": "__ Группы в кэше __",
+      "reason": "the old bot wrapped these headings in legacy Markdown underline markers, which the HTML-based port printed as literal underscores; the Go port renders the same lines bold without the markers"
+    },
+    {
+      "section": "texts",
+      "kind": "missing_in_go",
+      "value": "__ Преподаватели в кэше __",
+      "reason": "the old bot wrapped these headings in legacy Markdown underline markers, which the HTML-based port printed as literal underscores; the Go port renders the same lines bold without the markers"
+    },
+    {
+      "section": "texts",
+      "kind": "missing_in_go",
+      "value": "__ Страницы с учителями/администрацией __",
+      "reason": "the old bot wrapped these headings in legacy Markdown underline markers, which the HTML-based port printed as literal underscores; the Go port renders the same lines bold without the markers"
+    },
+    {
+      "section": "texts",
+      "kind": "missing_in_go",
+      "value": "__ Звонки (будни) __",
+      "reason": "the old bot wrapped these headings in legacy Markdown underline markers, which the HTML-based port printed as literal underscores; the Go port renders the same lines bold without the markers"
+    },
+    {
+      "section": "texts",
+      "kind": "missing_in_go",
+      "value": "__ Звонки (суббота) __",
+      "reason": "the old bot wrapped these headings in legacy Markdown underline markers, which the HTML-based port printed as literal underscores; the Go port renders the same lines bold without the markers"
     }
   ]
 }

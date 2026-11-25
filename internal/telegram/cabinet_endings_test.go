@@ -112,8 +112,8 @@ func TestEndingsCountsOnlyTheNearestDayOfEachGroup(t *testing.T) {
 		}
 
 		text := caller.last()
-		first := strings.Index(text, "__ "+next+" __")
-		second := strings.Index(text, "__ "+next2+" __")
+		first := strings.Index(text, "<b>"+next+"</b>")
+		second := strings.Index(text, "<b>"+next2+"</b>")
 		if first == -1 || second == -1 || first > second {
 			t.Fatalf("the days must be ordered by date: %q", text)
 		}

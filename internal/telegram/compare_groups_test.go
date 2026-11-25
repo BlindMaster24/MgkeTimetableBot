@@ -55,7 +55,7 @@ func TestCompareGroupsPrintsPairsSubjectsAndWindows(t *testing.T) {
 	for _, want := range []string{
 		"Сравнение групп 100 и 101",
 		"Учебная неделя №",
-		"__ ",
+		"<b>",
 		"Совпадающие пары: 1",
 		"1) Математика Лек {101} - Иванов И.И. | математика Пр {303} — совпадает",
 		"Общие предметы: 1) Математика",
@@ -159,7 +159,7 @@ func TestCompareGroupsKeepsTheWeekInsideTheRange(t *testing.T) {
 	if !strings.Contains(text, "Сравнение групп 100 и 101") {
 		t.Fatalf("the header is missing: %q", text)
 	}
-	if strings.Count(text, "__ ") != 6 {
+	if strings.Count(text, "<b>") != 6 {
 		t.Errorf("the comparison must cover exactly six weekdays, got:\n%s", text)
 	}
 }

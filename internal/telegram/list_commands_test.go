@@ -43,12 +43,12 @@ func TestTeachersListingShowsFullNamesAndPageTimestamps(t *testing.T) {
 
 	text := caller.last()
 	for _, want := range []string{
-		"__ Преподаватели в кэше __",
+		"<b>Преподаватели в кэше</b>",
 		"1. Иванов Иван Иванович",
 		"2. Петров П.П.",
 		"Загружено:",
 		"Изменено:",
-		"__ Страницы с учителями/администрацией __",
+		"<b>Страницы с учителями/администрацией</b>",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the teacher listing is missing %q:\n%s", want, text)
@@ -67,7 +67,7 @@ func TestGroupsListingUsesTheArchiveAndFallsBackToTheCache(t *testing.T) {
 	runList(t, b, userID, "/groups")
 	text := caller.last()
 
-	if !strings.Contains(text, "__ Группы в кэше __") || !strings.Contains(text, "100") {
+	if !strings.Contains(text, "<b>Группы в кэше</b>") || !strings.Contains(text, "100") {
 		t.Errorf("the archived groups are missing:\n%s", text)
 	}
 	if !strings.Contains(text, "Загружено:") || !strings.Contains(text, "Изменено:") {
@@ -82,7 +82,7 @@ func TestGroupsListingUsesTheArchiveAndFallsBackToTheCache(t *testing.T) {
 	runList(t, withoutArchive, userID, "/groups")
 
 	got := emptyCaller.last()
-	if !strings.Contains(got, "__ Группы в кэше __") {
+	if !strings.Contains(got, "<b>Группы в кэше</b>") {
 		t.Errorf("the cache fallback produced no groups: %s", got)
 	}
 }

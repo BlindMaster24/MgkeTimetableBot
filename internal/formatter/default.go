@@ -41,7 +41,7 @@ func (f *DefaultFormatter) formatDayHeader(day DayInfo, opts FormatOptions) stri
 	if day.Hint != "" {
 		w += " " + opts.i(day.Hint)
 	}
-	return "__ " + opts.b(w) + ", " + day.Date + " __"
+	return opts.b(w) + ", " + day.Date
 }
 
 func (f *DefaultFormatter) formatGroupLessons(lessons []any, opts FormatOptions) string {
